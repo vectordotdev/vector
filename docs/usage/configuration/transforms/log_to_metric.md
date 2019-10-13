@@ -24,18 +24,18 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["log_to_metric", "The name of this component"] # must be: "log_to_metric"
+  type = "log_to_metric" # must be: "log_to_metric"
   inputs = ["my-source-id"]
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
     # REQUIRED
-    type = ["counter", "A [counter metric type][docs.data-model#counters]."] # enum: "counter", "gauge", "histogram", and "set"
+    type = "counter" # enum: "counter", "gauge", "histogram", and "set"
     field = "duration"
     name = "duration_total"
     
     # OPTIONAL
-    increment_by_value = false # default: false, relevant when type = "counter"
+    increment_by_value = false # default, relevant when type = "counter"
     tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
 ```
 {% endcode-tabs-item %}

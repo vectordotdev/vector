@@ -24,7 +24,7 @@ The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allo
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["grok_parser", "The name of this component"] # must be: "grok_parser"
+  type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
   
@@ -43,13 +43,13 @@ The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allo
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["grok_parser", "The name of this component"] # must be: "grok_parser"
+  type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
   
   # OPTIONAL - General
-  drop_field = true # default: true
-  field = "message" # default: "message"
+  drop_field = true # default
+  field = "message" # default
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]

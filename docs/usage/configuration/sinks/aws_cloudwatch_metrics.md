@@ -30,7 +30,7 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["aws_cloudwatch_metrics", "The name of this component"] # must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"]
   namespace = "service"
   region = "us-east-1"
@@ -40,14 +40,14 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED
-  type = ["aws_cloudwatch_metrics", "The name of this component"] # must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"]
   namespace = "service"
   region = "us-east-1"
   
   # OPTIONAL
   endpoint = "127.0.0.0:5000" # no default
-  healthcheck = true # default: true
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

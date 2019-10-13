@@ -61,7 +61,7 @@ class Option
 
     if @examples.empty?
       if !@enum.nil?
-        @examples = @enum
+        @examples = @enum.keys
       elsif !@default.nil?
         @examples = [@default]
       end

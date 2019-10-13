@@ -30,7 +30,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["vector", "The name of this component"] # must be: "vector"
+  type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
 ```
 {% endcode-tabs-item %}
@@ -38,11 +38,11 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = ["vector", "The name of this component"] # must be: "vector"
+  type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
   
   # OPTIONAL
-  shutdown_timeout_secs = 30 # default: 30, unit: seconds
+  shutdown_timeout_secs = 30 # default, unit: seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

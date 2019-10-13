@@ -23,7 +23,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["file", "The name of this component"] # must be: "file"
+  type = "file" # must be: "file"
   include = ["/var/log/nginx/*.log"]
 ```
 {% endcode-tabs-item %}
@@ -31,30 +31,30 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = ["file", "The name of this component"] # must be: "file"
+  type = "file" # must be: "file"
   include = ["/var/log/nginx/*.log"]
   
   # OPTIONAL - General
   data_dir = "/var/lib/vector" # no default
   exclude = ["/var/log/nginx/access.log"] # no default
-  glob_minimum_cooldown = 1000 # default: 1000, unit: milliseconds
+  glob_minimum_cooldown = 1000 # default, unit: milliseconds
   ignore_older = 86400 # no default, unit: seconds
-  max_line_bytes = 102400 # default: 102400, unit: bytes
-  max_read_bytes = 2048 # default: 2048, unit: bytes
+  max_line_bytes = 102400 # default, unit: bytes
+  max_read_bytes = 2048 # default, unit: bytes
   message_start_indicator = "^(INFO|ERROR)" # no default
-  multi_line_timeout = 1000 # default: 1000, unit: milliseconds
-  oldest_first = false # default: false
-  start_at_beginning = false # default: false
+  multi_line_timeout = 1000 # default, unit: milliseconds
+  oldest_first = false # default
+  start_at_beginning = false # default
   
   # OPTIONAL - Context
-  file_key = "file" # default: "file"
-  host_key = "host" # default: "host"
+  file_key = "file" # default
+  host_key = "host" # default
   
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
-    strategy = ["checksum", "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."] # default: "checksum", enum: "checksum" or "device_and_inode"
-    fingerprint_bytes = 256 # default: 256, unit: bytes, relevant when fingerprinting.strategy = "checksum"
-    ignored_header_bytes = 0 # default: 0, unit: bytes, relevant when fingerprinting.strategy = "checksum"
+    strategy = "checksum" # default, enum: "checksum" or "device_and_inode"
+    fingerprint_bytes = 256 # default, unit: bytes, relevant when fingerprinting.strategy = "checksum"
+    ignored_header_bytes = 0 # default, unit: bytes, relevant when fingerprinting.strategy = "checksum"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

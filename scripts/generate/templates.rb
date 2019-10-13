@@ -210,7 +210,7 @@ class Templates
     description
   end
 
-  def option_tags(option, enum: true, example: true, optionality: true, relevant_when: true, type: true)
+  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true)
     tags = []
 
     if optionality
@@ -221,8 +221,12 @@ class Templates
       end
     end
 
-    if !option.default.nil?
-      tags << "default: #{option.default.inspect}"
+    if default && !option.default.nil?
+      if default == :short
+        tags << "default"
+      else
+        tags << "default: #{option.default.inspect}"
+      end
     elsif option.optional?
       tags << "no default"
     end

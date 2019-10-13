@@ -24,44 +24,44 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["kafka", "The name of this component"] # must be: "kafka"
+  type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
   bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
   key_field = "user_id"
   topic = "topic-1234"
   
   # REQUIRED - requests
-  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # enum: "json" or "text"
+  encoding = "json" # enum: "json" or "text"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["kafka", "The name of this component"] # must be: "kafka"
+  type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
   bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
   key_field = "user_id"
   topic = "topic-1234"
   
   # REQUIRED - requests
-  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # enum: "json" or "text"
+  encoding = "json" # enum: "json" or "text"
   
   # OPTIONAL - General
-  healthcheck = true # default: true
+  healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    type = "memory" # default, enum: "memory" or "disk"
     max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
+    num_items = 500 # default, unit: events, relevant when type = "memory"
+    when_full = "block" # default, enum: "block" or "drop_newest"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # no default
     crt_path = "/path/to/host_certificate.crt" # no default
-    enabled = false # default: false
+    enabled = false # default
     key_pass = "PassWord1" # no default
     key_path = "/path/to/host_certificate.key" # no default
 ```

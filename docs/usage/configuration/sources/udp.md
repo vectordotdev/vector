@@ -23,7 +23,7 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["udp", "The name of this component"] # must be: "udp"
+  type = "udp" # must be: "udp"
   address = "0.0.0.0:9000"
 ```
 {% endcode-tabs-item %}
@@ -31,14 +31,14 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = ["udp", "The name of this component"] # must be: "udp"
+  type = "udp" # must be: "udp"
   address = "0.0.0.0:9000"
   
   # OPTIONAL - General
-  max_length = 102400 # default: 102400, unit: bytes
+  max_length = 102400 # default, unit: bytes
   
   # OPTIONAL - Context
-  host_key = "host" # default: "host"
+  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

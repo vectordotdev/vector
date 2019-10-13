@@ -30,7 +30,7 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["statsd", "The name of this component"] # must be: "statsd"
+  type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"]
   namespace = "service"
 ```
@@ -39,13 +39,13 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED
-  type = ["statsd", "The name of this component"] # must be: "statsd"
+  type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"]
   namespace = "service"
   
   # OPTIONAL
-  address = "127.0.0.1:8125" # default: "127.0.0.1:8125"
-  healthcheck = true # default: true
+  address = "127.0.0.1:8125" # default
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

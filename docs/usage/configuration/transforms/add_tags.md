@@ -24,7 +24,7 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["add_tags", "The name of this component"] # must be: "add_tags"
+  type = "add_tags" # must be: "add_tags"
   inputs = ["my-source-id"]
   
   # REQUIRED - Tags

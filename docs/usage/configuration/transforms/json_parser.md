@@ -23,7 +23,7 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["json_parser", "The name of this component"] # must be: "json_parser"
+  type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
   drop_invalid = true
 ```
@@ -32,12 +32,12 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED
-  type = ["json_parser", "The name of this component"] # must be: "json_parser"
+  type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
   drop_invalid = true
   
   # OPTIONAL
-  field = "message" # default: "message"
+  field = "message" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

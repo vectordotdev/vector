@@ -31,23 +31,23 @@ The `journald` source ingests data through log records from journald and outputs
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = ["journald", "The name of this component"] # must be: "journald"
+  type = "journald" # must be: "journald"
   
   # OPTIONAL
-  units = ["ntpd", "sysinit.target"] # default: []
+  units = ["ntpd", "sysinit.target"] # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = ["journald", "The name of this component"] # must be: "journald"
+  type = "journald" # must be: "journald"
   
   # OPTIONAL
-  current_runtime_only = true # default: true
+  current_runtime_only = true # default
   data_dir = "/var/lib/vector" # no default
-  local_only = true # default: true
-  units = ["ntpd", "sysinit.target"] # default: []
+  local_only = true # default
+  units = ["ntpd", "sysinit.target"] # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

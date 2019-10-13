@@ -66,7 +66,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "docker"
-  type = ["docker", "The name of this component"]
+  type = "docker"
 
   # A list of container ids to match against when filtering running containers.
   # This will attempt to match the container id from the beginning meaning you do
@@ -99,7 +99,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "file"
-  type = ["file", "The name of this component"]
+  type = "file"
 
   # Array of file patterns to include. Globbing is supported.
   # 
@@ -226,8 +226,8 @@ data_dir = "/var/lib/vector"
     # * default: "checksum"
     # * type: string
     # * enum: "checksum" or "device_and_inode"
-    strategy = ["checksum", "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."]
-    strategy = ["device_and_inode", "Uses the [device and inode][urls.inode] to unique identify files."]
+    strategy = "checksum"
+    strategy = "device_and_inode"
 
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
@@ -257,7 +257,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "journald"
-  type = ["journald", "The name of this component"]
+  type = "journald"
 
   # Include only entries from the current runtime (boot)
   # 
@@ -299,7 +299,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "kafka"
-  type = ["kafka", "The name of this component"]
+  type = "kafka"
 
   # A comma-separated list of host and port pairs that are the addresses of the
   # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
@@ -362,7 +362,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "statsd"
-  type = ["statsd", "The name of this component"]
+  type = "statsd"
 
   # UDP socket address to bind to.
   # 
@@ -382,7 +382,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "stdin"
-  type = ["stdin", "The name of this component"]
+  type = "stdin"
 
   # The maxiumum bytes size of a message before it is discarded.
   # 
@@ -415,16 +415,16 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "syslog"
-  type = ["syslog", "The name of this component"]
+  type = "syslog"
 
   # The input mode.
   # 
   # * required
   # * type: string
   # * enum: "tcp", "udp", and "unix"
-  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."]
-  mode = ["udp", "Read incoming Syslog data over the UDP protocol."]
-  mode = ["unix", "Read uncoming Syslog data through a Unix socker."]
+  mode = "tcp"
+  mode = "udp"
+  mode = "unix"
 
   # The TCP or UDP address to listen on.
   # 
@@ -473,7 +473,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "tcp"
-  type = ["tcp", "The name of this component"]
+  type = "tcp"
 
   # The address to bind the socket to.
   # 
@@ -520,7 +520,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "udp"
-  type = ["udp", "The name of this component"]
+  type = "udp"
 
   # The address to bind the socket to.
   # 
@@ -555,7 +555,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "vector"
-  type = ["vector", "The name of this component"]
+  type = "vector"
 
   # The TCP address to bind to.
   # 
@@ -589,7 +589,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "add_fields"
-  type = ["add_fields", "The name of this component"]
+  type = "add_fields"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -629,7 +629,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "add_tags"
-  type = ["add_tags", "The name of this component"]
+  type = "add_tags"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -662,7 +662,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "coercer"
-  type = ["coercer", "The name of this component"]
+  type = "coercer"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -699,7 +699,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "field_filter"
-  type = ["field_filter", "The name of this component"]
+  type = "field_filter"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -733,7 +733,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "grok_parser"
-  type = ["grok_parser", "The name of this component"]
+  type = "grok_parser"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -790,7 +790,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "json_parser"
-  type = ["json_parser", "The name of this component"]
+  type = "json_parser"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -825,7 +825,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "log_to_metric"
-  type = ["log_to_metric", "The name of this component"]
+  type = "log_to_metric"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -844,10 +844,10 @@ data_dir = "/var/lib/vector"
     # * required
     # * type: string
     # * enum: "counter", "gauge", "histogram", and "set"
-    type = ["counter", "A [counter metric type][docs.data-model#counters]."]
-    type = ["gauge", "A [gauge metric type][docs.data-model#gauges]."]
-    type = ["histogram", "A [histogram metric type][docs.data-model#histograms]."]
-    type = ["set", "A [set metric type][docs.data-model#sets]."]
+    type = "counter"
+    type = "gauge"
+    type = "histogram"
+    type = "set"
 
     # The log field to use as the metric.
     # 
@@ -889,7 +889,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   # * must be: "lua"
-  type = ["lua", "The name of this component"]
+  type = "lua"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -934,7 +934,7 @@ end
   # * required
   # * type: string
   # * must be: "regex_parser"
-  type = ["regex_parser", "The name of this component"]
+  type = "regex_parser"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -991,7 +991,7 @@ end
   # * required
   # * type: string
   # * must be: "remove_fields"
-  type = ["remove_fields", "The name of this component"]
+  type = "remove_fields"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1014,7 +1014,7 @@ end
   # * required
   # * type: string
   # * must be: "remove_tags"
-  type = ["remove_tags", "The name of this component"]
+  type = "remove_tags"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1037,7 +1037,7 @@ end
   # * required
   # * type: string
   # * must be: "sampler"
-  type = ["sampler", "The name of this component"]
+  type = "sampler"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1075,7 +1075,7 @@ end
   # * required
   # * type: string
   # * must be: "split"
-  type = ["split", "The name of this component"]
+  type = "split"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1144,7 +1144,7 @@ end
   # * required
   # * type: string
   # * must be: "tokenizer"
-  type = ["tokenizer", "The name of this component"]
+  type = "tokenizer"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1211,7 +1211,7 @@ end
   # * required
   # * type: string
   # * must be: "aws_cloudwatch_logs"
-  type = ["aws_cloudwatch_logs", "The name of this component"]
+  type = "aws_cloudwatch_logs"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1357,8 +1357,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -1384,8 +1384,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
 # Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
@@ -1395,7 +1395,7 @@ end
   # * required
   # * type: string
   # * must be: "aws_cloudwatch_metrics"
-  type = ["aws_cloudwatch_metrics", "The name of this component"]
+  type = "aws_cloudwatch_metrics"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1442,7 +1442,7 @@ end
   # * required
   # * type: string
   # * must be: "aws_kinesis_streams"
-  type = ["aws_kinesis_streams", "The name of this component"]
+  type = "aws_kinesis_streams"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1569,8 +1569,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -1596,8 +1596,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
 # Batches `log` events to AWS S3 via the `PutObject` API endpoint.
 [sinks.aws_s3]
@@ -1611,7 +1611,7 @@ end
   # * required
   # * type: string
   # * must be: "aws_s3"
-  type = ["aws_s3", "The name of this component"]
+  type = "aws_s3"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1770,8 +1770,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -1797,8 +1797,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
 # Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
@@ -1808,7 +1808,7 @@ end
   # * required
   # * type: string
   # * must be: "blackhole"
-  type = ["blackhole", "The name of this component"]
+  type = "blackhole"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1843,7 +1843,7 @@ end
   # * required
   # * type: string
   # * must be: "clickhouse"
-  type = ["clickhouse", "The name of this component"]
+  type = "clickhouse"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -1962,7 +1962,7 @@ end
   # * default: "gzip"
   # * type: string
   # * must be: "gzip" (if supplied)
-  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."]
+  compression = "gzip"
 
   #
   # Basic auth
@@ -2045,7 +2045,7 @@ end
   # * required
   # * type: string
   # * must be: "console"
-  type = ["console", "The name of this component"]
+  type = "console"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2059,8 +2059,8 @@ end
   # * required
   # * type: string
   # * enum: "stdout" or "stderr"
-  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"]
-  target = ["stderr", "Output will be written to [STDERR][urls.stderr]"]
+  target = "stdout"
+  target = "stderr"
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -2081,7 +2081,7 @@ end
   # * required
   # * type: string
   # * must be: "elasticsearch"
-  type = ["elasticsearch", "The name of this component"]
+  type = "elasticsearch"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2130,8 +2130,8 @@ end
   # * default: "default"
   # * type: string
   # * enum: "default" or "aws"
-  provider = ["default", "A generic Elasticsearch provider."]
-  provider = ["aws", "The [AWS Elasticsearch Service][urls.aws_elasticsearch]."]
+  provider = "default"
+  provider = "aws"
 
   # When using the AWS provider, the AWS region of the target Elasticsearch
   # instance.
@@ -2243,8 +2243,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -2270,8 +2270,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Headers
@@ -2363,7 +2363,7 @@ end
   # * required
   # * type: string
   # * must be: "file"
-  type = ["file", "The name of this component"]
+  type = "file"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2403,8 +2403,8 @@ end
   # * required
   # * type: string
   # * enum: "ndjson" or "text"
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."]
-  encoding = ["text", "Each event is encoded into text via the `message` key and the payload is new line delimited."]
+  encoding = "ndjson"
+  encoding = "text"
 
 # Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
@@ -2418,7 +2418,7 @@ end
   # * required
   # * type: string
   # * must be: "http"
-  type = ["http", "The name of this component"]
+  type = "http"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2457,8 +2457,8 @@ end
   # * required
   # * type: string
   # * enum: "ndjson" or "text"
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."]
-  encoding = ["text", "Each event is encoded into text via the `message` key and the payload is new line delimited."]
+  encoding = "ndjson"
+  encoding = "text"
 
   #
   # Batching
@@ -2562,8 +2562,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -2589,8 +2589,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Headers
@@ -2671,7 +2671,7 @@ end
   # * required
   # * type: string
   # * must be: "kafka"
-  type = ["kafka", "The name of this component"]
+  type = "kafka"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2717,8 +2717,8 @@ end
   # * required
   # * type: string
   # * enum: "json" or "text"
-  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."]
-  encoding = ["text", "Each event is encoded into text via the `message` key and the payload is new line delimited."]
+  encoding = "json"
+  encoding = "text"
 
   #
   # Buffer
@@ -2732,8 +2732,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -2759,8 +2759,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Tls
@@ -2815,7 +2815,7 @@ end
   # * required
   # * type: string
   # * must be: "prometheus"
-  type = ["prometheus", "The name of this component"]
+  type = "prometheus"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2864,7 +2864,7 @@ end
   # * required
   # * type: string
   # * must be: "splunk_hec"
-  type = ["splunk_hec", "The name of this component"]
+  type = "splunk_hec"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -2901,8 +2901,8 @@ end
   # * required
   # * type: string
   # * enum: "ndjson" or "text"
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."]
-  encoding = ["text", "Each event is encoded into text via the `message` key and the payload is new line delimited."]
+  encoding = "ndjson"
+  encoding = "text"
 
   #
   # Batching
@@ -2989,8 +2989,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -3016,8 +3016,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Tls
@@ -3083,7 +3083,7 @@ end
   # * required
   # * type: string
   # * must be: "statsd"
-  type = ["statsd", "The name of this component"]
+  type = "statsd"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -3124,7 +3124,7 @@ end
   # * required
   # * type: string
   # * must be: "tcp"
-  type = ["tcp", "The name of this component"]
+  type = "tcp"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -3155,8 +3155,8 @@ end
   # * required
   # * type: string
   # * enum: "json" or "text"
-  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."]
-  encoding = ["text", "Each event is encoded into text via the `message` key and the payload is new line delimited."]
+  encoding = "json"
+  encoding = "text"
 
   #
   # Buffer
@@ -3170,8 +3170,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -3197,8 +3197,8 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Tls
@@ -3275,7 +3275,7 @@ end
   # * required
   # * type: string
   # * must be: "vector"
-  type = ["vector", "The name of this component"]
+  type = "vector"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -3309,8 +3309,8 @@ end
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."]
-    type = ["disk", "Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."]
+    type = "memory"
+    type = "disk"
 
     # The maximum size of the buffer on the disk.
     # 
@@ -3336,19 +3336,11 @@ end
     # * default: "block"
     # * type: string
     # * enum: "block" or "drop_newest"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."]
-    when_full = ["drop_newest", "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."]
+    when_full = "block"
+    when_full = "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 
-[docs.data-model#counters]: ../../about/data-model#counters
-[docs.data-model#gauges]: ../../about/data-model#gauges
-[docs.data-model#histograms]: ../../about/data-model#histograms
-[docs.data-model#sets]: ../../about/data-model#sets
-[urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
-[urls.gzip]: https://www.gzip.org/
-[urls.inode]: https://en.wikipedia.org/wiki/Inode
-[urls.stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
-[urls.stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
+

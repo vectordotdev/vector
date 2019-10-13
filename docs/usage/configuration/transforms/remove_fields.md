@@ -23,7 +23,7 @@ The `remove_fields` transform accepts [`log`][docs.data-model.log] events and al
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["remove_fields", "The name of this component"] # must be: "remove_fields"
+  type = "remove_fields" # must be: "remove_fields"
   inputs = ["my-source-id"]
   fields = ["field1", "field2"]
 ```

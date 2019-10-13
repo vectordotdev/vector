@@ -23,7 +23,7 @@ The `remove_tags` transform accepts [`metric`][docs.data-model.metric] events an
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["remove_tags", "The name of this component"] # must be: "remove_tags"
+  type = "remove_tags" # must be: "remove_tags"
   inputs = ["my-source-id"]
   tags = ["tag1", "tag2"]
 ```

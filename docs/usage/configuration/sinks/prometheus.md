@@ -30,7 +30,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["prometheus", "The name of this component"] # must be: "prometheus"
+  type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"
   namespace = "service"
@@ -40,14 +40,14 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED
-  type = ["prometheus", "The name of this component"] # must be: "prometheus"
+  type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"
   namespace = "service"
   
   # OPTIONAL
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0], unit: seconds
-  healthcheck = true # default: true
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, unit: seconds
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

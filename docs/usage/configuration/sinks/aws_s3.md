@@ -31,56 +31,56 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["aws_s3", "The name of this component"] # must be: "aws_s3"
+  type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # default: 10490000, unit: bytes
-  batch_timeout = 300 # default: 300, unit: seconds
+  batch_size = 10490000 # default, unit: bytes
+  batch_timeout = 300 # default, unit: seconds
   
   # OPTIONAL - Object Names
-  key_prefix = "date=%F/" # default: "date=%F"
+  key_prefix = "date=%F/" # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["aws_s3", "The name of this component"] # must be: "aws_s3"
+  type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
   
   # OPTIONAL - General
   endpoint = "127.0.0.0:5000" # no default
-  healthcheck = true # default: true
+  healthcheck = true # default
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # default: 10490000, unit: bytes
-  batch_timeout = 300 # default: 300, unit: seconds
+  batch_size = 10490000 # default, unit: bytes
+  batch_timeout = 300 # default, unit: seconds
   
   # OPTIONAL - Object Names
-  filename_append_uuid = true # default: true
-  filename_extension = "log" # default: "log"
-  filename_time_format = "%s" # default: "%s"
-  key_prefix = "date=%F/" # default: "date=%F"
+  filename_append_uuid = true # default
+  filename_extension = "log" # default
+  filename_time_format = "%s" # default
+  key_prefix = "date=%F/" # default
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default: 1, unit: seconds
-  rate_limit_num = 5 # default: 5
-  request_in_flight_limit = 5 # default: 5
-  request_timeout_secs = 30 # default: 30, unit: seconds
-  retry_attempts = 5 # default: 5
-  retry_backoff_secs = 5 # default: 5, unit: seconds
+  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_num = 5 # default
+  request_in_flight_limit = 5 # default
+  request_timeout_secs = 30 # default, unit: seconds
+  retry_attempts = 5 # default
+  retry_backoff_secs = 5 # default, unit: seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    type = "memory" # default, enum: "memory" or "disk"
     max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
+    num_items = 500 # default, unit: events, relevant when type = "memory"
+    when_full = "block" # default, enum: "block" or "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

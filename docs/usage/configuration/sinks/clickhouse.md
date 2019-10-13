@@ -31,42 +31,42 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["clickhouse", "The name of this component"] # must be: "clickhouse"
+  type = "clickhouse" # must be: "clickhouse"
   inputs = ["my-source-id"]
   host = "http://localhost:8123"
   table = "mytable"
   
   # OPTIONAL - requests
-  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # default: "gzip", must be: "gzip" (if supplied)
+  compression = "gzip" # default, must be: "gzip" (if supplied)
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["clickhouse", "The name of this component"] # must be: "clickhouse"
+  type = "clickhouse" # must be: "clickhouse"
   inputs = ["my-source-id"]
   host = "http://localhost:8123"
   table = "mytable"
   
   # OPTIONAL - General
   database = "mydatabase" # no default
-  healthcheck = true # default: true
+  healthcheck = true # default
   
   # OPTIONAL - Batching
-  batch_size = 1049000 # default: 1049000, unit: bytes
-  batch_timeout = 1 # default: 1, unit: seconds
+  batch_size = 1049000 # default, unit: bytes
+  batch_timeout = 1 # default, unit: seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default: 1, unit: seconds
-  rate_limit_num = 5 # default: 5
-  request_in_flight_limit = 5 # default: 5
-  request_timeout_secs = 30 # default: 30, unit: seconds
-  retry_attempts = 9223372036854775807 # default: 9223372036854775807
-  retry_backoff_secs = 9223372036854775807 # default: 9223372036854775807, unit: seconds
+  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_num = 5 # default
+  request_in_flight_limit = 5 # default
+  request_timeout_secs = 30 # default, unit: seconds
+  retry_attempts = 9223372036854775807 # default
+  retry_backoff_secs = 9223372036854775807 # default, unit: seconds
   
   # OPTIONAL - requests
-  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # default: "gzip", must be: "gzip" (if supplied)
+  compression = "gzip" # default, must be: "gzip" (if supplied)
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
@@ -79,8 +79,8 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
     crt_path = "/path/to/host_certificate.crt" # no default
     key_pass = "PassWord1" # no default
     key_path = "/path/to/host_certificate.key" # no default
-    verify_certificate = true # default: true
-    verify_hostname = true # default: true
+    verify_certificate = true # default
+    verify_hostname = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

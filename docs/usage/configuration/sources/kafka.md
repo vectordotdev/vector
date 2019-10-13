@@ -30,7 +30,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["kafka", "The name of this component"] # must be: "kafka"
+  type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
   topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
@@ -40,15 +40,15 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = ["kafka", "The name of this component"] # must be: "kafka"
+  type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
   topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
   
   # OPTIONAL
-  auto_offset_reset = "smallest" # default: "largest"
+  auto_offset_reset = "smallest" # default
   key_field = "user_id" # no default
-  session_timeout_ms = 5000 # default: 10000, unit: milliseconds
+  session_timeout_ms = 5000 # default, unit: milliseconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

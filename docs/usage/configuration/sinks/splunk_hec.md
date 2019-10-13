@@ -24,48 +24,48 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["splunk_hec", "The name of this component"] # must be: "splunk_hec"
+  type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"]
   host = "my-splunk-host.com"
   token = "A94A8FE5CCB19BA61C4C08"
   
   # REQUIRED - requests
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # enum: "ndjson" or "text"
+  encoding = "ndjson" # enum: "ndjson" or "text"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["splunk_hec", "The name of this component"] # must be: "splunk_hec"
+  type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"]
   host = "my-splunk-host.com"
   token = "A94A8FE5CCB19BA61C4C08"
   
   # REQUIRED - requests
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # enum: "ndjson" or "text"
+  encoding = "ndjson" # enum: "ndjson" or "text"
   
   # OPTIONAL - General
-  healthcheck = true # default: true
+  healthcheck = true # default
   
   # OPTIONAL - Batching
-  batch_size = 1049000 # default: 1049000, unit: bytes
-  batch_timeout = 1 # default: 1, unit: seconds
+  batch_size = 1049000 # default, unit: bytes
+  batch_timeout = 1 # default, unit: seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default: 1, unit: seconds
-  rate_limit_num = 10 # default: 10
-  request_in_flight_limit = 10 # default: 10
-  request_timeout_secs = 60 # default: 60, unit: seconds
-  retry_attempts = 5 # default: 5
-  retry_backoff_secs = 5 # default: 5, unit: seconds
+  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_num = 10 # default
+  request_in_flight_limit = 10 # default
+  request_timeout_secs = 60 # default, unit: seconds
+  retry_attempts = 5 # default
+  retry_backoff_secs = 5 # default, unit: seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    type = "memory" # default, enum: "memory" or "disk"
     max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
+    num_items = 500 # default, unit: events, relevant when type = "memory"
+    when_full = "block" # default, enum: "block" or "drop_newest"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -73,8 +73,8 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
     crt_path = "/path/to/host_certificate.crt" # no default
     key_pass = "PassWord1" # no default
     key_path = "/path/to/host_certificate.key" # no default
-    verify_certificate = true # default: true
-    verify_hostname = true # default: true
+    verify_certificate = true # default
+    verify_hostname = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

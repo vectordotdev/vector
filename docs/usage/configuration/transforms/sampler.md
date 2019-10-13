@@ -30,7 +30,7 @@ The `sampler` transform accepts [`log`][docs.data-model.log] events and allows y
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["sampler", "The name of this component"] # must be: "sampler"
+  type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
   rate = 10
 ```
@@ -39,7 +39,7 @@ The `sampler` transform accepts [`log`][docs.data-model.log] events and allows y
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED
-  type = ["sampler", "The name of this component"] # must be: "sampler"
+  type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
   rate = 10
   

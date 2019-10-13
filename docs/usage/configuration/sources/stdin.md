@@ -23,20 +23,20 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["stdin", "The name of this component"] # must be: "stdin"
+  type = "stdin" # must be: "stdin"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = ["stdin", "The name of this component"] # must be: "stdin"
+  type = "stdin" # must be: "stdin"
   
   # OPTIONAL - General
-  max_length = 102400 # default: 102400, unit: bytes
+  max_length = 102400 # default, unit: bytes
   
   # OPTIONAL - Context
-  host_key = "host" # default: "host"
+  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

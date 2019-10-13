@@ -30,7 +30,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["elasticsearch", "The name of this component"] # must be: "elasticsearch"
+  type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"]
   host = "http://10.24.32.122:9000"
 ```
@@ -39,28 +39,28 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["elasticsearch", "The name of this component"] # must be: "elasticsearch"
+  type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"]
   host = "http://10.24.32.122:9000"
   
   # OPTIONAL - General
-  doc_type = "_doc" # default: "_doc"
-  healthcheck = true # default: true
-  index = "vector-%Y-%m-%d" # default: "vector-%F"
-  provider = ["default", "A generic Elasticsearch provider."] # default: "default", enum: "default" or "aws"
+  doc_type = "_doc" # default
+  healthcheck = true # default
+  index = "vector-%Y-%m-%d" # default
+  provider = "default" # default, enum: "default" or "aws"
   region = "us-east-1" # no default
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # default: 10490000, unit: bytes
-  batch_timeout = 1 # default: 1, unit: seconds
+  batch_size = 10490000 # default, unit: bytes
+  batch_timeout = 1 # default, unit: seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default: 1, unit: seconds
-  rate_limit_num = 5 # default: 5
-  request_in_flight_limit = 5 # default: 5
-  request_timeout_secs = 60 # default: 60, unit: seconds
-  retry_attempts = 5 # default: 5
-  retry_backoff_secs = 5 # default: 5, unit: seconds
+  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_num = 5 # default
+  request_in_flight_limit = 5 # default
+  request_timeout_secs = 60 # default, unit: seconds
+  retry_attempts = 5 # default
+  retry_backoff_secs = 5 # default, unit: seconds
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
@@ -69,10 +69,10 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    type = "memory" # default, enum: "memory" or "disk"
     max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
+    num_items = 500 # default, unit: events, relevant when type = "memory"
+    when_full = "block" # default, enum: "block" or "drop_newest"
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
@@ -88,8 +88,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
     crt_path = "/path/to/host_certificate.crt" # no default
     key_pass = "PassWord1" # no default
     key_path = "/path/to/host_certificate.key" # no default
-    verify_certificate = true # default: true
-    verify_hostname = true # default: true
+    verify_certificate = true # default
+    verify_hostname = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

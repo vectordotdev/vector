@@ -24,7 +24,7 @@ The `split` transform accepts [`log`][docs.data-model.log] events and allows you
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["split", "The name of this component"] # must be: "split"
+  type = "split" # must be: "split"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
   
@@ -43,14 +43,14 @@ The `split` transform accepts [`log`][docs.data-model.log] events and allows you
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["split", "The name of this component"] # must be: "split"
+  type = "split" # must be: "split"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
   
   # OPTIONAL - General
-  drop_field = true # default: true
-  field = "message" # default: "message"
-  separator = "," # default: "whitespace"
+  drop_field = true # default
+  field = "message" # default
+  separator = "," # default
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]

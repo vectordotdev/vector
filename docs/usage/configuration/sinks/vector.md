@@ -23,7 +23,7 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to a
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["vector", "The name of this component"] # must be: "vector"
+  type = "vector" # must be: "vector"
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
 ```
@@ -32,19 +32,19 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to a
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["vector", "The name of this component"] # must be: "vector"
+  type = "vector" # must be: "vector"
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
   
   # OPTIONAL - General
-  healthcheck = true # default: true
+  healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    type = "memory" # default, enum: "memory" or "disk"
     max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
+    num_items = 500 # default, unit: events, relevant when type = "memory"
+    when_full = "block" # default, enum: "block" or "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

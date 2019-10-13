@@ -30,7 +30,7 @@ The `field_filter` transform accepts [`log`][docs.data-model.log] and [`metric`]
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["field_filter", "The name of this component"] # must be: "field_filter"
+  type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"]
   field = "file"
   value = "/var/log/nginx.log"

@@ -23,24 +23,24 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["syslog", "The name of this component"] # must be: "syslog"
-  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # enum: "tcp", "udp", and "unix"
+  type = "syslog" # must be: "syslog"
+  mode = "tcp" # enum: "tcp", "udp", and "unix"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = ["syslog", "The name of this component"] # must be: "syslog"
-  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # enum: "tcp", "udp", and "unix"
+  type = "syslog" # must be: "syslog"
+  mode = "tcp" # enum: "tcp", "udp", and "unix"
   
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default, relevant when mode = "tcp" or mode = "udp"
-  max_length = 102400 # default: 102400, unit: bytes
+  max_length = 102400 # default, unit: bytes
   path = "/path/to/socket" # no default, relevant when mode = "unix"
   
   # OPTIONAL - Context
-  host_key = "host" # default: "host"
+  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
