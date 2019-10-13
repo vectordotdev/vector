@@ -125,17 +125,6 @@ class Templates
     render("_partials/_component_troubleshooting.md", binding).strip
   end
 
-  def compression_description(compression)
-    case compression
-    when "gzip"
-      "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
-    when "none"
-      "The payload will not compressed at all."
-    else
-      raise("Unhandled compression: #{compression.inspect}")
-    end
-  end
-
   def config_example(options, opts = {})
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
@@ -211,23 +200,23 @@ class Templates
     description = option.description.strip
 
     if option.templateable?
-      description << "This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]."
+      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]."
     end
 
     if option.relevant_when
-      description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
+      description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}."
     end
-
-    description << "[[references:#{option.name}]]"
 
     description
   end
 
-  def option_tags(option)
+  def option_tags(option, enum: true, example: true, relevant_when: true, type: true)
     tags = []
 
     if option.required?
       tags << "required"
+    else
+      tags << "optional"
     end
 
     if !option.default.nil?
@@ -236,27 +225,40 @@ class Templates
       tags << "no default"
     end
 
-    if option.default.nil? && option.enum.nil? && option.examples.any?
-      value = option.examples.first.inspect
-
-      if value.length > 30
-        tags << "example: (see above)"
-      else
-        tags << "example: #{value}"
-      end
-    end
-
-    if option.enum
-      escaped_values = option.enum.collect { |enum| enum.to_toml }
-      if escaped_values.length > 1
-        tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
-      else
-        tags << "must be: #{escaped_values.first}"
-      end
+    if type
+      tags << "type: #{option.type}"
     end
 
     if !option.unit.nil?
       tags << "unit: #{option.unit}"
+    end
+
+    if example && option.default.nil? && option.enum.nil? && option.examples.any?
+      value = option.examples.first
+
+      if value.is_a?(Hash)
+        tags << "example: #{value.fetch("name")} = #{value.fetch("value").to_toml}"
+      else
+        tags << "example: #{value.to_toml}"
+      end
+    end
+
+    if enum && option.enum
+      escaped_values = option.enum.keys.collect { |enum| enum.to_toml }
+      if escaped_values.length > 1
+        tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+      else
+        tag = "must be: #{escaped_values.first}"
+        if option.optional?
+          tag << " (if supplied)"
+        end
+        tags << tag
+      end
+    end
+
+    if relevant_when && option.relevant_when
+      tag = "relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
+      tags << tag
     end
 
     tags
@@ -271,6 +273,7 @@ class Templates
       raise options.class.inspect
       raise ArgumentError.new("Options must be an Array")
     end
+
 
     render("_partials/_options_sections.md", binding).strip
   end

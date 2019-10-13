@@ -20,10 +20,23 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = "stdin" # must be: "stdin"
+  type = ["stdin", "The name of this component"] # required, type: string, must be: "stdin"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED - General
+  type = ["stdin", "The name of this component"] # required, type: string, must be: "stdin"
+  
+  # OPTIONAL - General
+  max_length = 102400 # optional, default: 102400, type: int, unit: bytes
+  
+  # OPTIONAL - Context
+  host_key = "host" # optional, default: "host", type: string
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -32,21 +45,15 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 
 ### host_key
 
-`default: "host"`
+`optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host.
 
 ### max_length
 
-`default: 102400` `unit: bytes`
+`optional` `default: 102400` `type: int` `unit: bytes`
 
 The maxiumum bytes size of a message before it is discarded.
-
-### type
-
-`required` `must be: "stdin"`
-
-The component type
 
 ## Input/Output
 

@@ -1,16 +1,32 @@
 <%- options.each do |option| -%>
 <%- full_path = [path, option.name].compact.join(".") -%>
 <%- if !option.options.nil? -%>
-<%= "#" * depth %> <%= full_path %>.*
+<%= "#" * depth %> <%= full_path %>
 
-<%= options_sections(option.options.sort, depth: depth + 1, path: full_path) %>
+<% if option.required? %>`required`<% else %>`optional`<% end %>
+<%- if option.description -%>
+
+<%= option.description %>
+<%- end -%>
+
+<%= options_sections(option.options, depth: depth + 1, path: full_path) %>
 
 <%- else -%>
 <%= "#" * depth %> <%= full_path %>
 
-<%= option_tags(option).collect { |tag| "`#{tag}`" }.join(" ") %>
+<%= option_tags(option, enum: false, relevant_when: false).collect { |tag| "`#{tag}`" }.join(" ") %>
 
 <%= option_description(option) %>
+<%- if !option.enum.nil? -%>
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+<%- option.enum.each do |value, description| -%>
+| `<%= value.to_toml %>`<% if value  == option.default %> *(default)*<% end %> | <%= description %> |
+<%- end -%>
+<%- end -%>
 
 <%- end -%>
 <%- end -%>

@@ -20,12 +20,24 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = "json_parser" # must be: "json_parser"
-  inputs = ["my-source-id"]
-  drop_invalid = true
+  type = ["json_parser", "The name of this component"] # required, type: string, must be: "json_parser"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  drop_invalid = true # required, type: bool, example: true
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[transforms.my_transform_id]
+  # REQUIRED
+  type = ["json_parser", "The name of this component"] # required, type: string, must be: "json_parser"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  drop_invalid = true # required, type: bool, example: true
+  
+  # OPTIONAL
+  field = "message" # optional, default: "message", type: string
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -34,27 +46,15 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 
 ### drop_invalid
 
-`required` `example: true`
+`required` `type: bool` `example: true`
 
-If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.
+If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through.
 
 ### field
 
-`default: "message"`
+`optional` `default: "message"` `type: string`
 
-The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
-### type
-
-`required` `must be: "json_parser"`
-
-The component type
+The log field to decode as JSON. Must be a `string` value type.
 
 ## Input/Output
 
@@ -216,14 +216,11 @@ Finally, consider the following alternatives:
 
 
 [assets.json_parser_transform]: ../../../assets/json_parser-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+bug%22
 [urls.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+enhancement%22

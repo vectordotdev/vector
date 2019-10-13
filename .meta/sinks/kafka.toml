@@ -2,6 +2,7 @@
 buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
+encodings = ["json", "text"]
 healthcheck = true
 input_types = ["log"]
 service_provider = "Confluent"
@@ -16,12 +17,6 @@ description = """\
 A list of host and port pairs that the Kafka client should contact to bootstrap \
 its cluster metadata.\
 """
-
-[sinks.kafka.options.encoding]
-type = "string"
-enum = ["json", "text"]
-null = false
-description = "The encoding format used to serialize the events before flushing."
 
 [sinks.kafka.options.key_field]
 type = "string"

@@ -23,33 +23,46 @@ The `coercer` transform accepts [`log`][docs.data-model.log] events and allows y
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = "coercer" # must be: "coercer"
-  inputs = ["my-source-id"]
+  # REQUIRED - General
+  type = ["coercer", "The name of this component"] # required, type: string, must be: "coercer"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-### inputs
+### types
 
-`required` `example: ["my-source-id"]`
+`optional`
 
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
-### type
-
-`required` `must be: "coercer"`
-
-The component type
-
-### types.*
+Key/Value pairs representing mapped log field types.
 
 #### types.*
 
-`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+`required` `type: string`
 
 A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"bool"` | Coerces `"true"`/`/"false"`, `"1"`/`"0"`, and `"t"`/`"f"` values into boolean. |
+| `"float"` | Coerce to a 64 bit float. |
+| `"int"` | Coerce to a 64 bit integer. |
+| `"string"` | Coerce to a string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Input/Output
 
@@ -115,37 +128,6 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-### Types
-
-By default, extracted (parsed) fields all contain `string` values. You can
-coerce these values into types via the `types` table as shown in the
-[Config File](#config-file) example above. For example:
-
-```coffeescript
-[transforms.my_transform_id]
-  # ...
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-
-The available types are:
-
-| Type        | Desription                                                                                                          |
-|:------------|:--------------------------------------------------------------------------------------------------------------------|
-| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
-| `float`     | Coerce to 64 bit floats.                                                                                            |
-| `int`       | Coerce to a 64 bit integer.                                                                                         |
-| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -175,13 +157,10 @@ Finally, consider the following alternatives:
 
 
 [assets.coercer_transform]: ../../../assets/coercer-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.coercer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+bug%22
 [urls.coercer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+enhancement%22

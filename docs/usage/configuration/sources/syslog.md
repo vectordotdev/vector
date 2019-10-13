@@ -20,11 +20,27 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = "syslog" # must be: "syslog"
-  mode = "tcp" # enum: "tcp", "udp", and "unix"
+  type = ["syslog", "The name of this component"] # required, type: string, must be: "syslog"
+  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # required, type: string, enum: "tcp", "udp", and "unix"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED - General
+  type = ["syslog", "The name of this component"] # required, type: string, must be: "syslog"
+  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # required, type: string, enum: "tcp", "udp", and "unix"
+  
+  # OPTIONAL - General
+  address = "0.0.0.0:9000" # optional, no default, type: string, example: "0.0.0.0:9000", relevant when mode = "tcp" or mode = "udp"
+  max_length = 102400 # optional, default: 102400, type: int, unit: bytes
+  path = "/path/to/socket" # optional, no default, type: string, example: "/path/to/socket", relevant when mode = "unix"
+  
+  # OPTIONAL - Context
+  host_key = "host" # optional, default: "host", type: string
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -33,39 +49,41 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 
 ### address
 
-`no default` `example: "0.0.0.0:9000"`
+`optional` `no default` `type: string` `example: "0.0.0.0:9000"`
 
-The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "udp"
+The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "udp".
 
 ### host_key
 
-`default: "host"`
+`optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host.
 
 ### max_length
 
-`default: 102400` `unit: bytes`
+`optional` `default: 102400` `type: int` `unit: bytes`
 
 The maximum bytes size of incoming messages before they are discarded.
 
 ### mode
 
-`required` `enum: "tcp", "udp", and "unix"`
+`required` `type: string`
 
 The input mode.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"tcp"` | Read incoming Syslog data over the TCP protocol. |
+| `"udp"` | Read incoming Syslog data over the UDP protocol. |
+| `"unix"` | Read uncoming Syslog data through a Unix socker. |
+
 ### path
 
-`no default` `example: "/path/to/socket"`
+`optional` `no default` `type: string` `example: "/path/to/socket"`
 
-The unix socket path. *This should be absolute path.* Only relevant when mode = "unix"
-
-### type
-
-`required` `must be: "syslog"`
-
-The component type
+The unix socket path. *This should be absolute path.* Only relevant when mode = "unix".
 
 ## Input/Output
 

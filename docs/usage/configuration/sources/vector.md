@@ -27,11 +27,22 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = "vector" # must be: "vector"
-  address = "0.0.0.0:9000"
+  type = ["vector", "The name of this component"] # required, type: string, must be: "vector"
+  address = "0.0.0.0:9000" # required, type: string, example: "0.0.0.0:9000"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED
+  type = ["vector", "The name of this component"] # required, type: string, must be: "vector"
+  address = "0.0.0.0:9000" # required, type: string, example: "0.0.0.0:9000"
+  
+  # OPTIONAL
+  shutdown_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -40,21 +51,15 @@ The `vector` source ingests data through another upstream Vector instance and ou
 
 ### address
 
-`required` `example: "0.0.0.0:9000"`
+`required` `type: string` `example: "0.0.0.0:9000"`
 
 The TCP address to bind to.
 
 ### shutdown_timeout_secs
 
-`default: 30` `unit: seconds`
+`optional` `default: 30` `type: int` `unit: seconds`
 
 The timeout before a connection is forcefully closed during shutdown.
-
-### type
-
-`required` `must be: "vector"`
-
-The component type
 
 ## How It Works
 

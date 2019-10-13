@@ -34,9 +34,13 @@ The maximum bytes size of incoming messages before they are discarded.\
 
 [sources.syslog.options.mode]
 type = "string"
-enum = ["tcp", "udp", "unix"]
 null = false
 description = "The input mode."
+
+[sources.syslog.options.mode.enum]
+tcp = "Read incoming Syslog data over the TCP protocol."
+udp = "Read incoming Syslog data over the UDP protocol."
+unix = "Read uncoming Syslog data through a Unix socker."
 
 [sources.syslog.options.path]
 type = "string"

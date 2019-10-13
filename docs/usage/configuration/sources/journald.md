@@ -27,14 +27,27 @@ The `journald` source ingests data through log records from journald and outputs
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = "journald" # must be: "journald"
+  type = ["journald", "The name of this component"] # required, type: string, must be: "journald"
   
   # OPTIONAL
-  units = ["ntpd", "sysinit.target"]
+  units = ["ntpd", "sysinit.target"] # optional, default: [], type: [string]
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED
+  type = ["journald", "The name of this component"] # required, type: string, must be: "journald"
+  
+  # OPTIONAL
+  current_runtime_only = true # optional, default: true, type: bool
+  data_dir = "/var/lib/vector" # optional, no default, type: string, example: "/var/lib/vector"
+  local_only = true # optional, default: true, type: bool
+  units = ["ntpd", "sysinit.target"] # optional, default: [], type: [string]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -43,31 +56,25 @@ The `journald` source ingests data through log records from journald and outputs
 
 ### current_runtime_only
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Include only entries from the current runtime (boot)
 
 ### data_dir
 
-`no default` `example: "/var/lib/vector"`
+`optional` `no default` `type: string` `example: "/var/lib/vector"`
 
 The directory used to persist the journal checkpoint position. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir.
 
 ### local_only
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Include only entries from the local system
 
-### type
-
-`required` `must be: "journald"`
-
-The component type
-
 ### units
 
-`default: []`
+`optional` `default: []` `type: [string]`
 
 The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.
 

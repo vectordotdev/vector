@@ -12,8 +12,8 @@ examples = ["/var/lib/vector"]
 null = true
 description = """\
 The directory used to persist file checkpoint positions. By default, the \
-global `data_dir` is used. Please make sure the Vector project has write \
-permissions to this dir.\
+[global `data_dir` option][docs.configuration#data_dir] is used. Please make \
+sure the Vector project has write permissions to this dir.\
 """
 
 [sources.file.options.include]
@@ -30,7 +30,7 @@ examples = [["/var/log/nginx/access.log"]]
 null = true
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
-*Takes precedence over the `include` option.*\
+*Takes precedence over the [`include` option](#include).*\
 """
 
 [sources.file.options.file_key]
@@ -102,21 +102,23 @@ Configuration for how the file source should identify files.\
 
 [sources.file.options.fingerprinting.options.strategy]
 type = "string"
-enum = ["checksum", "device_and_inode"]
 default = "checksum"
 null = true
 description = """\
-Whether to use the content of a file to differentiate it (`checksum`) or the \
-storage device and inode (`device_and_inode`). Depending on your log rotation \
-strategy, one may be a better fit than the other.\
+The strategy used to uniquely identify files. This is important for \
+[checkpointing](#checkpointing) when file rotation is used.\
 """
+
+[sources.file.options.fingerprinting.options.strategy.enum]
+checksum = "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."
+device_and_inode = "Uses the [device and inode][urls.inode] to unique identify files."
 
 [sources.file.options.fingerprinting.options.fingerprint_bytes]
 type = "int"
 default = 256
 null = false
 unit = "bytes"
-relevant_when = {strategy = "checksum"}
+relevant_when = {"fingerprinting.strategy" = "checksum"}
 description = """\
 The number of bytes read off the head of the file to generate a unique \
 fingerprint.\
@@ -127,7 +129,7 @@ type = "int"
 default = 0
 null = false
 unit = "bytes"
-relevant_when = {strategy = "checksum"}
+relevant_when = {"fingerprinting.strategy" = "checksum"}
 description = """\
 The number of bytes to skip ahead (or ignore) when generating a unique \
 fingerprint. This is helpful if all files share a common header.\

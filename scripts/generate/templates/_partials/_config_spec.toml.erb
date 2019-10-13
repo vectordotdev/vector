@@ -17,10 +17,7 @@
 <%= config_spec(option.options, titles: false, path: "#{opts[:path]}.#{option.name}").indent(2) %>
     <%- else -%>
 <%= option.description.editorify(78).commentify.indent(2) %>
-      <%- if option.relevant_when -%>
-  # * only relevant when <%= option.relevant_when_kvs.to_sentence(two_words_connector: " or ") %>
-      <%- end -%>
-      <%- spec.tags(option).each do |tag| -%>
+      <%- option_tags(option, example: false).each do |tag| -%>
   # * <%= tag %>
       <%- end -%>
       <%- option.examples.each do |example| -%>

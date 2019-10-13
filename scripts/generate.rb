@@ -22,7 +22,7 @@ require_relative "setup"
 #
 
 require_relative "generate/post_processors/link_definer"
-require_relative "generate/post_processors/option_referencer"
+require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/post_processors/toml_syntax_switcher"
 require_relative "generate/templates"
@@ -71,7 +71,7 @@ end
 def post_process(content, doc, links)
   content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content = PostProcessors::SectionSorter.sort!(content)
-  content = PostProcessors::OptionReferencer.reference!(content)
+  content = PostProcessors::SectionReferencer.reference!(content)
   content = PostProcessors::LinkDefiner.define!(content, doc, links)
   content
 end
@@ -112,12 +112,7 @@ title("Generating files...")
 # Setup
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
-  end
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
 
 #
 # Create missing component templates

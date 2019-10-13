@@ -27,13 +27,27 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"]
-  namespace = "service"
-  region = "us-east-1"
+  type = ["aws_cloudwatch_metrics", "The name of this component"] # required, type: string, must be: "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  namespace = "service" # required, type: string, example: "service"
+  region = "us-east-1" # required, type: string, example: "us-east-1"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED
+  type = ["aws_cloudwatch_metrics", "The name of this component"] # required, type: string, must be: "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  namespace = "service" # required, type: string, example: "service"
+  region = "us-east-1" # required, type: string, example: "us-east-1"
+  
+  # OPTIONAL
+  endpoint = "127.0.0.0:5000" # optional, no default, type: string, example: "127.0.0.0:5000"
+  healthcheck = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -42,39 +56,27 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 
 ### endpoint
 
-`no default` `example: "127.0.0.0:5000"`
+`optional` `no default` `type: string` `example: "127.0.0.0:5000"`
 
 Custom endpoint for use with AWS-compatible services.
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### namespace
 
-`required` `example: "service"`
+`required` `type: string` `example: "service"`
 
 A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
 
 ### region
 
-`required` `example: "us-east-1"`
+`required` `type: string` `example: "us-east-1"`
 
 The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.
-
-### type
-
-`required` `must be: "aws_cloudwatch_metrics"`
-
-The component type
 
 ## How It Works
 
@@ -178,13 +180,10 @@ issue, please:
 
 
 [assets.aws_cloudwatch_metrics_sink]: ../../../assets/aws_cloudwatch_metrics-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_cloudwatch_metrics_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22+label%3A%22Type%3A+bug%22

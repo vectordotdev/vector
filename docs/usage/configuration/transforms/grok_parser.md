@@ -20,12 +20,46 @@ The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allo
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = "grok_parser" # must be: "grok_parser"
-  inputs = ["my-source-id"]
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  # REQUIRED - General
+  type = ["grok_parser", "The name of this component"] # required, type: string, must be: "grok_parser"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required, type: string, example: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = ["grok_parser", "The name of this component"] # required, type: string, must be: "grok_parser"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required, type: string, example: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  
+  # OPTIONAL - General
+  drop_field = true # optional, default: true, type: bool
+  field = "message" # optional, default: "message", type: string
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -34,41 +68,43 @@ The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allo
 
 ### drop_field
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` will drop the specified `field` after parsing.
 
 ### field
 
-`default: "message"`
+`optional` `default: "message"` `type: string`
 
 The log field to execute the `pattern` against. Must be a `string` value.
 
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
 ### pattern
 
-`required` `example: (see above)`
+`required` `type: string` `example: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"`
 
 The [Grok pattern][urls.grok_patterns]
 
-### type
+### types
 
-`required` `must be: "grok_parser"`
+`optional`
 
-The component type
-
-### types.*
+Key/Value pairs representing mapped log field types.
 
 #### types.*
 
-`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+`required` `type: string`
 
-A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"bool"` | Coerces `"true"`/`/"false"`, `"1"`/`"0"`, and `"t"`/`"f"` values into boolean. |
+| `"float"` | Coerce to a 64 bit float. |
+| `"int"` | Coerce to a 64 bit integer. |
+| `"string"` | Coerce to a string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## How It Works
 
@@ -99,37 +135,6 @@ We plan to add a [performance test][docs.performance] for this in the future.
 While this is still plenty fast for most use cases we recommend using the
 [`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
 performance issues.
-
-### Types
-
-By default, extracted (parsed) fields all contain `string` values. You can
-coerce these values into types via the `types` table as shown in the
-[Config File](#config-file) example above. For example:
-
-```coffeescript
-[transforms.my_transform_id]
-  # ...
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-
-The available types are:
-
-| Type        | Desription                                                                                                          |
-|:------------|:--------------------------------------------------------------------------------------------------------------------|
-| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
-| `float`     | Coerce to 64 bit floats.                                                                                            |
-| `int`       | Coerce to a 64 bit integer.                                                                                         |
-| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 
@@ -165,17 +170,14 @@ Finally, consider the following alternatives:
 
 
 [assets.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
-[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/

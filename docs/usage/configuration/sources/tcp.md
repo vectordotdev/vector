@@ -20,11 +20,26 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = "tcp" # must be: "tcp"
-  address = "0.0.0.0:9000"
+  type = ["tcp", "The name of this component"] # required, type: string, must be: "tcp"
+  address = "0.0.0.0:9000" # required, type: string, example: "0.0.0.0:9000"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED - General
+  type = ["tcp", "The name of this component"] # required, type: string, must be: "tcp"
+  address = "0.0.0.0:9000" # required, type: string, example: "0.0.0.0:9000"
+  
+  # OPTIONAL - General
+  max_length = 102400 # optional, default: 102400, type: int, unit: bytes
+  shutdown_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
+  
+  # OPTIONAL - Context
+  host_key = "host" # optional, default: "host", type: string
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -33,33 +48,27 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 
 ### address
 
-`required` `example: "0.0.0.0:9000"`
+`required` `type: string` `example: "0.0.0.0:9000"`
 
 The address to bind the socket to.
 
 ### host_key
 
-`default: "host"`
+`optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host.
 
 ### max_length
 
-`default: 102400` `unit: bytes`
+`optional` `default: 102400` `type: int` `unit: bytes`
 
 The maximum bytes size of incoming messages before they are discarded.
 
 ### shutdown_timeout_secs
 
-`default: 30` `unit: seconds`
+`optional` `default: 30` `type: int` `unit: seconds`
 
 The timeout before a connection is forcefully closed during shutdown.
-
-### type
-
-`required` `must be: "tcp"`
-
-The component type
 
 ## Input/Output
 

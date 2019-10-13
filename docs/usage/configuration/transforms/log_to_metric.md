@@ -24,18 +24,18 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "log_to_metric" # must be: "log_to_metric"
-  inputs = ["my-source-id"]
+  type = ["log_to_metric", "The name of this component"] # required, type: string, must be: "log_to_metric"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
     # REQUIRED
-    type = "counter" # enum: "counter", "gauge", "histogram", and "set"
-    field = "duration"
-    name = "duration_total"
+    type = ["counter", "A [counter metric type][docs.data-model#counters]."] # required, type: string, enum: "counter", "gauge", "histogram", and "set"
+    field = "duration" # required, type: string, example: "duration"
+    name = "duration_total" # required, type: string, example: "duration_total"
     
     # OPTIONAL
-    increment_by_value = false # default, relevant when type = "counter"
+    increment_by_value = false # optional, default: false, type: bool, relevant when type = "counter"
     tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
 ```
 {% endcode-tabs-item %}
@@ -43,51 +43,56 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 
 ## Options
 
-### inputs
+### metrics
 
-`required` `example: ["my-source-id"]`
+`required`
 
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
-### metrics.*
-
-#### metrics.field
-
-`required` `example: "duration"`
-
-The log field to use as the metric. See [Null Fields](#null-fields) for more info.
-
-#### metrics.increment_by_value
-
-`default: false`
-
-If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"
-
-#### metrics.name
-
-`required` `example: "duration_total"`
-
-The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
-
-#### metrics.tags.*
-
-##### metrics.tags.*
-
-`required` `example: (see above)`
-
-Key/value pairs representing the metric tags.
+A table of key/value pairs representing the keys to be added to the event.
 
 #### metrics.type
 
-`required` `enum: "counter", "gauge", "histogram", and "set"`
+`required` `type: string`
 
 The metric type.
 
-### type
+The field is an enumeration and only accepts the following values:
 
-`required` `must be: "log_to_metric"`
+| Value | Description |
+|:------|:------------|
+| `"counter"` | A [counter metric type][docs.data-model#counters]. |
+| `"gauge"` | A [gauge metric type][docs.data-model#gauges]. |
+| `"histogram"` | A [histogram metric type][docs.data-model#histograms]. |
+| `"set"` | A [set metric type][docs.data-model#sets]. |
 
-The component type
+#### metrics.field
+
+`required` `type: string` `example: "duration"`
+
+The log field to use as the metric.
+
+#### metrics.increment_by_value
+
+`optional` `default: false` `type: bool`
+
+If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter".
+
+#### metrics.name
+
+`required` `type: string` `example: "duration_total"`
+
+The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
+
+#### metrics.tags
+
+`optional`
+
+Key/value pairs representing [metric tags][docs.data-model#tags].
+
+##### metrics.tags.*
+
+`required` `type: string` `example: host = "${HOSTNAME}"`
+
+Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
 
 ## Input/Output
 
@@ -456,14 +461,16 @@ issue, please:
 
 
 [assets.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model#counters]: ../../../about/data-model#counters
+[docs.data-model#gauges]: ../../../about/data-model#gauges
+[docs.data-model#histograms]: ../../../about/data-model#histograms
+[docs.data-model#sets]: ../../../about/data-model#sets
+[docs.data-model#tags]: ../../../about/data-model#tags
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
 [urls.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22

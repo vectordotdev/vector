@@ -3,6 +3,7 @@ batch_size = 1049000
 batch_timeout = 1
 beta = true
 buffer = false
+compressions  = ["gzip"]
 delivery_guarantee = "best_effort"
 healthcheck = true
 egress_method = "batching"
@@ -15,14 +16,6 @@ request_in_flight_limit = 5
 request_timeout_secs = 30
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
 tls_options = []
-
-[sinks.clickhouse.options.compression]
-type = "string"
-category = "Requests"
-enum = ["gzip"]
-null = true
-simple = true
-description = "The compression type to use before writing data."
 
 [sinks.clickhouse.options.host]
 type = "string"

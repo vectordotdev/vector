@@ -17,7 +17,7 @@
         <%- end -%>
       <%- else -%>
         <%- first_example = option.examples.first -%>
-        <%- tags = example.tags(option) -%>
+        <%- tags = option_tags(option) -%>
         <%- if first_example.is_a?(Hash) -%>
   <%= first_example.fetch("name") %> = <%= first_example.fetch("value").to_toml %>
         <%- else -%>

@@ -20,15 +20,50 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "kafka" # must be: "kafka"
-  inputs = ["my-source-id"]
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
-  encoding = "json" # enum: "json" or "text"
-  key_field = "user_id"
-  topic = "topic-1234"
+  # REQUIRED - General
+  type = ["kafka", "The name of this component"] # required, type: string, must be: "kafka"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # required, type: [string], example: ["10.14.22.123:9092", "10.14.23.332:9092"]
+  key_field = "user_id" # required, type: string, example: "user_id"
+  topic = "topic-1234" # required, type: string, example: "topic-1234"
+  
+  # REQUIRED - requests
+  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # required, type: string, enum: "json" or "text"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = ["kafka", "The name of this component"] # required, type: string, must be: "kafka"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # required, type: [string], example: ["10.14.22.123:9092", "10.14.23.332:9092"]
+  key_field = "user_id" # required, type: string, example: "user_id"
+  topic = "topic-1234" # required, type: string, example: "topic-1234"
+  
+  # REQUIRED - requests
+  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # required, type: string, enum: "json" or "text"
+  
+  # OPTIONAL - General
+  healthcheck = true # optional, default: true, type: bool
+  
+  # OPTIONAL - Buffer
+  [sinks.my_sink_id.buffer]
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
+    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
+    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
+  
+  # OPTIONAL - Tls
+  [sinks.my_sink_id.tls]
+    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
+    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
+    enabled = false # optional, default: false, type: bool
+    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
+    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -37,103 +72,120 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
 
 ### bootstrap_servers
 
-`required` `example: (see above)`
+`required` `type: [string]` `example: ["10.14.22.123:9092", "10.14.23.332:9092"]`
 
 A list of host and port pairs that the Kafka client should contact to bootstrap its cluster metadata.
 
-### buffer.*
+### buffer
 
-#### buffer.max_size
+`optional`
 
-`no default` `example: 104900000` `unit: bytes`
-
-The maximum size of the buffer on the disk. Only relevant when type = "disk"
-
-#### buffer.num_items
-
-`default: 500` `unit: events`
-
-The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+Configures the sink specific buffer.
 
 #### buffer.type
 
-`default: "memory"` `enum: "memory" or "disk"`
+`optional` `default: "memory"` `type: string`
 
 The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"memory"` *(default)* | Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly. |
+| `"disk"` | Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts. |
+
 #### buffer.when_full
 
-`default: "block"` `enum: "block" or "drop_newest"`
+`optional` `default: "block"` `type: string`
 
 The behavior when the buffer becomes full.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"block"` *(default)* | Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge. |
+| `"drop_newest"` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
+
+#### buffer.max_size
+
+`optional` `no default` `type: int` `unit: bytes` `example: 104900000`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk".
+
+#### buffer.num_items
+
+`optional` `default: 500` `type: int` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory".
+
 ### encoding
 
-`required` `enum: "json" or "text"`
+`required` `type: string`
 
-The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.
+The encoding format used to serialize the events before outputting.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"json"` | Each event is encoded into JSON and the payload is represented as a JSON array. |
+| `"text"` | Each event is encoded into text via the `message` key and the payload is new line delimited. |
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### key_field
 
-`required` `example: "user_id"`
+`required` `type: string` `example: "user_id"`
 
 The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.
 
-### tls.*
+### tls
+
+`optional`
+
+Configures the TLS options for connections from this sink.
+
+#### tls.enabled
+
+`optional` `default: false` `type: bool`
+
+Enable TLS during connections to the remote.
 
 #### tls.ca_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/certificate_authority.crt"`
 
 Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
 
 #### tls.crt_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.crt"`
 
 Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
 
-#### tls.enabled
-
-`default: false`
-
-Enable TLS during connections to the remote.
-
-#### tls.key_pass
-
-`no default` `example: "PassWord1"`
-
-Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
-
 #### tls.key_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.key"`
 
 Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
 
+#### tls.key_pass
+
+`optional` `no default` `type: string` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
 ### topic
 
-`required` `example: "topic-1234"`
+`required` `type: string` `example: "topic-1234"`
 
 The Kafka topic name to write events to.
-
-### type
-
-`required` `must be: "kafka"`
-
-The component type
 
 ## How It Works
 
@@ -141,30 +193,6 @@ The component type
 
 This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
 if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-
-### Encodings
-
-The `kafka` sink encodes events before writing
-them downstream. This is controlled via the `encoding` option which accepts
-the following options:
-
-| Encoding | Description |
-| :------- | :---------- |
-| `json` | The payload will be encoded as a single JSON payload. |
-| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
-
-#### Dynamic encoding
-
-By default, the `encoding` chosen is dynamic based on the explicit/implcit
-nature of the event's structure. For example, if this event is parsed (explicit
-structuring), Vector will use `json` to encode the structured data. If the event
-was not explicitly structured, the `text` encoding will be used.
-
-To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
-it directly to the `kafka` sink. It is less
-surprising that the outgoing data reflects the incoming data exactly since it
-was not explicitly structured.
 
 ### Environment Variables
 
@@ -218,15 +246,11 @@ issue, please:
 
 
 [assets.kafka_sink]: ../../../assets/kafka-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

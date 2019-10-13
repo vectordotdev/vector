@@ -20,11 +20,25 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = "udp" # must be: "udp"
-  address = "0.0.0.0:9000"
+  type = ["udp", "The name of this component"] # required, type: string, must be: "udp"
+  address = "0.0.0.0:9000" # required, type: string, example: "0.0.0.0:9000"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED - General
+  type = ["udp", "The name of this component"] # required, type: string, must be: "udp"
+  address = "0.0.0.0:9000" # required, type: string, example: "0.0.0.0:9000"
+  
+  # OPTIONAL - General
+  max_length = 102400 # optional, default: 102400, type: int, unit: bytes
+  
+  # OPTIONAL - Context
+  host_key = "host" # optional, default: "host", type: string
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -33,27 +47,21 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 
 ### address
 
-`required` `example: "0.0.0.0:9000"`
+`required` `type: string` `example: "0.0.0.0:9000"`
 
 The address to bind the socket to.
 
 ### host_key
 
-`default: "host"`
+`optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host.
 
 ### max_length
 
-`default: 102400` `unit: bytes`
+`optional` `default: 102400` `type: int` `unit: bytes`
 
 The maximum bytes size of incoming messages before they are discarded.
-
-### type
-
-`required` `must be: "udp"`
-
-The component type
 
 ## Input/Output
 

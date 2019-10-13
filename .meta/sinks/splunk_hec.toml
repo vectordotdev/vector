@@ -4,6 +4,7 @@ batch_timeout = 1
 buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+encodings = ["ndjson", "text"]
 healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
@@ -15,14 +16,6 @@ request_timeout_secs = 60
 service_provider = "Splunk"
 write_to_description = "a [Splunk HTTP Event Collector][urls.splunk_hec]"
 tls_options = []
-
-[sinks.splunk_hec.options.encoding]
-type = "string"
-category = "Requests"
-enum = ["ndjson", "text"]
-null = false
-description = "The encoding format used to serialize the events before flushing."
-
 
 [sinks.splunk_hec.options.host]
 type = "string"

@@ -1,5 +1,5 @@
 ---
-description: Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
+description: Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 ---
 
 <!--
@@ -15,52 +15,53 @@ description: Streams `log` and `metric` events to the console, `STDOUT` or `STDE
 ![][assets.console_sink]
 
 
-The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to the console, `STDOUT` or `STDERR`.
+The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
 
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "console" # must be: "console"
-  inputs = ["my-source-id"]
-  target = "stdout" # enum: "stdout" or "stderr"
+  type = ["console", "The name of this component"] # required, type: string, must be: "console"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"] # required, type: string, enum: "stdout" or "stderr"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED
+  type = ["console", "The name of this component"] # required, type: string, must be: "console"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"] # required, type: string, enum: "stdout" or "stderr"
+  
+  # OPTIONAL
+  healthcheck = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-### encoding
-
-`no default` `enum: "json" or "text"`
-
-The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.
-
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### target
 
-`required` `enum: "stdout" or "stderr"`
+`required` `type: string`
 
 The [standard stream][urls.standard_streams] to write to.
 
-### type
+The field is an enumeration and only accepts the following values:
 
-`required` `must be: "console"`
-
-The component type
+| Value | Description |
+|:------|:------------|
+| `"stdout"` | Output will be written to [STDOUT][urls.stdout] |
+| `"stderr"` | Output will be written to [STDERR][urls.stderr] |
 
 ## How It Works
 
@@ -68,30 +69,6 @@ The component type
 
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
-### Encodings
-
-The `console` sink encodes events before writing
-them downstream. This is controlled via the `encoding` option which accepts
-the following options:
-
-| Encoding | Description |
-| :------- | :---------- |
-| `json` | The payload will be encoded as a single JSON payload. |
-| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
-
-#### Dynamic encoding
-
-By default, the `encoding` chosen is dynamic based on the explicit/implcit
-nature of the event's structure. For example, if this event is parsed (explicit
-structuring), Vector will use `json` to encode the structured data. If the event
-was not explicitly structured, the `text` encoding will be used.
-
-To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
-it directly to the `console` sink. It is less
-surprising that the outgoing data reflects the incoming data exactly since it
-was not explicitly structured.
 
 ### Environment Variables
 
@@ -145,15 +122,11 @@ issue, please:
 
 
 [assets.console_sink]: ../../../assets/console-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+bug%22
 [urls.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+enhancement%22
@@ -162,4 +135,6 @@ issue, please:
 [urls.new_console_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+bug
 [urls.new_console_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+enhancement
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
+[urls.stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
+[urls.stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
 [urls.vector_chat]: https://chat.vector.dev

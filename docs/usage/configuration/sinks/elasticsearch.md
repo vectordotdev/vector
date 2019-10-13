@@ -27,207 +27,293 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "elasticsearch" # must be: "elasticsearch"
-  inputs = ["my-source-id"]
-  host = "http://10.24.32.122:9000"
+  type = ["elasticsearch", "The name of this component"] # required, type: string, must be: "elasticsearch"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  host = "http://10.24.32.122:9000" # required, type: string, example: "http://10.24.32.122:9000"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = ["elasticsearch", "The name of this component"] # required, type: string, must be: "elasticsearch"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  host = "http://10.24.32.122:9000" # required, type: string, example: "http://10.24.32.122:9000"
+  
+  # OPTIONAL - General
+  doc_type = "_doc" # optional, default: "_doc", type: string
+  healthcheck = true # optional, default: true, type: bool
+  index = "vector-%Y-%m-%d" # optional, default: "vector-%F", type: string
+  provider = ["default", "A generic Elasticsearch provider."] # optional, default: "default", type: string, enum: "default" or "aws"
+  region = "us-east-1" # optional, no default, type: string, example: "us-east-1"
+  
+  # OPTIONAL - Batching
+  batch_size = 10490000 # optional, default: 10490000, type: int, unit: bytes
+  batch_timeout = 1 # optional, default: 1, type: int, unit: seconds
+  
+  # OPTIONAL - Requests
+  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
+  rate_limit_num = 5 # optional, default: 5, type: int
+  request_in_flight_limit = 5 # optional, default: 5, type: int
+  request_timeout_secs = 60 # optional, default: 60, type: int, unit: seconds
+  retry_attempts = 5 # optional, default: 5, type: int
+  retry_backoff_secs = 5 # optional, default: 5, type: int, unit: seconds
+  
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password" # required, type: string, example: "password"
+    user = "username" # required, type: string, example: "username"
+  
+  # OPTIONAL - Buffer
+  [sinks.my_sink_id.buffer]
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
+    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
+    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
+  
+  # OPTIONAL - Headers
+  [sinks.my_sink_id.headers]
+    X-Powered-By = "Vector"
+  
+  # OPTIONAL - Query
+  [sinks.my_sink_id.query]
+    X-Powered-By = "Vector"
+  
+  # OPTIONAL - Tls
+  [sinks.my_sink_id.tls]
+    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
+    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
+    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
+    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
+    verify_certificate = true # optional, default: true, type: bool
+    verify_hostname = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-### basic_auth.*
+### basic_auth
+
+`optional`
+
+Options for basic authentication.
 
 #### basic_auth.password
 
-`required` `example: "password"`
+`required` `type: string` `example: "password"`
 
 The basic authentication password.
 
 #### basic_auth.user
 
-`required` `example: "username"`
+`required` `type: string` `example: "username"`
 
 The basic authentication user name.
 
 ### batch_size
 
-`default: 10490000` `unit: bytes`
+`optional` `default: 10490000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed.
 
 ### batch_timeout
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed.
 
-### buffer.*
+### buffer
 
-#### buffer.max_size
+`optional`
 
-`no default` `example: 104900000` `unit: bytes`
-
-The maximum size of the buffer on the disk. Only relevant when type = "disk"
-
-#### buffer.num_items
-
-`default: 500` `unit: events`
-
-The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+Configures the sink specific buffer.
 
 #### buffer.type
 
-`default: "memory"` `enum: "memory" or "disk"`
+`optional` `default: "memory"` `type: string`
 
 The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"memory"` *(default)* | Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly. |
+| `"disk"` | Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts. |
+
 #### buffer.when_full
 
-`default: "block"` `enum: "block" or "drop_newest"`
+`optional` `default: "block"` `type: string`
 
 The behavior when the buffer becomes full.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"block"` *(default)* | Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge. |
+| `"drop_newest"` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
+
+#### buffer.max_size
+
+`optional` `no default` `type: int` `unit: bytes` `example: 104900000`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk".
+
+#### buffer.num_items
+
+`optional` `default: 500` `type: int` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory".
+
 ### doc_type
 
-`default: "_doc"`
+`optional` `default: "_doc"` `type: string`
 
 The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.
 
-### headers.*
+### headers
+
+`optional`
+
+Options for custom headers.
 
 #### headers.*
 
-`required` `example: (see above)`
+`required` `type: string` `example: X-Powered-By = "Vector"`
 
 A custom header to be added to each outgoing Elasticsearch request.
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### host
 
-`required` `example: "http://10.24.32.122:9000"`
+`required` `type: string` `example: "http://10.24.32.122:9000"`
 
 The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
 
 ### index
 
-`default: "vector-%F"`
+`optional` `default: "vector-%F"` `type: string`
 
-Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Template Syntax](#template-syntax) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+Index name to write events to. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
 
 ### provider
 
-`default: "default"` `enum: "default" or "aws"`
+`optional` `default: "default"` `type: string`
 
-The provider of the Elasticsearch service.
+The provider of the Elasticsearch service. This is used to properly authenticate with the Elasticsearch cluster. For example, authentication for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we obtain AWS credentials to properly sign the request.
 
-### query.*
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"default"` *(default)* | A generic Elasticsearch provider. |
+| `"aws"` | The [AWS Elasticsearch Service][urls.aws_elasticsearch]. |
+
+### query
+
+`optional`
+
+Custom parameters to Elasticsearch query string.
 
 #### query.*
 
-`required` `example: (see above)`
+`required` `type: string` `example: X-Powered-By = "Vector"`
 
 A custom parameter to be added to each Elasticsearch request.
 
 ### rate_limit_duration
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+The window used for the `request_rate_limit_num` option
 
 ### rate_limit_num
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the `rate_limit_duration` window.
 
 ### region
 
-`no default` `example: "us-east-1"`
+`optional` `no default` `type: string` `example: "us-east-1"`
 
 When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance.
 
 ### request_in_flight_limit
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+The maximum number of in-flight requests allowed at any given time.
 
 ### request_timeout_secs
 
-`default: 60` `unit: seconds`
+`optional` `default: 60` `type: int` `unit: seconds`
 
-The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
 
 ### retry_attempts
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+The maximum number of retries to make for failed requests.
 
 ### retry_backoff_secs
 
-`default: 5` `unit: seconds`
+`optional` `default: 5` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting a failed request again.
 
-### tls.*
+### tls
+
+`optional`
+
+Configures the TLS options for connections from this sink.
 
 #### tls.ca_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/certificate_authority.crt"`
 
 Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
 
 #### tls.crt_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.crt"`
 
 Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
 
-#### tls.key_pass
-
-`no default` `example: "PassWord1"`
-
-Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
-
 #### tls.key_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.key"`
 
 Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
 
+#### tls.key_pass
+
+`optional` `no default` `type: string` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
 #### tls.verify_certificate
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
 
 #### tls.verify_hostname
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-
-### type
-
-`required` `must be: "elasticsearch"`
-
-The component type
 
 ## Input/Output
 
@@ -259,31 +345,12 @@ differently, instead of treating them as global concepts, Vector treats them
 as sink specific concepts. This isolates sinks, ensuring services disruptions
 are contained and [delivery guarantees][docs.guarantees] are honored.
 
-#### Buffers types
-
-The `buffer.type` option allows you to control buffer resource usage:
-
-| Type     | Description                                                                                                    |
-|:---------|:---------------------------------------------------------------------------------------------------------------|
-| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a crash. Uses more memory. |
-| `disk`   | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below.                      |
-
-#### Buffer overflow
-
-The `buffer.when_full` option allows you to control the behavior when the
-buffer overflows:
-
-| Type          | Description                                                                                                                        |
-|:--------------|:-----------------------------------------------------------------------------------------------------------------------------------|
-| `block`       | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
-| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority.                  |
-
-#### Batch flushing
-
-Batches are flushed when 1 of 2 conditions are met:
+*Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `1 seconds`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `10490000 bytes`).
+
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
 ### Delivery Guarantee
 
@@ -364,16 +431,6 @@ enabling dynamic values derived from the event's data. This syntax accepts
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
-### Timeouts
-
-To ensure the pipeline does not halt when a service fails to respond Vector
-will abort requests after `60 seconds`.
-This can be adjsuted with the `request_timeout_secs` option.
-
-It is highly recommended that you do not lower value below the service's
-internal timeout, as this could create orphaned requests, pile on retries,
-and result in deuplicate data downstream.
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -397,7 +454,6 @@ issue, please:
 
 [assets.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
@@ -406,9 +462,8 @@ issue, please:
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
 [urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22

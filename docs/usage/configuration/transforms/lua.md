@@ -27,11 +27,11 @@ The `lua` transform accepts [`log`][docs.data-model.log] events and allows you t
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = "lua" # must be: "lua"
-  inputs = ["my-source-id"]
+  type = ["lua", "The name of this component"] # required, type: string, must be: "lua"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
   source = """
 require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -45,33 +45,53 @@ end
 """
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[transforms.my_transform_id]
+  # REQUIRED
+  type = ["lua", "The name of this component"] # required, type: string, must be: "lua"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  source = """
+require("script") # a `script.lua` file must be in your `search_dirs`
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""
+  
+  # OPTIONAL
+  search_dirs = ["/etc/vector/lua"] # optional, no default, type: [string], example: ["/etc/vector/lua"]
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
 ### search_dirs
 
-`no default` `example: ["/etc/vector/lua"]`
+`optional` `no default` `type: [string]` `example: ["/etc/vector/lua"]`
 
-A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.
+A list of directories search when loading a Lua file via the `require` function.
 
 ### source
 
-`required` `example: (see above)`
+`required` `type: string` `example: """
+require("script") # a `script.lua` file must be in your `search_dirs`
 
-The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""`
 
-### type
-
-`required` `must be: "lua"`
-
-The component type
+The inline Lua source to evaluate.
 
 ## Input/Output
 
@@ -195,15 +215,12 @@ Finally, consider the following alternatives:
 
 
 [assets.lua_transform]: ../../../assets/lua-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log#default-schema]: ../../../about/data-model/log.md#default-schema
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data_model]: ../../../about/data-model
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/

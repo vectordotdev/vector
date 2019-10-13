@@ -2,6 +2,7 @@
 buffer = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+encodings = ["ndjson", "text"]
 healthcheck = false
 input_types = ["log"]
 write_to_description = "a file"
@@ -24,13 +25,4 @@ description = """\
 The amount of time a file can be idle  and stay open. \
 After not receiving any events for this timeout, the file will be flushed and \
 closed.
-"""
-
-[sinks.file.options.encoding]
-type = "string"
-enum = ["ndjson", "text"]
-null = true
-description = """\
-The encoding format used to serialize the events before appending. The default \
-is dynamic based on if the event is structured or not.\
 """

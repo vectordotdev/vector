@@ -24,8 +24,8 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "add_fields" # must be: "add_fields"
-  inputs = ["my-source-id"]
+  type = ["add_fields", "The name of this component"] # required, type: string, must be: "add_fields"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
@@ -43,25 +43,17 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
 
 ## Options
 
-### fields.*
+### fields
+
+`required`
+
+A table of key/value pairs representing the keys to be added to the event.
 
 #### fields.*
 
-`required` `example: (see above)`
+`required` `type: *` `example: my_string_field = "string value"`
 
 A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
-### type
-
-`required` `must be: "add_fields"`
-
-The component type
 
 ## Input/Output
 
@@ -230,7 +222,6 @@ Finally, consider the following alternatives:
 
 
 [assets.add_fields_transform]: ../../../assets/add_fields-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#value-types]: ../../../usage/configuration#value-types
 [docs.configuration#value_types]: ../../../usage/configuration#value_types
@@ -238,10 +229,8 @@ Finally, consider the following alternatives:
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model]: ../../../about/data-model
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.remove_fields]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+bug%22
 [urls.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+enhancement%22

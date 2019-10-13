@@ -20,12 +20,31 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to a
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"]
-  address = "92.12.333.224:5000"
+  type = ["vector", "The name of this component"] # required, type: string, must be: "vector"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  address = "92.12.333.224:5000" # required, type: string, example: "92.12.333.224:5000"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = ["vector", "The name of this component"] # required, type: string, must be: "vector"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  address = "92.12.333.224:5000" # required, type: string, example: "92.12.333.224:5000"
+  
+  # OPTIONAL - General
+  healthcheck = true # optional, default: true, type: bool
+  
+  # OPTIONAL - Buffer
+  [sinks.my_sink_id.buffer]
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
+    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
+    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -34,53 +53,59 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to a
 
 ### address
 
-`required` `example: "92.12.333.224:5000"`
+`required` `type: string` `example: "92.12.333.224:5000"`
 
 The downstream Vector address.
 
-### buffer.*
+### buffer
 
-#### buffer.max_size
+`optional`
 
-`no default` `example: 104900000` `unit: bytes`
-
-The maximum size of the buffer on the disk. Only relevant when type = "disk"
-
-#### buffer.num_items
-
-`default: 500` `unit: events`
-
-The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+Configures the sink specific buffer.
 
 #### buffer.type
 
-`default: "memory"` `enum: "memory" or "disk"`
+`optional` `default: "memory"` `type: string`
 
 The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"memory"` *(default)* | Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly. |
+| `"disk"` | Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts. |
+
 #### buffer.when_full
 
-`default: "block"` `enum: "block" or "drop_newest"`
+`optional` `default: "block"` `type: string`
 
 The behavior when the buffer becomes full.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"block"` *(default)* | Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge. |
+| `"drop_newest"` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
+
+#### buffer.max_size
+
+`optional` `no default` `type: int` `unit: bytes` `example: 104900000`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk".
+
+#### buffer.num_items
+
+`optional` `default: 500` `type: int` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory".
+
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
-### type
-
-`required` `must be: "vector"`
-
-The component type
+Enables/disables the sink healthcheck upon start.
 
 ## How It Works
 
@@ -141,14 +166,11 @@ issue, please:
 
 
 [assets.vector_sink]: ../../../assets/vector-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_vector_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+bug
 [urls.new_vector_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+enhancement

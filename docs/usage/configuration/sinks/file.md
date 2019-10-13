@@ -20,12 +20,32 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a f
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
+  # REQUIRED - General
+  type = ["file", "The name of this component"] # required, type: string, must be: "file"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  path = "vector-%Y-%m-%d.log" # required, type: string, example: "vector-%Y-%m-%d.log"
+  
+  # REQUIRED - requests
+  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # required, type: string, enum: "ndjson" or "text"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = ["file", "The name of this component"] # required, type: string, must be: "file"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  path = "vector-%Y-%m-%d.log" # required, type: string, example: "vector-%Y-%m-%d.log"
+  
+  # REQUIRED - requests
+  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # required, type: string, enum: "ndjson" or "text"
+  
+  # OPTIONAL - General
+  healthcheck = true # optional, default: true, type: bool
+  idle_timeout_secs = "30" # optional, default: "30", type: int
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -34,39 +54,34 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a f
 
 ### encoding
 
-`no default` `enum: "ndjson" or "text"`
+`required` `type: string`
 
-The encoding format used to serialize the events before appending. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.
+The encoding format used to serialize the events before outputting.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"ndjson"` | Each event is encoded into JSON and the payload is new line delimited. |
+| `"text"` | Each event is encoded into text via the `message` key and the payload is new line delimited. |
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Enables/disables the sink healthcheck upon start.
 
 ### idle_timeout_secs
 
-`default: "30"`
+`optional` `default: "30"` `type: int`
 
 The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.
 
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
 ### path
 
-`required` `example: "vector-%Y-%m-%d.log"`
+`required` `type: string` `example: "vector-%Y-%m-%d.log"`
 
-File name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Template Syntax](#template-syntax) for more info.
-
-### type
-
-`required` `must be: "file"`
-
-The component type
+File name to write events to. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
 
 ## How It Works
 
@@ -74,30 +89,6 @@ The component type
 
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
-### Encodings
-
-The `file` sink encodes events before writing
-them downstream. This is controlled via the `encoding` option which accepts
-the following options:
-
-| Encoding | Description |
-| :------- | :---------- |
-| `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
-| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
-
-#### Dynamic encoding
-
-By default, the `encoding` chosen is dynamic based on the explicit/implcit
-nature of the event's structure. For example, if this event is parsed (explicit
-structuring), Vector will use `json` to encode the structured data. If the event
-was not explicitly structured, the `text` encoding will be used.
-
-To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
-it directly to the `file` sink. It is less
-surprising that the outgoing data reflects the incoming data exactly since it
-was not explicitly structured.
 
 ### Environment Variables
 
@@ -158,15 +149,11 @@ issue, please:
 
 
 [assets.file_sink]: ../../../assets/file-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22
 [urls.file_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+enhancement%22

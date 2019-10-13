@@ -20,12 +20,46 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = "tokenizer" # must be: "tokenizer"
-  inputs = ["my-source-id"]
-  field_names = ["timestamp", "level", "message"]
+  # REQUIRED - General
+  type = ["tokenizer", "The name of this component"] # required, type: string, must be: "tokenizer"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  field_names = ["timestamp", "level", "message"] # required, type: [string], example: ["timestamp", "level", "message"]
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = ["tokenizer", "The name of this component"] # required, type: string, must be: "tokenizer"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  field_names = ["timestamp", "level", "message"] # required, type: [string], example: ["timestamp", "level", "message"]
+  
+  # OPTIONAL - General
+  drop_field = true # optional, default: true, type: bool
+  field = "message" # optional, default: "message", type: string
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -34,41 +68,43 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 
 ### drop_field
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` the `field` will be dropped after parsing.
 
 ### field
 
-`default: "message"`
+`optional` `default: "message"` `type: string`
 
 The log field to tokenize.
 
 ### field_names
 
-`required` `example: (see above)`
+`required` `type: [string]` `example: ["timestamp", "level", "message"]`
 
 The log field names assigned to the resulting tokens, in order.
 
-### inputs
+### types
 
-`required` `example: ["my-source-id"]`
+`optional`
 
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
-### type
-
-`required` `must be: "tokenizer"`
-
-The component type
-
-### types.*
+Key/Value pairs representing mapped log field types.
 
 #### types.*
 
-`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+`required` `type: string`
 
-A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"bool"` | Coerces `"true"`/`/"false"`, `"1"`/`"0"`, and `"t"`/`"f"` values into boolean. |
+| `"float"` | Coerce to a 64 bit float. |
+| `"int"` | Coerce to a 64 bit integer. |
+| `"string"` | Coerce to a string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Input/Output
 
@@ -145,37 +181,6 @@ certain characters as special. These characters will be discarded:
 * `[...]` - Brackets are used to wrap phrases. Spaces are preserved, but the wrapping brackets will be discarded.
 * `\` - Can be used to escape the above characters, Vector will treat them as literal.
 
-### Types
-
-By default, extracted (parsed) fields all contain `string` values. You can
-coerce these values into types via the `types` table as shown in the
-[Config File](#config-file) example above. For example:
-
-```coffeescript
-[transforms.my_transform_id]
-  # ...
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-
-The available types are:
-
-| Type        | Desription                                                                                                          |
-|:------------|:--------------------------------------------------------------------------------------------------------------------|
-| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
-| `float`     | Coerce to 64 bit floats.                                                                                            |
-| `int`       | Coerce to a 64 bit integer.                                                                                         |
-| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -208,16 +213,13 @@ Finally, consider the following alternatives:
 
 
 [assets.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_tokenizer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+bug
 [urls.new_tokenizer_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+enhancement

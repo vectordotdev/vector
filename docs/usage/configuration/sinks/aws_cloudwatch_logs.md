@@ -27,18 +27,50 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
+```coffeescript
+[sinks.my_sink_id]
+  type = ["aws_cloudwatch_logs", "The name of this component"] # required, type: string, must be: "aws_cloudwatch_logs"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  group_name = "{{ file }}" # required, type: string, example: "{{ file }}"
+  region = "us-east-1" # required, type: string, example: "us-east-1"
+  stream_name = "{{ instance_id }}" # required, type: string, example: "{{ instance_id }}"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
-  inputs = ["my-source-id"]
-  group_name = "{{ file }}"
-  region = "us-east-1"
-  stream_name = "{{ instance_id }}"
+  type = ["aws_cloudwatch_logs", "The name of this component"] # required, type: string, must be: "aws_cloudwatch_logs"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  group_name = "{{ file }}" # required, type: string, example: "{{ file }}"
+  region = "us-east-1" # required, type: string, example: "us-east-1"
+  stream_name = "{{ instance_id }}" # required, type: string, example: "{{ instance_id }}"
   
-  # REQUIRED - Requests
-  encoding = "json" # enum: "json" or "text"
+  # OPTIONAL - General
+  create_missing_group = true # optional, default: true, type: bool
+  create_missing_stream = true # optional, default: true, type: bool
+  endpoint = "127.0.0.0:5000" # optional, no default, type: string, example: "127.0.0.0:5000"
+  healthcheck = true # optional, default: true, type: bool
+  
+  # OPTIONAL - Batching
+  batch_size = 1049000 # optional, default: 1049000, type: int, unit: bytes
+  batch_timeout = 1 # optional, default: 1, type: int, unit: seconds
+  
+  # OPTIONAL - Requests
+  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
+  rate_limit_num = 5 # optional, default: 5, type: int
+  request_in_flight_limit = 5 # optional, default: 5, type: int
+  request_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
+  retry_attempts = 5 # optional, default: 5, type: int
+  retry_backoff_secs = 5 # optional, default: 5, type: int, unit: seconds
+  
+  # OPTIONAL - Buffer
+  [sinks.my_sink_id.buffer]
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
+    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
+    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -47,137 +79,137 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
 
 ### batch_size
 
-`default: 1049000` `unit: bytes`
+`optional` `default: 1049000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed.
 
 ### batch_timeout
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed.
 
-### buffer.*
+### buffer
 
-#### buffer.max_size
+`optional`
 
-`no default` `example: 104900000` `unit: bytes`
-
-The maximum size of the buffer on the disk. Only relevant when type = "disk"
-
-#### buffer.num_items
-
-`default: 500` `unit: events`
-
-The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+Configures the sink specific buffer.
 
 #### buffer.type
 
-`default: "memory"` `enum: "memory" or "disk"`
+`optional` `default: "memory"` `type: string`
 
 The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"memory"` *(default)* | Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly. |
+| `"disk"` | Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts. |
+
 #### buffer.when_full
 
-`default: "block"` `enum: "block" or "drop_newest"`
+`optional` `default: "block"` `type: string`
 
 The behavior when the buffer becomes full.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"block"` *(default)* | Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge. |
+| `"drop_newest"` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
+
+#### buffer.max_size
+
+`optional` `no default` `type: int` `unit: bytes` `example: 104900000`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk".
+
+#### buffer.num_items
+
+`optional` `default: 500` `type: int` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory".
+
 ### create_missing_group
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream.
 
 ### create_missing_stream
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist.
 
-### encoding
-
-`required` `enum: "json" or "text"`
-
-The encoding format used to serialize the events as before flushing. See [Encodings](#encodings) for more info.
-
 ### endpoint
 
-`no default` `example: "127.0.0.0:5000"`
+`optional` `no default` `type: string` `example: "127.0.0.0:5000"`
 
 Custom endpoint for use with AWS-compatible services.
 
 ### group_name
 
-`required` `example: "{{ file }}"`
+`required` `type: string` `example: "{{ file }}"`
 
-The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
+The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### rate_limit_duration
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+The window used for the `request_rate_limit_num` option
 
 ### rate_limit_num
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the `rate_limit_duration` window.
 
 ### region
 
-`required` `example: "us-east-1"`
+`required` `type: string` `example: "us-east-1"`
 
 The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.
 
 ### request_in_flight_limit
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+The maximum number of in-flight requests allowed at any given time.
 
 ### request_timeout_secs
 
-`default: 30` `unit: seconds`
+`optional` `default: 30` `type: int` `unit: seconds`
 
-The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
 
 ### retry_attempts
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+The maximum number of retries to make for failed requests.
 
 ### retry_backoff_secs
 
-`default: 5` `unit: seconds`
+`optional` `default: 5` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting a failed request again.
 
 ### stream_name
 
-`required` `example: "{{ instance_id }}"`
+`required` `type: string` `example: "{{ instance_id }}"`
 
-The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
-
-### type
-
-`required` `must be: "aws_cloudwatch_logs"`
-
-The component type
+The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs stream. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
 
 ## Input/Output
 
@@ -242,60 +274,17 @@ differently, instead of treating them as global concepts, Vector treats them
 as sink specific concepts. This isolates sinks, ensuring services disruptions
 are contained and [delivery guarantees][docs.guarantees] are honored.
 
-#### Buffers types
-
-The `buffer.type` option allows you to control buffer resource usage:
-
-| Type     | Description                                                                                                    |
-|:---------|:---------------------------------------------------------------------------------------------------------------|
-| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a crash. Uses more memory. |
-| `disk`   | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below.                      |
-
-#### Buffer overflow
-
-The `buffer.when_full` option allows you to control the behavior when the
-buffer overflows:
-
-| Type          | Description                                                                                                                        |
-|:--------------|:-----------------------------------------------------------------------------------------------------------------------------------|
-| `block`       | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
-| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority.                  |
-
-#### Batch flushing
-
-Batches are flushed when 1 of 2 conditions are met:
+*Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `1 seconds`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
+
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
 ### Delivery Guarantee
 
 This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
 if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-
-### Encodings
-
-The `aws_cloudwatch_logs` sink encodes events before writing
-them downstream. This is controlled via the `encoding` option which accepts
-the following options:
-
-| Encoding | Description |
-| :------- | :---------- |
-| `json` | The payload will be encoded as a single JSON payload. |
-| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
-
-#### Dynamic encoding
-
-By default, the `encoding` chosen is dynamic based on the explicit/implcit
-nature of the event's structure. For example, if this event is parsed (explicit
-structuring), Vector will use `json` to encode the structured data. If the event
-was not explicitly structured, the `text` encoding will be used.
-
-To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
-it directly to the `aws_cloudwatch_logs` sink. It is less
-surprising that the outgoing data reflects the incoming data exactly since it
-was not explicitly structured.
 
 ### Environment Variables
 
@@ -372,16 +361,6 @@ enabling dynamic values derived from the event's data. This syntax accepts
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
-### Timeouts
-
-To ensure the pipeline does not halt when a service fails to respond Vector
-will abort requests after `30 seconds`.
-This can be adjsuted with the `request_timeout_secs` option.
-
-It is highly recommended that you do not lower value below the service's
-internal timeout, as this could create orphaned requests, pile on retries,
-and result in deuplicate data downstream.
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -406,7 +385,6 @@ issue, please:
 
 [assets.aws_cloudwatch_logs_sink]: ../../../assets/aws_cloudwatch_logs-sink.svg
 [assets.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
@@ -414,9 +392,6 @@ issue, please:
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+bug%22

@@ -27,177 +27,211 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "clickhouse" # must be: "clickhouse"
-  inputs = ["my-source-id"]
-  host = "http://localhost:8123"
-  table = "mytable"
+  type = ["clickhouse", "The name of this component"] # required, type: string, must be: "clickhouse"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  host = "http://localhost:8123" # required, type: string, example: "http://localhost:8123"
+  table = "mytable" # required, type: string, example: "mytable"
+  
+  # OPTIONAL - requests
+  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # optional, default: "gzip", type: string, must be: "gzip" (if supplied)
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = ["clickhouse", "The name of this component"] # required, type: string, must be: "clickhouse"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  host = "http://localhost:8123" # required, type: string, example: "http://localhost:8123"
+  table = "mytable" # required, type: string, example: "mytable"
+  
+  # OPTIONAL - General
+  database = "mydatabase" # optional, no default, type: string, example: "mydatabase"
+  healthcheck = true # optional, default: true, type: bool
+  
+  # OPTIONAL - Batching
+  batch_size = 1049000 # optional, default: 1049000, type: int, unit: bytes
+  batch_timeout = 1 # optional, default: 1, type: int, unit: seconds
   
   # OPTIONAL - Requests
-  compression = "gzip" # no default, must be: "gzip" (if supplied)
+  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
+  rate_limit_num = 5 # optional, default: 5, type: int
+  request_in_flight_limit = 5 # optional, default: 5, type: int
+  request_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
+  retry_attempts = 9223372036854775807 # optional, default: 9223372036854775807, type: int
+  retry_backoff_secs = 9223372036854775807 # optional, default: 9223372036854775807, type: int, unit: seconds
+  
+  # OPTIONAL - requests
+  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # optional, default: "gzip", type: string, must be: "gzip" (if supplied)
+  
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password" # required, type: string, example: "password"
+    user = "username" # required, type: string, example: "username"
+  
+  # OPTIONAL - Tls
+  [sinks.my_sink_id.tls]
+    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
+    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
+    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
+    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
+    verify_certificate = true # optional, default: true, type: bool
+    verify_hostname = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-### basic_auth.*
+### basic_auth
+
+`optional`
+
+Options for basic authentication.
 
 #### basic_auth.password
 
-`required` `example: "password"`
+`required` `type: string` `example: "password"`
 
 The basic authentication password.
 
 #### basic_auth.user
 
-`required` `example: "username"`
+`required` `type: string` `example: "username"`
 
 The basic authentication user name.
 
 ### batch_size
 
-`default: 1049000` `unit: bytes`
+`optional` `default: 1049000` `type: int` `unit: bytes`
 
 The maximum size of a batch before it is flushed.
 
 ### batch_timeout
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
 The maximum age of a batch before it is flushed.
 
 ### compression
 
-`no default` `must be: "gzip"`
+`optional` `default: "gzip"` `type: string`
 
-The compression type to use before writing data. See [Compression](#compression) for more info.
+The compression strategy used to compress the encoded event data before outputting.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"gzip"` *(default)* | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
 
 ### database
 
-`no default` `example: "mydatabase"`
+`optional` `no default` `type: string` `example: "mydatabase"`
 
 The database that contains the stable that data will be inserted into.
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### host
 
-`required` `example: "http://localhost:8123"`
+`required` `type: string` `example: "http://localhost:8123"`
 
 The host url of the [Clickhouse][urls.clickhouse] server.
 
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
 ### rate_limit_duration
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+The window used for the `request_rate_limit_num` option
 
 ### rate_limit_num
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the `rate_limit_duration` window.
 
 ### request_in_flight_limit
 
-`default: 5`
+`optional` `default: 5` `type: int`
 
-The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+The maximum number of in-flight requests allowed at any given time.
 
 ### request_timeout_secs
 
-`default: 30` `unit: seconds`
+`optional` `default: 30` `type: int` `unit: seconds`
 
-The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
 
 ### retry_attempts
 
-`default: 9223372036854775807`
+`optional` `default: 9223372036854775807` `type: int`
 
-The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+The maximum number of retries to make for failed requests.
 
 ### retry_backoff_secs
 
-`default: 9223372036854775807` `unit: seconds`
+`optional` `default: 9223372036854775807` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting a failed request again.
 
 ### table
 
-`required` `example: "mytable"`
+`required` `type: string` `example: "mytable"`
 
 The table that data will be inserted into.
 
-### tls.*
+### tls
+
+`optional`
+
+Configures the TLS options for connections from this sink.
 
 #### tls.ca_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/certificate_authority.crt"`
 
 Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
 
 #### tls.crt_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.crt"`
 
 Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
 
-#### tls.key_pass
-
-`no default` `example: "PassWord1"`
-
-Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
-
 #### tls.key_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.key"`
 
 Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
 
+#### tls.key_pass
+
+`optional` `no default` `type: string` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
 #### tls.verify_certificate
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
 
 #### tls.verify_hostname
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
-### type
-
-`required` `must be: "clickhouse"`
-
-The component type
-
 ## How It Works
-
-### Compression
-
-The `clickhouse` sink compresses payloads before
-flushing. This helps to reduce the payload size, ultimately reducing bandwidth
-and cost. This is controlled via the `compression` option. Each compression
-type is described in more detail below:
-
-| Compression | Description |
-|:------------|:------------|
-| `gzip` | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
 
 ### Delivery Guarantee
 
@@ -248,16 +282,6 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
-### Timeouts
-
-To ensure the pipeline does not halt when a service fails to respond Vector
-will abort requests after `30 seconds`.
-This can be adjsuted with the `request_timeout_secs` option.
-
-It is highly recommended that you do not lower value below the service's
-internal timeout, as this could create orphaned requests, pile on retries,
-and result in deuplicate data downstream.
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -280,13 +304,10 @@ issue, please:
 
 
 [assets.clickhouse_sink]: ../../../assets/clickhouse-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/

@@ -20,11 +20,41 @@ The `file` source ingests data through one or more local files and outputs [`log
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = "file" # must be: "file"
-  include = ["/var/log/nginx/*.log"]
+  type = ["file", "The name of this component"] # required, type: string, must be: "file"
+  include = ["/var/log/nginx/*.log"] # required, type: [string], example: ["/var/log/nginx/*.log"]
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sources.my_source_id]
+  # REQUIRED - General
+  type = ["file", "The name of this component"] # required, type: string, must be: "file"
+  include = ["/var/log/nginx/*.log"] # required, type: [string], example: ["/var/log/nginx/*.log"]
+  
+  # OPTIONAL - General
+  data_dir = "/var/lib/vector" # optional, no default, type: string, example: "/var/lib/vector"
+  exclude = ["/var/log/nginx/access.log"] # optional, no default, type: [string], example: ["/var/log/nginx/access.log"]
+  glob_minimum_cooldown = 1000 # optional, default: 1000, type: int, unit: milliseconds
+  ignore_older = 86400 # optional, no default, type: int, unit: seconds, example: 86400
+  max_line_bytes = 102400 # optional, default: 102400, type: int, unit: bytes
+  max_read_bytes = 2048 # optional, default: 2048, type: int, unit: bytes
+  message_start_indicator = "^(INFO|ERROR)" # optional, no default, type: string, example: "^(INFO|ERROR)"
+  multi_line_timeout = 1000 # optional, default: 1000, type: int, unit: milliseconds
+  oldest_first = false # optional, default: false, type: bool
+  start_at_beginning = false # optional, default: false, type: bool
+  
+  # OPTIONAL - Context
+  file_key = "file" # optional, default: "file", type: string
+  host_key = "host" # optional, default: "host", type: string
+  
+  # OPTIONAL - Fingerprinting
+  [sources.my_source_id.fingerprinting]
+    strategy = ["checksum", "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."] # optional, default: "checksum", type: string, enum: "checksum" or "device_and_inode"
+    fingerprint_bytes = 256 # optional, default: 256, type: int, unit: bytes, relevant when fingerprinting.strategy = "checksum"
+    ignored_header_bytes = 0 # optional, default: 0, type: int, unit: bytes, relevant when fingerprinting.strategy = "checksum"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -33,107 +63,112 @@ The `file` source ingests data through one or more local files and outputs [`log
 
 ### data_dir
 
-`no default` `example: "/var/lib/vector"`
+`optional` `no default` `type: string` `example: "/var/lib/vector"`
 
-The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
+The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir.
 
 ### exclude
 
-`no default` `example: ["/var/log/nginx/access.log"]`
+`optional` `no default` `type: [string]` `example: ["/var/log/nginx/access.log"]`
 
-Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*
+Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the [`include` option](#include).*
 
 ### file_key
 
-`default: "file"`
+`optional` `default: "file"` `type: string`
 
-The key name added to each event with the full path of the file. See [Context](#context) for more info.
+The key name added to each event with the full path of the file.
 
-### fingerprinting.*
+### fingerprinting
 
-#### fingerprinting.fingerprint_bytes
+`optional`
 
-`default: 256` `unit: bytes`
-
-The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.
-
-#### fingerprinting.ignored_header_bytes
-
-`default: 0` `unit: bytes`
-
-The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.
+Configuration for how the file source should identify files.
 
 #### fingerprinting.strategy
 
-`default: "checksum"` `enum: "checksum" or "device_and_inode"`
+`optional` `default: "checksum"` `type: string`
 
-Whether to use the content of a file to differentiate it (`checksum`) or the storage device and inode (`device_and_inode`). Depending on your log rotation strategy, one may be a better fit than the other.
+The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"checksum"` *(default)* | Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum. |
+| `"device_and_inode"` | Uses the [device and inode][urls.inode] to unique identify files. |
+
+#### fingerprinting.fingerprint_bytes
+
+`optional` `default: 256` `type: int` `unit: bytes`
+
+The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when fingerprinting.strategy = "checksum".
+
+#### fingerprinting.ignored_header_bytes
+
+`optional` `default: 0` `type: int` `unit: bytes`
+
+The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when fingerprinting.strategy = "checksum".
 
 ### glob_minimum_cooldown
 
-`default: 1000` `unit: milliseconds`
+`optional` `default: 1000` `type: int` `unit: milliseconds`
 
-Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
+Delay between file discovery calls. This controls the interval at which Vector searches for files.
 
 ### host_key
 
-`default: "host"`
+`optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host.
 
 ### ignore_older
 
-`no default` `example: 86400` `unit: seconds`
+`optional` `no default` `type: int` `unit: seconds` `example: 86400`
 
 Ignore files with a data modification date that does not exceed this age.
 
 ### include
 
-`required` `example: ["/var/log/nginx/*.log"]`
+`required` `type: [string]` `example: ["/var/log/nginx/*.log"]`
 
-Array of file patterns to include. [Globbing](#globbing) is supported. See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
+Array of file patterns to include. [Globbing](#globbing) is supported.
 
 ### max_line_bytes
 
-`default: 102400` `unit: bytes`
+`optional` `default: 102400` `type: int` `unit: bytes`
 
 The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.
 
 ### max_read_bytes
 
-`default: 2048` `unit: bytes`
+`optional` `default: 2048` `type: int` `unit: bytes`
 
 An approximate limit on the amount of data read from a single file at a given time.
 
 ### message_start_indicator
 
-`no default` `example: "^(INFO|ERROR)"`
+`optional` `no default` `type: string` `example: "^(INFO|ERROR)"`
 
 When present, Vector will aggregate multiple lines into a single event, using this pattern as the indicator that the previous lines should be flushed and a new event started. The pattern will be matched against entire lines as a regular expression, so remember to anchor as appropriate.
 
 ### multi_line_timeout
 
-`default: 1000` `unit: milliseconds`
+`optional` `default: 1000` `type: int` `unit: milliseconds`
 
 When `message_start_indicator` is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
 
 ### oldest_first
 
-`default: false`
+`optional` `default: false` `type: bool`
 
-Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files. See [File Read Order](#file-read-order) for more info.
+Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
 
 ### start_at_beginning
 
-`default: false`
+`optional` `default: false` `type: bool`
 
-When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
-
-### type
-
-`required` `must be: "file"`
-
-The component type
+When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.
 
 ## Input/Output
 
@@ -316,6 +351,7 @@ issue, please:
 
 [assets.file_source]: ../../../assets/file-source.svg
 [docs.configuration#data-directory]: ../../../usage/configuration#data-directory
+[docs.configuration#data_dir]: ../../../usage/configuration#data_dir
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.data-model.log]: ../../../about/data-model/log.md
@@ -330,6 +366,7 @@ issue, please:
 [urls.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
 [urls.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
+[urls.inode]: https://en.wikipedia.org/wiki/Inode
 [urls.new_file_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+bug
 [urls.new_file_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+enhancement
 [urls.vector_chat]: https://chat.vector.dev

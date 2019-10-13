@@ -20,200 +20,271 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "http" # must be: "http"
-  inputs = ["my-source-id"]
-  encoding = "ndjson" # enum: "ndjson" or "text"
-  uri = "https://10.22.212.22:9000/endpoint"
+  type = ["http", "The name of this component"] # required, type: string, must be: "http"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  uri = "https://10.22.212.22:9000/endpoint" # required, type: string, example: "https://10.22.212.22:9000/endpoint"
   
-  # OPTIONAL - General
-  compression = "gzip" # no default, must be: "gzip" (if supplied)
+  # REQUIRED - requests
+  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # required, type: string, enum: "ndjson" or "text"
   
   # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
-  batch_timeout = 5 # default, seconds
+  batch_size = 1049000 # optional, default: 1049000, type: int, unit: bytes
+  batch_timeout = 5 # optional, default: 5, type: int, unit: seconds
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = ["http", "The name of this component"] # required, type: string, must be: "http"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  uri = "https://10.22.212.22:9000/endpoint" # required, type: string, example: "https://10.22.212.22:9000/endpoint"
+  
+  # REQUIRED - requests
+  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # required, type: string, enum: "ndjson" or "text"
+  
+  # OPTIONAL - General
+  healthcheck = true # optional, default: true, type: bool
+  healthcheck_uri = "https://10.22.212.22:9000/_health" # optional, no default, type: string, example: "https://10.22.212.22:9000/_health"
+  
+  # OPTIONAL - Batching
+  batch_size = 1049000 # optional, default: 1049000, type: int, unit: bytes
+  batch_timeout = 5 # optional, default: 5, type: int, unit: seconds
+  
+  # OPTIONAL - Requests
+  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
+  rate_limit_num = 10 # optional, default: 10, type: int
+  request_in_flight_limit = 10 # optional, default: 10, type: int
+  request_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
+  retry_attempts = 10 # optional, default: 10, type: int
+  retry_backoff_secs = 10 # optional, default: 10, type: int, unit: seconds
+  
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password" # required, type: string, example: "password"
+    user = "username" # required, type: string, example: "username"
+  
+  # OPTIONAL - Buffer
+  [sinks.my_sink_id.buffer]
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
+    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
+    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
+  
+  # OPTIONAL - Headers
+  [sinks.my_sink_id.headers]
+    X-Powered-By = "Vector"
+  
+  # OPTIONAL - Tls
+  [sinks.my_sink_id.tls]
+    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
+    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
+    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
+    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
+    verify_certificate = true # optional, default: true, type: bool
+    verify_hostname = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-### basic_auth.*
+### basic_auth
+
+`optional`
+
+Options for basic authentication.
 
 #### basic_auth.password
 
-`required` `example: "password"`
+`required` `type: string` `example: "password"`
 
 The basic authentication password.
 
 #### basic_auth.user
 
-`required` `example: "username"`
+`required` `type: string` `example: "username"`
 
 The basic authentication user name.
 
 ### batch_size
 
-`default: 1049000` `unit: bytes`
+`optional` `default: 1049000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed.
 
 ### batch_timeout
 
-`default: 5` `unit: seconds`
+`optional` `default: 5` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed.
 
-### buffer.*
+### buffer
 
-#### buffer.max_size
+`optional`
 
-`no default` `example: 104900000` `unit: bytes`
-
-The maximum size of the buffer on the disk. Only relevant when type = "disk"
-
-#### buffer.num_items
-
-`default: 500` `unit: events`
-
-The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+Configures the sink specific buffer.
 
 #### buffer.type
 
-`default: "memory"` `enum: "memory" or "disk"`
+`optional` `default: "memory"` `type: string`
 
 The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"memory"` *(default)* | Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly. |
+| `"disk"` | Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts. |
+
 #### buffer.when_full
 
-`default: "block"` `enum: "block" or "drop_newest"`
+`optional` `default: "block"` `type: string`
 
 The behavior when the buffer becomes full.
 
-### compression
+The field is an enumeration and only accepts the following values:
 
-`no default` `must be: "gzip"`
+| Value | Description |
+|:------|:------------|
+| `"block"` *(default)* | Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge. |
+| `"drop_newest"` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
 
-The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.
+#### buffer.max_size
+
+`optional` `no default` `type: int` `unit: bytes` `example: 104900000`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk".
+
+#### buffer.num_items
+
+`optional` `default: 500` `type: int` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory".
 
 ### encoding
 
-`required` `enum: "ndjson" or "text"`
+`required` `type: string`
 
-The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.
+The encoding format used to serialize the events before outputting.
 
-### headers.*
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"ndjson"` | Each event is encoded into JSON and the payload is new line delimited. |
+| `"text"` | Each event is encoded into text via the `message` key and the payload is new line delimited. |
+
+### headers
+
+`optional`
+
+Options for custom headers.
 
 #### headers.*
 
-`required` `example: (see above)`
+`required` `type: string` `example: X-Powered-By = "Vector"`
 
 A custom header to be added to each outgoing HTTP request.
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+Enables/disables the sink healthcheck upon start.
 
 ### healthcheck_uri
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "https://10.22.212.22:9000/_health"`
 
-A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.
-
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+A URI that Vector can request in order to determine the service health.
 
 ### rate_limit_duration
 
-`default: 1` `unit: seconds`
+`optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+The window used for the `request_rate_limit_num` option
 
 ### rate_limit_num
 
-`default: 10`
+`optional` `default: 10` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the `rate_limit_duration` window.
 
 ### request_in_flight_limit
 
-`default: 10`
+`optional` `default: 10` `type: int`
 
-The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+The maximum number of in-flight requests allowed at any given time.
 
 ### request_timeout_secs
 
-`default: 30` `unit: seconds`
+`optional` `default: 30` `type: int` `unit: seconds`
 
-The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
 
 ### retry_attempts
 
-`default: 10`
+`optional` `default: 10` `type: int`
 
-The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+The maximum number of retries to make for failed requests.
 
 ### retry_backoff_secs
 
-`default: 10` `unit: seconds`
+`optional` `default: 10` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting a failed request again.
 
-### tls.*
+### tls
+
+`optional`
+
+Configures the TLS options for connections from this sink.
 
 #### tls.ca_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/certificate_authority.crt"`
 
 Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
 
 #### tls.crt_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.crt"`
 
 Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
 
-#### tls.key_pass
-
-`no default` `example: "PassWord1"`
-
-Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
-
 #### tls.key_path
 
-`no default` `example: (see above)`
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.key"`
 
 Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
 
+#### tls.key_pass
+
+`optional` `no default` `type: string` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
 #### tls.verify_certificate
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
 
 #### tls.verify_hostname
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
-### type
-
-`required` `must be: "http"`
-
-The component type
-
 ### uri
 
-`required` `example: (see above)`
+`required` `type: string` `example: "https://10.22.212.22:9000/endpoint"`
 
 The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
 
@@ -258,71 +329,17 @@ differently, instead of treating them as global concepts, Vector treats them
 as sink specific concepts. This isolates sinks, ensuring services disruptions
 are contained and [delivery guarantees][docs.guarantees] are honored.
 
-#### Buffers types
-
-The `buffer.type` option allows you to control buffer resource usage:
-
-| Type     | Description                                                                                                    |
-|:---------|:---------------------------------------------------------------------------------------------------------------|
-| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a crash. Uses more memory. |
-| `disk`   | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below.                      |
-
-#### Buffer overflow
-
-The `buffer.when_full` option allows you to control the behavior when the
-buffer overflows:
-
-| Type          | Description                                                                                                                        |
-|:--------------|:-----------------------------------------------------------------------------------------------------------------------------------|
-| `block`       | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
-| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority.                  |
-
-#### Batch flushing
-
-Batches are flushed when 1 of 2 conditions are met:
+*Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `5 seconds`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
 
-### Compression
-
-The `http` sink compresses payloads before
-flushing. This helps to reduce the payload size, ultimately reducing bandwidth
-and cost. This is controlled via the `compression` option. Each compression
-type is described in more detail below:
-
-| Compression | Description |
-|:------------|:------------|
-| `gzip` | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
 ### Delivery Guarantee
 
 This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
 if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-
-### Encodings
-
-The `http` sink encodes events before writing
-them downstream. This is controlled via the `encoding` option which accepts
-the following options:
-
-| Encoding | Description |
-| :------- | :---------- |
-| `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
-| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
-
-#### Dynamic encoding
-
-By default, the `encoding` chosen is dynamic based on the explicit/implcit
-nature of the event's structure. For example, if this event is parsed (explicit
-structuring), Vector will use `json` to encode the structured data. If the event
-was not explicitly structured, the `text` encoding will be used.
-
-To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
-it directly to the `http` sink. It is less
-surprising that the outgoing data reflects the incoming data exactly since it
-was not explicitly structured.
 
 ### Environment Variables
 
@@ -370,16 +387,6 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
-### Timeouts
-
-To ensure the pipeline does not halt when a service fails to respond Vector
-will abort requests after `30 seconds`.
-This can be adjsuted with the `request_timeout_secs` option.
-
-It is highly recommended that you do not lower value below the service's
-internal timeout, as this could create orphaned requests, pile on retries,
-and result in deuplicate data downstream.
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -403,19 +410,14 @@ issue, please:
 
 [assets.http_sink]: ../../../assets/http-sink.svg
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
-[urls.gzip]: https://www.gzip.org/
 [urls.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+bug%22
 [urls.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+enhancement%22
 [urls.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22

@@ -52,8 +52,8 @@ null = true
 default = "largest"
 description = """\
 If offsets for consumer group do not exist, set them using this strategy. \
-[librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) \
-for `auto.offset.reset` option for explanation.\
+[librdkafka documentation][urls.lib_rdkafka_config] for `auto.offset.reset` \
+option for explanation.\
 """
 
 [sources.kafka.options.session_timeout_ms]

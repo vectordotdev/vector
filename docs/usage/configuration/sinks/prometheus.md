@@ -27,13 +27,27 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "prometheus" # must be: "prometheus"
-  inputs = ["my-source-id"]
-  address = "0.0.0.0:9598"
-  namespace = "service"
+  type = ["prometheus", "The name of this component"] # required, type: string, must be: "prometheus"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  address = "0.0.0.0:9598" # required, type: string, example: "0.0.0.0:9598"
+  namespace = "service" # required, type: string, example: "service"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED
+  type = ["prometheus", "The name of this component"] # required, type: string, must be: "prometheus"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  address = "0.0.0.0:9598" # required, type: string, example: "0.0.0.0:9598"
+  namespace = "service" # required, type: string, example: "service"
+  
+  # OPTIONAL
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0], type: [float], unit: seconds
+  healthcheck = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -42,40 +56,28 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 
 ### address
 
-`required` `example: "0.0.0.0:9598"`
+`required` `type: string` `example: "0.0.0.0:9598"`
 
-The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.
+The address to expose for scraping.
 
 ### buckets
 
-`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `unit: seconds`
+`optional` `default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `type: [float]` `unit: seconds`
 
-Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
+Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics.
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Enables/disables the sink healthcheck upon start.
 
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
 ### namespace
 
-`required` `example: "service"`
+`required` `type: string` `example: "service"`
 
 A prefix that will be added to all metric names.
 It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
-
-### type
-
-`required` `must be: "prometheus"`
-
-The component type
 
 ## Input/Output
 
@@ -351,7 +353,6 @@ discussion with your use case if you find this to be a problem.
 
 
 [assets.prometheus_sink]: ../../../assets/prometheus-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric#counters]: ../../../about/data-model/metric.md#counters
 [docs.data-model.metric#gauges]: ../../../about/data-model/metric.md#gauges
@@ -361,8 +362,6 @@ discussion with your use case if you find this to be a problem.
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710

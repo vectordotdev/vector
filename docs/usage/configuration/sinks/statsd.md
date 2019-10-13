@@ -27,12 +27,25 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = "statsd" # must be: "statsd"
-  inputs = ["my-source-id"]
-  namespace = "service"
+  type = ["statsd", "The name of this component"] # required, type: string, must be: "statsd"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  namespace = "service" # required, type: string, example: "service"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED
+  type = ["statsd", "The name of this component"] # required, type: string, must be: "statsd"
+  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  namespace = "service" # required, type: string, example: "service"
+  
+  # OPTIONAL
+  address = "127.0.0.1:8125" # optional, default: "127.0.0.1:8125", type: string
+  healthcheck = true # optional, default: true, type: bool
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -41,33 +54,21 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 
 ### address
 
-`default: "127.0.0.1:8125"`
+`optional` `default: "127.0.0.1:8125"` `type: string`
 
 The UDP socket address to send stats to.
 
 ### healthcheck
 
-`default: true`
+`optional` `default: true` `type: bool`
 
 Enables/disables the sink healthcheck upon start.
 
-### inputs
-
-`required` `example: ["my-source-id"]`
-
-A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
-
 ### namespace
 
-`required` `example: "service"`
+`required` `type: string` `example: "service"`
 
 A prefix that will be added to all metric names.
-
-### type
-
-`required` `must be: "statsd"`
-
-The component type
 
 ## Input/Output
 
@@ -120,13 +121,10 @@ issue, please:
 
 
 [assets.statsd_sink]: ../../../assets/statsd-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_statsd_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+bug
 [urls.new_statsd_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+enhancement
