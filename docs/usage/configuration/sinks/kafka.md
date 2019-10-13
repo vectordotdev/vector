@@ -53,8 +53,8 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
-    max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default, unit: events, relevant when type = "memory"
+    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum: "block" or "drop_newest"
   
   # OPTIONAL - Tls

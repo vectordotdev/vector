@@ -42,7 +42,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
   address = "0.0.0.0:9000"
   
   # OPTIONAL
-  shutdown_timeout_secs = 30 # default, unit: seconds
+  shutdown_timeout_secs = 30 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

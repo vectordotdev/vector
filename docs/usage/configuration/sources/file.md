@@ -37,12 +37,12 @@ The `file` source ingests data through one or more local files and outputs [`log
   # OPTIONAL - General
   data_dir = "/var/lib/vector" # no default
   exclude = ["/var/log/nginx/access.log"] # no default
-  glob_minimum_cooldown = 1000 # default, unit: milliseconds
-  ignore_older = 86400 # no default, unit: seconds
-  max_line_bytes = 102400 # default, unit: bytes
-  max_read_bytes = 2048 # default, unit: bytes
+  glob_minimum_cooldown = 1000 # default, milliseconds
+  ignore_older = 86400 # no default, seconds
+  max_line_bytes = 102400 # default, bytes
+  max_read_bytes = 2048 # default, bytes
   message_start_indicator = "^(INFO|ERROR)" # no default
-  multi_line_timeout = 1000 # default, unit: milliseconds
+  multi_line_timeout = 1000 # default, milliseconds
   oldest_first = false # default
   start_at_beginning = false # default
   
@@ -53,8 +53,8 @@ The `file` source ingests data through one or more local files and outputs [`log
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
     strategy = "checksum" # default, enum: "checksum" or "device_and_inode"
-    fingerprint_bytes = 256 # default, unit: bytes, relevant when fingerprinting.strategy = "checksum"
-    ignored_header_bytes = 0 # default, unit: bytes, relevant when fingerprinting.strategy = "checksum"
+    fingerprint_bytes = 256 # default, bytes, relevant when fingerprinting.strategy = "checksum"
+    ignored_header_bytes = 0 # default, bytes, relevant when fingerprinting.strategy = "checksum"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

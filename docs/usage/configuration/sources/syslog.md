@@ -36,7 +36,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
   
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default, relevant when mode = "tcp" or mode = "udp"
-  max_length = 102400 # default, unit: bytes
+  max_length = 102400 # default, bytes
   path = "/path/to/socket" # no default, relevant when mode = "unix"
   
   # OPTIONAL - Context

@@ -48,7 +48,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   # OPTIONAL
   auto_offset_reset = "smallest" # default
   key_field = "user_id" # no default
-  session_timeout_ms = 5000 # default, unit: milliseconds
+  session_timeout_ms = 5000 # default, milliseconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

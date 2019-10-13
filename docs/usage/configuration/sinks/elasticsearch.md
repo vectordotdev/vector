@@ -51,16 +51,16 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   region = "us-east-1" # no default
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # default, unit: bytes
-  batch_timeout = 1 # default, unit: seconds
+  batch_size = 10490000 # default, bytes
+  batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
-  request_timeout_secs = 60 # default, unit: seconds
+  request_timeout_secs = 60 # default, seconds
   retry_attempts = 5 # default
-  retry_backoff_secs = 5 # default, unit: seconds
+  retry_backoff_secs = 5 # default, seconds
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
@@ -70,8 +70,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
-    max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
-    num_items = 500 # default, unit: events, relevant when type = "memory"
+    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum: "block" or "drop_newest"
   
   # OPTIONAL - Headers

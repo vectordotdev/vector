@@ -33,7 +33,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
   type = "stdin" # must be: "stdin"
   
   # OPTIONAL - General
-  max_length = 102400 # default, unit: bytes
+  max_length = 102400 # default, bytes
   
   # OPTIONAL - Context
   host_key = "host" # default

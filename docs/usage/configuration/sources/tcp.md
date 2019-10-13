@@ -35,8 +35,8 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
   address = "0.0.0.0:9000"
   
   # OPTIONAL - General
-  max_length = 102400 # default, unit: bytes
-  shutdown_timeout_secs = 30 # default, unit: seconds
+  max_length = 102400 # default, bytes
+  shutdown_timeout_secs = 30 # default, seconds
   
   # OPTIONAL - Context
   host_key = "host" # default

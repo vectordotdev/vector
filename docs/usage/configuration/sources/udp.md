@@ -35,7 +35,7 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
   address = "0.0.0.0:9000"
   
   # OPTIONAL - General
-  max_length = 102400 # default, unit: bytes
+  max_length = 102400 # default, bytes
   
   # OPTIONAL - Context
   host_key = "host" # default

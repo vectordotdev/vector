@@ -54,16 +54,16 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   healthcheck = true # default
   
   # OPTIONAL - Batching
-  batch_size = 1049000 # default, unit: bytes
-  batch_timeout = 1 # default, unit: seconds
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
-  request_timeout_secs = 30 # default, unit: seconds
+  request_timeout_secs = 30 # default, seconds
   retry_attempts = 9223372036854775807 # default
-  retry_backoff_secs = 9223372036854775807 # default, unit: seconds
+  retry_backoff_secs = 9223372036854775807 # default, seconds
   
   # OPTIONAL - requests
   compression = "gzip" # default, must be: "gzip" (if supplied)

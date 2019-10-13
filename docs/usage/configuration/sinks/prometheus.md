@@ -46,7 +46,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
   namespace = "service"
   
   # OPTIONAL
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, unit: seconds
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
   healthcheck = true # default
 ```
 {% endcode-tabs-item %}

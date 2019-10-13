@@ -210,7 +210,7 @@ class Templates
     description
   end
 
-  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true)
+  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true, unit: true)
     tags = []
 
     if optionality
@@ -235,8 +235,12 @@ class Templates
       tags << "type: #{option.type}"
     end
 
-    if !option.unit.nil?
-      tags << "unit: #{option.unit}"
+    if unit && !option.unit.nil?
+      if unit == :short
+        tags << option.unit
+      else
+        tags << "unit: #{option.unit}"
+      end
     end
 
     if example && option.default.nil? && option.enum.nil? && option.examples.any?
