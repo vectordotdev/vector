@@ -58,6 +58,7 @@ scopes:
   - blackhole sink
   - clickhouse sink
   - console sink
+  - datadog_metrics sink
   - elasticsearch sink
   - file sink
   - http sink

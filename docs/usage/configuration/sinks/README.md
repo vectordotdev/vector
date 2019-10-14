@@ -29,6 +29,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
 | [**`clickhouse`**][docs.sinks.clickhouse] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]. |
 | [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`. |
+| [**`datadog_metrics`**][docs.sinks.datadog_metrics] | [Batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics). |
 | [**`elasticsearch`**][docs.sinks.elasticsearch] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`file`**][docs.sinks.file] | [Streams](#streaming) [`log`][docs.data-model.log] events to a file. |
 | [**`http`**][docs.sinks.http] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint. |
@@ -54,6 +55,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 [docs.sinks.blackhole]: ../../../usage/configuration/sinks/blackhole.md
 [docs.sinks.clickhouse]: ../../../usage/configuration/sinks/clickhouse.md
 [docs.sinks.console]: ../../../usage/configuration/sinks/console.md
+[docs.sinks.datadog_metrics]: ../../../usage/configuration/sinks/datadog_metrics.md
 [docs.sinks.elasticsearch]: ../../../usage/configuration/sinks/elasticsearch.md
 [docs.sinks.file]: ../../../usage/configuration/sinks/file.md
 [docs.sinks.http]: ../../../usage/configuration/sinks/http.md
@@ -69,6 +71,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.datadog]: https://www.datadoghq.com
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

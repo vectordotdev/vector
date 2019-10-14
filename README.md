@@ -155,6 +155,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
 | [**`clickhouse`**][docs.sinks.clickhouse] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]. |
 | [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`. |
+| [**`datadog_metrics`**][docs.sinks.datadog_metrics] | [Batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics). |
 | [**`elasticsearch`**][docs.sinks.elasticsearch] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`file`**][docs.sinks.file] | [Streams](#streaming) [`log`][docs.data-model.log] events to a file. |
 | [**`http`**][docs.sinks.http] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint. |
@@ -221,6 +222,7 @@ the License.
 [docs.sinks.blackhole]: https://docs.vector.dev/usage/configuration/sinks/blackhole
 [docs.sinks.clickhouse]: https://docs.vector.dev/usage/configuration/sinks/clickhouse
 [docs.sinks.console]: https://docs.vector.dev/usage/configuration/sinks/console
+[docs.sinks.datadog_metrics]: https://docs.vector.dev/usage/configuration/sinks/datadog_metrics
 [docs.sinks.elasticsearch]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
 [docs.sinks.file]: https://docs.vector.dev/usage/configuration/sinks/file
 [docs.sinks.http]: https://docs.vector.dev/usage/configuration/sinks/http
@@ -268,6 +270,7 @@ the License.
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.datadog]: https://www.datadoghq.com
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.kafka]: https://kafka.apache.org/
