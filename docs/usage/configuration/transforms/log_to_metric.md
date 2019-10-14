@@ -20,7 +20,21 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
+```coffeescript
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = "log_to_metric" # must be: "log_to_metric"
+  inputs = ["my-source-id"]
+  
+  # REQUIRED - Metrics
+  [[transforms.my_transform_id.metrics]]
+    type = "counter" # enum: "counter", "gauge", "histogram", and "set"
+    field = "duration"
+    name = "duration_total"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -36,7 +50,10 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
     
     # OPTIONAL
     increment_by_value = false # default, relevant when type = "counter"
-    tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
+    [transforms.my_transform_id.metrics.tags]
+      host = "${HOSTNAME}" # example
+      region = "us-east-1" # example
+      status = "{{status}}" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -45,7 +62,7 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 
 ### metrics
 
-`required`
+`required` `type: [table]`
 
 A table of key/value pairs representing the keys to be added to the event.
 
@@ -68,7 +85,7 @@ The field is an enumeration and only accepts the following values:
 
 `required` `type: string` `example: "duration"`
 
-The log field to use as the metric.
+The log field to use as the metric. See [Null Fields](#null-fields) for more info.
 
 #### metrics.increment_by_value
 
@@ -84,7 +101,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
 
 #### metrics.tags
 
-`optional`
+`optional` `type: table`
 
 Key/value pairs representing [metric tags][docs.data-model#tags].
 

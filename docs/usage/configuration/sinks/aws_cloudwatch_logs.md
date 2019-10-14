@@ -81,17 +81,17 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
 
 `optional` `default: 1049000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### batch_timeout
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### buffer
 
-`optional`
+`optional` `type: table`
 
 Configures the sink specific buffer.
 
@@ -155,25 +155,25 @@ Custom endpoint for use with AWS-compatible services.
 
 `required` `type: string` `example: "{{ file }}"`
 
-The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
+The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
 ### healthcheck
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### rate_limit_duration
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
 
 ### rate_limit_num
 
 `optional` `default: 5` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window.
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
 
 ### region
 
@@ -185,7 +185,7 @@ The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream 
 
 `optional` `default: 5` `type: int`
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 ### request_timeout_secs
 
@@ -197,19 +197,19 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 `optional` `default: 5` `type: int`
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 ### retry_backoff_secs
 
 `optional` `default: 5` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 ### stream_name
 
 `required` `type: string` `example: "{{ instance_id }}"`
 
-The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs stream. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
+The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs stream. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
 ## Input/Output
 

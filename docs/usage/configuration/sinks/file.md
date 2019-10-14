@@ -81,7 +81,7 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
 
 `required` `type: string` `example: "vector-%Y-%m-%d.log"`
 
-File name to write events to. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
+File name to write events to. This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Template Syntax](#template-syntax) for more info.
 
 ## How It Works
 

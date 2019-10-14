@@ -1,9 +1,9 @@
 <%- options.each do |option| -%>
 <%- full_path = [path, option.name].compact.join(".") -%>
-<%- if !option.options.nil? -%>
+<%- if option.options.any? -%>
 <%= "#" * depth %> <%= full_path %>
 
-<% if option.required? %>`required`<% else %>`optional`<% end %>
+<%= option_tags(option, default: false, enum: false).collect { |tag| "`#{tag}`" }.join(" ") %>
 <%- if option.description -%>
 
 <%= option.description %>
@@ -16,7 +16,7 @@
 
 <%= option_tags(option, enum: false, relevant_when: false).collect { |tag| "`#{tag}`" }.join(" ") %>
 
-<%= option_description(option) %>
+<%= option_description(option) %>[[references:<%= option.name %>]]
 <%- if !option.enum.nil? -%>
 
 The field is an enumeration and only accepts the following values:

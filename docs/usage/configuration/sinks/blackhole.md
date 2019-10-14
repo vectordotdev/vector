@@ -48,7 +48,7 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`me
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### print_amount
 

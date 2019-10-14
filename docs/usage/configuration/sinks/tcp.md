@@ -76,7 +76,7 @@ The TCP address.
 
 ### buffer
 
-`optional`
+`optional` `type: table`
 
 Configures the sink specific buffer.
 
@@ -135,11 +135,11 @@ The field is an enumeration and only accepts the following values:
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### tls
 
-`optional`
+`optional` `type: table`
 
 Configures the TLS options for connections from this sink.
 

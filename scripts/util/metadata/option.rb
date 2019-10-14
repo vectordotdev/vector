@@ -29,6 +29,8 @@ class Option
         options_hashes.collect do |sub_name, sub_hash|
           self.class.new(sub_hash.merge("name" => sub_name))
         end
+    else
+      @options = []
     end
 
     @name = hash.fetch("name")
@@ -45,10 +47,14 @@ class Option
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    @category = hash["category"] || ((@options.nil? || inline?) ? "General" : @name.humanize)
+    @category = hash["category"] || ((@options.empty? || inline?) ? "General" : @name.humanize)
 
     if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")
+    end
+
+    if @options.any? && @simple
+      raise ArgumentError.new("#{self.class.name}#simple cannot be true when options are passed")
     end
 
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
@@ -67,7 +73,7 @@ class Option
       end
     end
 
-    if @examples.empty? && @options.nil? && !table?
+    if @examples.empty? && @options.empty? && !table?
       raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
     end
 
@@ -80,6 +86,14 @@ class Option
 
   def <=>(other_option)
     name <=> other_option.name
+  end
+
+  def advanced?
+    if options.any?
+      options.any?(&:advanced?)
+    else
+      !simple?
+    end
   end
 
   def array?(inner_type)
@@ -163,7 +177,15 @@ class Option
   end
 
   def simple?
-    @simple == true || required?
+    if options.any?
+      required? && simple_options.any?
+    else
+      @simple == true || required?
+    end
+  end
+
+  def simple_options
+    @simple_options ||= options.select(&:simple?)
   end
 
   def table?

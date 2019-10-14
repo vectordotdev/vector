@@ -23,19 +23,8 @@ The `coercer` transform accepts [`log`][docs.data-model.log] events and allows y
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -44,7 +33,7 @@ The `coercer` transform accepts [`log`][docs.data-model.log] events and allows y
 
 ### types
 
-`optional`
+`optional` `type: table`
 
 Key/Value pairs representing mapped log field types.
 

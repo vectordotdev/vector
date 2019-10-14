@@ -29,8 +29,8 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
   
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
+    my_tag = "my value" # example
+    my_env_tag = "${ENV_VAR}" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -39,7 +39,7 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
 
 ### tags
 
-`required`
+`required` `type: table`
 
 A table of key/value pairs representing the tags to be added to the metric.
 

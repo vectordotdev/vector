@@ -56,7 +56,7 @@ The address to bind the socket to.
 
 `optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host.
+The key name added to each event representing the current host. See [Context](#context) for more info.
 
 ### max_length
 

@@ -150,44 +150,6 @@ data_dir = "/var/lib/vector"
   # * unit: bytes
   max_line_bytes = 102400
 
-  # An approximate limit on the amount of data read from a single file at a given
-  # time.
-  # 
-  # * optional
-  # * default: 2048
-  # * type: int
-  # * unit: bytes
-  max_read_bytes = 2048
-
-  # When present, Vector will aggregate multiple lines into a single event, using
-  # this pattern as the indicator that the previous lines should be flushed and a
-  # new event started. The pattern will be matched against entire lines as a
-  # regular expression, so remember to anchor as appropriate.
-  # 
-  # * optional
-  # * no default
-  # * type: string
-  message_start_indicator = "^(INFO|ERROR)"
-
-  # When `message_start_indicator` is present, this sets the amount of time
-  # Vector will buffer lines into a single event before flushing, regardless of
-  # whether or not it has seen a line indicating the start of a new message.
-  # 
-  # * optional
-  # * default: 1000
-  # * type: int
-  # * unit: milliseconds
-  multi_line_timeout = 1000
-
-  # Instead of balancing read capacity fairly across all watched files,
-  # prioritize draining the oldest files before moving on to read data from
-  # younger files.
-  # 
-  # * optional
-  # * default: false
-  # * type: bool
-  oldest_first = false
-
   # When `true` Vector will read from the beginning of new files, when `false`
   # Vector will only read new data added to the file.
   # 
@@ -213,6 +175,52 @@ data_dir = "/var/lib/vector"
   # * default: "host"
   # * type: string
   host_key = "host"
+
+  #
+  # Multi-line
+  #
+
+  # When present, Vector will aggregate multiple lines into a single event, using
+  # this pattern as the indicator that the previous lines should be flushed and a
+  # new event started. The pattern will be matched against entire lines as a
+  # regular expression, so remember to anchor as appropriate.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  message_start_indicator = "^(INFO|ERROR)"
+
+  # When `message_start_indicator` is present, this sets the amount of time
+  # Vector will buffer lines into a single event before flushing, regardless of
+  # whether or not it has seen a line indicating the start of a new message.
+  # 
+  # * optional
+  # * default: 1000
+  # * type: int
+  # * unit: milliseconds
+  multi_line_timeout = 1000
+
+  #
+  # Priority
+  #
+
+  # An approximate limit on the amount of data read from a single file at a given
+  # time.
+  # 
+  # * optional
+  # * default: 2048
+  # * type: int
+  # * unit: bytes
+  max_read_bytes = 2048
+
+  # Instead of balancing read capacity fairly across all watched files,
+  # prioritize draining the oldest files before moving on to read data from
+  # younger files.
+  # 
+  # * optional
+  # * default: false
+  # * type: bool
+  oldest_first = false
 
   #
   # Fingerprinting

@@ -23,20 +23,9 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
@@ -53,13 +42,13 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -76,17 +65,17 @@ If the specified `field` should be dropped (removed) after parsing.
 
 `optional` `default: "message"` `type: string`
 
-The log field to parse.
+The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
 
 ### regex
 
 `required` `type: string` `example: "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"`
 
-The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
+The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
 
 ### types
 
-`optional`
+`optional` `type: table`
 
 Key/Value pairs representing mapped log field types.
 

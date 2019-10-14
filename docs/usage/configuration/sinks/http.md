@@ -77,7 +77,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    X-Powered-By = "Vector"
+    X-Powered-By = "Vector" # example
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -95,7 +95,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
 
 ### basic_auth
 
-`optional`
+`optional` `type: table`
 
 Options for basic authentication.
 
@@ -115,17 +115,17 @@ The basic authentication user name.
 
 `optional` `default: 1049000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### batch_timeout
 
 `optional` `default: 5` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### buffer
 
-`optional`
+`optional` `type: table`
 
 Configures the sink specific buffer.
 
@@ -182,7 +182,7 @@ The field is an enumeration and only accepts the following values:
 
 ### headers
 
-`optional`
+`optional` `type: table`
 
 Options for custom headers.
 
@@ -196,31 +196,31 @@ A custom header to be added to each outgoing HTTP request.
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### healthcheck_uri
 
 `optional` `no default` `type: string` `example: "https://10.22.212.22:9000/_health"`
 
-A URI that Vector can request in order to determine the service health.
+A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.
 
 ### rate_limit_duration
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
 
 ### rate_limit_num
 
 `optional` `default: 10` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window.
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
 
 ### request_in_flight_limit
 
 `optional` `default: 10` `type: int`
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 ### request_timeout_secs
 
@@ -232,17 +232,17 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 `optional` `default: 10` `type: int`
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 ### retry_backoff_secs
 
 `optional` `default: 10` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 ### tls
 
-`optional`
+`optional` `type: table`
 
 Configures the TLS options for connections from this sink.
 

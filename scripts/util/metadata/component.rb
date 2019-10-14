@@ -64,6 +64,10 @@ class Component
     name <=> other.name
   end
 
+  def advanced_relevant?
+    options_list.any?(&:advanced?)
+  end
+
   def beta?
     beta == true
   end
@@ -78,10 +82,6 @@ class Component
 
   def partition_options
     options_list.select(&:partition_key?)
-  end
-
-  def simple_options
-    options_list.select(&:simple?)
   end
 
   def sink?

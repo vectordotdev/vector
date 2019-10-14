@@ -57,7 +57,7 @@ The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "
 
 `optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host.
+The key name added to each event representing the current host. See [Context](#context) for more info.
 
 ### max_length
 

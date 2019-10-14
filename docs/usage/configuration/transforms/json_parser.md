@@ -48,13 +48,13 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 
 `required` `type: bool` `example: true`
 
-If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through.
+If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.
 
 ### field
 
 `optional` `default: "message"` `type: string`
 
-The log field to decode as JSON. Must be a `string` value type.
+The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
 
 ## Input/Output
 

@@ -23,20 +23,9 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
@@ -53,13 +42,13 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -86,7 +75,7 @@ The log field names assigned to the resulting tokens, in order.
 
 ### types
 
-`optional`
+`optional` `type: table`
 
 Key/Value pairs representing mapped log field types.
 

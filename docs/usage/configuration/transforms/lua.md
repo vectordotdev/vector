@@ -75,7 +75,7 @@ end
 
 `optional` `no default` `type: [string]` `example: ["/etc/vector/lua"]`
 
-A list of directories search when loading a Lua file via the `require` function.
+A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.
 
 ### source
 
@@ -91,7 +91,7 @@ if event["host"] == nil then
 end
 """`
 
-The inline Lua source to evaluate.
+The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.
 
 ## Input/Output
 

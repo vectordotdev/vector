@@ -78,7 +78,7 @@ A list of host and port pairs that the Kafka client should contact to bootstrap 
 
 ### buffer
 
-`optional`
+`optional` `type: table`
 
 Configures the sink specific buffer.
 
@@ -137,7 +137,7 @@ The field is an enumeration and only accepts the following values:
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### key_field
 
@@ -147,7 +147,7 @@ The log field name to use for the topic key. If unspecified, the key will be ran
 
 ### tls
 
-`optional`
+`optional` `type: table`
 
 Configures the TLS options for connections from this sink.
 

@@ -137,6 +137,7 @@ fingerprint. This is helpful if all files share a common header.\
 
 [sources.file.options.message_start_indicator]
 type = "string"
+category = "Multi-line"
 null = true
 examples = ["^(INFO|ERROR)"]
 description = """\
@@ -148,6 +149,7 @@ a regular expression, so remember to anchor as appropriate.\
 
 [sources.file.options.multi_line_timeout]
 type = "int"
+category = "Multi-line"
 default = 1000
 null = true
 unit = "milliseconds"
@@ -159,6 +161,7 @@ or not it has seen a line indicating the start of a new message.\
 
 [sources.file.options.max_read_bytes]
 type = "int"
+category = "Priority"
 default = 2048
 null = true
 unit = "bytes"
@@ -169,6 +172,7 @@ time.\
 
 [sources.file.options.oldest_first]
 type = "bool"
+category = "Priority"
 default = false
 null = true
 description = """\

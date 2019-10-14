@@ -91,13 +91,13 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
 
 `optional` `default: 10490000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### batch_timeout
 
 `optional` `default: 300` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### bucket
 
@@ -107,7 +107,7 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 ### buffer
 
-`optional`
+`optional` `type: table`
 
 Configures the sink specific buffer.
 
@@ -159,7 +159,7 @@ Custom endpoint for use with AWS-compatible services.
 
 `optional` `default: true` `type: bool`
 
-Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases.
+Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.
 
 ### filename_extension
 
@@ -171,31 +171,31 @@ The extension to use in the object name.
 
 `optional` `default: "%s"` `type: string`
 
-The format of the resulting object file name. [`strftime` specifiers][urls.strftime_specifiers] are supported.
+The format of the resulting object file name. [`strftime` specifiers][urls.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.
 
 ### healthcheck
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### key_prefix
 
 `optional` `default: "date=%F"` `type: string`
 
-A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax].
+A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 ### rate_limit_duration
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
 
 ### rate_limit_num
 
 `optional` `default: 5` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window.
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
 
 ### region
 
@@ -207,7 +207,7 @@ The [AWS region][urls.aws_s3_regions] of the target S3 bucket.
 
 `optional` `default: 5` `type: int`
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 ### request_timeout_secs
 
@@ -219,13 +219,13 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 `optional` `default: 5` `type: int`
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 ### retry_backoff_secs
 
 `optional` `default: 5` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 ## Input/Output
 

@@ -48,7 +48,7 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metr
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### target
 

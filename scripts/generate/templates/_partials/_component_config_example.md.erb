@@ -1,10 +1,10 @@
 {% code-tabs %}
-{% code-tabs-item title="vector.toml<% if component.simple_options != component.options_list %> (simple)<% end %>" %}
+{% code-tabs-item title="vector.toml<% if component.advanced_relevant? %> (simple)<% end %>" %}
 ```toml
-<%= config_example(component.simple_options, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
+<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", simple: true) %>
 ```
 {% endcode-tabs-item %}
-<%- if component.simple_options != component.options_list -%>
+<%- if component.advanced_relevant? -%>
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```toml
 <%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id") %>

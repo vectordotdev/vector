@@ -40,15 +40,19 @@ The `file` source ingests data through one or more local files and outputs [`log
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
   max_line_bytes = 102400 # default, bytes
-  max_read_bytes = 2048 # default, bytes
-  message_start_indicator = "^(INFO|ERROR)" # no default
-  multi_line_timeout = 1000 # default, milliseconds
-  oldest_first = false # default
   start_at_beginning = false # default
   
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
+  
+  # OPTIONAL - Multi-line
+  message_start_indicator = "^(INFO|ERROR)" # no default
+  multi_line_timeout = 1000 # default, milliseconds
+  
+  # OPTIONAL - Priority
+  max_read_bytes = 2048 # default, bytes
+  oldest_first = false # default
   
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
@@ -65,7 +69,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 
 `optional` `no default` `type: string` `example: "/var/lib/vector"`
 
-The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir.
+The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
 
 ### exclude
 
@@ -77,11 +81,11 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes pr
 
 `optional` `default: "file"` `type: string`
 
-The key name added to each event with the full path of the file.
+The key name added to each event with the full path of the file. See [Context](#context) for more info.
 
 ### fingerprinting
 
-`optional`
+`optional` `type: table`
 
 Configuration for how the file source should identify files.
 
@@ -102,25 +106,25 @@ The field is an enumeration and only accepts the following values:
 
 `optional` `default: 256` `type: int` `unit: bytes`
 
-The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when fingerprinting.strategy = "checksum".
+The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when fingerprinting.strategy = "checksum". See [File Identification](#file-identification) for more info.
 
 #### fingerprinting.ignored_header_bytes
 
 `optional` `default: 0` `type: int` `unit: bytes`
 
-The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when fingerprinting.strategy = "checksum".
+The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when fingerprinting.strategy = "checksum". See [File Identification](#file-identification) for more info.
 
 ### glob_minimum_cooldown
 
 `optional` `default: 1000` `type: int` `unit: milliseconds`
 
-Delay between file discovery calls. This controls the interval at which Vector searches for files.
+Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
 
 ### host_key
 
 `optional` `default: "host"` `type: string`
 
-The key name added to each event representing the current host.
+The key name added to each event representing the current host. See [Context](#context) for more info.
 
 ### ignore_older
 
@@ -132,7 +136,7 @@ Ignore files with a data modification date that does not exceed this age.
 
 `required` `type: [string]` `example: ["/var/log/nginx/*.log"]`
 
-Array of file patterns to include. [Globbing](#globbing) is supported.
+Array of file patterns to include. [Globbing](#globbing) is supported. See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
 
 ### max_line_bytes
 
@@ -162,13 +166,13 @@ When `message_start_indicator` is present, this sets the amount of time Vector w
 
 `optional` `default: false` `type: bool`
 
-Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
+Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files. See [File Read Order](#file-read-order) for more info.
 
 ### start_at_beginning
 
 `optional` `default: false` `type: bool`
 
-When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.
+When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
 
 ## Input/Output
 

@@ -58,13 +58,13 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 
 `required` `type: string` `example: "0.0.0.0:9598"`
 
-The address to expose for scraping.
+The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.
 
 ### buckets
 
 `optional` `default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `type: [float]` `unit: seconds`
 
-Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics.
+Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
 
 ### healthcheck
 

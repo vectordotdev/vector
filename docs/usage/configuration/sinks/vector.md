@@ -59,7 +59,7 @@ The downstream Vector address.
 
 ### buffer
 
-`optional`
+`optional` `type: table`
 
 Configures the sink specific buffer.
 
@@ -105,7 +105,7 @@ The maximum number of [events][docs.event] allowed in the buffer. Only relevant 
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ## How It Works
 

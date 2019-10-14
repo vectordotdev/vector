@@ -16,7 +16,7 @@ class Templates
           title = "#{option.required? && option.default.nil? ? "REQUIRED" : "OPTIONAL"}"
 
           if categories.length > 1
-           "#{title} - #{option.category}"
+            "#{title} - #{option.category}"
           else
             title
           end

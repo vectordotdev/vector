@@ -52,6 +52,7 @@ class Transform < Component
           ],
           "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.",
           "null" => false,
+          "simple" => true,
           "type" => "string"
         }
 
@@ -61,7 +62,6 @@ class Transform < Component
           "description" => "Key/Value pairs representing mapped log field types.",
           "null" => true,
           "options" => {"*" => wildcard_option},
-          "simple" => true,
           "type" => "table"
         })
     end

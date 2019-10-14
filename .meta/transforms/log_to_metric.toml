@@ -17,6 +17,7 @@ event.\
 [transforms.log_to_metric.options.metrics.options.type]
 type = "string"
 null = false
+simple = true
 description = "The metric type."
 
 [transforms.log_to_metric.options.metrics.options.type.enum]
@@ -29,6 +30,7 @@ set = "A [set metric type][docs.data-model#sets]."
 type = "string"
 examples = ["duration"]
 null = false
+simple = true
 description = "The log field to use as the metric."
 
 [transforms.log_to_metric.options.metrics.options.increment_by_value]
@@ -45,6 +47,7 @@ the metric will be incremented by 1 regardless of the `field` value.\
 type = "string"
 examples = ["duration_total"]
 null = false
+simple = true
 description = """\
 The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
@@ -64,6 +67,7 @@ examples = [
   {name = "status", value = "{{status}}"},
 ]
 null = false
+simple = true
 description = """\
 Key/value pairs representing [metric tags][docs.data-model#tags]. Environment \
 variables and field interpolation is allowed.\

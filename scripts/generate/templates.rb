@@ -125,12 +125,14 @@ class Templates
     render("_partials/_component_troubleshooting.md", binding).strip
   end
 
-  def config_example(options, opts = {})
+  def config_example(options, array: false, path: nil, simple: false, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    opts[:titles] = true unless opts.key?(:titles)
+    if simple
+      options = options.select(&:simple?)
+    end
 
     options = options.sort_by(&:config_file_sort_token)
     example = ConfigExample.new(options)
@@ -221,14 +223,16 @@ class Templates
       end
     end
 
-    if default && !option.default.nil?
-      if default == :short
-        tags << "default"
-      else
-        tags << "default: #{option.default.inspect}"
+    if default
+      if !option.default.nil?
+        if default == :short
+          tags << "default"
+        else
+          tags << "default: #{option.default.inspect}"
+        end
+      elsif option.optional?
+        tags << "no default"
       end
-    elsif option.optional?
-      tags << "no default"
     end
 
     if type

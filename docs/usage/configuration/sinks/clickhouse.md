@@ -89,7 +89,7 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 
 ### basic_auth
 
-`optional`
+`optional` `type: table`
 
 Options for basic authentication.
 
@@ -139,7 +139,7 @@ The database that contains the stable that data will be inserted into.
 
 `optional` `default: true` `type: bool`
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 ### host
 
@@ -151,19 +151,19 @@ The host url of the [Clickhouse][urls.clickhouse] server.
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The window used for the `request_rate_limit_num` option
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
 
 ### rate_limit_num
 
 `optional` `default: 5` `type: int`
 
-The maximum number of requests allowed within the `rate_limit_duration` window.
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
 
 ### request_in_flight_limit
 
 `optional` `default: 5` `type: int`
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 ### request_timeout_secs
 
@@ -175,13 +175,13 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 `optional` `default: 9223372036854775807` `type: int`
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 ### retry_backoff_secs
 
 `optional` `default: 9223372036854775807` `type: int` `unit: seconds`
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 ### table
 
@@ -191,7 +191,7 @@ The table that data will be inserted into.
 
 ### tls
 
-`optional`
+`optional` `type: table`
 
 Configures the TLS options for connections from this sink.
 
