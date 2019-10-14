@@ -24,10 +24,10 @@ as it will help shape the roadmap of this component.
 
 The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "datadog_metrics" # must be: "datadog_metrics"
@@ -36,30 +36,107 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
   namespace = "service"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
+```coffeescript
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = "datadog_metrics" # must be: "datadog_metrics"
+  inputs = ["my-source-id"]
+  api_key = "3111111111111111aaaaaaaaaaaaaaaa"
+  namespace = "service"
+  
+  # OPTIONAL - General
+  healthcheck = true # default
+  host = "https://api.datadoghq.com" # default
+  
+  # OPTIONAL - Batching
+  batch_size = 20 # default, unit: bytes
+  batch_timeout = 1 # default, unit: seconds
+  
+  # OPTIONAL - Requests
+  rate_limit_duration = 1 # default, unit: seconds
+  rate_limit_num = 5 # default
+  request_in_flight_limit = 5 # default
+  request_timeout_secs = 60 # default, unit: seconds
+  retry_attempts = 5 # default
+  retry_backoff_secs = 5 # default, unit: seconds
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `api_key` | `string` | Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)<br />`required` `example: (see above)` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
-| `type` | `string` | The component type<br />`required` `must be: "datadog_metrics"` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 20` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 1` `unit: seconds` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| `host` | `string` | Datadog endpoint to send metrics to.<br />`default: "https://api.datadoghq.com"` |
-| **OPTIONAL** - Requests | | |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
+### api_key
+
+`required` `type: string` `example: "3111111111111111aaaaaaaaaaaaaaaa"`
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
+
+### batch_size
+
+`optional` `default: 20` `type: int` `unit: bytes`
+
+The maximum size of a batch before it is flushed.
+
+### batch_timeout
+
+`optional` `default: 1` `type: int` `unit: seconds`
+
+The maximum age of a batch before it is flushed.
+
+### healthcheck
+
+`optional` `default: true` `type: bool`
+
+Enables/disables the sink healthcheck upon start.
+
+### host
+
+`optional` `default: "https://api.datadoghq.com"` `type: string`
+
+Datadog endpoint to send metrics to.
+
+### namespace
+
+`required` `type: string` `example: "service"`
+
+A prefix that will be added to all metric names.
+
+### rate_limit_duration
+
+`optional` `default: 1` `type: int` `unit: seconds`
+
+The window used for the `request_rate_limit_num` option
+
+### rate_limit_num
+
+`optional` `default: 5` `type: int`
+
+The maximum number of requests allowed within the `rate_limit_duration` window.
+
+### request_in_flight_limit
+
+`optional` `default: 5` `type: int`
+
+The maximum number of in-flight requests allowed at any given time.
+
+### request_timeout_secs
+
+`optional` `default: 60` `type: int` `unit: seconds`
+
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
+
+### retry_attempts
+
+`optional` `default: 5` `type: int`
+
+The maximum number of retries to make for failed requests.
+
+### retry_backoff_secs
+
+`optional` `default: 5` `type: int` `unit: seconds`
+
+The amount of time to wait before attempting a failed request again.
 
 ## How It Works
 
@@ -131,16 +208,6 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
-### Timeouts
-
-To ensure the pipeline does not halt when a service fails to respond Vector
-will abort requests after `60 seconds`.
-This can be adjsuted with the `request_timeout_secs` option.
-
-It is highly recommended that you do not lower value below the service's
-internal timeout, as this could create orphaned requests, pile on retries,
-and result in deuplicate data downstream.
-
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -163,13 +230,10 @@ issue, please:
 
 
 [assets.datadog_metrics_sink]: ../../../assets/datadog_metrics-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.datadog]: https://www.datadoghq.com
 [urls.datadog_metrics_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22+label%3A%22Type%3A+bug%22

@@ -2075,10 +2075,11 @@ end
   # General
   #
 
-  # The component type
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `datadog_metrics`.
   # 
   # * required
-  # * no default
+  # * type: string
   # * must be: "datadog_metrics"
   type = "datadog_metrics"
 
@@ -2086,31 +2087,33 @@ end
   # info.
   # 
   # * required
-  # * no default
+  # * type: [string]
   inputs = ["my-source-id"]
 
   # Datadog API key
   # 
   # * required
-  # * no default
+  # * type: string
   api_key = "3111111111111111aaaaaaaaaaaaaaaa"
 
   # A prefix that will be added to all metric names.
   # 
   # * required
-  # * no default
+  # * type: string
   namespace = "service"
 
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
+  # * type: bool
   healthcheck = true
 
   # Datadog endpoint to send metrics to.
   # 
   # * optional
   # * default: "https://api.datadoghq.com"
+  # * type: string
   host = "https://api.datadoghq.com"
   host = "https://api.datadoghq.eu"
 
@@ -2122,6 +2125,7 @@ end
   # 
   # * optional
   # * default: 20
+  # * type: int
   # * unit: bytes
   batch_size = 20
 
@@ -2129,6 +2133,7 @@ end
   # 
   # * optional
   # * default: 1
+  # * type: int
   # * unit: seconds
   batch_timeout = 1
 
@@ -2140,6 +2145,7 @@ end
   # 
   # * optional
   # * default: 1
+  # * type: int
   # * unit: seconds
   rate_limit_duration = 1
 
@@ -2148,18 +2154,24 @@ end
   # 
   # * optional
   # * default: 5
+  # * type: int
   rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
+  # * type: int
   request_in_flight_limit = 5
 
-  # The maximum time a request can take before being aborted.
+  # The maximum time a request can take before being aborted. It is highly
+  # recommended that you do not lower value below the service's internal timeout,
+  # as this could create orphaned requests, pile on retries, and result in
+  # deuplicate data downstream.
   # 
   # * optional
   # * default: 60
+  # * type: int
   # * unit: seconds
   request_timeout_secs = 60
 
@@ -2167,12 +2179,14 @@ end
   # 
   # * optional
   # * default: 5
+  # * type: int
   retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
   # 
   # * optional
   # * default: 5
+  # * type: int
   # * unit: seconds
   retry_backoff_secs = 5
 
