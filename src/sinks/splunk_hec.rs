@@ -182,7 +182,7 @@ pub fn healthcheck(token: String, host: String) -> crate::Result<super::Healthch
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> crate::Result<()> {
+pub fn validate_host(host: &str) -> crate::Result<()> {
     let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme_part() {
@@ -194,7 +194,7 @@ pub fn validate_host(host: &String) -> crate::Result<()> {
 fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let mut event = event.into_log();
 
-    let host = event.get(&host_field).map(|h| h.clone());
+    let host = event.get(&host_field).cloned();
     let timestamp = if let Some(ValueKind::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
         ts.timestamp()
     } else {
@@ -202,12 +202,12 @@ fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<
     };
 
     let mut body = match encoding {
-        &Encoding::Json => json!({
+        Encoding::Json => json!({
             "fields": event.explicit_fields(),
             "event": event.unflatten(),
             "time": timestamp,
         }),
-        &Encoding::Text => json!({
+        Encoding::Text => json!({
             "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),

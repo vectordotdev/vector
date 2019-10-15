@@ -52,10 +52,10 @@ impl FileWatcher {
         };
 
         Ok(FileWatcher {
-            path: path,
+            path,
             findable: true,
             reader: rdr,
-            file_position: file_position,
+            file_position,
             devno: metadata.dev(),
             inode: metadata.ino(),
             is_dead: false,

@@ -55,7 +55,7 @@ impl File {
             (&Some(Encoding::Text), _) | (None, false) => log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes())
-                .unwrap_or(Bytes::new()),
+                .unwrap_or_default(),
         }
     }
 }
@@ -117,8 +117,7 @@ impl Sink for File {
                         io::ErrorKind::WriteZero,
                         "failed to \
                          write frame to transport",
-                    )
-                    .into());
+                    ));
                 }
 
                 let _ = self.buffer.split_to(n);
@@ -128,7 +127,7 @@ impl Sink for File {
             try_ready!(file.poll_flush());
 
             trace!("framed transport flushed");
-            return Ok(Async::Ready(()));
+            Ok(Async::Ready(()))
         } else {
             unreachable!()
         }

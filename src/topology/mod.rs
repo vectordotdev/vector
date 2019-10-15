@@ -71,7 +71,7 @@ pub fn validate(config: &Config) -> Option<Pieces> {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
-            return None;
+            None
         }
         Ok((new_pieces, warnings)) => {
             for warning in warnings {
@@ -316,13 +316,13 @@ impl RunningTopology {
 
     fn spawn_sink(
         &mut self,
-        name: &String,
+        name: &str,
         new_pieces: &mut builder::Pieces,
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("sink", name = name.as_str()));
+        let task = task.instrument(info_span!("sink", %name));
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -331,13 +331,13 @@ impl RunningTopology {
 
     fn spawn_transform(
         &mut self,
-        name: &String,
+        name: &str,
         new_pieces: &mut builder::Pieces,
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("transform", name = name.as_str()));
+        let task = task.instrument(info_span!("transform", %name));
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -346,13 +346,13 @@ impl RunningTopology {
 
     fn spawn_source(
         &mut self,
-        name: &String,
+        name: &str,
         new_pieces: &mut builder::Pieces,
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("source-pump", name = name.as_str()));
+        let task = task.instrument(info_span!("source-pump", %name));
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -360,25 +360,27 @@ impl RunningTopology {
 
         let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
         self.shutdown_triggers
-            .insert(name.clone(), shutdown_trigger);
+            .insert(name.to_string(), shutdown_trigger);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone());
-        let source_task = source_task.instrument(info_span!("source", name = name.as_str()));
-        self.source_tasks
-            .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
+        let source_task = source_task.instrument(info_span!("source", %name));
+        self.source_tasks.insert(
+            name.to_string(),
+            oneshot::spawn(source_task, &rt.executor()),
+        );
     }
 
-    fn shutdown_source(&mut self, name: &String) {
+    fn shutdown_source(&mut self, name: &str) {
         self.shutdown_triggers.remove(name).unwrap().cancel();
         self.source_tasks.remove(name).wait().unwrap();
     }
 
-    fn remove_outputs(&mut self, name: &String) {
+    fn remove_outputs(&mut self, name: &str) {
         self.outputs.remove(name);
     }
 
-    fn remove_inputs(&mut self, name: &String) {
+    fn remove_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
 
         let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
@@ -390,7 +392,7 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get(input) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                        .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
                         .unwrap();
                     // std::thread::sleep(std::time::Duration::from_millis(100));
                 }
@@ -402,7 +404,7 @@ impl RunningTopology {
         let output = new_pieces.outputs.remove(name).unwrap();
 
         for (sink_name, sink) in &self.config.sinks {
-            if sink.inputs.contains(&name) {
+            if sink.inputs.contains(name) {
                 output
                     .unbounded_send(fanout::ControlMessage::Add(
                         sink_name.clone(),
@@ -412,7 +414,7 @@ impl RunningTopology {
             }
         }
         for (transform_name, transform) in &self.config.transforms {
-            if transform.inputs.contains(&name) {
+            if transform.inputs.contains(name) {
                 output
                     .unbounded_send(fanout::ControlMessage::Add(
                         transform_name.clone(),
@@ -422,22 +424,22 @@ impl RunningTopology {
             }
         }
 
-        self.outputs.insert(name.clone(), output);
+        self.outputs.insert(name.to_string(), output);
     }
 
-    fn setup_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+    fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         for input in inputs {
             self.outputs[&input]
-                .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
                 .unwrap();
         }
 
-        self.inputs.insert(name.clone(), tx);
+        self.inputs.insert(name.to_string(), tx);
     }
 
-    fn replace_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+    fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
@@ -445,7 +447,7 @@ impl RunningTopology {
         let old_inputs = sink_inputs
             .or(trans_inputs)
             .unwrap()
-            .into_iter()
+            .iter()
             .collect::<HashSet<_>>();
 
         let new_inputs = inputs.iter().collect::<HashSet<_>>();
@@ -457,24 +459,24 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get(input) {
                 output
-                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                    .unbounded_send(fanout::ControlMessage::Remove(name.to_string()))
                     .unwrap();
             }
         }
 
         for input in inputs_to_add {
             self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
                 .unwrap();
         }
 
         for &input in inputs_to_replace {
             self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
+                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), tx.get()))
                 .unwrap();
         }
 
-        self.inputs.insert(name.clone(), tx);
+        self.inputs.insert(name.to_string(), tx);
     }
 }
 
@@ -515,10 +517,10 @@ fn handle_errors(
         .catch_unwind()
         .map_err(|_| ())
         .flatten()
-        .or_else(move |err| {
+        .or_else(move |()| {
             error!("Unhandled error");
             let _ = abort_tx.unbounded_send(());
-            Err(err)
+            Err(())
         })
 }
 

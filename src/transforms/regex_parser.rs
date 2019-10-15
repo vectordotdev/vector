@@ -29,13 +29,11 @@ impl TransformConfig for RegexParserConfig {
 
         let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
 
-        let types = parse_check_conversion_map(
-            &self.types,
-            &regex
-                .capture_names()
-                .filter_map(|s| s.map(|s| s.into()))
-                .collect(),
-        )?;
+        let names = &regex
+            .capture_names()
+            .filter_map(|s| s.map(|s| s.into()))
+            .collect::<Vec<_>>();
+        let types = parse_check_conversion_map(&self.types, names)?;
 
         Ok(Box::new(RegexParser::new(
             regex,
@@ -109,7 +107,11 @@ impl Transform for RegexParser {
         let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
-            if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
+            if self
+                .regex
+                .captures_read(&mut self.capture_locs, &value)
+                .is_some()
+            {
                 for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: ValueKind = value[start..end].into();
@@ -152,7 +154,7 @@ impl Transform for RegexParser {
     }
 }
 
-fn truncate_string_at<'a>(s: &'a str, maxlen: usize) -> Cow<'a, str> {
+fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
         format!("{}[...]", &s[..maxlen - 5]).into()
     } else {

@@ -187,7 +187,7 @@ impl From<&Config> for Graph {
 
 fn paths_rec(nodes: &HashMap<String, Node>, node: &str, mut path: Vec<String>) -> Vec<Vec<String>> {
     path.push(node.to_string());
-    match nodes.get(node).clone() {
+    match nodes.get(node) {
         Some(Node::Source { .. }) | None => {
             path.reverse();
             vec![path]

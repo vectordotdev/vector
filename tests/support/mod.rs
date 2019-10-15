@@ -172,7 +172,7 @@ impl MockSinkConfig {
     pub fn new(sender: Sender<Event>, healthy: bool) -> Self {
         Self {
             sender: Some(sender),
-            healthy: healthy,
+            healthy,
         }
     }
 }
