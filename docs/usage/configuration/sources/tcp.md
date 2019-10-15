@@ -17,7 +17,7 @@ description: Ingests data through the TCP protocol and outputs `log` events.
 
 The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -25,58 +25,52 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 [sources.my_source_id]
   type = "tcp" # must be: "tcp"
   address = "0.0.0.0:9000"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sources.tcp_source]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tcp"
-  type = "tcp"
-
-  # The address to bind the socket to.
-  # 
-  # * required
-  # * no default
+[sources.my_source_id]
+  # REQUIRED - General
+  type = "tcp" # must be: "tcp"
   address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
+  
+  # OPTIONAL - General
+  max_length = 102400 # default, bytes
+  shutdown_timeout_secs = 30 # default, seconds
+  
+  # OPTIONAL - Context
+  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### address
+
+`required` `type: string` `example: "0.0.0.0:9000"`
+
+The address to bind the socket to.
+
+### host_key
+
+`optional` `default: "host"` `type: string`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`optional` `default: 102400` `type: int` `unit: bytes`
+
+The maximum bytes size of incoming messages before they are discarded.
+
+### shutdown_timeout_secs
+
+`optional` `default: 30` `type: int` `unit: seconds`
+
+The timeout before a connection is forcefully closed during shutdown.
+
+## Input/Output
 
 Given the following input line:
 
@@ -88,7 +82,7 @@ Given the following input line:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

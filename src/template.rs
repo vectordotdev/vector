@@ -3,7 +3,10 @@ use crate::{
     Event,
 };
 use bytes::Bytes;
-use chrono::{format::strftime::StrftimeItems, Utc};
+use chrono::{
+    format::{strftime::StrftimeItems, Item},
+    Utc,
+};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use serde::{
@@ -30,9 +33,19 @@ impl From<&str> for Template {
         Template {
             src: src.into(),
             src_bytes: src.into(),
-            has_ts: StrftimeItems::new(src).count() > 0,
+            has_ts: StrftimeItems::new(src).filter(is_dynamic).count() > 0,
             has_fields: RE.is_match(src),
         }
+    }
+}
+
+fn is_dynamic(item: &Item) -> bool {
+    match item {
+        Item::Error => true,
+        Item::Fixed(_) => true,
+        Item::Numeric(_, _) => true,
+        Item::Space(_) | Item::OwnedSpace(_) => false,
+        Item::Literal(_) | Item::OwnedLiteral(_) => false,
     }
 }
 
@@ -61,7 +74,7 @@ impl Template {
     }
 
     pub fn is_dynamic(&self) -> bool {
-        !(self.has_fields && self.has_ts)
+        self.has_fields || self.has_ts
     }
 
     pub fn get_ref(&self) -> &Bytes {
@@ -145,6 +158,14 @@ impl Serialize for Template {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    #[test]
+    fn is_dynamic() {
+        assert_eq!(true, Template::from("/kube-demo/%F").is_dynamic());
+        assert_eq!(false, Template::from("/kube-demo/echo").is_dynamic());
+        assert_eq!(true, Template::from("/kube-demo/{{ foo }}").is_dynamic());
+        assert_eq!(true, Template::from("/kube-demo/{{ foo }}/%F").is_dynamic());
+    }
 
     #[test]
     fn render_static() {

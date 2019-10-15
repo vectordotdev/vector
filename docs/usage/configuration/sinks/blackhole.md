@@ -17,7 +17,7 @@ description: Streams `log` and `metric` events to a blackhole that simply discar
 
 The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -26,42 +26,35 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`me
   type = "blackhole" # must be: "blackhole"
   inputs = ["my-source-id"]
   print_amount = 1000
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sinks.blackhole_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "blackhole"
-  type = "blackhole"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[sinks.my_sink_id]
+  # REQUIRED
+  type = "blackhole" # must be: "blackhole"
   inputs = ["my-source-id"]
-
-  # The number of events that must be received in order to print a summary of
-  # activity.
-  # 
-  # * required
-  # * no default
   print_amount = 1000
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
+  
+  # OPTIONAL
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### healthcheck
+
+`optional` `default: true` `type: bool`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### print_amount
+
+`required` `type: int` `example: 1000`
+
+The number of events that must be received in order to print a summary of activity.
 
 ## How It Works
 

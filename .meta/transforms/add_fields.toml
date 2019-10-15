@@ -29,5 +29,5 @@ examples = [
 ]
 description = """\
 A key/value pair representing the new log fields to be added. Accepts all \
-[supported types][docs.config_value_types]. Use `.` for adding nested fields.\
+[supported types][docs.configuration#value_types]. Use `.` for adding nested fields.\
 """

@@ -56,6 +56,20 @@ services:
         - "9300:9300"
       environment:
         - discovery.type=single-node
+    elasticsearch-tls:
+      image: elasticsearch:6.6.2
+      ports:
+        - "9201:9200"
+        - "9301:9300"
+      environment:
+        - discovery.type=single-node
+        - xpack.security.enabled=true
+        - xpack.security.http.ssl.enabled=true
+        - xpack.security.transport.ssl.enabled=true
+        - xpack.ssl.certificate=certs/localhost.crt
+        - xpack.ssl.key=certs/localhost.key
+      volumes:
+        - ./tests/data:/usr/share/elasticsearch/config/certs:ro
     clickhouse:
       image: yandex/clickhouse-server:19
       ports:

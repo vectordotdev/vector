@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to parse a log field's value wi
 
 The `regex_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex].
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -25,74 +25,77 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
 [transforms.my_transform_id]
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
-  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-
-  # For a complete list of options see the "advanced" tab above.
+  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[transforms.regex_parser_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "regex_parser"
-  type = "regex_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
-
-  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
-  # 
-  # * required
-  # * no default
-  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-
-  # If the specified `field` should be dropped (removed) after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to parse.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.regex_parser_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  
+  # OPTIONAL - General
+  drop_field = true # default
+  field = "message" # default
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_field
+
+`optional` `default: true` `type: bool`
+
+If the specified `field` should be dropped (removed) after parsing.
+
+### field
+
+`optional` `default: "message"` `type: string`
+
+The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
+
+### regex
+
+`required` `type: string` `example: "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"`
+
+The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
+
+### types
+
+`optional` `type: table`
+
+Key/Value pairs representing mapped log field types.
+
+#### types.*
+
+`required` `type: string`
+
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"bool"` | Coerces `"true"`/`/"false"`, `"1"`/`"0"`, and `"t"`/`"f"` values into boolean. |
+| `"float"` | Coerce to a 64 bit float. |
+| `"int"` | Coerce to a 64 bit integer. |
+| `"string"` | Coerce to a string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
+
+## Input/Output
 
 Given the following log line:
 
@@ -125,7 +128,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -222,38 +225,6 @@ For example, to enable the case-insensitive flag you can write:
 
 More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].
-
-
-### Types
-
-By default, extracted (parsed) fields all contain `string` values. You can
-coerce these values into types via the `types` table as shown in the
-[Config File](#config-file) example above. For example:
-
-```coffeescript
-[transforms.my_transform_id]
-  # ...
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-
-The available types are:
-
-| Type        | Desription                                                                                                          |
-|:------------|:--------------------------------------------------------------------------------------------------------------------|
-| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
-| `float`     | Coerce to 64 bit floats.                                                                                            |
-| `int`       | Coerce to a 64 bit integer.                                                                                         |
-| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 

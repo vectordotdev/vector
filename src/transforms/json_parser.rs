@@ -66,6 +66,7 @@ impl Transform for JsonParser {
                             message = "Event failed to parse as JSON",
                             field = self.field.as_ref(),
                             %error,
+                            rate_limit_secs = 30
                         )
                     })
                     .ok()

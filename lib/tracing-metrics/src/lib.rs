@@ -4,29 +4,6 @@
 //! with this basic subscriber. It will enable all spans and events that match the
 //! metric capturing criteria. This means every span is enabled regardless of its level
 //! and any event with a field name ending with `_counter` or `_gauge`.
-//!
-//! # Example
-//!
-//! ```
-//! # #[macro_use] extern crate tracing;
-//! # extern crate tracing_fmt;
-//! # extern crate tracing_metrics;
-//! # extern crate hotmic;
-//! # use hotmic::Receiver;
-//! # use tracing_metrics::MetricsSubscriber;
-//! # use tracing_fmt::FmtSubscriber;
-//! // Get the metrics sink
-//! let mut receiver = Receiver::builder().build();
-//! let sink = receiver.get_sink();
-//!
-//! // Setup the subscribers
-//! let fmt_subscriber = FmtSubscriber::builder().finish();
-//! let metric_subscriber = MetricsSubscriber::new(fmt_subscriber, sink);
-//!
-//! tracing::subscriber::with_default(metric_subscriber, || {
-//!     info!({ do_something_counter = 1 }, "Do some logging");
-//! })
-//! ```
 
 use hotmic::Sink;
 use std::{

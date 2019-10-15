@@ -24,52 +24,33 @@ as it will help shape the roadmap of this component.
 
 The `field_filter` transform accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"]
   field = "file"
   value = "/var/log/nginx.log"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.field_filter_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "field_filter"
-  type = "field_filter"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The target log field to compare against the `value`.
-  # 
-  # * required
-  # * no default
-  field = "file"
-
-  # If the value of the specified `field` matches this value then the event will
-  # be permitted, otherwise it is dropped.
-  # 
-  # * required
-  # * no default
-  value = "/var/log/nginx.log"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### field
+
+`required` `type: string` `example: "file"`
+
+The target log field to compare against the `value`.
+
+### value
+
+`required` `type: string` `example: "/var/log/nginx.log"`
+
+If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.
 
 ## How It Works
 

@@ -70,7 +70,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     }
                     .into();
-                    config.data_dir = Some(data_dir.clone());
+                    config.global.data_dir = Some(data_dir.clone());
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -106,7 +106,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         max_size: 10_000,
                         when_full: Default::default(),
                     };
-                    config.data_dir = Some(data_dir2.clone());
+                    config.global.data_dir = Some(data_dir2.clone());
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 

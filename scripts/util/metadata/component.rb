@@ -37,27 +37,35 @@ class Component
       OpenStruct.new(resource_hash)
     end
 
-    @options.type = Option.new({
+    @options.type =
+      Option.new({
         "name" => "type",
-        "description" => "The component type",
-        "enum" => [name],
+        "description" => "The component type. This is a required field that tells Vector which component to use. The value _must_ be `#{name}`.",
+        "enum" => {
+          name => "The name of this component"
+        },
         "null" => false,
         "type" => "string"
       })
 
     if type != "source"
-      @options.inputs = Option.new({
-        "name" => "inputs",
-        "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.",
-        "examples" => [["my-source-id"]],
-        "null" => false,
-        "type" => "[string]"
-      })
+      @options.inputs =
+        Option.new({
+          "name" => "inputs",
+          "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.",
+          "examples" => [["my-source-id"]],
+          "null" => false,
+          "type" => "[string]"
+        })
     end
   end
 
   def <=>(other)
     name <=> other.name
+  end
+
+  def advanced_relevant?
+    options_list.any?(&:advanced?)
   end
 
   def beta?
@@ -76,16 +84,18 @@ class Component
     options_list.select(&:partition_key?)
   end
 
-  def simple_options
-    options_list.select(&:simple?)
-  end
-
   def sink?
     type == "sink"
   end
 
   def source?
     type == "source"
+  end
+
+  def specific_options_list
+    options_list.select do |option|
+      !["type", "inputs"].include?(option.name)
+    end
   end
 
   def templateable_options

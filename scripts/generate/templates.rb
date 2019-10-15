@@ -125,24 +125,16 @@ class Templates
     render("_partials/_component_troubleshooting.md", binding).strip
   end
 
-  def compression_description(compression)
-    case compression
-    when "gzip"
-      "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
-    when "none"
-      "The payload will not compressed at all."
-    else
-      raise("Unhandled compression: #{compression.inspect}")
-    end
-  end
-
-  def config_example(options, opts = {})
+  def config_example(options, array: false, path: nil, simple: false, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    opts[:titles] = true unless opts.key?(:titles)
+    if simple
+      options = options.select(&:simple?)
+    end
 
+    options = options.sort_by(&:config_file_sort_token)
     example = ConfigExample.new(options)
     render("_partials/_config_example.toml", binding).strip
   end
@@ -154,6 +146,7 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
+    options = options.sort_by(&:config_file_sort_token)
     schema = ConfigSchema.new(options)
     render("_partials/_config_schema.toml", binding).strip
   end
@@ -165,6 +158,7 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
+    options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
     content = render("_partials/_config_spec.toml", binding).strip
 
@@ -173,6 +167,10 @@ class Templates
     else
       content.gsub("\n  ", "\n")
     end
+  end
+
+  def docker_docs
+    render("_partials/_docker_docs.md")
   end
 
   def encoding_description(encoding)
@@ -200,8 +198,98 @@ class Templates
     render("_partials/_full_config_spec.toml", binding).strip
   end
 
+  def option_description(option)
+    description = option.description.strip
+
+    if option.templateable?
+      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]."
+    end
+
+    if option.relevant_when
+      description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}."
+    end
+
+    description
+  end
+
+  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true, unit: true)
+    tags = []
+
+    if optionality
+      if option.required?
+        tags << "required"
+      else
+        tags << "optional"
+      end
+    end
+
+    if default
+      if !option.default.nil?
+        if default == :short
+          tags << "default"
+        else
+          tags << "default: #{option.default.inspect}"
+        end
+      elsif option.optional?
+        tags << "no default"
+      end
+    end
+
+    if type
+      tags << "type: #{option.type}"
+    end
+
+    if unit && !option.unit.nil?
+      if unit == :short
+        tags << option.unit
+      else
+        tags << "unit: #{option.unit}"
+      end
+    end
+
+    if example && option.default.nil? && option.enum.nil? && option.examples.any?
+      value = option.examples.first
+
+      if value.is_a?(Hash)
+        tags << "example: #{value.fetch("name")} = #{value.fetch("value").to_toml}"
+      else
+        tags << "example: #{value.to_toml}"
+      end
+    end
+
+    if enum && option.enum
+      escaped_values = option.enum.keys.collect { |enum| enum.to_toml }
+      if escaped_values.length > 1
+        tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+      else
+        tag = "must be: #{escaped_values.first}"
+        if option.optional?
+          tag << " (if supplied)"
+        end
+        tags << tag
+      end
+    end
+
+    if relevant_when && option.relevant_when
+      tag = "relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
+      tags << tag
+    end
+
+    tags
+  end
+
   def option_names(options)
     options.collect { |option| "`#{option.name}`" }
+  end
+
+  def options_sections(options, depth: 1, path: nil)
+    if !options.is_a?(Array)
+      raise options.class.inspect
+      raise ArgumentError.new("Options must be an Array")
+    end
+
+
+    render("_partials/_options_sections.md", binding).strip
   end
 
   def options_table(options, opts = {})

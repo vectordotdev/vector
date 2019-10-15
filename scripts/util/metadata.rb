@@ -168,8 +168,8 @@ class Metadata
   def previous_minor_releases(release)
     releases_list.select do |other_release|
       other_release.version < release.version &&
-        other_release.major != release.major &&
-        other_release.minor != release.minor
+        other_release.version.major != release.version.major &&
+        other_release.version.minor != release.version.minor
     end
   end
 

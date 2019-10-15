@@ -14,6 +14,14 @@ echo "Checking for pending generation changes..."
 
 changes=$(scripts/generate.rb --dry-run | grep 'Will be changed' || true)
 
+if [[ "$?" != "0" ]]; then
+  echo 'The `scripts/generate.rb --dry-run` command returned an error:'
+  echo ''
+  echo "$changes"
+  echo ''
+  exit 1
+fi
+
 if [[ -n "$changes" ]]; then
   echo 'It looks like the following files would change if `make generate` was run:'
   echo ''

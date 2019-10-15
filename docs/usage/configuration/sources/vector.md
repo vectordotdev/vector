@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -32,35 +32,34 @@ The `vector` source ingests data through another upstream Vector instance and ou
 [sources.my_source_id]
   type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sources.vector_source]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "vector"
-  type = "vector"
-
-  # The TCP address to bind to.
-  # 
-  # * required
-  # * no default
+[sources.my_source_id]
+  # REQUIRED
+  type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
+  
+  # OPTIONAL
+  shutdown_timeout_secs = 30 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### address
+
+`required` `type: string` `example: "0.0.0.0:9000"`
+
+The TCP address to bind to.
+
+### shutdown_timeout_secs
+
+`optional` `default: 30` `type: int` `unit: seconds`
+
+The timeout before a connection is forcefully closed during shutdown.
 
 ## How It Works
 

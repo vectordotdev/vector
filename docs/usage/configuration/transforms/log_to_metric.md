@@ -17,10 +17,24 @@ description: Accepts `log` events and allows you to convert logs into one or mor
 
 The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
+```coffeescript
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = "log_to_metric" # must be: "log_to_metric"
+  inputs = ["my-source-id"]
+  
+  # REQUIRED - Metrics
+  [[transforms.my_transform_id.metrics]]
+    type = "counter" # enum: "counter", "gauge", "histogram", and "set"
+    field = "duration"
+    name = "duration_total"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -36,80 +50,68 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
     
     # OPTIONAL
     increment_by_value = false # default, relevant when type = "counter"
-    tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.log_to_metric_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "log_to_metric"
-  type = "log_to_metric"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Metrics
-  #
-
-  [[transforms.log_to_metric_transform.metrics]]
-    # The metric type.
-    # 
-    # * required
-    # * no default
-    # * enum: "counter", "gauge", "histogram", and "set"
-    type = "counter"
-    type = "gauge"
-    type = "histogram"
-    type = "set"
-
-    # The log field to use as the metric.
-    # 
-    # * required
-    # * no default
-    field = "duration"
-
-    # If `true` the metric will be incremented by the `field` value. If `false` the
-    # metric will be incremented by 1 regardless of the `field` value.
-    # 
-    # * optional
-    # * default: false
-    increment_by_value = false
-
-    # The name of the metric. Defaults to `<field>_total` for `counter` and
-    # `<field>` for `gauge`.
-    # 
-    # * required
-    # * no default
-    name = "duration_total"
-
-    [transforms.log_to_metric_transform.metrics.tags]
-      # Key/value pairs representing the metric tags.
-      # 
-      # * required
-      # * no default
-      host = "${HOSTNAME}"
-      region = "us-east-1"
-      status = "{{status}}"
+    [transforms.my_transform_id.metrics.tags]
+      host = "${HOSTNAME}" # example
+      region = "us-east-1" # example
+      status = "{{status}}" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### metrics
+
+`required` `type: [table]`
+
+A table of key/value pairs representing the keys to be added to the event.
+
+#### metrics.type
+
+`required` `type: string`
+
+The metric type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"counter"` | A [counter metric type][docs.data-model#counters]. |
+| `"gauge"` | A [gauge metric type][docs.data-model#gauges]. |
+| `"histogram"` | A [histogram metric type][docs.data-model#histograms]. |
+| `"set"` | A [set metric type][docs.data-model#sets]. |
+
+#### metrics.field
+
+`required` `type: string` `example: "duration"`
+
+The log field to use as the metric. See [Null Fields](#null-fields) for more info.
+
+#### metrics.increment_by_value
+
+`optional` `default: false` `type: bool`
+
+If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter".
+
+#### metrics.name
+
+`required` `type: string` `example: "duration_total"`
+
+The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
+
+#### metrics.tags
+
+`optional` `type: table`
+
+Key/value pairs representing [metric tags][docs.data-model#tags].
+
+##### metrics.tags.*
+
+`required` `type: string` `example: host = "${HOSTNAME}"`
+
+Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Timings" %}
@@ -146,7 +148,7 @@ You can convert the `time` field into a `histogram` metric:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -203,7 +205,7 @@ You can count the number of responses by status code:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -260,7 +262,7 @@ field's value:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -325,7 +327,7 @@ You can reduce this logs into multiple `gauge` metrics:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Multiple [`metric` events][docs.data-model.metric] will be emitted with the following
+Multiple [`metric` events][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -400,7 +402,7 @@ You can count the number of unique `remote_addr` values by using a set:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -477,6 +479,11 @@ issue, please:
 
 [assets.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model#counters]: ../../../about/data-model#counters
+[docs.data-model#gauges]: ../../../about/data-model#gauges
+[docs.data-model#histograms]: ../../../about/data-model#histograms
+[docs.data-model#sets]: ../../../about/data-model#sets
+[docs.data-model#tags]: ../../../about/data-model#tags
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs

@@ -1,23 +1,28 @@
-use super::retries::RetryLogic;
+use super::{
+    retries::RetryLogic,
+    tls::{TlsConnectorExt, TlsSettings},
+};
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
-use http::StatusCode;
+use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use native_tls::TlsConnector;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
 use tower_hyper::client::Client;
 use tracing::field;
-use tracing_tower_http::InstrumentedHttpService;
+use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 pub type Response = hyper::Response<Bytes>;
+pub type Error = hyper::Error;
 
 #[derive(Clone)]
 pub struct HttpService {
-    inner: InstrumentedHttpService<Client<HttpsConnector<HttpConnector>, Vec<u8>>>,
+    inner: InstrumentedService<Client<HttpsConnector<HttpConnector>, Vec<u8>>, Request<Vec<u8>>>,
     request_builder: Arc<RequestBuilder>,
 }
 
@@ -35,35 +40,37 @@ impl HttpService {
 }
 
 /// A builder for `HttpService`s
+#[derive(Default)]
 pub struct HttpServiceBuilder {
     threads: usize,
-    verify_certificate: bool,
+    tls_settings: Option<TlsSettings>,
 }
 
 impl HttpServiceBuilder {
     fn new() -> Self {
         Self {
             threads: 4,
-            verify_certificate: true,
+            ..Default::default()
         }
     }
 
     /// Build the configured `HttpService`
-    pub fn build<F>(&self, request_builder: F) -> HttpService
+    pub fn build<F>(self, request_builder: F) -> HttpService
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
         let mut http = HttpConnector::new(self.threads);
         http.enforce_http(false);
-        let tls = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(!self.verify_certificate)
-            .build()
-            .expect("TLS initialization failed");
+        let mut tls = native_tls::TlsConnector::builder();
+        if let Some(settings) = self.tls_settings {
+            tls.use_tls_settings(settings);
+        }
+        let tls = tls.build().expect("TLS initialization failed");
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
-        let inner = InstrumentedHttpService::new(Client::with_client(client));
+        let inner = Client::with_client(client).instrument(info_span!("http"));
         HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
@@ -71,21 +78,31 @@ impl HttpServiceBuilder {
     }
 
     /// Set the number of threads used by the `HttpService`
-    pub fn threads(&mut self, threads: usize) -> &mut Self {
+    pub fn threads(mut self, threads: usize) -> Self {
         self.threads = threads;
         self
     }
 
-    /// Verify the remote server's certificate
-    pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
-        self.verify_certificate = verify;
+    /// Set the standard TLS settings
+    pub fn tls_settings(mut self, settings: TlsSettings) -> Self {
+        self.tls_settings = Some(settings);
         self
     }
 }
 
+pub fn https_client(
+    tls: TlsSettings,
+) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>>> {
+    let mut http = HttpConnector::new(1);
+    http.enforce_http(false);
+    let tls = TlsConnector::builder().use_tls_settings(tls).build()?;
+    let https = HttpsConnector::from((http, tls));
+    Ok(hyper::Client::builder().build(https))
+}
+
 impl Service<Vec<u8>> for HttpService {
     type Response = Response;
-    type Error = hyper::Error;
+    type Error = Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {

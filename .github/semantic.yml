@@ -25,6 +25,7 @@ scopes:
   - testing
   - topology
   # sources
+  - docker source
   - file source
   - journald source
   - kafka source
@@ -57,6 +58,7 @@ scopes:
   - blackhole sink
   - clickhouse sink
   - console sink
+  - datadog_metrics sink
   - elasticsearch sink
   - file sink
   - http sink

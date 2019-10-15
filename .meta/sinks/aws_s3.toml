@@ -6,6 +6,7 @@ beta = true
 buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+encodings = ["ndjson", "text"]
 healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
@@ -23,23 +24,6 @@ type = "string"
 examples = ["my-bucket"]
 null = false
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
-
-[sinks.aws_s3.options.compression]
-type = "string"
-category = "Requests"
-enum = ["gzip", "none"]
-default = "gzip"
-null = true
-simple = true
-description = "The compression type to use before writing data."
-
-[sinks.aws_s3.options.encoding]
-type = "string"
-category = "Requests"
-enum = ["ndjson", "text"]
-null = false
-simple = true
-description = "The encoding format used to serialize the events before flushing."
 
 [sinks.aws_s3.options.filename_append_uuid]
 type = "bool"

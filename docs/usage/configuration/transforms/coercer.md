@@ -17,63 +17,43 @@ description: Accepts `log` events and allows you to coerce log fields into fixed
 
 The `coercer` transform accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.coercer_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "coercer"
-  type = "coercer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Types
-  #
-
-  [transforms.coercer_transform.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### types
+
+`optional` `type: table`
+
+Key/Value pairs representing mapped log field types.
+
+#### types.*
+
+`required` `type: string`
+
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"bool"` | Coerces `"true"`/`/"false"`, `"1"`/`"0"`, and `"t"`/`"f"` values into boolean. |
+| `"float"` | Coerce to a 64 bit float. |
+| `"int"` | Coerce to a 64 bit integer. |
+| `"string"` | Coerce to a string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
+
+## Input/Output
 
 Given the following input event:
 
@@ -111,7 +91,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -136,37 +116,6 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
-
-### Types
-
-By default, extracted (parsed) fields all contain `string` values. You can
-coerce these values into types via the `types` table as shown in the
-[Config File](#config-file) example above. For example:
-
-```coffeescript
-[transforms.my_transform_id]
-  # ...
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-
-The available types are:
-
-| Type        | Desription                                                                                                          |
-|:------------|:--------------------------------------------------------------------------------------------------------------------|
-| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
-| `float`     | Coerce to 64 bit floats.                                                                                            |
-| `int`       | Coerce to a 64 bit integer.                                                                                         |
-| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 

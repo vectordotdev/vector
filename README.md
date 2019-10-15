@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.4.0<a/>
+    <a href="https://vector.dev/community">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.5.0<a/>
   </strong>
 </p>
 
@@ -49,7 +49,7 @@ simple and unified.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.4.0][urls.v0.4.0], [changelog][urls.vector_changelog]
+* [**Releases**][urls.vector_releases] - [v0.5.0][urls.v0.5.0], [changelog][urls.vector_changelog]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -108,6 +108,7 @@ Or view [platform specific installation instructions][docs.installation].
 
 | Name  | Description |
 |:------|:------------|
+| [**`docker`**][docs.sources.docker] | Ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events. |
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
@@ -153,7 +154,8 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
 | [**`clickhouse`**][docs.sinks.clickhouse] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]. |
-| [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to the console, `STDOUT` or `STDERR`. |
+| [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`. |
+| [**`datadog_metrics`**][docs.sinks.datadog_metrics] | [Batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics). |
 | [**`elasticsearch`**][docs.sinks.elasticsearch] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`file`**][docs.sinks.file] | [Streams](#streaming) [`log`][docs.data-model.log] events to a file. |
 | [**`http`**][docs.sinks.http] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint. |
@@ -220,6 +222,7 @@ the License.
 [docs.sinks.blackhole]: https://docs.vector.dev/usage/configuration/sinks/blackhole
 [docs.sinks.clickhouse]: https://docs.vector.dev/usage/configuration/sinks/clickhouse
 [docs.sinks.console]: https://docs.vector.dev/usage/configuration/sinks/console
+[docs.sinks.datadog_metrics]: https://docs.vector.dev/usage/configuration/sinks/datadog_metrics
 [docs.sinks.elasticsearch]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
 [docs.sinks.file]: https://docs.vector.dev/usage/configuration/sinks/file
 [docs.sinks.http]: https://docs.vector.dev/usage/configuration/sinks/http
@@ -230,6 +233,7 @@ the License.
 [docs.sinks.tcp]: https://docs.vector.dev/usage/configuration/sinks/tcp
 [docs.sinks.vector]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
+[docs.sources.docker]: https://docs.vector.dev/usage/configuration/sources/docker
 [docs.sources.file]: https://docs.vector.dev/usage/configuration/sources/file
 [docs.sources.journald]: https://docs.vector.dev/usage/configuration/sources/journald
 [docs.sources.kafka]: https://docs.vector.dev/usage/configuration/sources/kafka
@@ -266,6 +270,7 @@ the License.
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.datadog]: https://www.datadoghq.com
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.kafka]: https://kafka.apache.org/
@@ -279,9 +284,10 @@ the License.
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust]: https://www.rust-lang.org/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.statsd]: https://github.com/statsd/statsd
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
+[urls.v0.5.0]: https://github.com/timberio/vector/releases/tag/v0.5.0
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

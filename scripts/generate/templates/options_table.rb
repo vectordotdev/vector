@@ -23,45 +23,6 @@ class Templates
         end
     end
 
-    def option_tags(option)
-      tags = []
-
-      if option.required?
-        tags << "required"
-      end
-
-      if !option.default.nil?
-        tags << "default: #{option.default.inspect}"
-      elsif option.optional?
-        tags << "no default"
-      end
-
-      if option.default.nil? && option.enum.nil? && option.examples.any?
-        value = option.examples.first.inspect
-
-        if value.length > 30
-          tags << "example: (see above)"
-        else
-          tags << "example: #{value}"
-        end
-      end
-
-      if option.enum
-        escaped_values = option.enum.collect { |enum| enum.to_toml }
-        if escaped_values.length > 1
-          tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
-        else
-          tags << "must be: #{escaped_values.first}"
-        end
-      end
-
-      if !option.unit.nil?
-        tags << "unit: #{option.unit}"
-      end
-
-      tags
-    end
-
     def option_description(option)
       description = option.description.strip
 
@@ -70,8 +31,7 @@ class Templates
       end
 
       if option.relevant_when
-        conditions = option.relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
-        description << " Only relevant when #{conditions.to_sentence}"
+        description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
       end
 
       description << "[[references:#{option.name}]]"

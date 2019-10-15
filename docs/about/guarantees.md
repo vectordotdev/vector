@@ -25,6 +25,7 @@ and [source][docs.sources].
 | Name | Description |
 |:-----|:------------|
 | **Sources** | |
+| [`docker` source][docs.sources.docker] | `best_effort` |
 | [`file` source][docs.sources.file] | `best_effort` |
 | [`journald` source][docs.sources.journald] | `best_effort` |
 | [`kafka` source][docs.sources.kafka] | `at_least_once` |
@@ -42,6 +43,7 @@ and [source][docs.sources].
 | [`blackhole` sink][docs.sinks.blackhole] | `best_effort` |
 | [`clickhouse` sink][docs.sinks.clickhouse] | `best_effort` |
 | [`console` sink][docs.sinks.console] | `best_effort` |
+| [`datadog_metrics` sink][docs.sinks.datadog_metrics] | `best_effort` |
 | [`elasticsearch` sink][docs.sinks.elasticsearch] | `best_effort` |
 | [`file` sink][docs.sinks.file] | `best_effort` |
 | [`http` sink][docs.sinks.http] | `at_least_once` |
@@ -121,6 +123,7 @@ keep you in the loop if this ever changes.
 [docs.sinks.blackhole]: ../usage/configuration/sinks/blackhole.md
 [docs.sinks.clickhouse]: ../usage/configuration/sinks/clickhouse.md
 [docs.sinks.console]: ../usage/configuration/sinks/console.md
+[docs.sinks.datadog_metrics]: ../usage/configuration/sinks/datadog_metrics.md
 [docs.sinks.elasticsearch]: ../usage/configuration/sinks/elasticsearch.md
 [docs.sinks.file]: ../usage/configuration/sinks/file.md
 [docs.sinks.http]: ../usage/configuration/sinks/http.md
@@ -131,6 +134,7 @@ keep you in the loop if this ever changes.
 [docs.sinks.tcp]: ../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../usage/configuration/sinks/vector.md
 [docs.sinks]: ../usage/configuration/sinks
+[docs.sources.docker]: ../usage/configuration/sources/docker.md
 [docs.sources.file]: ../usage/configuration/sources/file.md
 [docs.sources.journald]: ../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../usage/configuration/sources/kafka.md

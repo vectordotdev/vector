@@ -73,15 +73,17 @@ data_dir = "/var/lib/vector"
 
 ## Global Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **OPTIONAL** | | |
-| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.<br />`no default` `example: "/var/lib/vector"` |
+### data_dir
+
+`optional` `no default` `type: string` `example: "/var/lib/vector"`
+
+The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
 
 ## Sources
 
 | Name  | Description |
 |:------|:------------|
+| [**`docker`**][docs.sources.docker] | Ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events. |
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
@@ -125,7 +127,8 @@ data_dir = "/var/lib/vector"
 | [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
 | [**`clickhouse`**][docs.sinks.clickhouse] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]. |
-| [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to the console, `STDOUT` or `STDERR`. |
+| [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`. |
+| [**`datadog_metrics`**][docs.sinks.datadog_metrics] | [Batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics). |
 | [**`elasticsearch`**][docs.sinks.elasticsearch] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`file`**][docs.sinks.file] | [Streams](#streaming) [`log`][docs.data-model.log] events to a file. |
 | [**`http`**][docs.sinks.http] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint. |
@@ -148,12 +151,6 @@ and [sinks][docs.sinks] through the `inputs` option.
 
 Notice in the above example each input references the `id` assigned to a
 previous source or transform.
-
-### Config File Location
-
-The location of your Vector configuration file depends on your
-[platform][docs.platforms] or [operating system][docs.operating_systems]. For
-most Linux based systems the file can be found at `/etc/vector/vector.toml`.
 
 ### Data Directory
 
@@ -187,6 +184,12 @@ quotes around the definition.
 You can escape environment variable by preceding them with a `$` character. For
 example `$${HOSTNAME}` will be treated _literally_ in the above environment
 variable example.
+
+### Example Location
+
+The location of your Vector configuration file depends on your
+[platform][docs.platforms] or [operating system][docs.operating_systems]. For
+most Linux based systems the file can be found at `/etc/vector/vector.toml`.
 
 ### Format
 
@@ -304,6 +307,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.sinks.blackhole]: ../../usage/configuration/sinks/blackhole.md
 [docs.sinks.clickhouse]: ../../usage/configuration/sinks/clickhouse.md
 [docs.sinks.console]: ../../usage/configuration/sinks/console.md
+[docs.sinks.datadog_metrics]: ../../usage/configuration/sinks/datadog_metrics.md
 [docs.sinks.elasticsearch]: ../../usage/configuration/sinks/elasticsearch.md
 [docs.sinks.file]: ../../usage/configuration/sinks/file.md
 [docs.sinks.http]: ../../usage/configuration/sinks/http.md
@@ -314,6 +318,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.sinks.tcp]: ../../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../../usage/configuration/sinks/vector.md
 [docs.sinks]: ../../usage/configuration/sinks
+[docs.sources.docker]: ../../usage/configuration/sources/docker.md
 [docs.sources.file]: ../../usage/configuration/sources/file.md
 [docs.sources.journald]: ../../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../../usage/configuration/sources/kafka.md
@@ -347,6 +352,7 @@ All TOML values types are supported. For convenience this includes:
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.datadog]: https://www.datadoghq.com
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.kafka]: https://kafka.apache.org/
@@ -358,6 +364,7 @@ All TOML values types are supported. For convenience this includes:
 [urls.prometheus]: https://prometheus.io/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.statsd]: https://github.com/statsd/statsd
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.toml]: https://github.com/toml-lang/toml

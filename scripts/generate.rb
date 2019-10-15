@@ -22,13 +22,19 @@ require_relative "setup"
 #
 
 require_relative "generate/post_processors/link_definer"
-require_relative "generate/post_processors/option_referencer"
+require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/post_processors/toml_syntax_switcher"
 require_relative "generate/templates"
 
 require_relative "generate/core_ext/hash"
 require_relative "generate/core_ext/string"
+
+#
+# Flags
+#
+
+dry_run = ARGV.include?("--dry-run")
 
 #
 # Functions
@@ -65,7 +71,7 @@ end
 def post_process(content, doc, links)
   content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content = PostProcessors::SectionSorter.sort!(content)
-  content = PostProcessors::OptionReferencer.reference!(content)
+  content = PostProcessors::SectionReferencer.reference!(content)
   content = PostProcessors::LinkDefiner.define!(content, doc, links)
   content
 end
@@ -77,6 +83,7 @@ def url_valid?(url)
   # it serves directories.
   when /^https:\/\/packages\.timber\.io\/vector[^.]*$/
     true
+
   else
     uri = URI.parse(url)
     req = Net::HTTP.new(uri.host, uri.port)
@@ -105,20 +112,20 @@ title("Generating files...")
 # Setup
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
-  end
-
-templates = Templates.new(TEMPLATES_DIR, metadata)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
 
 #
 # Create missing component templates
 #
 
 metadata.components.each do |component|
+  # Base .md file to ensure links to the new source work
+  md_path = "#{DOCS_ROOT}/usage/configuration/#{component.type.pluralize}/#{component.name}.md"
+
+  if !File.exists?(md_path)
+    File.open(md_path, 'w+') { |file| file.write("") }
+  end
+
   # Configuration templates
   template_path = "#{TEMPLATES_DIR}/docs/usage/configuration/#{component.type.pluralize}/#{component.name}.md.erb"
 
@@ -131,6 +138,8 @@ end
 #
 # Render templates
 #
+
+templates = Templates.new(TEMPLATES_DIR, metadata)
 
 Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
@@ -157,14 +166,18 @@ Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
     current_content = File.read(target_path)
 
     if current_content != content
-      action = false ? "Will be changed" : "Changed"
+      action = dry_run ? "Will be changed" : "Changed"
       say("#{action} - #{target_file}", color: :green)
-      File.write(target_path, content)
+      File.write(target_path, content) if !dry_run
     else
-      action = false ? "Will not be changed" : "Not changed"
+      action = dry_run ? "Will not be changed" : "Not changed"
       say("#{action} - #{target_file}", color: :blue)
     end
   end
+
+if dry_run
+  return
+end
 
 #
 # Post process individual docs
@@ -190,9 +203,13 @@ end
 # Check URLs
 #
 
-title("Checking URLs...")
-
-check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+check_urls =
+  if ENV.key?("CHECK_URLS")
+    ENV.fetch("CHECK_URLS") == "true"
+  else
+    title("Checking URLs...")
+    get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+  end
 
 if check_urls
   Parallel.map(metadata.links.values.to_a.sort, in_threads: 50) do |id, value|
