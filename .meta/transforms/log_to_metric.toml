@@ -57,6 +57,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 type = "table"
 display = "inline"
 null = true
+simple = true
 description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
 
 [transforms.log_to_metric.options.metrics.options.tags.options."*"]
