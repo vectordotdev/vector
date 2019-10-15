@@ -94,10 +94,6 @@ impl LogEvent {
         self.fields.remove(key).map(|v| v.value)
     }
 
-    pub fn is_structured(&self) -> bool {
-        self.fields.iter().any(|(_, v)| v.explicit)
-    }
-
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
         self.fields.insert(
             key,
