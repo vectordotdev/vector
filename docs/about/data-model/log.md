@@ -243,6 +243,7 @@ remove, or rename fields as desired.
 
 ## Examples
 
+{% code-tabs %}
 {% code-tabs-item title="log.json" %}
 ```javascript
 {
@@ -255,7 +256,7 @@ remove, or rename fields as desired.
 }
 ```
 {% endcode-tabs-item %}
-
+{% endcode-tabs %}
 
 [assets.data-model-log]: ../../assets/data-model-log.svg
 [docs.configuration]: ../../usage/configuration
