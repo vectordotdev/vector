@@ -53,10 +53,6 @@ class Option
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")
     end
 
-    if @options.any? && @simple
-      raise ArgumentError.new("#{self.class.name}#simple cannot be true when options are passed")
-    end
-
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
       raise ArgumentError.new("#{self.class.name}#null must be a hash of conditions")
     end
@@ -178,7 +174,7 @@ class Option
 
   def simple?
     if options.any?
-      required? && simple_options.any?
+      @simple == true || (required? && simple_options.any?)
     else
       @simple == true || required?
     end

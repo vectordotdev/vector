@@ -29,9 +29,16 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
+    # REQUIRED
     type = "counter" # enum: "counter", "gauge", "histogram", and "set"
     field = "duration"
     name = "duration_total"
+    
+    # OPTIONAL
+    [transforms.my_transform_id.metrics.tags]
+      host = "${HOSTNAME}" # example
+      region = "us-east-1" # example
+      status = "{{status}}" # example
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
