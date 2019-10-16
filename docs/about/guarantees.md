@@ -29,6 +29,7 @@ and [source][docs.sources].
 | [`file` source][docs.sources.file] | `best_effort` |
 | [`journald` source][docs.sources.journald] | `best_effort` |
 | [`kafka` source][docs.sources.kafka] | `at_least_once` |
+| [`kubernetes` source][docs.sources.kubernetes] | `best_effort` |
 | [`statsd` source][docs.sources.statsd] | `best_effort` |
 | [`stdin` source][docs.sources.stdin] | `at_least_once` |
 | [`syslog` source][docs.sources.syslog] | `best_effort` |
@@ -138,6 +139,7 @@ keep you in the loop if this ever changes.
 [docs.sources.file]: ../usage/configuration/sources/file.md
 [docs.sources.journald]: ../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../usage/configuration/sources/kafka.md
+[docs.sources.kubernetes]: ../usage/configuration/sources/kubernetes.md
 [docs.sources.statsd]: ../usage/configuration/sources/statsd.md
 [docs.sources.stdin]: ../usage/configuration/sources/stdin.md
 [docs.sources.syslog]: ../usage/configuration/sources/syslog.md

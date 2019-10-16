@@ -1,11 +1,12 @@
-# Everything related to vector should be in this namespace
+# Everything related to vector will live under the `telemetry` namespace.
 apiVersion: v1
 kind: Namespace
 metadata:
    name: telemetry
-   
 ---
 # ConfigMap which contains vector.toml configuration for pods.
+#
+# This can also be removed and loaded from a file via `kubectl`.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -13,24 +14,23 @@ metadata:
   namespace: telemetry
 data:
   vector-agent-config: |
-    # VECTOR.TOML
+    # file: vector.toml
     # Configuration for vector-agent
 
     # Set global options
     data_dir = "/var/tmp/vector"
 
     # Ingest logs from Kubernetes
-    [sources.kubernetes_logs]
-      type = "kubernetes"
+    [sources.kubernetes]
+    type = "kubernetes"
 
     ######
-    # NOTE: Here, vector can be configured  
+    # NOTE: Here, vector can be configured
     ######
 
-  # This line is not in VECTOR.TOML       
-
+  # This line is not in VECTOR.TOML
 ---
-# Vector agent runned on each Node where it collects logs from pods.
+# Vector agent ran on each node where it collects logs from pods.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -45,6 +45,8 @@ spec:
     metadata:
       labels:
         name: vector-agent
+    # TODO: Modify this pod spec to include any extra configuration needed like
+    # secrets or dns.
     spec:
       volumes:
       # Directory with logs
@@ -67,18 +69,17 @@ spec:
              path: vector.toml
       containers:
       - name: vector
-        # TODO: update to a proper version which contains kubernetes source.
-        image: timberio/vector:0.4.0-alpine
+        image: timberio/vector:latest-alpine
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
-          readOnly: true        
+          readOnly: true
         - name: var-lib
           mountPath: /var/lib
-          readOnly: true 
+          readOnly: true
         - name: data-dir
           mountPath: /var/tmp/vector
         - name: config-dir
           mountPath: /etc/vector
-          readOnly: true 
+          readOnly: true

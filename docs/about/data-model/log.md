@@ -258,6 +258,7 @@ remove, or rename fields as desired.
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+
 [assets.data-model-log]: ../../assets/data-model-log.svg
 [docs.configuration]: ../../usage/configuration
 [docs.data-model]: ../../about/data-model

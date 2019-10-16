@@ -1,0 +1,7 @@
+[sources.kubernetes]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "kubernetes node's"

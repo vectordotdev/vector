@@ -112,6 +112,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
+| [**`kubernetes`**][docs.sources.kubernetes] | Ingests data through kubernetes node's and outputs [`log`][docs.data-model.log] events. |
 | [**`statsd`**][docs.sources.statsd] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events. |
 | [**`stdin`**][docs.sources.stdin] | Ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events. |
 | [**`syslog`**][docs.sources.syslog] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events. |
@@ -237,6 +238,7 @@ the License.
 [docs.sources.file]: https://docs.vector.dev/usage/configuration/sources/file
 [docs.sources.journald]: https://docs.vector.dev/usage/configuration/sources/journald
 [docs.sources.kafka]: https://docs.vector.dev/usage/configuration/sources/kafka
+[docs.sources.kubernetes]: https://docs.vector.dev/usage/configuration/sources/kubernetes
 [docs.sources.statsd]: https://docs.vector.dev/usage/configuration/sources/statsd
 [docs.sources.stdin]: https://docs.vector.dev/usage/configuration/sources/stdin
 [docs.sources.syslog]: https://docs.vector.dev/usage/configuration/sources/syslog

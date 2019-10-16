@@ -87,6 +87,7 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
+| [**`kubernetes`**][docs.sources.kubernetes] | Ingests data through kubernetes node's and outputs [`log`][docs.data-model.log] events. |
 | [**`statsd`**][docs.sources.statsd] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events. |
 | [**`stdin`**][docs.sources.stdin] | Ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events. |
 | [**`syslog`**][docs.sources.syslog] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events. |
@@ -322,6 +323,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.sources.file]: ../../usage/configuration/sources/file.md
 [docs.sources.journald]: ../../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../../usage/configuration/sources/kafka.md
+[docs.sources.kubernetes]: ../../usage/configuration/sources/kubernetes.md
 [docs.sources.statsd]: ../../usage/configuration/sources/statsd.md
 [docs.sources.stdin]: ../../usage/configuration/sources/stdin.md
 [docs.sources.syslog]: ../../usage/configuration/sources/syslog.md

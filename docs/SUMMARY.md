@@ -54,6 +54,7 @@
     * [file source][docs.sources.file]
     * [journald source][docs.sources.journald]
     * [kafka source][docs.sources.kafka]
+    * [kubernetes source][docs.sources.kubernetes]
     * [statsd source][docs.sources.statsd]
     * [stdin source][docs.sources.stdin]
     * [syslog source][docs.sources.syslog]
@@ -189,6 +190,7 @@
 [docs.sources.file]: ./usage/configuration/sources/file.md
 [docs.sources.journald]: ./usage/configuration/sources/journald.md
 [docs.sources.kafka]: ./usage/configuration/sources/kafka.md
+[docs.sources.kubernetes]: ./usage/configuration/sources/kubernetes.md
 [docs.sources.readme]: ./usage/configuration/sources/README.md
 [docs.sources.statsd]: ./usage/configuration/sources/statsd.md
 [docs.sources.stdin]: ./usage/configuration/sources/stdin.md

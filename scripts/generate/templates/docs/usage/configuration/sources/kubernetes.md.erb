@@ -1,0 +1,59 @@
+# <% component = metadata.sources.kubernetes %>
+
+<%= component_header(component) %>
+
+## Example
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+    "host": "vector-agent-rmqbn",
+    "message": "<188>1 2019-10-16T17:50:44.216Z forwardproductize.info quisquam 1693 ID830 - Use the digital ADP capacitor, then you can calculate the solid state capacitor!\n",
+    "stream": "stdout",
+    "pod_uid": "default_flog-f8dd5f7b-tvgfn_52cdc270-c3e6-4769-b0a9-275481502618",
+    "container_name": "flog",
+    "timestamp": "2019-10-16T17:51:10.244625907Z"
+}
+```
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_sections(component.specific_options_list, depth: 3) %>
+
+## How It Works [[sort]]
+
+### High Level
+
+Kubernetes is system to manage containerized based workloads. It internally manages
+physical nodes which will then run their designated containers. Vector's Kubernetes
+support is designed to run a single instance of the vector agent on each node. This is
+done via a [`DaemonSet`][urls.kubernetes_daemonset] which ensures that each node runs one copy of vector on each
+node present within the Kubernetes cluster. Each Vector agent will collect logs for all
+pods currently deployed running each node.
+
+### Deployment
+
+The `kubernetes` source is designed to live on each Kubernetes node as a [`DaemonSet`][urls.kubernetes_daemonset]. You
+can find an [example config] in the `vector` repository. At a high level the `kubernetes` source
+will run an agent on each node and will internally use the file source to collect logs from `/var/log/pods`
+and a few other locations that Kubernetes places logs into. Via the [`DaemonSet`][urls.kubernetes_daemonset] Kubernetes
+will ensure that there is always a copy of the agent running on each node.
+
+### Metadata
+
+Each event will contain a `message` field that contains the direct output from the containers stdout/stderr. There
+will also be other fields included that come from Kubernetes. These fields include `host`, `stream`, `pod_uid`,
+`container_name` and `timestamp`.
+
+<%= component_sections(component) %>
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

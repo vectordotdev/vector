@@ -342,6 +342,16 @@ data_dir = "/var/lib/vector"
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through kubernetes node's and outputs `log` events.
+[sources.kubernetes]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `kubernetes`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "kubernetes"
+  type = "kubernetes"
+
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
   # The component type. This is a required field that tells Vector which
