@@ -87,9 +87,24 @@ impl std::str::FromStr for Color {
     }
 }
 
+fn get_version() -> String {
+    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
+    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
+        .unwrap()
+        .format("%Y-%m-%d");
+    let built_string = if let Some(commit_hash) = commit_hash {
+        format!("{} {}", commit_hash, built_date)
+    } else {
+        built_date.to_string()
+    };
+    format!("{} ({})", built_info::PKG_VERSION, built_string)
+}
+
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let opts = Opts::from_args();
+    let version = get_version();
+    let app = Opts::clap().version(&version[..]);
+    let opts = Opts::from_clap(&app.get_matches());
 
     let level = match opts.quiet {
         0 => match opts.verbose {
