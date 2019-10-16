@@ -1,14 +1,14 @@
 # Generate
 
 The `make generate` command auto-generates files across the Vector repository
-(mostly documentation). This folders contains all of the innerworkings of
-that command.
+(mostly documentation). This folder contains all of the inner-workings of that
+command.
 
 ## Metadata
 
-To start, you shuold be familiar with the Vector [`/.meta`](/.meta) directory.
+To start, you should be familiar with the Vector [`/.meta`](/.meta) directory.
 This directory contains various metadata about the Vector project as a whole,
-mostly configuration details but also link definitions and m0ore. This file is
+mostly configuration details but also link definitions and more. This file is
 loaded via the [`metadata.rb`](metadata.rb) file and represented as an object.
 
 ## Templates
@@ -29,8 +29,8 @@ all template files.
 
 ## Partials
 
-The [`context.rb`](context.rb) file incudes a `#render_partial` methood that
-can be used to render partial templates that are commonly reused. These partials
-are placed in [`templates/_partials`](templates/partials).
+The [`context.rb`](context.rb) file incudes a `#render_partial` method that can
+be used to render partial templates that are commonly reused. These partials are
+placed in [`templates/_partials`](templates/partials).
 
 Partials should only be used when absolutely necessary.

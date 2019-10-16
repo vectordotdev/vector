@@ -237,7 +237,7 @@ override the fields used, if relevant.
 
 ### Deviating from the default schema
 
-As mentioned in the [structure](#structure) section, Vector does require any
+As mentioned in the [schema](#schema) section, Vector does not require any
 specific fields. You are free to use [transforms][docs.transforms] to add,
 remove, or rename fields as desired.
 
