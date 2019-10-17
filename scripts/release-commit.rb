@@ -12,6 +12,18 @@ require_relative "setup"
 # Functions
 #
 
+def bump_cargo_version(version)
+  cargo_content = File.read("#{ROOT_DIR}/Cargo.toml")
+
+  new_cargo_content =
+    cargo_content.sub(
+      /name = "vector"\nversion = "([a-z0-9.-]*)"\n/,
+      "name = \"vector\"\nversion = \"#{version}\"\n"
+    )
+
+  File.write("#{ROOT_DIR}/Cargo.toml", new_cargo_content)
+end
+
 def release_exists?(release)
   errors = `git rev-parse v#{release.version} 2>&1 >/dev/null`
   errors == ""
@@ -40,6 +52,10 @@ if release_exists?(release)
   )
 else
   title("Committing and tagging release")
+
+  bump_cargo_version(release.version)
+
+  success("Bumped the version in Cargo.toml to #{release.version}")
   
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
