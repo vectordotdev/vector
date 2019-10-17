@@ -42,7 +42,6 @@ pub struct HttpSinkConfig {
     pub uri: String,
     pub method: Option<HttpMethod>,
     pub healthcheck_uri: Option<String>,
-    #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
     pub batch_size: Option<usize>,
