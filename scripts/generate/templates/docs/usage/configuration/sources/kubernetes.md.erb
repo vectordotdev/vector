@@ -25,22 +25,14 @@
 
 ## How It Works [[sort]]
 
-### High Level
-
-Kubernetes is system to manage containerized based workloads. It internally manages
-physical nodes which will then run their designated containers. Vector's Kubernetes
-support is designed to run a single instance of the vector agent on each node. This is
-done via a [`DaemonSet`][urls.kubernetes_daemonset] which ensures that each node runs one copy of vector on each
-node present within the Kubernetes cluster. Each Vector agent will collect logs for all
-pods currently deployed running each node.
-
 ### Deployment
 
-The `kubernetes` source is designed to live on each Kubernetes node as a [`DaemonSet`][urls.kubernetes_daemonset]. You
-can find an [example config] in the `vector` repository. At a high level the `kubernetes` source
-will run an agent on each node and will internally use the file source to collect logs from `/var/log/pods`
-and a few other locations that Kubernetes places logs into. Via the [`DaemonSet`][urls.kubernetes_daemonset] Kubernetes
-will ensure that there is always a copy of the agent running on each node.
+The `kubernetes` source is designed to be deployed to a Kubernetes cluster as a
+[`DaemonSet`][urls.kubernetes_daemonset]. You can find an [example config] in the
+`vector` repository. At a high level the `kubernetes` source will run an agent on
+each node and will internally use the file source to collect logs from `/var/log/pods`
+and a few other locations that Kubernetes places logs into. Via the [`DaemonSet`][urls.kubernetes_daemonset]
+Kubernetes will ensure that there is always a copy of the agent running on each node.
 
 ### Metadata
 
