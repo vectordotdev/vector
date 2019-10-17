@@ -5,7 +5,7 @@ use crate::{
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::{io, thread};
+use std::{io, thread, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -70,6 +70,7 @@ where
                         let msg = Bytes::from(string_data);
                         while let Err(e) = tx.try_send(msg.clone()) {
                             if e.is_full() {
+                                thread::sleep(Duration::from_millis(10));
                                 continue;
                             }
                             error!(message = "Unable to send event.", error = %e);
