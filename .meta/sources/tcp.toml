@@ -7,9 +7,11 @@ through_description = "the TCP protocol"
 
 [sources.tcp.options.address]
 type = "string"
-examples = ["0.0.0.0:9000"]
+examples = ["0.0.0.0:9000", "systemd", "systemd#3"]
 null = false
-description = "The address to bind the socket to."
+description = """The address to listen for connections on, \
+or "systemd#N" to use the Nth socket passed by systemd socket activation. \
+"""
 
 [sources.tcp.options.host_key]
 name = "host_key"

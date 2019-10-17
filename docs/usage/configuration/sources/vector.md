@@ -53,7 +53,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 
 `required` `type: string` `example: "0.0.0.0:9000"`
 
-The TCP address to bind to.
+The TCP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 ### shutdown_timeout_secs
 

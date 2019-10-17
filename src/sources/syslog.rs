@@ -1,4 +1,4 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
@@ -33,7 +33,7 @@ pub struct SyslogConfig {
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp { address: SocketAddr },
+    Tcp { address: SocketListenAddr },
     Udp { address: SocketAddr },
     Unix { path: PathBuf },
 }
