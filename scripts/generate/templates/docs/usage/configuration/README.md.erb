@@ -65,7 +65,7 @@ data_dir = "/var/lib/vector"
 
 ## Global Options
 
-<%= options_table(metadata.options.to_h.values.sort) %>
+<%= options_sections(metadata.options.to_h.values.sort, depth: 3) %>
 
 ## Sources
 
@@ -96,7 +96,7 @@ and [sinks][docs.sinks] through the `inputs` option.
 Notice in the above example each input references the `id` assigned to a
 previous source or transform.
 
-### Config File Location
+### Example Location
 
 The location of your Vector configuration file depends on your
 [platform][docs.platforms] or [operating system][docs.operating_systems]. For

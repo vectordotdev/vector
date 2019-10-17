@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to parse a log field value as J
 
 The `json_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -26,44 +26,37 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
   type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
   drop_invalid = true
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[transforms.json_parser_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "json_parser"
-  type = "json_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[transforms.my_transform_id]
+  # REQUIRED
+  type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
-
-  # If `true` events with invalid JSON will be dropped, otherwise the event will
-  # be kept and passed through.
-  # 
-  # * required
-  # * no default
   drop_invalid = true
-
-  # The log field to decode as JSON. Must be a `string` value type.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
+  
+  # OPTIONAL
+  field = "message" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_invalid
+
+`required` `type: bool` `example: true`
+
+If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.
+
+### field
+
+`optional` `default: "message"` `type: string`
+
+The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Simple" %}

@@ -17,7 +17,7 @@ description: Streams `log` events to a TCP connection.
 
 The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -28,153 +28,162 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
   
-  # REQUIRED - Requests
+  # REQUIRED - requests
   encoding = "json" # enum: "json" or "text"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sinks.tcp_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tcp"
-  type = "tcp"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = "tcp" # must be: "tcp"
   inputs = ["my-source-id"]
-
-  # The TCP address.
-  # 
-  # * required
-  # * no default
   address = "92.12.333.224:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
-  # Buffer
-  #
-
-  [sinks.tcp_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
-
-  #
-  # Tls
-  #
-
-  [sinks.tcp_sink.tls]
-    # Enable TLS during connections to the remote.
-    # 
-    # * optional
-    # * default: false
-    enabled = false
-
-    # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
-    # 
-    # * optional
-    # * no default
-    ca_path = "/path/to/certificate_authority.crt"
-
-    # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    crt_path = "/path/to/host_certificate.crt"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
-    # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
-    # 
-    # * optional
-    # * no default
-    key_pass = "PassWord1"
-
-    # If `true` (the default), Vector will validate the TLS certificate of the
-    # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
-    # 
-    # * optional
-    # * default: true
-    verify_certificate = true
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    # 
-    # * optional
-    # * default: true
-    verify_hostname = true
+  
+  # REQUIRED - requests
+  encoding = "json" # enum: "json" or "text"
+  
+  # OPTIONAL - General
+  healthcheck = true # default
+  
+  # OPTIONAL - Buffer
+  [sinks.my_sink_id.buffer]
+    type = "memory" # default, enum: "memory" or "disk"
+    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
+    when_full = "block" # default, enum: "block" or "drop_newest"
+  
+  # OPTIONAL - Tls
+  [sinks.my_sink_id.tls]
+    ca_path = "/path/to/certificate_authority.crt" # no default
+    crt_path = "/path/to/host_certificate.crt" # no default
+    enabled = false # default
+    key_pass = "PassWord1" # no default
+    key_path = "/path/to/host_certificate.key" # no default
+    verify_certificate = true # default
+    verify_hostname = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### address
+
+`required` `type: string` `example: "92.12.333.224:5000"`
+
+The TCP address.
+
+### buffer
+
+`optional` `type: table`
+
+Configures the sink specific buffer.
+
+#### buffer.type
+
+`optional` `default: "memory"` `type: string`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"memory"` *(default)* | Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly. |
+| `"disk"` | Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts. |
+
+#### buffer.when_full
+
+`optional` `default: "block"` `type: string`
+
+The behavior when the buffer becomes full.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"block"` *(default)* | Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge. |
+| `"drop_newest"` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
+
+#### buffer.max_size
+
+`optional` `no default` `type: int` `unit: bytes` `example: 104900000`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk".
+
+#### buffer.num_items
+
+`optional` `default: 500` `type: int` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory".
+
+### encoding
+
+`required` `type: string`
+
+The encoding format used to serialize the events before outputting.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"json"` | Each event is encoded into JSON and the payload is represented as a JSON array. |
+| `"text"` | Each event is encoded into text via the `message` key and the payload is new line delimited. |
+
+### healthcheck
+
+`optional` `default: true` `type: bool`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### tls
+
+`optional` `type: table`
+
+Configures the TLS options for connections from this sink.
+
+#### tls.enabled
+
+`optional` `default: false` `type: bool`
+
+Enable TLS during connections to the remote.
+
+#### tls.ca_path
+
+`optional` `no default` `type: string` `example: "/path/to/certificate_authority.crt"`
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+#### tls.crt_path
+
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.crt"`
+
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
+
+#### tls.key_path
+
+`optional` `no default` `type: string` `example: "/path/to/host_certificate.key"`
+
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+
+#### tls.key_pass
+
+`optional` `no default` `type: string` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
+#### tls.verify_certificate
+
+`optional` `default: true` `type: bool`
+
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+
+#### tls.verify_hostname
+
+`optional` `default: true` `type: bool`
+
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 ## How It Works
 
@@ -182,30 +191,6 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
 
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
-### Encodings
-
-The `tcp` sink encodes events before writing
-them downstream. This is controlled via the `encoding` option which accepts
-the following options:
-
-| Encoding | Description |
-| :------- | :---------- |
-| `json` | The payload will be encoded as a single JSON payload. |
-| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
-
-#### Dynamic encoding
-
-By default, the `encoding` chosen is dynamic based on the explicit/implcit
-nature of the event's structure. For example, if this event is parsed (explicit
-structuring), Vector will use `json` to encode the structured data. If the event
-was not explicitly structured, the `text` encoding will be used.
-
-To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
-it directly to the `tcp` sink. It is less
-surprising that the outgoing data reflects the incoming data exactly since it
-was not explicitly structured.
 
 ### Environment Variables
 
@@ -261,9 +246,9 @@ issue, please:
 [assets.tcp_sink]: ../../../assets/tcp-sink.svg
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+bug
 [urls.new_tcp_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+enhancement

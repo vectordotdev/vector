@@ -1,23 +1,21 @@
-<% if opts[:array] %>[[<%= opts[:path] %>]]<% else %>[<%= opts[:path] %>]<% end %>
+<% if array %>[[<%= path %>]]<% else %>[<%= path %>]<% end %>
 <% example.grouped.each do |title, options| -%>
   <%- if example.grouped.length > 1 -%>
   # <%= title %>
   <%- end -%>
   <%- options.each do |option| -%>
     <%- if option.array?("table") -%>
-<%= config_example(option.options, path: "#{opts[:path]}.#{option.name}", array: true).indent(2) %>
-    <%- elsif option.table? && option.inline? -%>
-  <%= option.name %> = {<%= option.options.first.examples.collect { |e| "#{e.fetch("name")} = #{e.fetch("value").to_toml}" }.join(", ") %>}
+<%= config_example(option.options, array: true, path: "#{path}.#{option.name}", simple: simple).indent(2) %>
     <%- elsif option.table? -%>
-<%= config_example(option.options, path: "#{opts[:path]}.#{option.name}").indent(2) %>
+<%= config_example(option.options, path: "#{path}.#{option.name}", simple: simple).indent(2) %>
     <%- else -%>
       <%- if option.wildcard? -%>
         <%- option.examples.each do |e| -%>
-  <%= e.fetch("name") %> = <%= e.fetch("value").to_toml %>
+  <%= e.fetch("name") %> = <%= e.fetch("value").to_toml %> # example
         <%- end -%>
       <%- else -%>
         <%- first_example = option.examples.first -%>
-        <%- tags = example.tags(option) -%>
+        <%- tags = option_tags(option, default: :short, example: false, optionality: false, type: false, unit: :short) -%>
         <%- if first_example.is_a?(Hash) -%>
   <%= first_example.fetch("name") %> = <%= first_example.fetch("value").to_toml %>
         <%- else -%>
@@ -26,7 +24,7 @@
       <%- end -%>
     <%- end -%>
   <%- end -%>
-  <%- if opts[:titles] -%>
+  <%- if titles -%>
   
   <%- end -%>
 <%- end -%>

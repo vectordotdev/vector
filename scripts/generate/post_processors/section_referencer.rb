@@ -8,7 +8,7 @@ module PostProcessors
   # In many of the sections we'll reference options that dictate that behavior.
   # Within the options table above it helps to add text like "See the XXX
   # section for more info". This processor adds that text automatically.
-  class OptionReferencer
+  class SectionReferencer
     class << self
       def reference!(content)
         content.scan(/\[\[references:(.*)\]\]/).collect do |matches|

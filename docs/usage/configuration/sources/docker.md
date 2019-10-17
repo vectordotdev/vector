@@ -24,56 +24,41 @@ as it will help shape the roadmap of this component.
 
 The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   type = "docker" # must be: "docker"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sources.docker_source]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "docker"
-  type = "docker"
-
-  # A list of container ids to match against when filtering running containers.
-  # This will attempt to match the container id from the beginning meaning you do
-  # not need to include the whole id but just the first few characters. If no
-  # containers ids are provided, all containers will be included.
-  # 
-  # * optional
-  # * no default
-  include_containers = "ffd2bc2cb74a"
-
-  #  A list of container object labels to match against when filtering running
-  # containers. This should follow the described label's synatx in docker object
-  # labels docs.
-  # 
-  # * optional
-  # * no default
-  include_labels = "key=value"
+[sources.my_source_id]
+  # REQUIRED
+  type = "docker" # must be: "docker"
+  
+  # OPTIONAL
+  include_containers = "ffd2bc2cb74a" # no default
+  include_labels = "key=value" # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "docker"` |
-| **OPTIONAL** | | |
-| `include_containers` | `[string]` | A list of container ids to match against when filtering running containers. This will attempt to match the container id from the beginning meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.<br />`no default` `example: "ffd2bc2cb74a"` |
-| `include_labels` | `[string]` | A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].<br />`no default` `example: "key=value"` |
+### include_containers
+
+`optional` `no default` `type: [string]` `example: "ffd2bc2cb74a"`
+
+A list of container ids to match against when filtering running containers. This will attempt to match the container id from the beginning meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.
+
+### include_labels
+
+`optional` `no default` `type: [string]` `example: "key=value"`
+
+A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].
 
 ## How It Works
 

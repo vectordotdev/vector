@@ -17,44 +17,26 @@ description: Accepts `metric` events and allows you to remove one or more metric
 
 The `remove_tags` transform accepts [`metric`][docs.data-model.metric] events and allows you to remove one or more metric tags.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "remove_tags" # must be: "remove_tags"
   inputs = ["my-source-id"]
   tags = ["tag1", "tag2"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.remove_tags_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "remove_tags"
-  type = "remove_tags"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The tag names to drop.
-  # 
-  # * required
-  # * no default
-  tags = ["tag1", "tag2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### tags
+
+`required` `type: [string]` `example: ["tag1", "tag2"]`
+
+The tag names to drop.
 
 ## How It Works
 

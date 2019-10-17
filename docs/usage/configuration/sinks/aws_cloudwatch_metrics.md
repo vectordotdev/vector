@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -34,66 +34,49 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
   inputs = ["my-source-id"]
   namespace = "service"
   region = "us-east-1"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sinks.aws_cloudwatch_metrics_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_cloudwatch_metrics"
-  type = "aws_cloudwatch_metrics"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[sinks.my_sink_id]
+  # REQUIRED
+  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"]
-
-  # A namespace that will isolate different metrics from each other.
-  # 
-  # * required
-  # * no default
   namespace = "service"
-
-  # The AWS region of the target CloudWatch stream resides.
-  # 
-  # * required
-  # * no default
   region = "us-east-1"
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * optional
-  # * no default
-  endpoint = "127.0.0.0:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
+  
+  # OPTIONAL
+  endpoint = "127.0.0.0:5000" # no default
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_metrics"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.<br />`required` `example: "service"` |
-| `region` | `string` | The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.<br />`required` `example: "us-east-1"` |
-| **OPTIONAL** | | |
-| `endpoint` | `string` | Custom endpoint for use with AWS-compatible services.<br />`no default` `example: "127.0.0.0:5000"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
+### endpoint
+
+`optional` `no default` `type: string` `example: "127.0.0.0:5000"`
+
+Custom endpoint for use with AWS-compatible services.
+
+### healthcheck
+
+`optional` `default: true` `type: bool`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### namespace
+
+`required` `type: string` `example: "service"`
+
+A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
+
+### region
+
+`required` `type: string` `example: "us-east-1"`
+
+The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.
 
 ## How It Works
 
@@ -197,13 +180,10 @@ issue, please:
 
 
 [assets.aws_cloudwatch_metrics_sink]: ../../../assets/aws_cloudwatch_metrics-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_cloudwatch_metrics_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22+label%3A%22Type%3A+bug%22

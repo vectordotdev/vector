@@ -70,10 +70,18 @@ description = "A custom header to be added to each outgoing Elasticsearch reques
 
 [sinks.elasticsearch.options.provider]
 type = "string"
-enum = ["default", "aws"]
 null = true
 default = "default"
-description = "The provider of the Elasticsearch service."
+description = """\
+The provider of the Elasticsearch service. This is used to properly \
+authenticate with the Elasticsearch cluster. For example, authentication \
+for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we \
+obtain AWS credentials to properly sign the request.\
+"""
+
+[sinks.elasticsearch.options.provider.enum]
+default = "A generic Elasticsearch provider."
+aws = "The [AWS Elasticsearch Service][urls.aws_elasticsearch]."
 
 [sinks.elasticsearch.options.query]
 type = "table"

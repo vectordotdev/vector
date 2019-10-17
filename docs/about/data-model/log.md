@@ -237,12 +237,13 @@ override the fields used, if relevant.
 
 ### Deviating from the default schema
 
-As mentioned in the [structure](#structure) section, Vector does require any
+As mentioned in the [schema](#schema) section, Vector does not require any
 specific fields. You are free to use [transforms][docs.transforms] to add,
 remove, or rename fields as desired.
 
 ## Examples
 
+{% code-tabs %}
 {% code-tabs-item title="log.json" %}
 ```javascript
 {
@@ -255,7 +256,7 @@ remove, or rename fields as desired.
 }
 ```
 {% endcode-tabs-item %}
-
+{% endcode-tabs %}
 
 [assets.data-model-log]: ../../assets/data-model-log.svg
 [docs.configuration]: ../../usage/configuration

@@ -186,7 +186,7 @@ key/value pairs represented as single-level strings.
 }
 ```
 {% endcode-tabs-item %}
-{% endcode-tabs}
+{% endcode-tabs %}
 
 
 [assets.data-model-metric]: ../../assets/data-model-metric.svg

@@ -17,10 +17,10 @@ description: Accepts `metric` events and allows you to add one or more metric ta
 
 The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and allows you to add one or more metric tags.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -29,47 +29,25 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
   
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.add_tags_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_tags"
-  type = "add_tags"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Tags
-  #
-
-  [transforms.add_tags_transform.tags]
-    # A key/value pair representing the new tag to be added.
-    # 
-    # * required
-    # * no default
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
+    my_tag = "my value" # example
+    my_env_tag = "${ENV_VAR}" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### tags
+
+`required` `type: table`
+
+A table of key/value pairs representing the tags to be added to the metric.
+
+#### tags.*
+
+`required` `type: *` `example: my_tag = "my value"`
+
+A key/value pair representing the new tag to be added.
 
 ## How It Works
 

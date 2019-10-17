@@ -29,6 +29,8 @@ class Option
         options_hashes.collect do |sub_name, sub_hash|
           self.class.new(sub_hash.merge("name" => sub_name))
         end
+    else
+      @options = []
     end
 
     @name = hash.fetch("name")
@@ -45,7 +47,7 @@ class Option
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    @category = hash["category"] || ((@options.nil? || inline?) ? "General" : @name.humanize)
+    @category = hash["category"] || ((@options.empty? || inline?) ? "General" : @name.humanize)
 
     if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")
@@ -61,13 +63,13 @@ class Option
 
     if @examples.empty?
       if !@enum.nil?
-        @examples = @enum
+        @examples = @enum.keys
       elsif !@default.nil?
         @examples = [@default]
       end
     end
 
-    if @examples.empty? && @options.nil? && !table?
+    if @examples.empty? && @options.empty? && !table?
       raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
     end
 
@@ -79,11 +81,52 @@ class Option
   end
 
   def <=>(other_option)
-    sort_token <=> other_option.sort_token
+    name <=> other_option.name
+  end
+
+  def advanced?
+    if options.any?
+      options.any?(&:advanced?)
+    else
+      !simple?
+    end
   end
 
   def array?(inner_type)
     type == "[#{inner_type}]"
+  end
+
+  def config_file_sort_token
+    first =
+      if table?
+        2
+      elsif required?
+        0
+      else
+        1
+      end
+
+    second =
+      case category
+      when "General"
+        "AA #{category}"
+      when "Requests"
+        "ZZ #{category}"
+      else
+        category
+      end
+
+    third =
+      case name
+      when "inputs"
+        "AAB #{name}"
+      when "strategy", "type"
+        "AAA #{name}"
+      else
+        name
+      end
+
+    [first, second, third]
   end
 
   def context?
@@ -114,7 +157,15 @@ class Option
   end
 
   def relevant_when_kvs
-    relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
+    relevant_when.collect do |k, v|
+      if v.is_a?(Array)
+        v.collect do |sub_v|
+          "#{k} = #{sub_v.to_toml}"
+        end
+      else
+        "#{k} = #{v.to_toml}"
+      end
+    end.flatten
   end
 
   def required?
@@ -122,40 +173,15 @@ class Option
   end
 
   def simple?
-    @simple == true || required?
+    if options.any?
+      @simple == true || (required? && simple_options.any?)
+    else
+      @simple == true || required?
+    end
   end
 
-  def sort_token
-    first =
-      if table?
-        2
-      elsif required?
-        0
-      else
-        1
-      end
-
-    second =
-      case category
-      when "General"
-        "AA #{category}"
-      when "Requests"
-        "ZZ #{category}"
-      else
-        category
-      end
-
-    third =
-      case name
-      when "inputs"
-        "AAB #{name}"
-      when "type"
-        "AAA #{name}"
-      else
-        name
-      end
-
-    [first, second, third]
+  def simple_options
+    @simple_options ||= options.select(&:simple?)
   end
 
   def table?

@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `lua` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -43,31 +43,14 @@ if event["host"] == nil then
   event["host"] = hostname
 end
 """
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[transforms.lua_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "lua"
-  type = "lua"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[transforms.my_transform_id]
+  # REQUIRED
+  type = "lua" # must be: "lua"
   inputs = ["my-source-id"]
-
-  # The inline Lua source to evaluate.
-  # 
-  # * required
-  # * no default
   source = """
 require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -79,18 +62,38 @@ if event["host"] == nil then
   event["host"] = hostname
 end
 """
-
-  # A list of directories search when loading a Lua file via the `require`
-  # function.
-  # 
-  # * optional
-  # * no default
-  search_dirs = ["/etc/vector/lua"]
+  
+  # OPTIONAL
+  search_dirs = ["/etc/vector/lua"] # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### search_dirs
+
+`optional` `no default` `type: [string]` `example: ["/etc/vector/lua"]`
+
+A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.
+
+### source
+
+`required` `type: string` `example: """
+require("script") # a `script.lua` file must be in your `search_dirs`
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""`
+
+The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Add fields" %}

@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to tokenize a field's value by 
 
 The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -26,73 +26,76 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[transforms.tokenizer_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tokenizer"
-  type = "tokenizer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
-
-  # The log field names assigned to the resulting tokens, in order.
-  # 
-  # * required
-  # * no default
   field_names = ["timestamp", "level", "message"]
-
-  # If `true` the `field` will be dropped after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to tokenize.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.tokenizer_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+  
+  # OPTIONAL - General
+  drop_field = true # default
+  field = "message" # default
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_field
+
+`optional` `default: true` `type: bool`
+
+If `true` the `field` will be dropped after parsing.
+
+### field
+
+`optional` `default: "message"` `type: string`
+
+The log field to tokenize.
+
+### field_names
+
+`required` `type: [string]` `example: ["timestamp", "level", "message"]`
+
+The log field names assigned to the resulting tokens, in order.
+
+### types
+
+`optional` `type: table`
+
+Key/Value pairs representing mapped log field types.
+
+#### types.*
+
+`required` `type: string`
+
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"bool"` | Coerces `"true"`/`/"false"`, `"1"`/`"0"`, and `"t"`/`"f"` values into boolean. |
+| `"float"` | Coerce to a 64 bit float. |
+| `"int"` | Coerce to a 64 bit integer. |
+| `"string"` | Coerce to a string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
+
+## Input/Output
 
 Given the following log line:
 
@@ -119,7 +122,7 @@ fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -166,37 +169,6 @@ certain characters as special. These characters will be discarded:
 * `"..."` - Quotes are used tp wrap phrases. Spaces are preserved, but the wrapping quotes will be discarded.
 * `[...]` - Brackets are used to wrap phrases. Spaces are preserved, but the wrapping brackets will be discarded.
 * `\` - Can be used to escape the above characters, Vector will treat them as literal.
-
-### Types
-
-By default, extracted (parsed) fields all contain `string` values. You can
-coerce these values into types via the `types` table as shown in the
-[Config File](#config-file) example above. For example:
-
-```coffeescript
-[transforms.my_transform_id]
-  # ...
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-
-The available types are:
-
-| Type        | Desription                                                                                                          |
-|:------------|:--------------------------------------------------------------------------------------------------------------------|
-| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
-| `float`     | Coerce to 64 bit floats.                                                                                            |
-| `int`       | Coerce to a 64 bit integer.                                                                                         |
-| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 

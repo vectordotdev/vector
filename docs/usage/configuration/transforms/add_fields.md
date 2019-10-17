@@ -17,10 +17,10 @@ description: Accepts `log` events and allows you to add one or more log fields.
 
 The `add_fields` transform accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -29,62 +29,33 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00Z
-    my_nested_fields = {key1 = "value1", key2 = "value2"}
-    my_list = ["first", "second", "third"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.add_fields_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_fields"
-  type = "add_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Fields
-  #
-
-  [transforms.add_fields_transform.fields]
-    # A key/value pair representing the new log fields to be added. Accepts all
-    # supported types. Use `.` for adding nested fields.
-    # 
-    # * required
-    # * no default
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00Z
-    my_nested_fields = {key1 = "value1", key2 = "value2"}
-    my_list = ["first", "second", "third"]
+    my_string_field = "string value" # example
+    my_env_var_field = "${ENV_VAR}" # example
+    my_int_field = 1 # example
+    my_float_field = 1.2 # example
+    my_bool_field = true # example
+    my_timestamp_field = 1979-05-27T00:32:00Z # example
+    my_nested_fields = {key1 = "value1", key2 = "value2"} # example
+    my_list = ["first", "second", "third"] # example
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### fields
+
+`required` `type: table`
+
+A table of key/value pairs representing the keys to be added to the event.
+
+#### fields.*
+
+`required` `type: *` `example: my_string_field = "string value"`
+
+A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
+
+## Input/Output
 
 Given the following configuration:
 
@@ -108,7 +79,7 @@ Given the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -253,6 +224,7 @@ Finally, consider the following alternatives:
 [assets.add_fields_transform]: ../../../assets/add_fields-transform.svg
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#value-types]: ../../../usage/configuration#value-types
+[docs.configuration#value_types]: ../../../usage/configuration#value_types
 [docs.data-model.log#special-characters]: ../../../about/data-model/log.md#special-characters
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model]: ../../../about/data-model

@@ -43,6 +43,7 @@ and [source][docs.sources].
 | [`blackhole` sink][docs.sinks.blackhole] | `best_effort` |
 | [`clickhouse` sink][docs.sinks.clickhouse] | `best_effort` |
 | [`console` sink][docs.sinks.console] | `best_effort` |
+| [`datadog_metrics` sink][docs.sinks.datadog_metrics] | `best_effort` |
 | [`elasticsearch` sink][docs.sinks.elasticsearch] | `best_effort` |
 | [`file` sink][docs.sinks.file] | `best_effort` |
 | [`http` sink][docs.sinks.http] | `at_least_once` |
@@ -122,6 +123,7 @@ keep you in the loop if this ever changes.
 [docs.sinks.blackhole]: ../usage/configuration/sinks/blackhole.md
 [docs.sinks.clickhouse]: ../usage/configuration/sinks/clickhouse.md
 [docs.sinks.console]: ../usage/configuration/sinks/console.md
+[docs.sinks.datadog_metrics]: ../usage/configuration/sinks/datadog_metrics.md
 [docs.sinks.elasticsearch]: ../usage/configuration/sinks/elasticsearch.md
 [docs.sinks.file]: ../usage/configuration/sinks/file.md
 [docs.sinks.http]: ../usage/configuration/sinks/http.md

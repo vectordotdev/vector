@@ -8,7 +8,7 @@
 <% end -%>
 <% options.each do |option| -%>
 <%- name = opts[:path] ? "#{opts[:path]}.#{option.name}" : option.name -%>
-<% if !option.options.nil? -%>
+<% if option.options.any? -%>
 <%= options_table(option.options, header: false, path: name, titles: false) %>
 <% else -%>
 | `<%= name %>` | `<%= option.type %>` | <%= table.option_description(option).table_escape %> |

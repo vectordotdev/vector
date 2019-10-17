@@ -17,52 +17,45 @@ description: Ingests data through standard input (STDIN) and outputs `log` event
 
 The `stdin` source ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   type = "stdin" # must be: "stdin"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sources.stdin_source]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "stdin"
-  type = "stdin"
-
-  # The maxiumum bytes size of a message before it is discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
+[sources.my_source_id]
+  # REQUIRED - General
+  type = "stdin" # must be: "stdin"
+  
+  # OPTIONAL - General
+  max_length = 102400 # default, bytes
+  
+  # OPTIONAL - Context
+  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### host_key
+
+`optional` `default: "host"` `type: string`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`optional` `default: 102400` `type: int` `unit: bytes`
+
+The maxiumum bytes size of a message before it is discarded.
+
+## Input/Output
 
 Given the following input line:
 
@@ -74,7 +67,7 @@ Given the following input line:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

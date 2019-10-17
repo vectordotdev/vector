@@ -83,6 +83,7 @@
     * [blackhole sink][docs.sinks.blackhole]
     * [clickhouse sink][docs.sinks.clickhouse]
     * [console sink][docs.sinks.console]
+    * [datadog_metrics sink][docs.sinks.datadog_metrics]
     * [elasticsearch sink][docs.sinks.elasticsearch]
     * [file sink][docs.sinks.file]
     * [http sink][docs.sinks.http]
@@ -173,6 +174,7 @@
 [docs.sinks.blackhole]: ./usage/configuration/sinks/blackhole.md
 [docs.sinks.clickhouse]: ./usage/configuration/sinks/clickhouse.md
 [docs.sinks.console]: ./usage/configuration/sinks/console.md
+[docs.sinks.datadog_metrics]: ./usage/configuration/sinks/datadog_metrics.md
 [docs.sinks.elasticsearch]: ./usage/configuration/sinks/elasticsearch.md
 [docs.sinks.file]: ./usage/configuration/sinks/file.md
 [docs.sinks.http]: ./usage/configuration/sinks/http.md

@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -33,61 +33,44 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
   type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"]
   namespace = "service"
-
-  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
-[sinks.statsd_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "statsd"
-  type = "statsd"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
+[sinks.my_sink_id]
+  # REQUIRED
+  type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"]
-
-  # A prefix that will be added to all metric names.
-  # 
-  # * required
-  # * no default
   namespace = "service"
-
-  # The UDP socket address to send stats to.
-  # 
-  # * optional
-  # * default: "127.0.0.1:8125"
-  address = "127.0.0.1:8125"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
+  
+  # OPTIONAL
+  address = "127.0.0.1:8125" # default
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
-| **OPTIONAL** | | |
-| `address` | `string` | The UDP socket address to send stats to.<br />`default: "127.0.0.1:8125"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
+### address
 
-## Examples
+`optional` `default: "127.0.0.1:8125"` `type: string`
+
+The UDP socket address to send stats to.
+
+### healthcheck
+
+`optional` `default: true` `type: bool`
+
+Enables/disables the sink healthcheck upon start.
+
+### namespace
+
+`required` `type: string` `example: "service"`
+
+A prefix that will be added to all metric names.
+
+## Input/Output
 
 The `statsd` sink batches [`metric`][docs.data-model.metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][urls.statsd_multi]. For example:
 
@@ -138,13 +121,10 @@ issue, please:
 
 
 [assets.statsd_sink]: ../../../assets/statsd-sink.svg
-[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_statsd_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+bug
 [urls.new_statsd_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+enhancement

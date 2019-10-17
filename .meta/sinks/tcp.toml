@@ -2,6 +2,7 @@
 buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+encodings = ["json", "text"]
 healthcheck = true
 input_types = ["log"]
 write_to_description = "a TCP connection"
@@ -12,10 +13,3 @@ type = "string"
 examples = ["92.12.333.224:5000"]
 null = false
 description = "The TCP address."
-
-[sinks.tcp.options.encoding]
-type = "string"
-category = "Requests"
-enum = ["json", "text"]
-null = false
-description = "The encoding format used to serialize the events before flushing."
