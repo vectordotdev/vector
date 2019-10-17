@@ -10,6 +10,7 @@ type = "string"
 examples = ["0.0.0.0:9000"]
 null = true
 relevant_when = {mode = ["tcp", "udp"]}
+simple = true
 description = "The TCP or UDP address to listen on."
 
 [sources.syslog.options.host_key]
@@ -47,6 +48,7 @@ type = "string"
 examples = ["/path/to/socket"]
 null = true
 relevant_when = {mode = "unix"}
+simple = true
 description = """\
 The unix socket path. *This should be absolute path.*
 """
