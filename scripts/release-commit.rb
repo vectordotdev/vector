@@ -13,15 +13,22 @@ require_relative "setup"
 #
 
 def bump_cargo_version(version)
-  cargo_content = File.read("#{ROOT_DIR}/Cargo.toml")
+  # Cargo.toml
+  content = File.read("#{ROOT_DIR}/Cargo.toml")
+  new_content = bump_version(content, version)
+  File.write("#{ROOT_DIR}/Cargo.toml", new_content)
 
-  new_cargo_content =
-    cargo_content.sub(
-      /name = "vector"\nversion = "([a-z0-9.-]*)"\n/,
-      "name = \"vector\"\nversion = \"#{version}\"\n"
-    )
+  # Cargo.lock
+  content = File.read("#{ROOT_DIR}/Cargo.lock")
+  new_content = bump_version(content, version)
+  File.write("#{ROOT_DIR}/Cargo.lock", new_content)
+end
 
-  File.write("#{ROOT_DIR}/Cargo.toml", new_cargo_content)
+def bump_version(content, version)
+  content.sub(
+    /name = "vector"\nversion = "([a-z0-9.-]*)"\n/,
+    "name = \"vector\"\nversion = \"#{version}\"\n"
+  )
 end
 
 def release_exists?(release)
