@@ -62,7 +62,7 @@ else
 
   bump_cargo_version(release.version)
 
-  success("Bumped the version in Cargo.toml to #{release.version}")
+  success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
   
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
