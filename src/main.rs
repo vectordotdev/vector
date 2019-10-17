@@ -88,6 +88,12 @@ impl std::str::FromStr for Color {
 }
 
 fn get_version() -> String {
+    let pkg_version = if built_info::CI_PLATFORM.is_some() && built_info::PKG_VERSION.contains('-')
+    {
+        built_info::PKG_VERSION.replace("-dev", "-nightly")
+    } else {
+        built_info::PKG_VERSION.into()
+    };
     let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
     let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
         .unwrap()
@@ -97,7 +103,7 @@ fn get_version() -> String {
     } else {
         built_date.to_string()
     };
-    format!("{} ({})", built_info::PKG_VERSION, built_string)
+    format!("{} ({})", pkg_version, built_string)
 }
 
 fn main() {
