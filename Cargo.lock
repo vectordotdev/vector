@@ -1373,13 +1373,13 @@ version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb-sys 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "leveldb-sys 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.56 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.1"
+version = "2.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.56 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4278,7 +4278,7 @@ dependencies = [
 "checksum lazy_static 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "76f033c7ad61445c5b347c7382dd1237847eb1bce590fe50365dcb33d546be73"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
 "checksum leveldb 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8438a36a31c982ac399c4477d7e3c62cc7a6bf91bb6f42837b7e1033359fcbad"
-"checksum leveldb-sys 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4a4e97b4e1ee52602c3af5f47c1959e9f349217a41f1510fe4a8ac02ce3dc818"
+"checksum leveldb-sys 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "71f46429bb70612c3e939aaeed27ffd31a24a773d21728a1a426e4089d6778d2"
 "checksum lexical-core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3e82e023e062f1d25f807ad182008fba1b46538e999f908a08cc0c29e084462e"
 "checksum libc 0.2.56 (registry+https://github.com/rust-lang/crates.io-index)" = "113dacd5d2dd5dcf7800449b3c3115957db1b6452a4c5bb3447e81087f23e53f"
 "checksum libgit2-sys 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)" = "48441cb35dc255da8ae72825689a95368bf510659ae1ad55dc4aa88cb1789bf1"
