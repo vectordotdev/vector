@@ -7,7 +7,7 @@ through_description = "the Syslog 5424 protocol"
 
 [sources.syslog.options.address]
 type = "string"
-examples = ["0.0.0.0:9000", "systemd#2"]
+examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
 null = true
 relevant_when = {mode = ["tcp", "udp"]}
 simple = true

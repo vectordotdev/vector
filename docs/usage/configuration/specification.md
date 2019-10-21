@@ -442,6 +442,7 @@ data_dir = "/var/lib/vector"
   # * type: string
   # * relevant when mode = "tcp" or mode = "udp"
   address = "0.0.0.0:9000"
+  address = "systemd"
   address = "systemd#2"
 
   # The maximum bytes size of incoming messages before they are discarded.
@@ -576,6 +577,7 @@ data_dir = "/var/lib/vector"
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
   address = "systemd#1"
 
   # The timeout before a connection is forcefully closed during shutdown.
