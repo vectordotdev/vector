@@ -89,6 +89,10 @@ struct Validate {
     /// Ensure that the config topology is correct and that all components resolve
     #[structopt(short, long)]
     topology: bool,
+
+    /// Fail validation on warnings
+    #[structopt(short, long)]
+    strict: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -378,14 +382,28 @@ fn validate(opts: &Validate, root_opts: &RootOpts) {
     });
 
     if opts.topology {
-        topology::validate(&config).unwrap_or_else(|| {
-            error!(
-                message = "Failed to validate config topology.",
-                path = ?root_opts.config_path
-            );
-            std::process::exit(exitcode::CONFIG);
-        });
+        match topology::builder::check(&config) {
+            Err(errors) => {
+                for error in errors {
+                    error!("Topology error: {}", error);
+                }
+                std::process::exit(exitcode::CONFIG);
+            }
+            Ok(warnings) => {
+                for warning in &warnings {
+                    error!("Topology warning: {}", warning);
+                }
+                if opts.strict && !warnings.is_empty() {
+                    std::process::exit(exitcode::CONFIG);
+                }
+            }
+        }
     }
+
+    debug!(
+        message = "Validation successful.",
+        path = ?root_opts.config_path
+    );
 }
 
 #[allow(unused)]

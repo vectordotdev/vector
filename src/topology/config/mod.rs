@@ -14,7 +14,9 @@ mod vars;
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    #[serde(default)]
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
@@ -208,18 +210,7 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars)
-            .map_err(|e| vec![e.to_string()])
-            .and_then(|config: Config| {
-                if config.sources.is_empty() {
-                    return Err(vec!["No sources defined in the config.".to_owned()]);
-                }
-                if config.sinks.is_empty() {
-                    return Err(vec!["No sinks defined in the config.".to_owned()]);
-                }
-
-                Ok(config)
-            })
+        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn contains_cycle(&self) -> bool {
