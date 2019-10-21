@@ -66,11 +66,11 @@ impl FromStr for Conversion {
 /// Helper function to parse a conversion map and check against a list of names
 pub fn parse_check_conversion_map(
     types: &HashMap<Atom, String>,
-    names: &Vec<Atom>,
+    names: &[Atom],
 ) -> Result<HashMap<Atom, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
-    let names: HashSet<Atom> = names.into_iter().map(|s| s.into()).collect();
-    for (name, _) in types {
+    let names: HashSet<Atom> = names.iter().map(|s| s.into()).collect();
+    for name in types.keys() {
         if !names.contains(name) {
             warn!(
                 message = "Field was specified in the types but is not a valid field name.",
@@ -87,7 +87,7 @@ pub fn parse_conversion_map(
     types: &HashMap<Atom, String>,
 ) -> Result<HashMap<Atom, Conversion>, ConversionError> {
     types
-        .into_iter()
+        .iter()
         .map(|(field, typename)| {
             typename
                 .parse::<Conversion>()

@@ -61,7 +61,7 @@ impl GlobalOptions {
         let data_dir = local_data_dir
             .or(self.data_dir.as_ref())
             .ok_or_else(|| DataDirError::MissingDataDir)
-            .map_err(|err| Box::new(err))?
+            .map_err(Box::new)?
             .to_path_buf();
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());

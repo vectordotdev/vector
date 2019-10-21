@@ -81,25 +81,22 @@ where
             }
         });
 
-        let source = rx
-            .map(move |line| create_event(line, &host_key, &hostname))
+        rx.map(move |line| create_event(line, &host_key, &hostname))
             .map_err(|e| error!("error reading line: {:?}", e))
             .forward(
                 out.sink_map_err(|e| error!(message = "Unable to send event to out.", error = %e)),
             )
-            .map(|_| info!("finished sending"));
-
-        source
+            .map(|_| info!("finished sending"))
     }))
 }
 
-fn create_event(line: Bytes, host_key: &String, hostname: &Option<String>) -> Event {
+fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
     let mut event = Event::from(line);
 
     if let Some(hostname) = &hostname {
         event
             .as_mut_log()
-            .insert_implicit(host_key.clone().into(), hostname.clone().into());
+            .insert_implicit(host_key.into(), hostname.clone().into());
     }
 
     event

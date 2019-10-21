@@ -164,7 +164,7 @@ pub fn file_source(
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         data_dir,
-        glob_minimum_cooldown: glob_minimum_cooldown,
+        glob_minimum_cooldown,
         fingerprinter: config.fingerprinting.clone().into(),
         oldest_first: config.oldest_first,
     };
@@ -317,7 +317,7 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
 fn create_event(
     line: Bytes,
     file: String,
-    host_key: &String,
+    host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
@@ -332,7 +332,7 @@ fn create_event(
     if let Some(hostname) = &hostname {
         event
             .as_mut_log()
-            .insert_implicit(host_key.clone().into(), hostname.clone().into());
+            .insert_implicit(host_key.into(), hostname.clone().into());
     }
 
     event

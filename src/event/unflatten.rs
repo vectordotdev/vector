@@ -51,7 +51,7 @@ impl From<HashMap<Atom, Value>> for Unflatten {
 /// of this function will be merged into the overall tree.
 fn unflatten(k: Atom, v: MapValue) -> MapValue {
     // Maps are delimited via `.`.
-    let mut s = k.rsplit(".").peekable();
+    let mut s = k.rsplit('.').peekable();
     let mut map = HashMap::new();
 
     // Temp value variable that ends up representing the overall path of the tree.
@@ -91,7 +91,7 @@ fn unflatten(k: Atom, v: MapValue) -> MapValue {
         // otherwise, we create an intermediate map that gets set as the the temp value.
         //
         // Since the next item is `None` in the iterator this essentially breaks out of the loop.
-        if let None = s.peek() {
+        if s.peek().is_none() {
             map.insert(k.into(), temp_v.take().unwrap());
         } else {
             let mut m = HashMap::new();
@@ -109,10 +109,7 @@ fn unflatten(k: Atom, v: MapValue) -> MapValue {
 /// `i -1` with `MapValue::Null`, that will then get replaced.
 fn build_array(i: usize, value: MapValue) -> Vec<MapValue> {
     let mut array = if i > 0 {
-        (0..i)
-            .into_iter()
-            .map(|_| MapValue::Null)
-            .collect::<Vec<_>>()
+        (0..i).map(|_| MapValue::Null).collect::<Vec<_>>()
     } else {
         Vec::new()
     };

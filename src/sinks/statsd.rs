@@ -106,7 +106,7 @@ fn encode_tags(tags: &HashMap<String, String>) -> String {
         .iter()
         .map(|(name, value)| {
             if value == "true" {
-                format!("{}", name)
+                name.to_string()
             } else {
                 format!("{}:{}", name, value)
             }
@@ -157,7 +157,7 @@ fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
             buf.push(format!("{}:{}", name, val));
             buf.push("h".to_string());
             if *sample_rate != 1 {
-                buf.push(format!("@{}", 1.0 / *sample_rate as f64));
+                buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
             };
             if let Some(t) = tags {
                 buf.push(format!("#{}", encode_tags(t)));

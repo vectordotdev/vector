@@ -140,11 +140,11 @@ where
             if let Some(duration) = &self.max_linger {
                 // We just inserted the first item of a new batch, so set our delay to the longest time
                 // we want to allow that item to linger in the batch before being flushed.
-                self.linger_deadline = Some(Delay::new(Instant::now() + duration.clone()));
+                self.linger_deadline = Some(Delay::new(Instant::now() + *duration));
             }
         }
 
-        self.batch.push(item.into());
+        self.batch.push(item);
 
         Ok(AsyncSink::Ready)
     }

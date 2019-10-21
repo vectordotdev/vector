@@ -49,7 +49,7 @@ impl AddFields {
 impl Transform for AddFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
-            event.as_mut_log().insert_explicit(key, value.into());
+            event.as_mut_log().insert_explicit(key, value);
         }
 
         Some(event)
