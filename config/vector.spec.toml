@@ -2027,6 +2027,10 @@ end
 
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `console`.
   # 
@@ -2042,20 +2046,33 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The standard stream to write to.
-  # 
-  # * required
-  # * type: string
-  # * enum: "stdout" or "stderr"
-  target = "stdout"
-  target = "stderr"
-
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   # * type: bool
   healthcheck = true
+
+  # The standard stream to write to.
+  # 
+  # * optional
+  # * default: "stdout"
+  # * type: string
+  # * enum: "stdout" or "stderr"
+  target = "stdout"
+  target = "stderr"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  # 
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
 
 # Batches `metric` events to Datadog metrics service using HTTP API.
 [sinks.datadog_metrics]

@@ -23,26 +23,45 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metr
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
-  target = "stdout" # enum: "stdout" or "stderr"
+  
+  # REQUIRED - requests
+  encoding = "json" # enum: "json" or "text"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
-  target = "stdout" # enum: "stdout" or "stderr"
   
-  # OPTIONAL
+  # REQUIRED - requests
+  encoding = "json" # enum: "json" or "text"
+  
+  # OPTIONAL - General
   healthcheck = true # default
+  target = "stdout" # default, enum: "stdout" or "stderr"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
+
+### encoding
+
+`required` `type: string`
+
+The encoding format used to serialize the events before outputting.
+
+The field is an enumeration and only accepts the following values:
+
+| Value | Description |
+|:------|:------------|
+| `"json"` | Each event is encoded into JSON and the payload is represented as a JSON array. |
+| `"text"` | Each event is encoded into text via the `message` key and the payload is new line delimited. |
 
 ### healthcheck
 
@@ -52,7 +71,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### target
 
-`required` `type: string`
+`optional` `default: "stdout"` `type: string`
 
 The [standard stream][urls.standard_streams] to write to.
 
@@ -60,7 +79,7 @@ The field is an enumeration and only accepts the following values:
 
 | Value | Description |
 |:------|:------------|
-| `"stdout"` | Output will be written to [STDOUT][urls.stdout] |
+| `"stdout"` *(default)* | Output will be written to [STDOUT][urls.stdout] |
 | `"stderr"` | Output will be written to [STDERR][urls.stderr] |
 
 ## How It Works

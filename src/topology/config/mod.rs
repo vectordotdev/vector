@@ -263,6 +263,7 @@ mod test {
       [sinks.out]
       type = "console"
       inputs = ["in"]
+      encoding = "json"
       "#,
         )
         .unwrap();
