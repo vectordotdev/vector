@@ -1,3 +1,5 @@
+#![cfg(feature = "leveldb")]
+
 use futures::Future;
 use prost::Message;
 use tempfile::tempdir;
