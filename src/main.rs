@@ -398,21 +398,30 @@ fn validate(opts: &Validate, root_opts: &RootOpts) -> exitcode::ExitCode {
     });
 
     if opts.topology {
-        match topology::builder::check(&config) {
+        let exit = match topology::builder::check(&config) {
             Err(errors) => {
                 for error in errors {
                     error!("Topology error: {}", error);
                 }
-                return exitcode::CONFIG;
+                Some(exitcode::CONFIG)
             }
             Ok(warnings) => {
                 for warning in &warnings {
                     warn!("Topology warning: {}", warning);
                 }
                 if opts.deny_warnings && !warnings.is_empty() {
-                    return exitcode::CONFIG;
+                    Some(exitcode::CONFIG)
+                } else {
+                    None
                 }
             }
+        };
+        if exit.is_some() {
+            error!(
+                message = "Failed to verify config file topology.",
+                path = ?opts.config_path
+            );
+            return exit.unwrap();
         }
     }
 
