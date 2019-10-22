@@ -363,12 +363,18 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate, root_opts: &RootOpts) -> exitcode::ExitCode {
-    if root_opts
-        .config_path
-        .to_str()
-        .map_or(false, |s| s != "/etc/vector/vector.toml")
-    {
-        error!("Config flag should appear after sub command.");
+    let (rconf, rconf_is_set) = root_opts.config_path.to_str().map_or(("", false), |s| {
+        let default_root_config = RootOpts::from_iter(vec![""]);
+        (
+            s,
+            s != default_root_config.config_path.to_str().unwrap_or(""),
+        )
+    });
+    if rconf_is_set {
+        error!(
+            "Config flag should appear after sub command: `vector validate -c {}`.",
+            rconf
+        );
         return exitcode::USAGE;
     }
 
