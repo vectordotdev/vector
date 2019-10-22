@@ -78,8 +78,6 @@ struct RootOpts {
 #[structopt(rename_all = "kebab-case")]
 enum SubCommand {
     /// Validate the target config, then exit.
-    ///
-    /// E.g. `vector --config ./example.toml validate`
     Validate(Validate),
 }
 
@@ -93,6 +91,16 @@ struct Validate {
     /// Fail validation on warnings
     #[structopt(short, long)]
     deny_warnings: bool,
+
+    /// Read configuration from the specified file
+    #[structopt(
+        name = "config",
+        value_name = "FILE",
+        short,
+        long,
+        default_value = "/etc/vector/vector.toml"
+    )]
+    config_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -161,10 +169,9 @@ fn main() {
     );
 
     sub_command.map(|s| {
-        match s {
+        std::process::exit(match s {
             SubCommand::Validate(v) => validate(&v, &opts),
-        }
-        std::process::exit(exitcode::OK);
+        })
     });
 
     info!("Log level {:?} is enabled.", level);
@@ -355,20 +362,29 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn validate(opts: &Validate, root_opts: &RootOpts) {
-    let file = if let Some(file) = open_config(&root_opts.config_path) {
+fn validate(opts: &Validate, root_opts: &RootOpts) -> exitcode::ExitCode {
+    if root_opts
+        .config_path
+        .to_str()
+        .map_or(false, |s| s != "/etc/vector/vector.toml")
+    {
+        error!("Config flag should appear after sub command.");
+        return exitcode::USAGE;
+    }
+
+    let file = if let Some(file) = open_config(&opts.config_path) {
         file
     } else {
         error!(
             message = "Failed to open config file.",
-            path = ?root_opts.config_path
+            path = ?opts.config_path
         );
-        std::process::exit(exitcode::CONFIG);
+        return exitcode::CONFIG;
     };
 
     trace!(
         message = "Parsing config.",
-        path = ?root_opts.config_path
+        path = ?opts.config_path
     );
 
     let config = vector::topology::Config::load(file);
@@ -376,7 +392,7 @@ fn validate(opts: &Validate, root_opts: &RootOpts) {
     let config = config.unwrap_or_else(|| {
         error!(
             message = "Failed to parse config file.",
-            path = ?root_opts.config_path
+            path = ?opts.config_path
         );
         std::process::exit(exitcode::CONFIG);
     });
@@ -387,14 +403,14 @@ fn validate(opts: &Validate, root_opts: &RootOpts) {
                 for error in errors {
                     error!("Topology error: {}", error);
                 }
-                std::process::exit(exitcode::CONFIG);
+                return exitcode::CONFIG;
             }
             Ok(warnings) => {
                 for warning in &warnings {
                     warn!("Topology warning: {}", warning);
                 }
                 if opts.deny_warnings && !warnings.is_empty() {
-                    std::process::exit(exitcode::CONFIG);
+                    return exitcode::CONFIG;
                 }
             }
         }
@@ -402,8 +418,9 @@ fn validate(opts: &Validate, root_opts: &RootOpts) {
 
     debug!(
         message = "Validation successful.",
-        path = ?root_opts.config_path
+        path = ?opts.config_path
     );
+    exitcode::OK
 }
 
 #[allow(unused)]
