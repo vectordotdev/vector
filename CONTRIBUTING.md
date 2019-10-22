@@ -133,8 +133,12 @@ updated versions of Vector through various channels.
    curl https://sh.rustup.rs -sSf | sh
    ```
 
-2. Install [OpenSSL 1.0.x](https://www.openssl.org/source/) and
-   [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/).
+2. Install [OpenSSL 1.0.x](https://www.openssl.org/source/) and set two environment variables
+
+   ```
+   export OPENSSL_INCLUDE_DIR=<openssl prefix>/include
+   export OPENSSL_LIB_DIR=<openssl prefix>/lib
+   ```
 
 3. [Install Docker](https://docs.docker.com/install/). Docker
    containers are used for mocking Vector's integrations.
