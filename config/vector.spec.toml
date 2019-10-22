@@ -414,13 +414,16 @@ data_dir = "/var/lib/vector"
   mode = "udp"
   mode = "unix"
 
-  # The TCP or UDP address to listen on.
+  # The TCP or UDP address to listen for connections on, or "systemd#N" to use
+  # the Nth socket passed by systemd socket activation.
   # 
   # * optional
   # * no default
   # * type: string
   # * relevant when mode = "tcp" or mode = "udp"
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#2"
 
   # The maximum bytes size of incoming messages before they are discarded.
   # 
@@ -463,11 +466,14 @@ data_dir = "/var/lib/vector"
   # * must be: "tcp"
   type = "tcp"
 
-  # The address to bind the socket to.
+  # The address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation.
   # 
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#3"
 
   # The maximum bytes size of incoming messages before they are discarded.
   # 
@@ -545,11 +551,14 @@ data_dir = "/var/lib/vector"
   # * must be: "vector"
   type = "vector"
 
-  # The TCP address to bind to.
+  # The TCP address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation.
   # 
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#1"
 
   # The timeout before a connection is forcefully closed during shutdown.
   # 

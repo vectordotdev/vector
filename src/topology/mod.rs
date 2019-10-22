@@ -538,7 +538,7 @@ mod tests {
         use std::path::Path;
 
         let mut old_config = Config::empty();
-        old_config.add_source("in", TcpConfig::new(next_addr()));
+        old_config.add_source("in", TcpConfig::new(next_addr().into()));
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
