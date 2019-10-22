@@ -179,7 +179,7 @@ impl CloudWatchMetricsSvc {
                     dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
                 }),
-                _ => unimplemented!(),
+                _ => None,
             })
             .collect();
 

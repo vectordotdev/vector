@@ -1,37 +1,67 @@
 use crate::event::{Event, Metric};
 use crate::sinks::util::Batch;
-use indexmap::IndexMap;
+use indexmap::IndexSet;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
-trait Aggregate {
-    fn partition(&self) -> String;
-}
+#[derive(Clone)]
+struct MetricEntry(Metric);
 
-impl Aggregate for Metric {
-    fn partition(&self) -> String {
-        match self {
-            Metric::Counter { name, tags, .. } => format!("{}{:?}", name, tags),
-            Metric::Gauge { name, tags, .. } => format!("{}{:?}", name, tags),
-            Metric::Set {
-                name, tags, val, ..
-            } => format!("{}{:?}{}", name, tags, val),
-            Metric::Histogram {
-                name, tags, val, ..
-            } => format!("{}{:?}{}", name, tags, val),
+impl Eq for MetricEntry {}
+
+impl Hash for MetricEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(&self.0).hash(state);
+
+        match &self.0 {
+            Metric::Counter { name, .. } => {
+                name.hash(state);
+            }
+            Metric::Gauge { name, .. } => {
+                name.hash(state);
+            }
+            Metric::Set { name, val, .. } => {
+                name.hash(state);
+                val.hash(state);
+            }
+            Metric::Histogram { name, val, .. } => {
+                name.hash(state);
+                val.to_bits().hash(state);
+            }
         }
+
+        self.0
+            .tags()
+            .as_ref()
+            .map(|ts| ts.iter().for_each(|t| t.hash(state)));
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl PartialEq for MetricEntry {
+    fn eq(&self, other: &Self) -> bool {
+        let mut state = DefaultHasher::new();
+        self.hash(&mut state);
+        let hash1 = state.finish();
+
+        let mut state = DefaultHasher::new();
+        other.hash(&mut state);
+        let hash2 = state.finish();
+
+        hash1 == hash2
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
-    state: IndexMap<String, Metric>,
-    metrics: IndexMap<String, Metric>,
+    state: IndexSet<MetricEntry>,
+    metrics: IndexSet<MetricEntry>,
 }
 
 impl MetricBuffer {
     pub fn new() -> Self {
         Self {
-            state: IndexMap::new(),
-            metrics: IndexMap::new(),
+            state: IndexSet::new(),
+            metrics: IndexSet::new(),
         }
     }
 }
@@ -46,25 +76,21 @@ impl Batch for MetricBuffer {
 
     fn push(&mut self, item: Self::Input) {
         let item = item.into_metric();
-        let key = item.partition();
+        let new = MetricEntry(item.clone());
 
         match item {
-            Metric::Counter { .. } => {
-                if let Some(metric) = self.metrics.get_mut(&key) {
-                    metric.merge(&item);
-                } else {
-                    self.metrics.insert(key, item);
-                }
-            }
+            // gauges are special because gauge values could come
+            // in deltas - relative increments or decrements
             Metric::Gauge { .. } => {
-                if let Some(metric) = self.metrics.get_mut(&key) {
-                    metric.merge(&item);
+                if let Some(MetricEntry(mut existing)) = self.metrics.swap_take(&new) {
+                    existing.merge(&item);
+                    self.metrics.insert(MetricEntry(existing));
                 } else {
                     // if the gauge is not present in active batch,
                     // then we look it up in permanent state, where we keep track
                     // of gauge values throughout the entire application uptime
-                    let value = if let Some(default) = self.state.get(&key) {
-                        default.clone()
+                    let mut initial = if let Some(default) = self.state.get(&new) {
+                        default.0.clone()
                     } else {
                         Metric::Gauge {
                             name: String::from(""),
@@ -74,17 +100,16 @@ impl Batch for MetricBuffer {
                             tags: None,
                         }
                     };
-                    self.metrics.entry(key).or_insert(value).merge(&item);
+                    initial.merge(&item);
+                    self.metrics.insert(MetricEntry(initial));
                 }
             }
-            Metric::Set { .. } => {
-                self.metrics.insert(key, item);
-            }
-            Metric::Histogram { .. } => {
-                if let Some(metric) = self.metrics.get_mut(&key) {
-                    metric.merge(&item);
+            _ => {
+                if let Some(MetricEntry(mut existing)) = self.metrics.swap_take(&new) {
+                    existing.merge(&item);
+                    self.metrics.insert(MetricEntry(existing));
                 } else {
-                    self.metrics.insert(key, item);
+                    self.metrics.insert(new);
                 }
             }
         }
@@ -96,20 +121,20 @@ impl Batch for MetricBuffer {
 
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
-        for (k, v) in self.metrics.iter() {
-            if v.is_gauge() {
-                state.insert(k.clone(), v.clone());
+        for entry in self.metrics.iter() {
+            if entry.0.is_gauge() {
+                state.insert(entry.clone());
             }
         }
 
         Self {
             state,
-            metrics: IndexMap::new(),
+            metrics: IndexSet::new(),
         }
     }
 
     fn finish(self) -> Self::Output {
-        self.metrics.values().cloned().collect()
+        self.metrics.into_iter().map(|e| e.0).collect()
     }
 
     fn num_items(&self) -> usize {
@@ -185,10 +210,10 @@ mod test {
             buffer[0].clone().finish(),
             [
                 Metric::Counter {
-                    name: "counter-0".into(),
-                    val: 6.0,
+                    name: "counter-3".into(),
+                    val: 3.0,
                     timestamp: None,
-                    tags: Some(tag("production")),
+                    tags: Some(tag("staging")),
                 },
                 Metric::Counter {
                     name: "counter-0".into(),
@@ -209,10 +234,10 @@ mod test {
                     tags: Some(tag("staging")),
                 },
                 Metric::Counter {
-                    name: "counter-3".into(),
-                    val: 3.0,
+                    name: "counter-0".into(),
+                    val: 6.0,
                     timestamp: None,
-                    tags: Some(tag("staging")),
+                    tags: Some(tag("production")),
                 },
                 Metric::Counter {
                     name: "counter-1".into(),
@@ -425,6 +450,12 @@ mod test {
             [
                 Metric::Set {
                     name: "set-0".into(),
+                    val: "2".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Set {
+                    name: "set-0".into(),
                     val: "0".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
@@ -432,12 +463,6 @@ mod test {
                 Metric::Set {
                     name: "set-0".into(),
                     val: "1".into(),
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-                Metric::Set {
-                    name: "set-0".into(),
-                    val: "2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
                 },

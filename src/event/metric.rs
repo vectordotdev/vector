@@ -111,6 +111,25 @@ impl Metric {
                 *tags = new_tags.clone();
             }
             (
+                Metric::Set {
+                    ref mut name,
+                    ref mut val,
+                    ref mut timestamp,
+                    ref mut tags,
+                },
+                Metric::Set {
+                    name: new_name,
+                    val: new_val,
+                    timestamp: new_timestamp,
+                    tags: new_tags,
+                },
+            ) => {
+                *val = new_val.clone();
+                *name = new_name.clone();
+                *timestamp = *new_timestamp;
+                *tags = new_tags.clone();
+            }
+            (
                 Metric::Histogram {
                     ref mut name,
                     ref mut val,
@@ -128,15 +147,12 @@ impl Metric {
             ) => {
                 if val == new_val {
                     *sample_rate += *new_sample_rate;
-                } else {
-                    unimplemented!();
+                    *name = new_name.clone();
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
                 };
-
-                *name = new_name.clone();
-                *timestamp = *new_timestamp;
-                *tags = new_tags.clone();
             }
-            _ => unimplemented!(),
+            _ => {}
         }
     }
 }
