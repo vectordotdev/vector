@@ -92,7 +92,7 @@ struct Validate {
 
     /// Fail validation on warnings
     #[structopt(short, long)]
-    strict: bool,
+    deny_warnings: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -391,9 +391,9 @@ fn validate(opts: &Validate, root_opts: &RootOpts) {
             }
             Ok(warnings) => {
                 for warning in &warnings {
-                    error!("Topology warning: {}", warning);
+                    warn!("Topology warning: {}", warning);
                 }
-                if opts.strict && !warnings.is_empty() {
+                if opts.deny_warnings && !warnings.is_empty() {
                     std::process::exit(exitcode::CONFIG);
                 }
             }
