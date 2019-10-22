@@ -2466,7 +2466,7 @@ dependencies = [
 [[package]]
 name = "rdkafka"
 version = "0.21.0"
-source = "git+https://github.com/timberio/rust-rdkafka#9cb0245aee2769ce2113f0c35bde5dd6566578b7"
+source = "git+https://github.com/timberio/rust-rdkafka#028d4ec9aea834e47a13f5e8180f998649335ccc"
 dependencies = [
  "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.56 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2480,7 +2480,7 @@ dependencies = [
 [[package]]
 name = "rdkafka-sys"
 version = "1.0.1"
-source = "git+https://github.com/timberio/rust-rdkafka#9cb0245aee2769ce2113f0c35bde5dd6566578b7"
+source = "git+https://github.com/timberio/rust-rdkafka#028d4ec9aea834e47a13f5e8180f998649335ccc"
 dependencies = [
  "bindgen 0.49.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "libz-sys 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
