@@ -12,7 +12,7 @@ ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
 ARG LINUX_HEADERS_VERSION=5.3.1
 # OpenSSL needs to be compiled against MUSL too, so we install it from source.
-ARG OPENSSL_VERSION=1.0.2t
+ARG OPENSSL_VERSION=1.1.0l
 ARG TARGET=armv7-unknown-linux-musleabihf
 
 # Locations for produced tools and libraries.
@@ -274,7 +274,7 @@ ENV CFLAGS=""
 ENV CXXFLAGS=""
 ENV LDFLAGS=""
 ENV CROSS_COMPILE=""
-RUN ./Configure --prefix=$LIBS_PREFIX linux-generic32 && \
+RUN ./Configure --prefix=$LIBS_PREFIX linux-generic32 no-shared && \
   make install
 
 # The actual builder.
@@ -299,7 +299,7 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y --install-recommends build-essential pkg-config openssh-client git
+RUN apt-get update && apt-get install -y --install-recommends build-essential cmake pkg-config openssh-client git
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to
@@ -323,6 +323,10 @@ ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
 # Set up pkg-config.
 ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
 ENV PKG_CONFIG_ALLOW_CROSS=1
+
+# Set up environment variables for Rust bindgen
+# See https://github.com/rust-lang/rust-bindgen/issues/1229#issuecomment-473493753
+ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target armv7-unknown-linux-musleabihf"
 
 # Set env vars for the scripts/build-archive.sh file
 ENV TARGET=armv7-unknown-linux-musleabihf
