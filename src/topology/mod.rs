@@ -526,7 +526,7 @@ fn handle_errors(
 
 #[cfg(test)]
 mod tests {
-    use crate::sinks::console::{ConsoleSinkConfig, Target};
+    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
@@ -545,7 +545,7 @@ mod tests {
             &[&"in"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
-                encoding: None,
+                encoding: Encoding::Text,
             },
         );
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
