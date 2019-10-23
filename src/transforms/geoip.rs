@@ -1,5 +1,3 @@
-extern crate maxminddb;
-
 use super::Transform;
 
 use crate::{
@@ -9,6 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
+use indexmap::IndexMap;
 use std::net::IpAddr;
 use std::str::FromStr;
 
@@ -21,17 +20,23 @@ pub struct GeoipConfig {
 }
 
 pub struct Geoip {
+    pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub source: Atom,
-    pub database: String,
     pub target: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GeoipDecodedData {
+    pub data: IndexMap<Atom, String>,
 }
 
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
     fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+        let reader = maxminddb::Reader::open_readfile(self.database.clone()).unwrap();
         Ok(Box::new(Geoip::new(
+            reader,
             self.source.clone(),
-            self.database.clone(),
             self.target.clone(),
         )))
     }
@@ -46,10 +51,10 @@ impl TransformConfig for GeoipConfig {
 }
 
 impl Geoip {
-    pub fn new(source: Atom, database: String, target: String) -> Self {
+    pub fn new(dbreader: maxminddb::Reader<Vec<u8>>, source: Atom, target: String) -> Self {
         Geoip {
+            dbreader: dbreader,
             source: source,
-            database: database,
             target: target,
         }
     }
@@ -65,15 +70,19 @@ impl Transform for Geoip {
         if let Some(ipaddress) = &ipaddress {
             let ip: IpAddr = FromStr::from_str(ipaddress).unwrap();
             println!("Looking up {}", ip);
-            let reader =
-                maxminddb::Reader::open_readfile("/usr/local/share/GeoIP/GeoIP2-City.mmdb")
-                    .unwrap();
-            let city: maxminddb::geoip2::City = reader.lookup(ip).unwrap();
-            let iso_code = city.country.and_then(|cy| cy.iso_code);
-            if let Some(iso_code) = iso_code {
-                event
-                    .as_mut_log()
-                    .insert_explicit(Atom::from("city"), iso_code.into());
+            let v = self.dbreader.lookup(ip);
+            if v.is_ok() {
+                let city: maxminddb::geoip2::City = v.unwrap();
+                let iso_code = city.country.and_then(|cy| cy.iso_code);
+                if let Some(iso_code) = iso_code {
+                    let mut d = IndexMap::new();
+                    d.insert(Atom::from("city"), iso_code.into());
+                    let geoipdata = GeoipDecodedData { data: d };
+                    event.as_mut_log().insert_explicit(
+                        Atom::from(self.target.clone()),
+                        serde_json::to_string(&geoipdata).unwrap().into(),
+                    );
+                }
             }
         } else {
             println!("Something went wrong: {:?}", Some(ipaddress));
@@ -90,7 +99,11 @@ impl Transform for Geoip {
 #[cfg(test)]
 mod tests {
     use super::Geoip;
-    use crate::{event::Event, transforms::Transform, transforms::json_parser::{JsonParser, JsonParserConfig},};
+    use crate::{
+        event::Event,
+        transforms::json_parser::{JsonParser, JsonParserConfig},
+        transforms::Transform,
+    };
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -98,19 +111,13 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "8.8.8.8", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
+        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(
-            Atom::from("remote_addr"),
-            "path/to/db".to_string(),
-            "geoip".to_string(),
-        );
-
+        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geoip".to_string());
         let new_event = augment.transform(event).unwrap();
+        println!("Event after transformation: {:?}", new_event.as_log());
 
-        let key = Atom::from("city".to_string());
-        let kv = new_event.as_log().get(&key);
-
-        let val = "bar".to_string();
-        assert_eq!(kv, Some(&val.into()));
+        // we expect there will be no geoip object in the transformed
+        // event
     }
 }
