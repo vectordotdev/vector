@@ -93,6 +93,21 @@ impl Transform for Geoip {
                 if let Some(iso_code) = iso_code {
                     d.insert(Atom::from("country_code"), iso_code.into());
                 }
+
+                let latitude = data.location.clone().and_then(|loc| loc.latitude);
+                if let Some(latitude) = latitude {
+                    d.insert(Atom::from("latitude"), latitude.to_string());
+                }
+
+                let longitude = data.location.clone().and_then(|loc| loc.longitude);
+                if let Some(longitude) = longitude {
+                    d.insert(Atom::from("longitude"), longitude.to_string());
+                }
+                let timezone = data.location.clone().and_then(|loc| loc.time_zone);
+                if let Some(timezone) = timezone {
+                    d.insert(Atom::from("timezone"), timezone.into());
+                }
+
                 // FIXME: We should check if d has any data/
                 let geoipdata = GeoipDecodedData { data: d };
                 event.as_mut_log().insert_explicit(
