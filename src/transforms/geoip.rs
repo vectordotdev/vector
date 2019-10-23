@@ -80,9 +80,13 @@ impl Transform for Geoip {
                     let geoipdata = GeoipDecodedData { data: d };
                     event.as_mut_log().insert_explicit(
                         Atom::from(self.target.clone()),
-                        serde_json::to_string(&geoipdata).unwrap().into(),
+                        serde_json::to_string(&geoipdata.data).unwrap().into(), //FIXME: handle pnic heere
                     );
+                } else {
+                    println!("ISO code lookup returned nothing");
                 }
+            } else {
+                println!("Look up returned no data");
             }
         } else {
             println!("Something went wrong: {:?}", Some(ipaddress));
@@ -109,15 +113,19 @@ mod tests {
     #[test]
     fn geoip_event() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
-        let event = Event::from(r#"{"remote_addr": "8.8.8.8", "request_path": "foo/bar"}"#);
+        let event = Event::from(r#"{"remote_addr": "49.255.14.118", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("test-data/GeoLite2-City.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geoip".to_string());
+        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
         println!("Event after transformation: {:?}", new_event.as_log());
 
-        // we expect there will be no geoip object in the transformed
-        // event
+        let geodata_k = Atom::from("geo".to_string());
+        let geodata = new_event.as_log().get(&geodata_k);
+
+        println!("Geodata: {:?}", geodata);
+
+        //assert_eq!(kv, Some(&val.into()));
     }
 }

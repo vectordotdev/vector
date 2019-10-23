@@ -1,1 +1,4 @@
-[GeoIP2-City-Test.mmdb](https://github.com/maxmind/MaxMind-DB/commit/486258c85aa553d03d8f5fa6b3486ce8f844c910)
+[GeoLite2-City.mmdb](https://dev.maxmind.com/geoip/geoip2/geolite2/#Downloads)
+
+This product includes GeoLite2 data created by MaxMind, available from
+<a href="https://www.maxmind.com">https://www.maxmind.com</a>.
