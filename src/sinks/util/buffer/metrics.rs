@@ -165,6 +165,12 @@ mod test {
             .collect()
     }
 
+    fn sorted(buffer: &Vec<Metric>) -> Vec<Metric> {
+        let mut buffer = buffer.clone();
+        buffer.sort_by_key(|k| format!("{:?}", k));
+        buffer
+    }
+
     #[test]
     fn metric_buffer_counters() {
         let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
@@ -211,29 +217,11 @@ mod test {
         assert_eq!(buffer[1].len(), 2);
 
         assert_eq!(
-            buffer[0].clone().finish(),
+            sorted(&buffer[0].clone().finish()),
             [
-                Metric::Counter {
-                    name: "counter-3".into(),
-                    val: 3.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
                 Metric::Counter {
                     name: "counter-0".into(),
                     val: 0.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::Counter {
-                    name: "counter-1".into(),
-                    val: 1.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::Counter {
-                    name: "counter-2".into(),
-                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
@@ -249,11 +237,29 @@ mod test {
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
+                Metric::Counter {
+                    name: "counter-1".into(),
+                    val: 1.0,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+                Metric::Counter {
+                    name: "counter-2".into(),
+                    val: 2.0,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+                Metric::Counter {
+                    name: "counter-3".into(),
+                    val: 3.0,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
             ]
         );
 
         assert_eq!(
-            buffer[1].clone().finish(),
+            sorted(&buffer[1].clone().finish()),
             [
                 Metric::Counter {
                     name: "counter-2".into(),
@@ -321,21 +327,21 @@ mod test {
         assert_eq!(buffer[2].len(), 3);
 
         assert_eq!(
-            buffer[0].clone().finish(),
+            sorted(&buffer[0].clone().finish()),
             [
-                Metric::Gauge {
-                    name: "gauge-0".into(),
-                    val: 3.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
                 Metric::Gauge {
                     name: "gauge-0".into(),
                     val: 0.0,
                     direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                },
+                Metric::Gauge {
+                    name: "gauge-0".into(),
+                    val: 3.0,
+                    direction: None,
+                    timestamp: None,
+                    tags: Some(tag("production")),
                 },
                 Metric::Gauge {
                     name: "gauge-1".into(),
@@ -355,22 +361,8 @@ mod test {
         );
 
         assert_eq!(
-            buffer[1].clone().finish(),
+            sorted(&buffer[1].clone().finish()),
             [
-                Metric::Gauge {
-                    name: "gauge-3".into(),
-                    val: 3.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::Gauge {
-                    name: "gauge-4".into(),
-                    val: 4.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
                 Metric::Gauge {
                     name: "gauge-0".into(),
                     val: 0.0,
@@ -385,11 +377,25 @@ mod test {
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
+                Metric::Gauge {
+                    name: "gauge-3".into(),
+                    val: 3.0,
+                    direction: None,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+                Metric::Gauge {
+                    name: "gauge-4".into(),
+                    val: 4.0,
+                    direction: None,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
             ]
         );
 
         assert_eq!(
-            buffer[2].clone().finish(),
+            sorted(&buffer[2].clone().finish()),
             [
                 Metric::Gauge {
                     name: "gauge-2".into(),
@@ -450,7 +456,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            buffer[0].clone().finish(),
+            sorted(&buffer[0].clone().finish()),
             [
                 Metric::Set {
                     name: "set-0".into(),
@@ -516,7 +522,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            buffer[0].clone().finish(),
+            sorted(&buffer[0].clone().finish()),
             [
                 Metric::Histogram {
                     name: "hist-2".into(),
