@@ -5,6 +5,7 @@ pub mod add_fields;
 pub mod add_tags;
 pub mod coercer;
 pub mod field_filter;
+pub mod geoip;
 pub mod grok_parser;
 pub mod json_parser;
 pub mod log_to_metric;
@@ -15,7 +16,6 @@ pub mod remove_tags;
 pub mod sampler;
 pub mod split;
 pub mod tokenizer;
-pub mod geoip;
 
 pub trait Transform: Send {
     fn transform(&mut self, event: Event) -> Option<Event>;
