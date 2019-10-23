@@ -72,21 +72,27 @@ impl Transform for Geoip {
             println!("Looking up {}", ip);
             let v = self.dbreader.lookup(ip);
             if v.is_ok() {
-                let city: maxminddb::geoip2::City = v.unwrap();
-                let iso_code = city.country.and_then(|cy| cy.iso_code);
+                let mut d = IndexMap::new();
+                let data: maxminddb::geoip2::City = v.unwrap();
+                let city = data.city;
+                if let Some(city) = city {
+                    let city_names = city.names;
+                    if let Some(city_names) = city_names {
+                        let city_name_en = city_names.get("en");
+                        if let Some(city_name_en) = city_name_en {
+                            d.insert(Atom::from("city"), city_name_en.into());
+                        }
+                    }
+                }
+                let iso_code = data.country.and_then(|cy| cy.iso_code);
                 if let Some(iso_code) = iso_code {
-                    let mut d = IndexMap::new();
-                    d.insert(Atom::from("city"), iso_code.into());
+                    d.insert(Atom::from("country_code"), iso_code.into());
                     let geoipdata = GeoipDecodedData { data: d };
                     event.as_mut_log().insert_explicit(
                         Atom::from(self.target.clone()),
                         serde_json::to_string(&geoipdata.data).unwrap().into(), //FIXME: handle pnic heere
                     );
-                } else {
-                    println!("ISO code lookup returned nothing");
                 }
-            } else {
-                println!("Look up returned no data");
             }
         } else {
             println!("Something went wrong: {:?}", Some(ipaddress));
