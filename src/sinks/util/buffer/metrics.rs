@@ -1,7 +1,6 @@
 use crate::event::{Event, Metric};
 use crate::sinks::util::Batch;
-use indexmap::IndexSet;
-use std::collections::hash_map::DefaultHasher;
+use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone)]
@@ -53,15 +52,15 @@ impl PartialEq for MetricEntry {
 
 #[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
-    state: IndexSet<MetricEntry>,
-    metrics: IndexSet<MetricEntry>,
+    state: HashSet<MetricEntry>,
+    metrics: HashSet<MetricEntry>,
 }
 
 impl MetricBuffer {
     pub fn new() -> Self {
         Self {
-            state: IndexSet::new(),
-            metrics: IndexSet::new(),
+            state: HashSet::new(),
+            metrics: HashSet::new(),
         }
     }
 }
@@ -82,7 +81,7 @@ impl Batch for MetricBuffer {
             // gauges are special because gauge values could come
             // in deltas - relative increments or decrements
             Metric::Gauge { .. } => {
-                if let Some(MetricEntry(mut existing)) = self.metrics.swap_take(&new) {
+                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.merge(&item);
                     self.metrics.insert(MetricEntry(existing));
                 } else {
@@ -109,7 +108,7 @@ impl Batch for MetricBuffer {
                 self.metrics.insert(new);
             }
             _ => {
-                if let Some(MetricEntry(mut existing)) = self.metrics.swap_take(&new) {
+                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.merge(&item);
                     self.metrics.insert(MetricEntry(existing));
                 } else {
@@ -133,7 +132,7 @@ impl Batch for MetricBuffer {
 
         Self {
             state,
-            metrics: IndexSet::new(),
+            metrics: HashSet::new(),
         }
     }
 
