@@ -104,6 +104,10 @@ impl Batch for MetricBuffer {
                     self.metrics.insert(MetricEntry(initial));
                 }
             }
+            // set observations are simply deduplicated
+            Metric::Set { .. } => {
+                self.metrics.insert(new);
+            }
             _ => {
                 if let Some(MetricEntry(mut existing)) = self.metrics.swap_take(&new) {
                     existing.merge(&item);
@@ -450,12 +454,6 @@ mod test {
             [
                 Metric::Set {
                     name: "set-0".into(),
-                    val: "2".into(),
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-                Metric::Set {
-                    name: "set-0".into(),
                     val: "0".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
@@ -463,6 +461,12 @@ mod test {
                 Metric::Set {
                     name: "set-0".into(),
                     val: "1".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Set {
+                    name: "set-0".into(),
+                    val: "2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
