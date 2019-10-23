@@ -29,7 +29,7 @@ impl Default for Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    pub encoding: Option<Encoding>,
+    pub encoding: Encoding,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -62,38 +62,34 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
-fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<String, ()> {
+fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
     match event {
-        Event::Log(log) => {
-            if (log.is_structured() && encoding != &Some(Encoding::Text))
-                || encoding == &Some(Encoding::Json)
-            {
-                let bytes = serde_json::to_vec(&log.unflatten())
-                    .map_err(|e| panic!("Error encoding: {}", e))?;
-                String::from_utf8(bytes)
-                    .map_err(|e| panic!("Unable to convert json to utf8: {}", e))
-            } else {
+        Event::Log(log) => match encoding {
+            Encoding::Json => {
+                serde_json::to_string(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
+            }
+            Encoding::Text => {
                 let s = log
                     .get(&event::MESSAGE)
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)
             }
-        }
+        },
         Event::Metric(metric) => serde_json::to_string(&metric).map_err(|_| ()),
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::encode_event;
+    use super::{encode_event, Encoding};
     use crate::{event::Metric, Event};
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
     fn encodes_raw_logs() {
         let event = Event::from("foo");
-        assert_eq!(Ok("foo".to_string()), encode_event(event, &None));
+        assert_eq!(Ok("foo".to_string()), encode_event(event, &Encoding::Text));
     }
 
     #[test]
@@ -110,7 +106,7 @@ mod test {
         });
         assert_eq!(
             Ok(r#"{"type":"counter","name":"foos","val":100.0,"timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"}}"#.to_string()),
-            encode_event(event, &None)
+            encode_event(event, &Encoding::Text)
         );
     }
 
@@ -125,7 +121,7 @@ mod test {
         });
         assert_eq!(
             Ok(r#"{"type":"histogram","name":"glork","val":10.0,"sample_rate":1,"timestamp":null,"tags":null}"#.to_string()),
-            encode_event(event, &None)
+            encode_event(event, &Encoding::Text)
         );
     }
 }

@@ -207,7 +207,7 @@ impl CloudWatchMetricsSvc {
                 } => Some(MetricDatum {
                     metric_name: name.to_string(),
                     values: Some(vec![val]),
-                    counts: Some(vec![sample_rate as f64]),
+                    counts: Some(vec![f64::from(sample_rate)]),
                     timestamp: timestamp.map(timestamp_to_string),
                     dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
@@ -218,12 +218,10 @@ impl CloudWatchMetricsSvc {
 
         let namespace = self.config.namespace.clone();
 
-        let datum = PutMetricDataInput {
+        PutMetricDataInput {
             namespace,
             metric_data,
-        };
-
-        datum
+        }
     }
 }
 

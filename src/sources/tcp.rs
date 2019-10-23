@@ -1,4 +1,4 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
@@ -7,14 +7,13 @@ use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
-    pub address: SocketAddr,
+    pub address: SocketListenAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -31,7 +30,7 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(address: SocketAddr) -> Self {
+    pub fn new(address: SocketListenAddr) -> Self {
         Self {
             address,
             max_length: default_max_length(),
@@ -110,7 +109,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = TcpConfig::new(addr)
+        let server = TcpConfig::new(addr.into())
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -151,7 +150,7 @@ mod test {
 
         let addr = next_addr();
 
-        let mut config = TcpConfig::new(addr);
+        let mut config = TcpConfig::new(addr.into());
         config.max_length = 10;
 
         let server = config

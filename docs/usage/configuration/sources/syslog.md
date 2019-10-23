@@ -56,7 +56,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 
 `optional` `no default` `type: string` `example: "0.0.0.0:9000"`
 
-The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "udp".
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. Only relevant when mode = "tcp" or mode = "udp".
 
 ### host_key
 

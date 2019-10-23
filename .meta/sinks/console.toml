@@ -2,14 +2,14 @@
 buffer = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
-encoodings = ["json", "text"]
+encodings = ["json", "text"]
 healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = "[standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`"
 
 [sinks.console.options.target]
 type = "string"
-defaukt = "stdout"
+default = "stdout"
 null = false
 description = "The [standard stream][urls.standard_streams] to write to."
 

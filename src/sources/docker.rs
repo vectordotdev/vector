@@ -20,7 +20,7 @@ use std::{collections::HashMap, env};
 use tracing::field;
 
 /// The begining of image names of vector docker images packaged by vector.
-const VECTOR_IMAGE_NAME: &'static str = "timberio/vector";
+const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
@@ -217,7 +217,7 @@ impl DockerSource {
                 .config
                 .include_labels
                 .clone()
-                .unwrap_or(Vec::new())
+                .unwrap_or_default()
                 .iter()
                 .map(|s| ContainerFilter::LabelName(s.clone()))
                 .collect(),
@@ -235,7 +235,7 @@ impl DockerSource {
             .config
             .include_containers
             .clone()
-            .unwrap_or(Vec::new())
+            .unwrap_or_default()
             .is_empty()
             && self
                 .esb
@@ -243,7 +243,7 @@ impl DockerSource {
                 .config
                 .include_labels
                 .clone()
-                .unwrap_or(Vec::new())
+                .unwrap_or_default()
                 .is_empty();
 
         // HOSTNAME hint
@@ -346,63 +346,58 @@ impl Future for DockerSource {
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         // Process event from docker
                         Ok(Async::Ready(Some(mut event))) => {
-                            match (event.id.take(), event.status.take()) {
-                                (Some(id), Some(status)) => {
-                                    trace!(
-                                        message = "docker event",
-                                        id = field::display(&id),
-                                        status = field::display(&status),
-                                        timestamp = field::display(event.time),
-                                        attributes = field::debug(&event.actor.attributes),
-                                    );
-                                    let id = ContainerId::new(id);
+                            if let (Some(id), Some(status)) = (event.id.take(), event.status.take())
+                            {
+                                trace!(
+                                    message = "docker event",
+                                    id = field::display(&id),
+                                    status = field::display(&status),
+                                    timestamp = field::display(event.time),
+                                    attributes = field::debug(&event.actor.attributes),
+                                );
+                                let id = ContainerId::new(id);
 
-                                    // Update container status
-                                    match status.as_str() {
-                                        "die" | "pause" => {
-                                            if let Some(state) = self.containers.get_mut(&id) {
-                                                state.stoped();
-                                            }
+                                // Update container status
+                                match status.as_str() {
+                                    "die" | "pause" => {
+                                        if let Some(state) = self.containers.get_mut(&id) {
+                                            state.stoped();
                                         }
-                                        "start" | "upause" => {
-                                            if let Some(state) = self.containers.get_mut(&id) {
-                                                state.running();
-                                                self.esb.restart(state);
-                                            } else {
-                                                let ignore_flag = self
-                                                    .ignore_container_id
-                                                    .binary_search_by(|a| {
-                                                        a.as_str().cmp(id.as_str())
-                                                    })
-                                                    .is_ok();
-
-                                                // This check is necessary since shiplift doesn't have way to include
-                                                // names into request to docker.
-                                                let include_name =
-                                                    self.esb.core.config.container_name_included(
-                                                        id.as_str(),
-                                                        event
-                                                            .actor
-                                                            .attributes
-                                                            .get("name")
-                                                            .map(|s| s.as_str()),
-                                                    );
-
-                                                if !ignore_flag && include_name {
-                                                    // Included
-                                                    self.containers
-                                                        .insert(id.clone(), self.esb.start(id));
-                                                } else {
-                                                    // Ignore
-                                                }
-                                            }
-                                        }
-                                        // Ignore
-                                        _ => (),
                                     }
+                                    "start" | "upause" => {
+                                        if let Some(state) = self.containers.get_mut(&id) {
+                                            state.running();
+                                            self.esb.restart(state);
+                                        } else {
+                                            let ignore_flag = self
+                                                .ignore_container_id
+                                                .binary_search_by(|a| a.as_str().cmp(id.as_str()))
+                                                .is_ok();
+
+                                            // This check is necessary since shiplift doesn't have way to include
+                                            // names into request to docker.
+                                            let include_name =
+                                                self.esb.core.config.container_name_included(
+                                                    id.as_str(),
+                                                    event
+                                                        .actor
+                                                        .attributes
+                                                        .get("name")
+                                                        .map(|s| s.as_str()),
+                                                );
+
+                                            if !ignore_flag && include_name {
+                                                // Included
+                                                self.containers
+                                                    .insert(id.clone(), self.esb.start(id));
+                                            } else {
+                                                // Ignore
+                                            }
+                                        }
+                                    }
+                                    // Ignore
+                                    _ => (),
                                 }
-                                // Ignore
-                                _ => (),
                             }
                         }
                         Err(error) => error!(source="docker events",%error),
@@ -461,9 +456,9 @@ impl EventStreamBuilder {
 
     /// If info is present, restarts event stream
     fn restart(&self, container: &mut ContainerState) {
-        container
-            .take_info()
-            .map(|info| self.start_event_stream(info));
+        if let Some(info) = container.take_info() {
+            self.start_event_stream(info)
+        }
     }
 
     fn start_event_stream(&self, info: ContainerLogInfo) {
@@ -567,7 +562,7 @@ impl ContainerState {
     /// Unix timestamp of event which created this struct
     fn new(id: ContainerId, created: i64) -> Self {
         let info = ContainerLogInfo {
-            id: id,
+            id,
             created,
             last_log: None,
             generation: 0,
@@ -657,7 +652,7 @@ impl ContainerLogInfo {
                     Some(&(ref last, gen))
                         if *last < timestamp || (*last == timestamp && gen == self.generation) =>
                     {
-                        ()
+                        // noop
                     }
                     // Recieved log is not from before of creation
                     None if self.created <= timestamp.timestamp() => (),

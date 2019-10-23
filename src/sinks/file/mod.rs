@@ -19,7 +19,7 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    pub encoding: Option<Encoding>,
+    pub encoding: Encoding,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -27,6 +27,12 @@ pub struct FileSinkConfig {
 pub enum Encoding {
     Text,
     Ndjson,
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Text
+    }
 }
 
 #[typetag::serde(name = "file")]
@@ -51,7 +57,7 @@ impl SinkConfig for FileSinkConfig {
 #[derive(Debug, Default)]
 pub struct PartitionedFileSink {
     path: Template,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     idle_timeout_secs: u64,
     partitions: HashMap<Bytes, File>,
     last_accessed: HashMap<Bytes, Instant>,
@@ -191,7 +197,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: None,
+            encoding: Encoding::Text,
         };
 
         let (sink, _) = config.build(Acker::Null).unwrap();
@@ -218,7 +224,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: None,
+            encoding: Encoding::Text,
         };
 
         let (sink, _) = config.build(Acker::Null).unwrap();

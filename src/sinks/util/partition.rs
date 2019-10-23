@@ -48,7 +48,7 @@ where
     pub fn new(sink: S, batch: B, max_size: usize) -> Self {
         let config = Config {
             max_linger: None,
-            max_size: max_size,
+            max_size,
             min_size: 0,
         };
 
@@ -175,7 +175,7 @@ where
         // or the batch got submitted by polling_complete above.
         let mut batch = self.batch.fresh();
 
-        batch.push(item.into());
+        batch.push(item);
         self.set_linger(partition.clone());
 
         self.partitions.insert(partition, batch);

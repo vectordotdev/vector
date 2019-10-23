@@ -185,7 +185,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         )
         .finish();
 
-    let url = if host.ends_with("/") {
+    let url = if host.ends_with('/') {
         format!("{}?{}", host, query)
     } else {
         format!("{}/?{}", host, query)
@@ -217,9 +217,10 @@ impl RetryLogic for ClickhouseRetryLogic {
                 // retry those errors.
                 //
                 // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
-                match body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53") {
-                    false => Some(String::from_utf8_lossy(body).to_string().into()),
-                    true => None,
+                if body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53") {
+                    None
+                } else {
+                    Some(String::from_utf8_lossy(body).to_string().into())
                 }
             }
             _ => self.inner.should_retry_response(response),

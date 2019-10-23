@@ -24,7 +24,12 @@ fn test_tcp_syslog() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", SyslogConfig::new(Mode::Tcp { address: in_addr }));
+    config.add_source(
+        "in",
+        SyslogConfig::new(Mode::Tcp {
+            address: in_addr.into(),
+        }),
+    );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
