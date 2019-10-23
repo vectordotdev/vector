@@ -15,6 +15,7 @@ pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod prometheus;
+pub mod rabbitmq;
 pub mod splunk_hec;
 pub mod statsd;
 pub mod tcp;
