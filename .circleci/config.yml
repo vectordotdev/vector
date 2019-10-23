@@ -218,6 +218,7 @@ jobs:
           - xpack.ssl.certificate=certs/localhost.crt
           - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
+      - image: rabbitmq:alpine
     steps:
       - checkout
       - setup_remote_docker:
@@ -829,7 +830,6 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
     - verify-systemd-on-debian
-
 
 #
 # Workflows

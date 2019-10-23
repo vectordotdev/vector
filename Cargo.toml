@@ -138,6 +138,7 @@ warp = "0.1.20"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
+lapin-futures = "0.28.0"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -200,7 +201,8 @@ docker = [
   "kinesis-integration-tests",
   "s3-integration-tests",
   "splunk-integration-tests",
-  "docker-integration-tests"
+  "docker-integration-tests",
+  "rabbitmq-integration-tests"
 ]
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
@@ -211,6 +213,7 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
+rabbitmq-integration-tests = []
 
 
 kubernetes = ["kubernetes-integration-tests"]
