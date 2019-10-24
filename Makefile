@@ -24,7 +24,7 @@ bench: ## Run internal benchmarks
 build: ## Build the project
 	@cargo build
 
-check: check-code check-fmt check-generate
+check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors
 	@cargo check --all --all-features --all-targets
