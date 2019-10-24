@@ -20,10 +20,7 @@ assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
-  ["config/examples/complete/*", "/etc/vector/examples/complex/", "644"],
-  ["config/examples/sources/*", "/etc/vector/examples/sources/", "644"],
-  ["config/examples/transforms/*", "/etc/vector/examples/transforms/", "644"],
-  ["config/examples/sinks/*", "/etc/vector/examples/sinks/", "644"],
+  ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
 
