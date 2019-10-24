@@ -184,12 +184,14 @@ where
             }
             Ok(None) => {}
             Err(err) => error!(
-                message = "Could not retrieve journald checkpoint",
+                message = "Could not retrieve saved journald checkpoint",
                 error = field::display(&err)
             ),
         }
 
         loop {
+            let mut saw_records = false;
+
             loop {
                 let record = match self.journal.next() {
                     None => break,
@@ -202,6 +204,7 @@ where
                         break;
                     }
                 };
+                saw_records = true;
                 if !self.units.is_empty() {
                     // Make sure the systemd unit is exactly one of the specified units
                     if let Some(unit) = record.get("_SYSTEMD_UNIT") {
@@ -218,19 +221,21 @@ where
                 }
             }
 
-            match self.journal.cursor() {
-                Ok(cursor) => {
-                    if let Err(err) = self.checkpointer.set(&cursor) {
-                        error!(
-                            message = "Could not set journald checkpoint.",
-                            error = field::display(&err)
-                        );
+            if saw_records {
+                match self.journal.cursor() {
+                    Ok(cursor) => {
+                        if let Err(err) = self.checkpointer.set(&cursor) {
+                            error!(
+                                message = "Could not set journald checkpoint.",
+                                error = field::display(&err)
+                            );
+                        }
                     }
+                    Err(err) => error!(
+                        message = "Could not retrieve current journald checkpoint.",
+                        error = field::display(&err)
+                    ),
                 }
-                Err(err) => error!(
-                    message = "Could not retrieve journald checkpoint.",
-                    error = field::display(&err)
-                ),
             }
 
             match self.shutdown.recv_timeout(timeout) {
