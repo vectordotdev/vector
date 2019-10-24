@@ -41,11 +41,17 @@ pub struct RabbitMQSink {
 }
 
 impl RabbitMQSink {
-  fn new(
-    config: RabbitMQSinkConfig,
-    channel: lapin_futures::Channel,
-    acker: Acker,
-  ) -> crate::Result<Self> {
+  fn new(config: RabbitMQSinkConfig, acker: Acker) -> crate::Result<Self> {
+    let channel = Client::connect(&config.addr, ConnectionProperties::default())
+      .and_then(|client| client.create_channel())
+      .wait()?;
+    channel
+      .queue_declare(
+        &config.queue_name,
+        QueueDeclareOptions::default(),
+        FieldTable::default(),
+      )
+      .wait()?;
     Ok(RabbitMQSink {
       acker,
       channel,
@@ -59,17 +65,7 @@ impl RabbitMQSink {
 #[typetag::serde(name = "rabbitmq")]
 impl SinkConfig for RabbitMQSinkConfig {
   fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-    let channel = Client::connect(&self.addr, ConnectionProperties::default())
-      .and_then(|client| client.create_channel())
-      .wait()?;
-    channel
-      .queue_declare(
-        &self.queue_name,
-        QueueDeclareOptions::default(),
-        FieldTable::default(),
-      )
-      .wait()?;
-    let sink = RabbitMQSink::new(self.clone(), channel.clone(), acker)?;
+    let sink = RabbitMQSink::new(self.clone(), acker)?;
     let hc = healthcheck(self.clone());
     Ok((Box::new(sink), hc))
   }
