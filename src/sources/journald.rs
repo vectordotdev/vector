@@ -184,7 +184,7 @@ where
             }
             Ok(None) => {}
             Err(err) => error!(
-                message = "Could not retrieve journald checkpoint",
+                message = "Could not retrieve saved journald checkpoint",
                 error = field::display(&err)
             ),
         }
@@ -232,7 +232,7 @@ where
                         }
                     }
                     Err(err) => error!(
-                        message = "Could not retrieve journald checkpoint.",
+                        message = "Could not retrieve current journald checkpoint.",
                         error = field::display(&err)
                     ),
                 }
