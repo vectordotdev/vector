@@ -12,7 +12,7 @@ const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 #[derive(Debug)]
 pub struct File {
     state: State,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     buffer: BytesMut,
     codec: BytesDelimitedCodec,
 }
@@ -25,7 +25,7 @@ enum State {
 }
 
 impl File {
-    pub fn new(path: Bytes, encoding: Option<Encoding>) -> Self {
+    pub fn new(path: Bytes, encoding: Encoding) -> Self {
         let path = BytesPath(path);
 
         let fut = file::OpenOptions::new()
@@ -48,14 +48,14 @@ impl File {
     fn encode_event(&self, event: Event) -> Bytes {
         let log = event.into_log();
 
-        match (&self.encoding, log.is_structured()) {
-            (&Some(Encoding::Ndjson), _) | (None, true) => serde_json::to_vec(&log.unflatten())
+        match self.encoding {
+            Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
-            (&Some(Encoding::Text), _) | (None, false) => log
+            Encoding::Text => log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes())
-                .unwrap_or(Bytes::new()),
+                .unwrap_or_default(),
         }
     }
 }
@@ -117,8 +117,7 @@ impl Sink for File {
                         io::ErrorKind::WriteZero,
                         "failed to \
                          write frame to transport",
-                    )
-                    .into());
+                    ));
                 }
 
                 let _ = self.buffer.split_to(n);
@@ -128,7 +127,7 @@ impl Sink for File {
             try_ready!(file.poll_flush());
 
             trace!("framed transport flushed");
-            return Ok(Async::Ready(()));
+            Ok(Async::Ready(()))
         } else {
             unreachable!()
         }
@@ -234,7 +233,7 @@ mod tests {
             .join("test.out");
 
         let b = Bytes::from(path.clone().to_str().unwrap().as_bytes());
-        let sink = File::new(b, Some(encoding));
+        let sink = File::new(b, encoding);
 
         let mut rt = crate::test_util::runtime();
         let pump = sink

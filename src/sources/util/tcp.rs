@@ -1,8 +1,10 @@
 use crate::Event;
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
+use listenfd::ListenFd;
+use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
-    io,
+    fmt, io,
     net::SocketAddr,
     time::{Duration, Instant},
 };
@@ -10,6 +12,7 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     codec::{Decoder, FramedRead},
     net::TcpListener,
+    reactor::Handle,
     timer,
 };
 use tracing::field;
@@ -28,14 +31,30 @@ pub trait TcpSource: Clone + Send + 'static {
 
     fn run(
         self,
-        addr: SocketAddr,
+        addr: SocketListenAddr,
         shutdown_timeout_secs: u64,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
+        let mut listenfd = ListenFd::from_env();
+
         let source = future::lazy(move || {
-            let listener = match TcpListener::bind(&addr) {
+            let listener = match addr {
+                SocketListenAddr::SocketAddr(addr) => TcpListener::bind(&addr),
+                SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
+                    Ok(Some(listener)) => TcpListener::from_std(listener, &Handle::default()),
+                    Ok(None) => {
+                        error!("Failed to take listen FD, not open or already taken");
+                        return future::Either::B(future::err(()));
+                    }
+                    Err(err) => {
+                        error!("Failed to take listen FD: {}", err);
+                        return future::Either::B(future::err(()));
+                    }
+                },
+            };
+            let listener = match listener {
                 Ok(listener) => listener,
                 Err(err) => {
                     error!("Failed to bind to listener socket: {}", err);
@@ -45,7 +64,12 @@ pub trait TcpSource: Clone + Send + 'static {
 
             info!(
                 message = "listening.",
-                addr = field::display(listener.local_addr().unwrap_or(addr))
+                addr = field::display(
+                    listener
+                        .local_addr()
+                        .map(|addr| SocketListenAddr::SocketAddr(addr))
+                        .unwrap_or(addr)
+                )
             );
 
             let (trigger, tripwire) = Tripwire::new();
@@ -111,5 +135,70 @@ pub trait TcpSource: Clone + Send + 'static {
         });
 
         Ok(Box::new(source))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum SocketListenAddr {
+    SocketAddr(SocketAddr),
+    #[serde(deserialize_with = "parse_systemd_fd")]
+    SystemdFd(usize),
+}
+
+impl fmt::Display for SocketListenAddr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::SocketAddr(ref addr) => addr.fmt(f),
+            Self::SystemdFd(offset) => write!(f, "systemd socket #{}", offset),
+        }
+    }
+}
+
+impl From<SocketAddr> for SocketListenAddr {
+    fn from(addr: SocketAddr) -> Self {
+        Self::SocketAddr(addr)
+    }
+}
+
+fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: &'de str = Deserialize::deserialize(des)?;
+    match s {
+        "systemd" => Ok(0),
+        s if s.starts_with("systemd#") => {
+            Ok(s[8..].parse::<usize>().map_err(de::Error::custom)? - 1)
+        }
+        _ => Err(de::Error::custom("must start with \"systemd\"")),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde::Deserialize;
+    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+    #[derive(Debug, Deserialize)]
+    struct Config {
+        addr: SocketListenAddr,
+    }
+
+    #[test]
+    fn parse_socket_listen_addr() {
+        let test: Config = toml::from_str(r#"addr="127.1.2.3:1234""#).unwrap();
+        assert_eq!(
+            test.addr,
+            SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(127, 1, 2, 3),
+                1234
+            )))
+        );
+        let test: Config = toml::from_str(r#"addr="systemd""#).unwrap();
+        assert_eq!(test.addr, SocketListenAddr::SystemdFd(0));
+        let test: Config = toml::from_str(r#"addr="systemd#3""#).unwrap();
+        assert_eq!(test.addr, SocketListenAddr::SystemdFd(2));
     }
 }

@@ -477,6 +477,7 @@ jobs:
           name: Verify that the Vector service has started
           command: |
             sleep 5
+            sudo systemctl status vector --full
             sudo systemctl is-active vector
 
   #

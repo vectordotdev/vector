@@ -321,7 +321,7 @@ fn encode_event(
             let mut bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
-                .unwrap_or(Vec::new());
+                .unwrap_or_default();
             bytes.push(b'\n');
             bytes
         }
@@ -675,7 +675,7 @@ mod integration_tests {
         client()
             .get_object(rusoto_s3::GetObjectRequest {
                 bucket: BUCKET.to_string(),
-                key: key,
+                key,
                 ..Default::default()
             })
             .sync()

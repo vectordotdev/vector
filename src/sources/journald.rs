@@ -60,7 +60,7 @@ impl SourceConfig for JournaldConfig {
             .units
             .iter()
             .map(|unit| {
-                if let Some(_) = unit.find('.') {
+                if unit.contains('.') {
                     unit.into()
                 } else {
                     format!("{}.service", unit)
@@ -129,15 +129,12 @@ fn create_event(record: Record) -> Event {
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log.get(&TIMESTAMP) {
         if let ValueKind::Bytes(timestamp) = timestamp {
-            match String::from_utf8_lossy(timestamp).parse::<u64>() {
-                Ok(timestamp) => {
-                    let timestamp = chrono::Utc.timestamp(
-                        (timestamp / 1_000_000) as i64,
-                        (timestamp % 1_000_000) as u32 * 1_000,
-                    );
-                    log.insert_explicit(event::TIMESTAMP.clone(), ValueKind::Timestamp(timestamp));
-                }
-                Err(_) => {}
+            if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
+                let timestamp = chrono::Utc.timestamp(
+                    (timestamp / 1_000_000) as i64,
+                    (timestamp % 1_000_000) as u32 * 1_000,
+                );
+                log.insert_explicit(event::TIMESTAMP.clone(), ValueKind::Timestamp(timestamp));
             }
         }
     }
@@ -205,7 +202,7 @@ where
                         break;
                     }
                 };
-                if self.units.len() > 0 {
+                if !self.units.is_empty() {
                     // Make sure the systemd unit is exactly one of the specified units
                     if let Some(unit) = record.get("_SYSTEMD_UNIT") {
                         if !self.units.contains(unit) {
@@ -245,7 +242,7 @@ where
     }
 }
 
-const CHECKPOINT_FILENAME: &'static str = "checkpoint.txt";
+const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 
 struct Checkpointer {
     file: File,
@@ -264,7 +261,7 @@ impl Checkpointer {
 
     fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0))?;
-        self.file.write(format!("{}\n", token).as_bytes())?;
+        self.file.write_all(format!("{}\n", token).as_bytes())?;
         Ok(())
     }
 

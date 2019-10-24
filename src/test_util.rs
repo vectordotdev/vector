@@ -150,7 +150,7 @@ pub fn wait_for(f: impl Fn() -> bool) {
     let limit = std::time::Duration::from_secs(5);
     let mut attempts = 0;
     while !f() {
-        std::thread::sleep(wait.clone());
+        std::thread::sleep(wait);
         attempts += 1;
         if attempts * wait > limit {
             panic!("timed out while waiting");

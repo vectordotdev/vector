@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
@@ -22,6 +22,18 @@ pub struct RegexParserConfig {
     pub types: HashMap<Atom, String>,
 }
 
+impl Default for RegexParserConfig {
+    fn default() -> Self {
+        RegexParserConfig {
+            regex: String::default(),
+            field: None,
+            drop_field: true,
+            drop_failed: false,
+            types: HashMap::default(),
+        }
+    }
+}
+
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
     fn build(&self) -> crate::Result<Box<dyn Transform>> {
@@ -29,13 +41,11 @@ impl TransformConfig for RegexParserConfig {
 
         let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
 
-        let types = parse_check_conversion_map(
-            &self.types,
-            &regex
-                .capture_names()
-                .filter_map(|s| s.map(|s| s.into()))
-                .collect(),
-        )?;
+        let names = &regex
+            .capture_names()
+            .filter_map(|s| s.map(|s| s.into()))
+            .collect::<Vec<_>>();
+        let types = parse_check_conversion_map(&self.types, names)?;
 
         Ok(Box::new(RegexParser::new(
             regex,
@@ -109,7 +119,11 @@ impl Transform for RegexParser {
         let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
-            if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
+            if self
+                .regex
+                .captures_read(&mut self.capture_locs, &value)
+                .is_some()
+            {
                 for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: ValueKind = value[start..end].into();
@@ -152,7 +166,7 @@ impl Transform for RegexParser {
     }
 }
 
-fn truncate_string_at<'a>(s: &'a str, maxlen: usize) -> Cow<'a, str> {
+fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
         format!("{}[...]", &s[..maxlen - 5]).into()
     } else {

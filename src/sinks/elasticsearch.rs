@@ -286,7 +286,7 @@ fn es(
 fn encode_event(
     event: Event,
     index: &Template,
-    doc_type: &String,
+    doc_type: &str,
     id_key: &Option<String>,
 ) -> Option<Vec<u8>> {
     let index = index
