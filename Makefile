@@ -36,6 +36,9 @@ check-generate: ## Checks for pending `make generate` changes
 	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/check-generate.sh
 
+check-examples: ## Validates the config examples
+	@find ./config/examples -name "*.toml" | xargs -I{} sh -c "cargo run -q -- validate --topology --deny-warnings -c {} || exit 255"
+
 CHECK_URLS=false
 export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
