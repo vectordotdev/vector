@@ -292,4 +292,35 @@ mod test {
             }
         )
     }
+
+    #[test]
+    fn merge_histograms() {
+        let mut hist1 = Metric::Histogram {
+            name: "hist".into(),
+            val: 1.0,
+            sample_rate: 10,
+            timestamp: None,
+            tags: None,
+        };
+
+        let hist2 = Metric::Histogram {
+            name: "hist".into(),
+            val: 1.0,
+            sample_rate: 20,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        hist1.merge(&hist2);
+        assert_eq!(
+            hist1,
+            Metric::Histogram {
+                name: "hist".into(),
+                val: 1.0,
+                sample_rate: 30,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
+    }
 }
