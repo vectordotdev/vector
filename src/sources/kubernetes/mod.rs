@@ -130,9 +130,6 @@ fn file_source(
     // NOTE: information should be used.
     // NOTE: At best, excluding/including using path can be an optimization
     // TODO: Exclude whole kube-system namespace properly
-    config
-        .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*/**").into());
     // TODO: Add exclude_namspace option, and with it in config exclude namespace used by vector.
     // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
     config
