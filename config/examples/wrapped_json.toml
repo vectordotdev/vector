@@ -33,5 +33,6 @@ data_dir = "/var/lib/vector"
 # Print the data to STDOUT for inspection
 # Docs: https://docs.vector.dev/usage/configuration/sinks/console
 [sinks.out]
-  inputs       = ["apache_parser"] # don't sample
+  inputs       = ["parse_child_json"]
   type         = "console"
+  encoding     = "json"
