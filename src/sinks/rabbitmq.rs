@@ -1,6 +1,7 @@
 use crate::{
   buffers::Acker,
   event::{self, Event},
+  sinks::util::MetadataFuture,
   topology::config::{DataType, SinkConfig},
   Error,
 };
@@ -13,10 +14,9 @@ use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Client, ConnectionProperties};
 use lapin_futures as lapin;
-use log::info;
+use lapin_futures::ConfirmationFuture;
 use serde::{Deserialize, Serialize};
 use std::{thread, time::Duration};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RabbitMQSinkConfig {
@@ -36,6 +36,7 @@ pub struct RabbitMQSink {
   acker: Acker,
   channel: lapin_futures::Channel,
   encoding: Encoding,
+  in_flight: FuturesUnordered<MetadataFuture<ConfirmationFuture<()>, ()>>,
   queue_name: String,
 }
 
@@ -49,6 +50,7 @@ impl RabbitMQSink {
       acker,
       channel,
       encoding: config.encoding,
+      in_flight: FuturesUnordered::new(),
       queue_name: config.queue_name,
     })
   }
@@ -59,16 +61,14 @@ impl SinkConfig for RabbitMQSinkConfig {
   fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
     let channel = Client::connect(&self.addr, ConnectionProperties::default())
       .and_then(|client| client.create_channel())
-      .wait()
-      .unwrap();
+      .wait()?;
     channel
       .queue_declare(
         &self.queue_name,
         QueueDeclareOptions::default(),
         FieldTable::default(),
       )
-      .wait()
-      .unwrap();
+      .wait()?;
     let sink = RabbitMQSink::new(self.clone(), channel.clone(), acker)?;
     let hc = healthcheck(self.clone());
     Ok((Box::new(sink), hc))
@@ -84,22 +84,35 @@ impl Sink for RabbitMQSink {
   type SinkError = ();
 
   fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-    self
-      .channel
-      .basic_publish(
-        "",
-        "hello",
-        b"hello from tokio".to_vec(),
-        BasicPublishOptions::default(),
-        BasicProperties::default(),
-      )
-      .wait()
-      .unwrap();
+    let payload = encode_event(&item, &self.encoding);
+    let future = self.channel.basic_publish(
+      "",
+      &self.queue_name,
+      payload,
+      BasicPublishOptions::default(),
+      BasicProperties::default(),
+    );
+    self.in_flight.push(future.join(future::ok(())));
     Ok(AsyncSink::Ready)
   }
 
   fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-    Ok(Async::Ready(()))
+    loop {
+      match self.in_flight.poll() {
+        // nothing ready yet
+        Ok(Async::NotReady) => return Ok(Async::NotReady),
+
+        // nothing in flight
+        Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
+
+        // request finished, check for success
+        Ok(Async::Ready(Some(((), _)))) => {
+          trace!("published message to rabbitmq");
+        }
+
+        Err(e) => error!("publishing message failed: {}", e),
+      }
+    }
   }
 }
 
@@ -109,18 +122,8 @@ fn healthcheck(config: RabbitMQSinkConfig) -> super::Healthcheck {
   Box::new(check)
 }
 
-fn encode_event(
-  event: &Event,
-  key_field: &Option<Atom>,
-  encoding: &Encoding,
-) -> (Vec<u8>, Vec<u8>) {
-  let key = key_field
-    .as_ref()
-    .and_then(|f| event.as_log().get(f))
-    .map(|v| v.as_bytes().to_vec())
-    .unwrap_or(Vec::new());
-
-  let body = match encoding {
+fn encode_event(event: &Event, encoding: &Encoding) -> Vec<u8> {
+  let payload = match encoding {
     &Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
     &Encoding::Text => event
       .as_log()
@@ -129,7 +132,7 @@ fn encode_event(
       .unwrap_or(Vec::new()),
   };
 
-  (key, body)
+  payload
 }
 
 #[cfg(test)]
