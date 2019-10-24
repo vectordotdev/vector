@@ -80,7 +80,7 @@ impl Batch for MetricBuffer {
         match item {
             // gauges are special because gauge values could come
             // in deltas - relative increments or decrements
-            Metric::Gauge { .. } => {
+            Metric::Gauge { ref name, .. } => {
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.merge(&item);
                     self.metrics.insert(MetricEntry(existing));
@@ -91,8 +91,9 @@ impl Batch for MetricBuffer {
                     let mut initial = if let Some(default) = self.state.get(&new) {
                         default.0.clone()
                     } else {
+                        // otherwise we start from absolute 0
                         Metric::Gauge {
-                            name: String::from(""),
+                            name: name.clone(),
                             val: 0.0,
                             direction: None,
                             timestamp: None,
