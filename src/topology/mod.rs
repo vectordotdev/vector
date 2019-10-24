@@ -526,6 +526,7 @@ fn handle_errors(
 
 #[cfg(test)]
 mod tests {
+    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
@@ -539,6 +540,14 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(next_addr().into()));
+        old_config.add_sink(
+            "out",
+            &[&"in"],
+            ConsoleSinkConfig {
+                target: Target::Stdout,
+                encoding: Encoding::Text,
+            },
+        );
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 

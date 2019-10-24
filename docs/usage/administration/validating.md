@@ -4,7 +4,50 @@ description: Validate Vector's configuration
 
 # Validating
 
-Vector provides a `--dry-run` option to validate configuration only:
+Vector provides a subcommand `validate` which checks the validity of a
+configuration file and then exits:
+
+{% code-tabs %}
+{% code-tabs-item title="fields only" %}
+```bash
+vector validate --config /etc/vector/vector.toml
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="fields + topology" %}
+```bash
+vector validate --config /etc/vector/vector.toml --topology
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The validate subcommand checks the correctness of fields for components defined
+within a configuration file, including:
+
+1. All [sources][docs.sources], [transforms][docs.transforms], and
+[sinks][docs.sinks] include all non-optional fields.
+2. All fields are of the proper [type][docs.configuration#value-types].
+
+If validation fails, Vector will exit with a `78`, and if validation succeeds
+Vector will exit with a `0`.
+
+These checks can be expanded with flags such as `--topology`, which causes
+`validate` to also verify that the configuration file contains a valid topology,
+expanding the above checks with the following:
+
+3. At least one [source][docs.sources] is defined.
+4. At least one [sink][docs.sinks] is defined.
+5. All `inputs` values contain at least one value (cannot be empty).
+6. All `inputs` values reference valid and upstream [source][docs.sources] or
+[transform][docs.transforms] components. See
+[composition][docs.configuration#composition] for more info.
+
+To see other customization options for the `validate` subcommand run
+`vector validate --help`.
+
+## Validating Environment
+
+Vector also provides a `--dry-run` option which prevents regular execution and
+instead validates a configuration file as well as the runtime environment:
 
 {% code-tabs %}
 {% code-tabs-item title="config only" %}
@@ -19,26 +62,18 @@ vector --config /etc/vector/vector.toml --dry-run --require-healthy
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-If validation fails, Vector will exit with a `78`, and if validation succeeds
-Vector will exit with a `0`.
+If a dry run fails, Vector will exit with a `78`, and if it succeeds Vector
+will exit with a `0`.
+
+A dry run expands upon the `validation` checks above with the following:
+
+7. All components are capable of running (data directories exist, are writable,
+etc).
 
 You'll notice in the second example above you can pass the `--require-healthy`
 flag to also run health checks for all defined sinks.
 
-This operation is useful to validate configuration changes before going live.
-
-## Checks
-
-For clarify, Vector validates the following:
-
-1. At least one [source][docs.sources] is defined.
-2. At least one [sink][docs.sinks] is defined.
-3. The all `inputs` values contain at least one value (cannot be empty).
-4. All `inputs` values reference valid and upstream [source][docs.sources] or [transform][docs.transforms] components. See [composition][docs.configuration#composition] for more info.
-5. All [sources][docs.sources], [tranforms][docs.transforms], and [sinks][docs.sinks] include required options.
-6. All options are of the proper [type][docs.configuration#value-types].
-7. All [sink][docs.sinks] health check if the `--require-healthy` option is supplied.
-
+8. All [sinks][docs.sinks] are able to connect to their targets.
 
 [docs.configuration#composition]: ../../usage/configuration#composition
 [docs.configuration#value-types]: ../../usage/configuration#value-types
