@@ -75,10 +75,11 @@ impl Metric {
                     tags: new_tags,
                 },
             ) => {
-                *val += *new_val;
-                *name = new_name.clone();
-                *timestamp = *new_timestamp;
-                *tags = new_tags.clone();
+                if name == new_name {
+                    *val += *new_val;
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
+                }
             }
             (
                 Metric::Gauge {
@@ -96,19 +97,20 @@ impl Metric {
                     tags: new_tags,
                 },
             ) => {
-                if new_direction.is_none() {
-                    *val = *new_val;
-                } else {
-                    let delta = match new_direction {
-                        None => 0.0,
-                        Some(Direction::Plus) => *val,
-                        Some(Direction::Minus) => -*val,
+                if name == new_name {
+                    if new_direction.is_none() {
+                        *val = *new_val;
+                    } else {
+                        let delta = match new_direction {
+                            None => 0.0,
+                            Some(Direction::Plus) => *val,
+                            Some(Direction::Minus) => -*val,
+                        };
+                        *val += delta;
                     };
-                    *val += delta;
-                };
-                *name = new_name.clone();
-                *timestamp = *new_timestamp;
-                *tags = new_tags.clone();
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
+                }
             }
             (
                 Metric::Set {
@@ -124,10 +126,11 @@ impl Metric {
                     tags: new_tags,
                 },
             ) => {
-                *val = new_val.clone();
-                *name = new_name.clone();
-                *timestamp = *new_timestamp;
-                *tags = new_tags.clone();
+                if name == new_name {
+                    *val = new_val.clone();
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
+                }
             }
             (
                 Metric::Histogram {
@@ -145,14 +148,148 @@ impl Metric {
                     tags: new_tags,
                 },
             ) => {
-                if val == new_val {
+                if name == new_name && val == new_val {
                     *sample_rate += *new_sample_rate;
-                    *name = new_name.clone();
                     *timestamp = *new_timestamp;
                     *tags = new_tags.clone();
                 };
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use chrono::{offset::TimeZone, DateTime, Utc};
+
+    fn ts() -> DateTime<Utc> {
+        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+    }
+
+    fn tags() -> HashMap<String, String> {
+        vec![
+            ("normal_tag".to_owned(), "value".to_owned()),
+            ("true_tag".to_owned(), "true".to_owned()),
+            ("empty_tag".to_owned(), "".to_owned()),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    #[test]
+    fn merge_counters() {
+        let mut counter1 = Metric::Counter {
+            name: "counter".into(),
+            val: 1.0,
+            timestamp: None,
+            tags: None,
+        };
+
+        let counter2 = Metric::Counter {
+            name: "counter".into(),
+            val: 2.0,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        counter1.merge(&counter2);
+        assert_eq!(
+            counter1,
+            Metric::Counter {
+                name: "counter".into(),
+                val: 3.0,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
+    }
+
+    #[test]
+    fn merge_incompatible_counters() {
+        let mut counter1 = Metric::Counter {
+            name: "first".into(),
+            val: 1.0,
+            timestamp: None,
+            tags: None,
+        };
+
+        let counter2 = Metric::Counter {
+            name: "second".into(),
+            val: 2.0,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        counter1.merge(&counter2);
+        assert_eq!(
+            counter1,
+            Metric::Counter {
+                name: "first".into(),
+                val: 1.0,
+                timestamp: None,
+                tags: None,
+            }
+        )
+    }
+
+    #[test]
+    fn merge_gauges() {
+        let mut gauge1 = Metric::Gauge {
+            name: "gauge".into(),
+            val: 1.0,
+            direction: None,
+            timestamp: None,
+            tags: None,
+        };
+
+        let gauge2 = Metric::Gauge {
+            name: "gauge".into(),
+            val: 2.0,
+            direction: None,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        gauge1.merge(&gauge2);
+        assert_eq!(
+            gauge1,
+            Metric::Gauge {
+                name: "gauge".into(),
+                val: 2.0,
+                direction: None,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
+    }
+
+    #[test]
+    fn merge_sets() {
+        let mut set1 = Metric::Set {
+            name: "set".into(),
+            val: "old".into(),
+            timestamp: None,
+            tags: None,
+        };
+
+        let set2 = Metric::Set {
+            name: "set".into(),
+            val: "new".into(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        set1.merge(&set2);
+        assert_eq!(
+            set1,
+            Metric::Set {
+                name: "set".into(),
+                val: "new".into(),
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
     }
 }
