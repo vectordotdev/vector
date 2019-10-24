@@ -65,6 +65,10 @@ where
         Self::build(inner, batch, min_size, min_size, max_linger)
     }
 
+    pub fn new_max(inner: S, batch: B, max_size: usize, max_linger: Option<Duration>) -> Self {
+        Self::build(inner, batch, 0, max_size, max_linger)
+    }
+
     fn build(
         inner: S,
         batch: B,
