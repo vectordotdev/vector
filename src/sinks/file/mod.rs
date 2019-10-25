@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn single_partition() {
-        let directory = tempdir().unwrap();
+        let directory = std::env::temp_dir();
 
         let mut template = directory.into_path().to_string_lossy().to_string();
         template.push_str("/test.out");
@@ -215,8 +215,7 @@ mod tests {
 
     #[test]
     fn many_partitions() {
-        let directory = tempdir().unwrap();
-        let directory = directory.into_path();
+        let directory = std::env::temp_dir();
 
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");

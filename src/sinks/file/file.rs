@@ -2,14 +2,17 @@ use super::Encoding;
 use crate::event::{self, Event};
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
-use std::{ffi, io, path};
-use tokio::{codec::Encoder, fs::file, io::AsyncWrite};
+use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use std::{ffi, fmt, io, path};
+use tokio::{
+    codec::Encoder,
+    fs::{self, file},
+    io::AsyncWrite,
+};
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
 const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
-#[derive(Debug)]
 pub struct File {
     state: State,
     encoding: Encoding,
@@ -17,9 +20,8 @@ pub struct File {
     codec: BytesDelimitedCodec,
 }
 
-#[derive(Debug)]
 enum State {
-    Creating(file::OpenFuture<BytesPath>),
+    Creating(Box<dyn Future<Item = file::File, Error = io::Error> + Send + 'static>),
     Open(file::File),
     Closed,
 }
@@ -27,11 +29,20 @@ enum State {
 impl File {
     pub fn new(path: Bytes, encoding: Encoding) -> Self {
         let path = BytesPath(path);
+        let parent = path.as_ref().parent().map(|p| p.to_path_buf());
 
-        let fut = file::OpenOptions::new()
+        let dir_fut = if let Some(parent) = parent {
+            future::Either::A(fs::create_dir_all(parent))
+        } else {
+            future::Either::B(future::ok(()))
+        };
+
+        let file_fut = file::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path);
+
+        let fut = Box::new(dir_fut.and_then(|_| file_fut));
 
         let state = State::Creating(fut);
         let buffer = BytesMut::with_capacity(INITIAL_CAPACITY);
@@ -156,6 +167,14 @@ impl AsRef<path::Path> for BytesPath {
     }
 }
 
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("File")
+            .field("encoding", &self.encoding)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,7 +220,28 @@ mod tests {
 
     #[test]
     fn file_is_appended() {
-        let directory = tempdir().unwrap().into_path();
+        let directory = std::env::temp_dir();
+
+        let (mut input1, events) = random_lines_with_stream(100, 16);
+        test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory.clone()));
+
+        let (mut input2, events) = random_lines_with_stream(100, 16);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory));
+
+        let mut input = vec![];
+        input.append(&mut input1);
+        input.append(&mut input2);
+
+        assert_eq!(output.len(), input.len());
+
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    #[test]
+    fn create_dir() {
+        let directory = std::env::temp_dir().join("addmore/file.log");
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
         test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory.clone()));
