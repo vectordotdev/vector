@@ -22,7 +22,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
                 config.add_sink(
                     "out",
                     &["in"],
@@ -70,7 +70,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
                 config.add_sink(
                     "out",
                     &["in"],

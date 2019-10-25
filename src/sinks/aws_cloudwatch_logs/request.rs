@@ -110,18 +110,16 @@ impl Future for CloudwatchFuture {
 
                         trace!(message = "putting logs.", ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
+                    } else if self.create_missing_stream {
+                        debug!("provided stream does not exist; creating a new one.");
+                        self.state = State::CreateStream(self.client.create_log_stream());
                     } else {
-                        if self.create_missing_stream {
-                            debug!("provided stream does not exist; creating a new one.");
-                            self.state = State::CreateStream(self.client.create_log_stream());
-                        } else {
-                            return Err(CloudwatchError::NoStreamsFound);
-                        }
+                        return Err(CloudwatchError::NoStreamsFound);
                     }
                 }
 
                 State::CreateGroup(fut) => {
-                    let _ = try_ready!(fut.poll().map_err(CloudwatchError::CreateGroup));
+                    try_ready!(fut.poll().map_err(CloudwatchError::CreateGroup));
 
                     trace!("group created.");
 
@@ -132,7 +130,7 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateStream(fut) => {
-                    let _ = try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
+                    try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
 
                     trace!("stream created.");
 

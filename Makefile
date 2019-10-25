@@ -24,7 +24,7 @@ bench: ## Run internal benchmarks
 build: ## Build the project
 	@cargo build
 
-check: check-code check-fmt check-generate
+check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors
 	@cargo check --all --all-features --all-targets
@@ -33,13 +33,16 @@ check-fmt: ## Checks code formatting correctness
 	@cargo fmt -- --check
 
 check-generate: ## Checks for pending `make generate` changes
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/check-generate.sh
+
+check-examples: ## Validates the config examples
+	@find ./config/examples -name "*.toml" | xargs -I{} sh -c "cargo run -q -- validate --topology --deny-warnings -c {} || exit 255"
 
 CHECK_URLS=false
 export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/generate.rb
 
 fmt: ## Format code
@@ -84,18 +87,18 @@ release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
 
 release-github: ## Release to Github
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/release-github.rb
 
 release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
 
 release-meta: ## Prepares the release metadata
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/release-meta.rb
 
 release-rollback:
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/release-rollback.rb
 
 release-s3: ## Release artifacts to S3

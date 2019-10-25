@@ -21,6 +21,74 @@ pub struct Pieces {
     pub shutdown_triggers: HashMap<String, Trigger>,
 }
 
+pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
+    let mut errors = vec![];
+    let mut warnings = vec![];
+
+    // Warnings and errors
+    let sink_inputs = config
+        .sinks
+        .iter()
+        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
+    let transform_inputs = config
+        .transforms
+        .iter()
+        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
+    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
+        if inputs.is_empty() {
+            errors.push(format!(
+                "{} {:?} has no inputs",
+                capitalize(output_type),
+                name
+            ));
+        }
+
+        for input in inputs {
+            if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
+                errors.push(format!(
+                    "Input {:?} for {} {:?} doesn't exist.",
+                    input, output_type, name
+                ));
+            }
+        }
+    }
+
+    let source_names = config.sources.keys().map(|name| ("source", name.clone()));
+    let transform_names = config
+        .transforms
+        .keys()
+        .map(|name| ("transform", name.clone()));
+    for (input_type, name) in transform_names.chain(source_names) {
+        if !config
+            .transforms
+            .iter()
+            .any(|(_, transform)| transform.inputs.contains(&name))
+            && !config
+                .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&name))
+        {
+            warnings.push(format!(
+                "{} {:?} has no outputs",
+                capitalize(input_type),
+                name
+            ));
+        }
+    }
+
+    if config.contains_cycle() {
+        errors.push(format!("Configured topology contains a cycle"));
+    } else if let Err(type_errors) = config.typecheck() {
+        errors.extend(type_errors);
+    }
+
+    if errors.is_empty() {
+        Ok(warnings)
+    } else {
+        Err(errors)
+    }
+}
+
 pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -31,6 +99,13 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
     let mut errors = vec![];
     let mut warnings = vec![];
+
+    if config.sources.is_empty() {
+        return Err(vec!["No sources defined in the config.".to_owned()]);
+    }
+    if config.sinks.is_empty() {
+        return Err(vec!["No sinks defined in the config.".to_owned()]);
+    }
 
     // Build sources
     for (name, source) in &config.sources {
@@ -138,60 +213,13 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     }
 
     // Warnings and errors
-    let sink_inputs = config
-        .sinks
-        .iter()
-        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
-    let transform_inputs = config
-        .transforms
-        .iter()
-        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
-    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
-        if inputs.is_empty() {
-            errors.push(format!(
-                "{} {:?} has no inputs",
-                capitalize(output_type),
-                name
-            ));
+    match check(&config) {
+        Err(check_errors) => {
+            errors.extend(check_errors);
         }
-
-        for input in inputs {
-            if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
-                errors.push(format!(
-                    "Input {:?} for {} {:?} doesn't exist.",
-                    input, output_type, name
-                ));
-            }
+        Ok(check_warnings) => {
+            warnings.extend(check_warnings);
         }
-    }
-
-    let source_names = config.sources.keys().map(|name| ("source", name.clone()));
-    let transform_names = config
-        .transforms
-        .keys()
-        .map(|name| ("transform", name.clone()));
-    for (input_type, name) in transform_names.chain(source_names) {
-        if !config
-            .transforms
-            .iter()
-            .any(|(_, transform)| transform.inputs.contains(&name))
-            && !config
-                .sinks
-                .iter()
-                .any(|(_, sink)| sink.inputs.contains(&name))
-        {
-            warnings.push(format!(
-                "{} {:?} has no outputs",
-                capitalize(input_type),
-                name
-            ));
-        }
-    }
-
-    if config.contains_cycle() {
-        errors.push(format!("Configured topology contains a cycle"));
-    } else if let Err(type_errors) = config.typecheck() {
-        errors.extend(type_errors);
     }
 
     if errors.is_empty() {

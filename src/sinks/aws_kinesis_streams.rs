@@ -233,14 +233,14 @@ fn encode_event(
 
     let log = event.into_log();
     let data = match encoding {
-        &Encoding::Json => {
+        Encoding::Json => {
             serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
         }
 
-        &Encoding::Text => log
+        Encoding::Text => log
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
-            .unwrap_or(Vec::new()),
+            .unwrap_or_default(),
     };
 
     Some(PutRecordsRequestEntry {
@@ -252,7 +252,7 @@ fn encode_event(
 
 fn gen_partition_key() -> String {
     random::<[char; 16]>()
-        .into_iter()
+        .iter()
         .fold(String::new(), |mut s, c| {
             s.push(*c);
             s

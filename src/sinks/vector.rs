@@ -53,7 +53,7 @@ pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::Router
     Box::new(
         TcpSink::new(hostname, addr, None)
             .stream_ack(acker)
-            .with(move |event| encode_event(event)),
+            .with(encode_event),
     )
 }
 
