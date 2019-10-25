@@ -140,10 +140,12 @@ updated versions of Vector through various channels.
    export OPENSSL_LIB_DIR=<openssl prefix>/lib
    ```
 
-3. [Install Docker](https://docs.docker.com/install/). Docker
+3. [Install CMake](https://cmake.org/download/).
+
+4. [Install Docker](https://docs.docker.com/install/). Docker
    containers are used for mocking Vector's integrations.
 
-4. [Install Ruby](https://www.ruby-lang.org/en/downloads/) and
+5. [Install Ruby](https://www.ruby-lang.org/en/downloads/) and
    [Bundler 2](https://bundler.io/v2.0/guides/bundler_2_upgrade.html).
    They are used to build Vector's documentation.
 
