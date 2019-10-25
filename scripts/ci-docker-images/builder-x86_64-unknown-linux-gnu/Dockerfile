@@ -17,7 +17,8 @@ RUN apt-get update && \
   curl \
   git \
   openssh-server \
-  vim
+  vim \
+  cmake
 
 # Note: We do not compile or install leveldb or rdkafka libraries because
 #       those Rust creates automatically build and link the libraries for

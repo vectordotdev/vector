@@ -137,6 +137,10 @@ jobs:
       - checkout
       - *install-rust
       - run:
+          name: Install CMake
+          command: |
+            brew install cmake
+      - run:
           name: Build archive
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
