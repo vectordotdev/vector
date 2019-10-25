@@ -6,6 +6,7 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
+pub mod component;
 mod validation;
 mod vars;
 

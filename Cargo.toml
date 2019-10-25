@@ -127,6 +127,7 @@ base64 = "0.10.1"
 shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
 owning_ref = "0.4.0"
 listenfd = "0.3.3"
+inventory = "0.1"
 
 [build-dependencies]
 prost-build = "0.4.0"
