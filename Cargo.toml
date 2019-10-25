@@ -128,6 +128,9 @@ shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" 
 owning_ref = "0.4.0"
 listenfd = "0.3.3"
 
+[patch.crates-io]
+ctor = { git = "https://github.com/mmastrac/rust-ctor", version = "0.1.12" }
+
 [build-dependencies]
 prost-build = "0.4.0"
 built = "0.3"
