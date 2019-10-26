@@ -64,9 +64,16 @@ pub struct QueueDeclareOptionsDef {
   pub nowait: bool,
 }
 
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+pub struct BasicPublishOptionsDef {
+  pub mandatory: bool,
+  pub immediate: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RabbitMQSinkConfig {
   addr: String,
+  basic_publish_options: BasicPublishOptionsDef,
   connection_properties: ConnectionPropertiesDef,
   encoding: Encoding,
   exchange: String,
@@ -95,6 +102,13 @@ impl RabbitMQSinkConfig {
       nowait: self.queue_declare_options.nowait,
     }
   }
+
+  pub fn basic_publish_options(&self) -> BasicPublishOptions {
+    BasicPublishOptions {
+      immediate: self.basic_publish_options.mandatory,
+      mandatory: self.basic_publish_options.mandatory,
+    }
+  }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -106,6 +120,7 @@ pub enum Encoding {
 
 pub struct RabbitMQSink {
   acker: Acker,
+  basic_publish_options: BasicPublishOptions,
   channel: lapin_futures::Channel,
   encoding: Encoding,
   exchange: String,
@@ -122,11 +137,12 @@ impl RabbitMQSink {
       .queue_declare(
         &config.queue_name,
         config.queue_declare_options(),
-        config.field_table,
+        config.field_table.clone(),
       )
       .wait()?;
     Ok(RabbitMQSink {
       acker,
+      basic_publish_options: config.basic_publish_options(),
       channel,
       encoding: config.encoding,
       exchange: config.exchange,
@@ -159,7 +175,7 @@ impl Sink for RabbitMQSink {
       &self.exchange,
       &self.queue_name,
       payload,
-      BasicPublishOptions::default(),
+      self.basic_publish_options.clone(),
       BasicProperties::default(),
     );
     self.in_flight.push(future.join(future::ok(())));
@@ -213,6 +229,7 @@ mod tests {
   fn simple_test() {
     let config = RabbitMQSinkConfig {
       addr: String::from("amqp://127.0.0.1:5672/%2f"),
+      basic_publish_options: BasicPublishOptionsDef::default(),
       connection_properties: ConnectionPropertiesDef::default(),
       encoding: Encoding::Text,
       exchange: String::from(""),
