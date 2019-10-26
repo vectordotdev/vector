@@ -3,26 +3,98 @@ use crate::{
   event::{self, Event},
   sinks::util::MetadataFuture,
   topology::config::{DataType, SinkConfig},
-  Error,
 };
 use futures::{
-  future::{self, poll_fn, IntoFuture},
+  future::{self, poll_fn},
   stream::FuturesUnordered,
   Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
-use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
-use lapin::types::FieldTable;
-use lapin::{BasicProperties, Client, ConnectionProperties};
-use lapin_futures as lapin;
-use lapin_futures::ConfirmationFuture;
+use lapin_futures::{
+  auth::SASLMechanism,
+  options::{BasicPublishOptions, QueueDeclareOptions},
+  types::FieldTable,
+  BasicProperties, Client, ConfirmationFuture, ConnectionProperties,
+};
 use serde::{Deserialize, Serialize};
-use std::{thread, time::Duration};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum SASLMechanismDef {
+  AMQPlain,
+  External,
+  Plain,
+  RabbitCrDemo,
+}
+
+impl SASLMechanismDef {
+  pub fn to_sasl_mechanism(&self) -> SASLMechanism {
+    match &self {
+      SASLMechanismDef::AMQPlain => SASLMechanism::AMQPlain,
+      SASLMechanismDef::External => SASLMechanism::External,
+      SASLMechanismDef::Plain => SASLMechanism::Plain,
+      SASLMechanismDef::RabbitCrDemo => SASLMechanism::RabbitCrDemo,
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ConnectionPropertiesDef {
+  pub mechanism: SASLMechanismDef,
+  pub locale: String,
+  pub client_properties: FieldTable,
+  pub max_executor_threads: usize,
+}
+
+impl Default for ConnectionPropertiesDef {
+  fn default() -> ConnectionPropertiesDef {
+    ConnectionPropertiesDef {
+      mechanism: SASLMechanismDef::Plain,
+      locale: "en_US".into(),
+      client_properties: FieldTable::default(),
+      max_executor_threads: 1,
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+pub struct QueueDeclareOptionsDef {
+  pub passive: bool,
+  pub durable: bool,
+  pub exclusive: bool,
+  pub auto_delete: bool,
+  pub nowait: bool,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RabbitMQSinkConfig {
   addr: String,
+  connection_properties: ConnectionPropertiesDef,
   encoding: Encoding,
+  exchange: String,
+  field_table: FieldTable,
   queue_name: String,
+  queue_declare_options: QueueDeclareOptionsDef,
+}
+
+impl RabbitMQSinkConfig {
+  pub fn connection_properties(&self) -> ConnectionProperties {
+    ConnectionProperties {
+      mechanism: self.connection_properties.mechanism.to_sasl_mechanism(),
+      locale: self.connection_properties.locale.clone(),
+      client_properties: self.connection_properties.client_properties.clone(),
+      executor: None,
+      max_executor_threads: self.connection_properties.max_executor_threads,
+    }
+  }
+
+  pub fn queue_declare_options(&self) -> QueueDeclareOptions {
+    QueueDeclareOptions {
+      passive: self.queue_declare_options.passive,
+      durable: self.queue_declare_options.durable,
+      exclusive: self.queue_declare_options.exclusive,
+      auto_delete: self.queue_declare_options.auto_delete,
+      nowait: self.queue_declare_options.nowait,
+    }
+  }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -36,26 +108,28 @@ pub struct RabbitMQSink {
   acker: Acker,
   channel: lapin_futures::Channel,
   encoding: Encoding,
+  exchange: String,
   in_flight: FuturesUnordered<MetadataFuture<ConfirmationFuture<()>, ()>>,
   queue_name: String,
 }
 
 impl RabbitMQSink {
   fn new(config: RabbitMQSinkConfig, acker: Acker) -> crate::Result<Self> {
-    let channel = Client::connect(&config.addr, ConnectionProperties::default())
+    let channel = Client::connect(&config.addr, config.connection_properties())
       .and_then(|client| client.create_channel())
       .wait()?;
     channel
       .queue_declare(
         &config.queue_name,
-        QueueDeclareOptions::default(),
-        FieldTable::default(),
+        config.queue_declare_options(),
+        config.field_table,
       )
       .wait()?;
     Ok(RabbitMQSink {
       acker,
       channel,
       encoding: config.encoding,
+      exchange: config.exchange,
       in_flight: FuturesUnordered::new(),
       queue_name: config.queue_name,
     })
@@ -82,7 +156,7 @@ impl Sink for RabbitMQSink {
   fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
     let payload = encode_event(&item, &self.encoding);
     let future = self.channel.basic_publish(
-      "",
+      &self.exchange,
       &self.queue_name,
       payload,
       BasicPublishOptions::default(),
@@ -139,10 +213,14 @@ mod tests {
   fn simple_test() {
     let config = RabbitMQSinkConfig {
       addr: String::from("amqp://127.0.0.1:5672/%2f"),
+      connection_properties: ConnectionPropertiesDef::default(),
       encoding: Encoding::Text,
+      exchange: String::from(""),
+      field_table: FieldTable::default(),
       queue_name: String::from("hello"),
+      queue_declare_options: QueueDeclareOptionsDef::default(),
     };
     let acker = Acker::Null;
-    let mut rabbit = config.build(acker).unwrap();
+    let rabbit = config.build(acker).unwrap();
   }
 }
