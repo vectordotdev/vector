@@ -124,7 +124,8 @@ pub struct RabbitMQSink {
   channel: lapin_futures::Channel,
   encoding: Encoding,
   exchange: String,
-  in_flight: FuturesUnordered<MetadataFuture<ConfirmationFuture<()>, ()>>,
+  in_flight: FuturesUnordered<MetadataFuture<ConfirmationFuture<()>, usize>>,
+  seqno: usize,
   queue_name: String,
 }
 
@@ -147,6 +148,7 @@ impl RabbitMQSink {
       encoding: config.encoding,
       exchange: config.exchange,
       in_flight: FuturesUnordered::new(),
+      seqno: 0,
       queue_name: config.queue_name,
     })
   }
@@ -178,7 +180,8 @@ impl Sink for RabbitMQSink {
       self.basic_publish_options.clone(),
       BasicProperties::default(),
     );
-    self.in_flight.push(future.join(future::ok(())));
+    self.in_flight.push(future.join(future::ok(self.seqno)));
+    self.seqno += 1;
     Ok(AsyncSink::Ready)
   }
 
@@ -192,7 +195,8 @@ impl Sink for RabbitMQSink {
         Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
 
         // request finished, check for success
-        Ok(Async::Ready(Some(((), _)))) => {
+        Ok(Async::Ready(Some(((), seqno)))) => {
+          self.acker.ack(seqno);
           trace!("published message to rabbitmq");
         }
 
