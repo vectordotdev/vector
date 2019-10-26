@@ -708,9 +708,10 @@ impl ContainerLogInfo {
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
+    use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
 
-    fn pull(image: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) {
+    fn pull(image: &str, docker: &Docker, rt: &mut runtime::Runtime) {
         let list_option = shiplift::ImageListOptions::builder()
             .filter_name(image)
             .build();
@@ -736,7 +737,7 @@ mod tests {
     fn source<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
-    ) -> (mpsc::Receiver<Event>, tokio::runtime::Runtime) {
+    ) -> (mpsc::Receiver<Event>, runtime::Runtime) {
         let mut rt = test_util::runtime();
         let source = source_with(name, label, &mut rt);
         (source, rt)
@@ -746,7 +747,7 @@ mod tests {
     fn source_with<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> mpsc::Receiver<Event> {
         trace_init();
         let (sender, recv) = mpsc::channel(100);
@@ -772,7 +773,7 @@ mod tests {
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> String {
         cmd_container(
             name,
@@ -791,7 +792,7 @@ mod tests {
         log: &str,
         delay: u32,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> String {
         cmd_container(
             name,
@@ -812,7 +813,7 @@ mod tests {
         label: L,
         cmd: Vec<String>,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> String {
         if let Some(id) = cmd_container_for_real(name, label, cmd, docker, rt) {
             id
@@ -832,7 +833,7 @@ mod tests {
         label: L,
         cmd: Vec<String>,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> Option<String> {
         pull("busybox", docker, rt);
         let mut options = shiplift::builder::ContainerOptions::builder("busybox");
@@ -857,7 +858,7 @@ mod tests {
     fn container_start(
         id: &str,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         let future = docker.containers().get(id).start();
         rt.block_on(future)
@@ -868,7 +869,7 @@ mod tests {
     fn container_wait(
         id: &str,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         let future = docker.containers().get(id).wait();
         rt.block_on(future)
@@ -880,13 +881,13 @@ mod tests {
     fn container_run(
         id: &str,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) -> Result<(), shiplift::errors::Error> {
         container_start(id, docker, rt)?;
         container_wait(id, docker, rt)
     }
 
-    fn container_remove(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) {
+    fn container_remove(id: &str, docker: &Docker, rt: &mut runtime::Runtime) {
         let future = docker
             .containers()
             .get(id)
@@ -903,7 +904,7 @@ mod tests {
         label: L,
         log: &str,
         docker: &Docker,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let id = log_container(name, label, log, docker, rt);
         for _ in 0..n {

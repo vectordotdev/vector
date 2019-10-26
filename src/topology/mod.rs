@@ -7,6 +7,7 @@ pub use self::config::Config;
 use crate::topology::builder::Pieces;
 
 use crate::buffers;
+use crate::runtime;
 use futures::{
     future,
     sync::{mpsc, oneshot},
@@ -33,7 +34,7 @@ pub struct RunningTopology {
 
 pub fn start(
     config: Config,
-    rt: &mut tokio::runtime::Runtime,
+    rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     validate(&config).and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
@@ -42,7 +43,7 @@ pub fn start(
 pub fn start_validated(
     config: Config,
     mut pieces: Pieces,
-    rt: &mut tokio::runtime::Runtime,
+    rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
@@ -157,7 +158,7 @@ impl RunningTopology {
     pub fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
         if self.config.global.data_dir != new_config.global.data_dir {
@@ -183,7 +184,7 @@ impl RunningTopology {
         &mut self,
         new_config: &Config,
         pieces: &mut Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
         let (_, sinks_to_change, sinks_to_add) =
@@ -216,7 +217,7 @@ impl RunningTopology {
         &mut self,
         new_config: Config,
         mut new_pieces: Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         // Sources
         let (sources_to_remove, sources_to_change, sources_to_add) =
@@ -318,7 +319,7 @@ impl RunningTopology {
         &mut self,
         name: &str,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
@@ -333,7 +334,7 @@ impl RunningTopology {
         &mut self,
         name: &str,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
@@ -348,7 +349,7 @@ impl RunningTopology {
         &mut self,
         name: &str,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());

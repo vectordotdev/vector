@@ -222,7 +222,7 @@ mod test {
     use crate::test_util::wait_for;
     use futures::{stream, sync::oneshot, Future, Poll, Sink};
     use std::sync::{atomic::Ordering, Arc, Mutex};
-    use tokio::runtime::Runtime;
+    use crate::runtime::Runtime;
     use tower::Service;
 
     struct FakeService {

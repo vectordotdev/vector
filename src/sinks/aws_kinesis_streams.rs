@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     region::RegionOrEndpoint,
+    runtime,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, SinkExt,
@@ -322,6 +323,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         buffers::Acker,
+        runtime,
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
@@ -329,7 +331,6 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
-    use tokio::runtime::Runtime;
 
     #[test]
     fn kinesis_put_records() {
@@ -349,7 +350,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         let sink = KinesisService::new(config, Acker::Null).unwrap();
 

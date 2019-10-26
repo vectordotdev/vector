@@ -224,7 +224,7 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::runtime::Runtime::new().unwrap();
 
         rt.spawn(server);
 

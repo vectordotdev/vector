@@ -23,6 +23,7 @@ pub mod topology;
 pub mod trace;
 pub mod transforms;
 pub mod types;
+pub mod runtime;
 
 pub use event::Event;
 
