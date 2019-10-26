@@ -5,7 +5,7 @@ use crate::{
   topology::config::{DataType, SinkConfig},
 };
 use futures::{
-  future::{self, poll_fn},
+  future::{self, poll_fn, IntoFuture},
   stream::FuturesUnordered,
   Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
@@ -207,7 +207,15 @@ impl Sink for RabbitMQSink {
 }
 
 fn healthcheck(config: RabbitMQSinkConfig) -> super::Healthcheck {
-  let check = poll_fn(move || Ok(Async::Ready(())));
+  let check = poll_fn(move || {
+    tokio_threadpool::blocking(|| {
+      Client::connect(&config.addr, config.connection_properties())
+        .map(|_| ())
+        .map_err(|err| err.into())
+    })
+  })
+  .map_err(|err| err.into())
+  .and_then(|result| result.into_future());
 
   Box::new(check)
 }
@@ -242,6 +250,6 @@ mod tests {
       queue_declare_options: QueueDeclareOptionsDef::default(),
     };
     let acker = Acker::Null;
-    let rabbit = config.build(acker).unwrap();
+    let _rabbit = config.build(acker).unwrap();
   }
 }
