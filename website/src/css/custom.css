@@ -1,0 +1,294 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/**
+ * You can override the default Infima variables here.
+ *
+ * Colors were generated with colorbox via:
+ *
+ * https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
+ */
+:root {
+  --ifm-blockquote-color: var(--ifm-color-primary-lighter);
+  --ifm-color-black-alpha-025: rgba(0, 0, 0, 0.025);
+  --ifm-color-black-alpha-075: rgba(0, 0, 0, 0.075);
+  --ifm-color-emphasis-alpha-025: var(--ifm-color-black-alpha-025);
+  --ifm-color-emphasis-alpha-075: var(--ifm-color-black-alpha-075);
+  --ifm-color-primary: #28D9F2;
+  --ifm-color-primary-dark: #0FBCE1;
+  --ifm-color-primary-darker: #0395C7;
+  --ifm-color-primary-darkest: #006EA6;
+  --ifm-color-primary-light: #51EBFB;
+  --ifm-color-primary-lighter: #6AF0FD;
+  --ifm-color-primary-lightest: #83F5FF;
+  --ifm-container-width: none;
+  --ifm-contents-border-color: var(--ifm-color-emphasis-alpha-075);
+  --ifm-code-background: #f5f7f9;
+  --ifm-code-font-size: 85%;
+  --ifm-font-base-color: #3B454E;
+  --ifm-font-family-base: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --ifm-font-family-monospace: "Source Code Pro", Menlo, monospace;
+  --ifm-font-size-base: 16px;
+  --ifm-global-radius: 3px;
+  --ifm-global-shadow-md: 0 3px 8px 0px var(--ifm-hr-border-color);
+  --ifm-heading-color: #001B3D;
+  --ifm-hr-border-color: var(--ifm-contents-border-color);
+  --ifm-line-height-base: 1.7;
+  --ifm-navbar-link-color: var(--ifm-heading-color);
+  --ifm-pre-line-height: var(--ifm-line-height-base);
+  --ifm-sidebar-background: #f9f9f9;
+  --ifm-sidebar-border-color: var(--ifm-color-emphasis-alpha-05);
+  --ifm-table-stripe-background: var(--ifm-table-background);
+}
+
+/**
+ * Base
+ */
+
+html, body {
+  font-smoothing: antialiased;
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media screen and (min-width: 768px) {
+  html, body {
+    text-rendering: optimizeLegibility;
+  }
+}
+
+blockquote {
+  border-left: 4px solid var(--ifm-hr-border-color);
+  color: var(--ifm-color-emphasis-alpha-40);
+  padding-left: 1.5rem;
+}
+
+header h1[class^='docTitle_'] {
+  border-bottom: 2px solid var(--ifm-hr-border-color);
+  font-family: Ubuntu, var(--ifm-font-family-base);
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+}
+
+li + li {
+  margin-top: 0;
+}
+
+/**
+ * Docs
+ */
+
+ul.contents li {
+  margin-right: 0;
+}
+
+main[class^='docMainContainer_'] div.container div.row div.col.col--3 {
+  padding-left: 0;
+}
+
+div[class^='docItemContainer_'] {
+  max-width: none;
+}
+
+div[class^='docSidebarContainer_'] {
+  background-color: var(--ifm-sidebar-background);
+  border-right-color: var(--ifm-sidebar-border-color);
+  max-width: 250px;
+  min-width: 250px;
+}
+
+div[class^='docSidebarContainer_'] .menu {
+  background-color: var(--ifm-sidebar-background);
+}
+
+div[class^='sidebar_'] .menu {
+  font-size: 0.9rem;
+  margin-right: calc( var(--ifm-spacing-horizontal) * -1);
+}
+
+@media (min-width: 997px) {
+  div[class^='docItemContainer_'] {
+    max-width: none;
+    padding: 0 calc( var(--ifm-spacing-horizontal) * 2);
+  }
+
+  div[class^='sidebar_'] {
+    padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal) !important;
+  }
+}
+
+/**
+ * Markdown
+ */
+
+ .markdown {
+  --ifm-h1-h2-vertical-rhythm-top: 1.5;
+  --ifm-h1-h2-vertical-rhythm-bottom: var(--ifm-h1-h2-vertical-rhythm-top);
+  --ifm-h3-vertical-rhythm-top: 2;
+  --ifm-h3-vertical-rhythm-bottom: calc( var(--ifm-h3-vertical-rhythm-top) / 2 );
+  --ifm-h4-vertical-rhythm-top: 1.5;
+  --ifm-h4-vertical-rhythm-bottom: calc( var(--ifm-h4-vertical-rhythm-top) / 2 );
+  --ifm-h5-vertical-rhythm-top: 1.25;
+  --ifm-h5-vertical-rhythm-bottom: calc( var(--ifm-h5-vertical-rhythm-top) / 2 );
+  --ifm-h6-vertical-rhythm-top: 1.125;
+  --ifm-h6-vertical-rhythm-bottom: calc( var(--ifm-h6-vertical-rhythm-top) / 2 );
+ }
+
+.markdown > h1,
+.markdown > h2 {
+  border-top: 1px solid var(--ifm-hr-border-color);
+  font-size: 1.5rem;
+  margin-top: calc( var(--ifm-h1-h2-vertical-rhythm-top) * var(--ifm-leading) );
+  margin-bottom: calc( var(--ifm-h1-h2-vertical-rhythm-bottom) * var(--ifm-leading) );
+  padding-top: calc( var(--ifm-h1-h2-vertical-rhythm-top) * var(--ifm-leading) );
+}
+
+.markdown > h3 {
+  margin-top: calc( var(--ifm-h3-vertical-rhythm-top) * var(--ifm-leading) );
+  margin-bottom: calc( var(--ifm-h3-vertical-rhythm-bottom) * var(--ifm-leading) );
+}
+
+.markdown > h4 {
+  margin-top: calc( var(--ifm-h4-vertical-rhythm-top) * var(--ifm-leading) );
+  margin-bottom: calc( var(--ifm-h4-vertical-rhythm-bottom) * var(--ifm-leading) );
+}
+
+.markdown > h5 {
+  margin-top: calc( var(--ifm-h5-vertical-rhythm-top) * var(--ifm-leading) );
+  margin-bottom: calc( var(--ifm-h5-vertical-rhythm-bottom) * var(--ifm-leading) );
+}
+
+.markdown > h6 {
+  margin-top: calc( var(--ifm-h6-vertical-rhythm-top) * var(--ifm-leading) );
+  margin-bottom: calc( var(--ifm-h6-vertical-rhythm-bottom) * var(--ifm-leading) );
+}
+
+.markdown pre {
+  font-size: 90%;
+}
+
+.markdown > table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  page-break-inside: auto;
+}
+
+.markdown > table > thead > tr,
+.markdown > table > tbody > tr {
+  border: none;
+  border-bottom: 1px solid #E6ECF1;
+  page-break-after: auto;
+  page-break-inside: avoid;
+}
+
+.markdown > table > thead > tr {
+  border-bottom-width: 2px;
+}
+
+.markdown > table > thead > tr > th:not([align]) {
+  text-align: left;
+}
+
+.markdown > table > thead > tr > th,
+.markdown > table > tbody > tr > td {
+  width: auto;
+  padding: 8px;
+  align-self: start;
+  border-top: none;
+  align-items: start;
+  border: none;
+  -webkit-box-align: start;
+  -ms-grid-row-align: start;
+}
+
+.markdown > table > thead > tr > th:first-child,
+.markdown > table > tbody > tr > td:first-child {
+  padding-left: 0;
+}
+
+.markdown > table > thead > tr > th:last-child,
+.markdown > table > tbody > tr > td:last-child {
+  padding-right: 0;
+}
+
+.markdown > table > thead > tr {
+  border-bottom-size: 2px;
+}
+
+.markdown > table > tbody > tr:hover {
+  background: var(--ifm-color-emphasis-alpha-025);
+}
+
+.menu > ul.menu__list li > a {
+  padding-left: 0;
+}
+
+.menu > ul.menu__list ul.menu__list {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.menu > ul.menu__list ul.menu__list a.menu__link {
+  font-size: 1em;
+  padding-left: var(--ifm-menu-link-padding-horizontal);
+}
+
+.menu .menu__link:hover {
+  background: none;
+}
+
+.menu .menu__link:not(.menu__link--sublist) {
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+}
+
+.menu .menu__link.menu__link--active:not(.menu__link--sublist) {
+  background: white;
+  border-top: 1px solid var(--ifm-hr-border-color);
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  border-radius: 0;
+}
+
+.menu .menu__link.menu__link--sublist::after {
+  background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-5 -4 30 30"><path fill="rgba(0,0,0,0.3)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
+  -webkit-transform: rotate(180deg);
+  transform: rotate(180deg);
+  transition: 250ms ease;
+}
+
+.menu .menu__link.menu__link--sublist:hover::after,
+.menu .menu__link.menu__link--sublist.menu__link--active::after {
+  background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-5 -4 30 30"><path fill="rgb(40,217,242)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
+}
+
+.menu .menu__list-item.menu__list-item--collapsed .menu__link--sublist::after {
+  -webkit-transform: rotate(90deg);
+  transform: rotate(90deg);
+}
+
+.menu .menu__link:hover {
+  color: var(--ifm-menu-color-active);
+}
+
+.navbar .navbar__items--right {
+  flex-grow: 2;
+}
+
+.navbar .navbar__items--right .react-toggle {
+  display: none;
+}
+
+.pagination-nav .pagination-nav__link {
+  border-color: var(--ifm-color-emphasis-alpha-10);
+  box-shadow: var(--ifm-global-shadow-md);
+  transition: border 250ms ease;
+}

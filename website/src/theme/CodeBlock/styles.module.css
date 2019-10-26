@@ -1,0 +1,34 @@
+.codeBlock {
+  border-radius: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.codeBlockWrapper {
+  position: relative;
+}
+
+.codeBlockWrapper:hover > .copyButton {
+  visibility: visible;
+  opacity: 1;
+}
+
+.copyButton {
+  background: rgb(1, 22, 39, 0.1);
+  border: 0px none;
+  border-radius: var(--ifm-global-radius);
+  color: var(--ifm-font-base-color);
+  cursor: pointer;
+  line-height: 12px;
+  opacity: 0;
+  outline: none;
+  padding: 4px 8px;
+  position: absolute;
+  right: var(--ifm-pre-padding);
+  top: var(--ifm-pre-padding);
+  visibility: hidden;
+  transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out,
+    bottom 200ms ease-in-out;
+}
