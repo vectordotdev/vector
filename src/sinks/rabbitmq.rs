@@ -259,19 +259,75 @@ mod tests {
 #[cfg(test)]
 mod integration_test {
   use super::*;
+  use crate::test_util::{block_on, random_lines_with_stream, random_string};
+  use lapin_futures::options::BasicConsumeOptions;
+  use std::{collections::HashSet, iter::FromIterator};
+
   #[test]
-  fn create_connection() {
+  fn publish_messages() {
+    let queue_name = format!("test-{}", random_string(10));
+    let addr = String::from("amqp://127.0.0.1:5672/%2f");
     let config = RabbitMQSinkConfig {
-      addr: String::from("amqp://127.0.0.1:5672/%2f"),
+      addr: addr.clone(),
       basic_publish_options: BasicPublishOptionsDef::default(),
       connection_properties: ConnectionPropertiesDef::default(),
       encoding: Encoding::Text,
       exchange: String::from(""),
       field_table: FieldTable::default(),
-      queue_name: String::from("hello"),
+      queue_name: queue_name.clone(),
       queue_declare_options: QueueDeclareOptionsDef::default(),
     };
-    let acker = Acker::Null;
-    let _rabbit = config.build(acker).unwrap();
+    // publish messages to test rabbit queue
+    let (acker, ack_counter) = Acker::new_for_testing();
+    let rabbit = RabbitMQSink::new(config, acker).unwrap();
+    let number_of_events = 1000;
+    let (input, events) = random_lines_with_stream(100, number_of_events);
+    let pump = rabbit.send_all(events);
+    block_on(pump).unwrap();
+    let mut messages: HashSet<String> = HashSet::from_iter(input);
+
+    // create consumer to check the existence of the previously pushed messages
+    let channel = Client::connect(&addr, ConnectionProperties::default())
+      .and_then(|client| client.create_channel())
+      .wait()
+      .unwrap();
+    let consumer_name = format!("consumer-{}", random_string(5));
+    let consumer = channel
+      .queue_declare(
+        &queue_name,
+        QueueDeclareOptions::default(),
+        FieldTable::default(),
+      )
+      .and_then(|queue| {
+        channel.basic_consume(
+          &queue,
+          &consumer_name,
+          BasicConsumeOptions::default(),
+          FieldTable::default(),
+        )
+      })
+      .wait()
+      .unwrap();
+    // check that all messages exist in rabbitmq
+    let mut counter = 0;
+    for item in consumer.wait() {
+      match item {
+        Ok(message) => {
+          let string_message = String::from_utf8_lossy(&message.data);
+          messages.remove(&string_message[..]);
+          channel.basic_ack(message.delivery_tag, false);
+        }
+        Err(e) => error!("failed to run rabbitmq test: {}", e),
+      }
+      counter += 1;
+      if counter == number_of_events {
+        break;
+      }
+    }
+    assert_eq!(messages.len(), 0);
+    assert_eq!(
+      ack_counter.load(std::sync::atomic::Ordering::Relaxed),
+      number_of_events
+    );
   }
 }

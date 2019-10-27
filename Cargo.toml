@@ -169,6 +169,7 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
+rabbitmq-integration-tests = []
 
 [[bench]]
 name = "bench"
