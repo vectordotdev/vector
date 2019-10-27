@@ -236,9 +236,31 @@ fn encode_event(event: &Event, encoding: &Encoding) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::collections::HashMap;
 
   #[test]
-  fn simple_test() {
+  fn rabbitmq_encode_event_text() {
+    let message = "hello world".to_string();
+    let bytes = encode_event(&message.clone().into(), &Encoding::Text);
+    assert_eq!(&bytes[..], message.as_bytes());
+  }
+
+  #[test]
+  fn rabbitmq_encode_event_json() {
+    let message = "hello world".to_string();
+    let event = Event::from(message.clone());
+    let bytes = encode_event(&event, &Encoding::Json);
+    let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+    assert_eq!(map[&event::MESSAGE.to_string()], message);
+  }
+}
+
+#[cfg(feature = "rabbitmq-integration-tests")]
+#[cfg(test)]
+mod integration_test {
+  use super::*;
+  #[test]
+  fn create_connection() {
     let config = RabbitMQSinkConfig {
       addr: String::from("amqp://127.0.0.1:5672/%2f"),
       basic_publish_options: BasicPublishOptionsDef::default(),
