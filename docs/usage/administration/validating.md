@@ -75,6 +75,7 @@ flag to also run health checks for all defined sinks.
 
 8. All [sinks][docs.sinks] are able to connect to their targets.
 
+
 [docs.configuration#composition]: ../../usage/configuration#composition
 [docs.configuration#value-types]: ../../usage/configuration#value-types
 [docs.sinks]: ../../usage/configuration/sinks

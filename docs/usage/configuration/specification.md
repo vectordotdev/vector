@@ -267,12 +267,12 @@ data_dir = "/var/lib/vector"
   # * must be: "journald"
   type = "journald"
 
-  # Include only entries from the current runtime (boot)
+  # Include only entries from the current boot.
   # 
   # * optional
   # * default: true
   # * type: bool
-  current_runtime_only = true
+  current_boot_only = true
 
   # The directory used to persist the journal checkpoint position. By default,
   # the global `data_dir` is used. Please make sure the Vector project has write
