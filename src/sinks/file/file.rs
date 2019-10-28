@@ -180,16 +180,18 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        test_util::{lines_from_file, random_lines_with_stream, random_nested_events_with_stream},
+        test_util::{
+            lines_from_file, random_lines_with_stream, random_nested_events_with_stream, temp_file,
+        },
     };
     use futures::Stream;
     use std::{collections::HashMap, path::PathBuf};
-    use tempfile::tempdir;
 
     #[test]
     fn encode_text() {
+        let path = temp_file();
         let (input, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, None);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path);
 
         for (input, output) in input.into_iter().zip(output) {
             assert_eq!(input, output);
@@ -198,8 +200,9 @@ mod tests {
 
     #[test]
     fn encode_json() {
+        let path = temp_file();
         let (input, events) = random_nested_events_with_stream(4, 3, 3, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, None);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
 
         for (input, output) in input.into_iter().zip(output) {
             let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
@@ -220,13 +223,13 @@ mod tests {
 
     #[test]
     fn file_is_appended() {
-        let directory = std::env::temp_dir();
+        let path = temp_file();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
-        test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory.clone()));
+        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
 
         let (mut input2, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory));
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path);
 
         let mut input = vec![];
         input.append(&mut input1);
@@ -241,13 +244,13 @@ mod tests {
 
     #[test]
     fn create_dir() {
-        let directory = std::env::temp_dir().join("addmore/file.log");
+        let path = temp_file();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
-        test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory.clone()));
+        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
 
         let (mut input2, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory));
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
 
         let mut input = vec![];
         input.append(&mut input1);
@@ -263,15 +266,11 @@ mod tests {
     fn test_unpartitioned_with_encoding<S>(
         events: S,
         encoding: Encoding,
-        directory: Option<PathBuf>,
+        path: PathBuf,
     ) -> Vec<String>
     where
         S: 'static + Stream<Item = Event, Error = ()> + Send,
     {
-        let path = directory
-            .unwrap_or(tempdir().unwrap().into_path())
-            .join("test.out");
-
         let b = Bytes::from(path.clone().to_str().unwrap().as_bytes());
         let sink = File::new(b, encoding);
 
