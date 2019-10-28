@@ -185,13 +185,12 @@ mod tests {
         topology::config::SinkConfig,
     };
     use futures::stream;
-    use tempfile::tempdir;
 
     #[test]
     fn single_partition() {
         let directory = std::env::temp_dir();
 
-        let mut template = directory.into_path().to_string_lossy().to_string();
+        let mut template = directory.to_string_lossy().to_string();
         template.push_str("/test.out");
 
         let config = FileSinkConfig {
