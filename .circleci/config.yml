@@ -606,7 +606,7 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
-      - test-version
+      - check-version
       - test-stable
 
       # Build & verify
