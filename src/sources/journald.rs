@@ -35,7 +35,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
-    pub current_runtime_only: Option<bool>,
+    pub current_boot_only: Option<bool>,
     pub local_only: Option<bool>,
     pub units: Vec<String>,
     pub data_dir: Option<PathBuf>,
@@ -50,9 +50,11 @@ impl SourceConfig for JournaldConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let local_only = self.local_only.unwrap_or(true);
-        let runtime_only = self.current_runtime_only.unwrap_or(true);
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
-        let journal = Journal::open(local_only, runtime_only).context(JournaldError)?;
+        let journal = Journal::open(local_only, false).context(JournaldError)?;
+        if self.current_boot_only.unwrap_or(true) {
+            journal.seek_boot()?;
+        }
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.

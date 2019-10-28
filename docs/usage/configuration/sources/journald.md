@@ -44,7 +44,7 @@ The `journald` source ingests data through log records from journald and outputs
   type = "journald" # must be: "journald"
   
   # OPTIONAL
-  current_runtime_only = true # default
+  current_boot_only = true # default
   data_dir = "/var/lib/vector" # no default
   local_only = true # default
   units = ["ntpd", "sysinit.target"] # default
@@ -54,11 +54,11 @@ The `journald` source ingests data through log records from journald and outputs
 
 ## Options
 
-### current_runtime_only
+### current_boot_only
 
 `optional` `default: true` `type: bool`
 
-Include only entries from the current runtime (boot)
+Include only entries from the current boot.
 
 ### data_dir
 

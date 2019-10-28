@@ -6,11 +6,11 @@ output_types = ["log"]
 resources = []
 through_description = "log records from journald"
 
-[sources.journald.options.current_runtime_only]
+[sources.journald.options.current_boot_only]
 type = "bool"
 null = true
 default = true
-description = "Include only entries from the current runtime (boot)"
+description = "Include only entries from the current boot."
 
 [sources.journald.options.data_dir]
 type = "string"
