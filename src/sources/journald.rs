@@ -182,6 +182,13 @@ where
                         message = "Could not seek journald to stored cursor",
                         error = field::display(&err)
                     );
+                // The cursor now points to the last successfully read
+                // record, so skip past it to any newer records.
+                } else if let Some(Err(err)) = self.journal.next() {
+                    error!(
+                        message = "Could not fetch next record after seeking to cursor",
+                        error = field::display(&err)
+                    );
                 }
             }
             Ok(None) => {}
@@ -381,7 +388,7 @@ mod tests {
         }
         fn seek_cursor(&mut self, cursor: &str) -> Result<(), io::Error> {
             let cursor = cursor.parse::<usize>().expect("Invalid cursor");
-            for _ in 0..cursor {
+            for _ in 1..cursor {
                 self.records.pop();
             }
             Ok(())
