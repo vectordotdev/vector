@@ -247,6 +247,14 @@ data_dir = "/var/lib/vector"
   # * must be: "journald"
   type = "journald"
 
+  # The systemd journal is read in batches, and a checkpoint is set at the end of
+  # each batch. This option limits the size of the batch.
+  # 
+  # * optional
+  # * default: 16
+  # * type: int
+  batch_size = 16
+
   # Include only entries from the current boot.
   # 
   # * optional
