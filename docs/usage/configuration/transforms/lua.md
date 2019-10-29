@@ -185,6 +185,19 @@ Vector provides a `search_dirs` option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 
+### Iterate over fields
+
+To iterate over all fields of an `event` use the `pairs` method.  For example:
+
+```lua
+# Remove all fields where the value is "-"
+for f,v in pairs(event) do
+  if v == "-" then
+    event[f] = nil
+  end
+end
+```
+
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
