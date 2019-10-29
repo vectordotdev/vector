@@ -62,12 +62,12 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing" }
 hotmic = "0.8"
 
 # Aws
-rusoto_core = "0.37.0"
-rusoto_s3 = "0.37.0"
-rusoto_logs = "0.37.0"
-rusoto_cloudwatch = "0.37.0"
-rusoto_kinesis = "0.37.0"
-rusoto_credential = "0.16.0"
+rusoto_core = "0.38.0"
+rusoto_s3 = "0.38.0"
+rusoto_logs = "0.38.0"
+rusoto_cloudwatch = "0.38.0"
+rusoto_kinesis = "0.38.0"
+rusoto_credential = "0.17.0"
 
 # Tower
 tower = "0.1.1"

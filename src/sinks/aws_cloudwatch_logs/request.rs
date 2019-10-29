@@ -1,6 +1,6 @@
 use super::CloudwatchError;
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
-use rusoto_core::RusotoFuture;
+use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
@@ -78,7 +78,10 @@ impl Future for CloudwatchFuture {
                         Ok(Async::Ready(res)) => res,
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(e) => {
-                            if let DescribeLogStreamsError::ResourceNotFound(_) = e {
+                            if let RusotoError::Service(
+                                DescribeLogStreamsError::ResourceNotFound(_),
+                            ) = e
+                            {
                                 if self.create_missing_group {
                                     info!("log group provided does not exist; creating a new one.");
 

@@ -12,10 +12,9 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
-use rusoto_core::{Region, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
-    HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
-    S3Client, S3,
+    HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -171,7 +170,7 @@ impl S3Sink {
 
         let bucket = config.bucket.clone();
         let healthcheck = response.map_err(|err| match err {
-            HeadBucketError::Unknown(response) => match response.status {
+            RusotoError::Unknown(response) => match response.status {
                 http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                 http::status::StatusCode::NOT_FOUND => {
                     HealthcheckError::UnknownBucket { bucket }.into()
@@ -208,7 +207,7 @@ impl S3Sink {
 
 impl Service<PartitionInnerBuffer<Vec<u8>, Bytes>> for S3Sink {
     type Response = PutObjectOutput;
-    type Error = PutObjectError;
+    type Error = RusotoError<PutObjectError>;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -255,13 +254,13 @@ impl Service<PartitionInnerBuffer<Vec<u8>, Bytes>> for S3Sink {
 struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
-    type Error = PutObjectError;
+    type Error = RusotoError<PutObjectError>;
     type Response = PutObjectOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            PutObjectError::HttpDispatch(_) => true,
-            PutObjectError::Unknown(res) if res.status.is_server_error() => true,
+            RusotoError::HttpDispatch(_) => true,
+            RusotoError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }
     }
@@ -640,9 +639,9 @@ mod integration_tests {
         let res = client.create_bucket(req);
 
         match res.sync() {
-            Ok(_) | Err(CreateBucketError::BucketAlreadyOwnedByYou(_)) => {}
+            Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
             Err(e) => match e {
-                CreateBucketError::Unknown(b) => {
+                RusotoError::Unknown(b) => {
                     let body = String::from_utf8(b.body.clone()).unwrap();
                     panic!("Couldn't create bucket: {:?}; Body {}", b, body);
                 }
