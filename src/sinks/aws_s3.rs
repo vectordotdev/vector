@@ -639,9 +639,9 @@ mod integration_tests {
         let res = client.create_bucket(req);
 
         match res.sync() {
-            Ok(_) | Err(CreateBucketError::BucketAlreadyOwnedByYou(_)) => {}
+            Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
             Err(e) => match e {
-                CreateBucketError::Unknown(b) => {
+                RusotoError::Unknown(b) => {
                     let body = String::from_utf8(b.body.clone()).unwrap();
                     panic!("Couldn't create bucket: {:?}; Body {}", b, body);
                 }
