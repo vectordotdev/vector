@@ -32,6 +32,7 @@ message Metric {
     Histogram histogram = 2;
     Gauge gauge = 3;
     Set set = 4;
+    AggregatedHistogram aggregated_histogram = 5;
   }
 }
 
@@ -48,6 +49,22 @@ message Histogram {
   uint32 sample_rate = 3;
   google.protobuf.Timestamp timestamp = 4;
   map<string, string> tags = 5;
+}
+
+message AggregatedHistogram {
+  string name = 1;
+  repeated double buckets = 2;
+  map<uint32, uint32> counts = 3;
+  uint32 count = 4;
+  double sum = 5;
+  Stats stats = 6;
+  google.protobuf.Timestamp timestamp = 7;
+  map<string, string> tags = 8;
+}
+
+message Stats {
+  double min = 3;
+  double max = 4;
 }
 
 message Gauge {

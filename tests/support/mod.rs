@@ -112,6 +112,19 @@ impl Transform for MockTransform {
             }) => {
                 *val += self.increase;
             }
+            Event::Metric(Metric::AggregatedHistogram {
+                name: _,
+                buckets: _,
+                counts: _,
+                count,
+                sum,
+                stats: _,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *count += 1;
+                *sum += self.increase;
+            }
             Event::Metric(Metric::Gauge {
                 name: _,
                 val,

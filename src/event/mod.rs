@@ -390,6 +390,33 @@ impl From<proto::EventWrapper> for Event {
                             tags,
                         })
                     }
+                    MetricProto::AggregatedHistogram(hist) => {
+                        let timestamp = hist
+                            .timestamp
+                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+
+                        let tags = if !hist.tags.is_empty() {
+                            Some(hist.tags)
+                        } else {
+                            None
+                        };
+
+                        let stats = hist.stats.map(|s| metric::Stats {
+                            min: s.min,
+                            max: s.max,
+                        });
+
+                        Event::Metric(Metric::AggregatedHistogram {
+                            name: hist.name,
+                            buckets: hist.buckets,
+                            counts: hist.counts,
+                            count: hist.count,
+                            sum: hist.sum,
+                            stats,
+                            timestamp,
+                            tags,
+                        })
+                    }
                     MetricProto::Gauge(gauge) => {
                         let direction = match gauge.direction() {
                             proto::gauge::Direction::None => None,
@@ -522,6 +549,43 @@ impl From<Event> for proto::EventWrapper {
                 };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::Histogram(hist)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::AggregatedHistogram {
+                name,
+                buckets,
+                counts,
+                count,
+                sum,
+                stats,
+                timestamp,
+                tags,
+            }) => {
+                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                });
+
+                let tags = tags.unwrap_or_default();
+
+                let stats = stats.map(|s| proto::Stats {
+                    min: s.min,
+                    max: s.max,
+                });
+
+                let hist = proto::AggregatedHistogram {
+                    name,
+                    buckets,
+                    counts,
+                    count,
+                    sum,
+                    stats,
+                    timestamp,
+                    tags,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::AggregatedHistogram(hist)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }

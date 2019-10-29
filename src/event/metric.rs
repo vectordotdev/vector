@@ -32,6 +32,25 @@ pub enum Metric {
         timestamp: Option<DateTime<Utc>>,
         tags: Option<HashMap<String, String>>,
     },
+    AggregatedHistogram {
+        name: String,
+        buckets: Vec<f64>,
+        counts: HashMap<u32, u32>,
+        count: u32,
+        sum: f64,
+        stats: Option<Stats>,
+        timestamp: Option<DateTime<Utc>>,
+        tags: Option<HashMap<String, String>>,
+    },
+}
+
+// https://github.com/influxdata/telegraf/tree/master/plugins/parsers/dropwizard
+// https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#publishingDataPoints1
+// https://docs.datadoghq.com/developers/faq/data-aggregation-with-dogstatsd-threadstats/#aggregation-rules-per-metric-type
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Stats {
+    pub min: f64,
+    pub max: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -46,6 +65,7 @@ impl Metric {
             Metric::Counter { tags, .. } => tags,
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
+            Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
         }
     }
@@ -55,11 +75,12 @@ impl Metric {
             Metric::Counter { tags, .. } => tags,
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
+            Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
         }
     }
 
-    pub fn merge(&mut self, other: &Metric) {
+    pub fn merge(&mut self, other: &Self) {
         match (self, other) {
             (
                 Metric::Counter {
@@ -153,6 +174,50 @@ impl Metric {
                     *timestamp = *new_timestamp;
                     *tags = new_tags.clone();
                 };
+            }
+            (
+                Metric::AggregatedHistogram {
+                    ref mut name,
+                    ref mut buckets,
+                    ref mut counts,
+                    ref mut count,
+                    ref mut sum,
+                    ref mut stats,
+                    ref mut timestamp,
+                    ref mut tags,
+                },
+                Metric::AggregatedHistogram {
+                    name: new_name,
+                    buckets: new_buckets,
+                    counts: new_counts,
+                    count: new_count,
+                    sum: new_sum,
+                    stats: new_stats,
+                    timestamp: new_timestamp,
+                    tags: new_tags,
+                },
+            ) => {
+                if name == new_name && buckets == new_buckets {
+                    for (i, c) in counts.iter_mut() {
+                        *c += new_counts[i];
+                    }
+                    *sum += new_sum;
+                    *count += new_count;
+                    match (&stats, &new_stats) {
+                        (None, Some(_)) => {
+                            *stats = new_stats.clone();
+                        }
+                        (Some(s1), Some(s2)) => {
+                            *stats = Some(Stats {
+                                min: s1.min.min(s2.min),
+                                max: s1.max.max(s2.max),
+                            });
+                        }
+                        _ => {}
+                    };
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
+                }
             }
             _ => {}
         }
@@ -318,6 +383,46 @@ mod test {
                 name: "hist".into(),
                 val: 1.0,
                 sample_rate: 30,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
+    }
+
+    #[test]
+    fn merge_aggregated_histograms() {
+        let mut hist1 = Metric::AggregatedHistogram {
+            name: "hist".into(),
+            buckets: vec![1.0, 2.0, 4.0],
+            counts: vec![(0, 1), (1, 5), (2, 15)].into_iter().collect(),
+            count: 21,
+            sum: 10.0,
+            stats: None,
+            timestamp: None,
+            tags: None,
+        };
+
+        let hist2 = Metric::AggregatedHistogram {
+            name: "hist".into(),
+            buckets: vec![1.0, 2.0, 4.0],
+            counts: vec![(0, 2), (1, 10), (2, 30)].into_iter().collect(),
+            count: 42,
+            sum: 20.0,
+            stats: None,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        hist1.merge(&hist2);
+        assert_eq!(
+            hist1,
+            Metric::AggregatedHistogram {
+                name: "hist".into(),
+                buckets: vec![1.0, 2.0, 4.0],
+                counts: vec![(0, 3), (1, 15), (2, 45)].into_iter().collect(),
+                count: 63,
+                sum: 30.0,
+                stats: None,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
             }

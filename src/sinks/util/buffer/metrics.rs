@@ -27,6 +27,12 @@ impl Hash for MetricEntry {
                 name.hash(state);
                 val.to_bits().hash(state);
             }
+            Metric::AggregatedHistogram { name, buckets, .. } => {
+                name.hash(state);
+                for bucket in buckets {
+                    bucket.to_bits().hash(state);
+                }
+            }
         }
 
         self.0
@@ -552,6 +558,86 @@ mod test {
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_aggregated_histograms() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for _i in 2..5 {
+            let event = Event::Metric(Metric::AggregatedHistogram {
+                name: "buckets-2".into(),
+                buckets: vec![1.0, 2.0, 4.0],
+                counts: vec![(0, 1), (1, 2), (2, 4)].into_iter().collect(),
+                count: 6,
+                sum: 10.0,
+                stats: None,
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        for i in 2..5 {
+            let event = Event::Metric(Metric::AggregatedHistogram {
+                name: format!("buckets-{}", i),
+                buckets: vec![1.0, 2.0, 4.0],
+                counts: vec![(0, 1 * i), (1, 2 * i), (2, 4 * i)]
+                    .into_iter()
+                    .collect(),
+                count: 6 * i,
+                sum: 10.0,
+                stats: None,
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+
+        assert_eq!(
+            sorted(&buffer[0].clone().finish()),
+            [
+                Metric::AggregatedHistogram {
+                    name: "buckets-2".into(),
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![(0, 5), (1, 10), (2, 20)].into_iter().collect(),
+                    count: 6 * 5,
+                    sum: 40.0,
+                    stats: None,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::AggregatedHistogram {
+                    name: "buckets-3".into(),
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![(0, 3), (1, 6), (2, 12)].into_iter().collect(),
+                    count: 6 * 3,
+                    sum: 10.0,
+                    stats: None,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::AggregatedHistogram {
+                    name: "buckets-4".into(),
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![(0, 4), (1, 8), (2, 16)].into_iter().collect(),
+                    count: 6 * 4,
+                    sum: 10.0,
+                    stats: None,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                }
             ]
         );
     }
