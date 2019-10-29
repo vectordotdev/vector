@@ -44,6 +44,7 @@ The `journald` source ingests data through log records from journald and outputs
   type = "journald" # must be: "journald"
   
   # OPTIONAL
+  batch_size = 16 # default
   current_boot_only = true # default
   data_dir = "/var/lib/vector" # no default
   local_only = true # default
@@ -53,6 +54,12 @@ The `journald` source ingests data through log records from journald and outputs
 {% endcode-tabs %}
 
 ## Options
+
+### batch_size
+
+`optional` `default: 16` `type: int`
+
+The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
 
 ### current_boot_only
 

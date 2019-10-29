@@ -12,6 +12,15 @@ null = true
 default = true
 description = "Include only entries from the current boot."
 
+[sources.journald.options.batch_size]
+type = "int"
+null = true
+default = 16
+description = """\
+The systemd journal is read in batches, and a checkpoint is set at the \
+end of each batch. This option limits the size of the batch.\
+"""
+
 [sources.journald.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
