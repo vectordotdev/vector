@@ -9,3 +9,5 @@ miniodat
 checkpoints/*
 *.iml
 *.tmp
+*.swp
+*~

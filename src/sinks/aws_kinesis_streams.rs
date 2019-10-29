@@ -10,7 +10,7 @@ use crate::{
 };
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use rand::random;
-use rusoto_core::RusotoFuture;
+use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_kinesis::{
     Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
@@ -115,7 +115,7 @@ impl KinesisService {
 
 impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
     type Response = PutRecordsOutput;
-    type Error = PutRecordsError;
+    type Error = RusotoError<PutRecordsError>;
     type Future = Instrumented<RusotoFuture<PutRecordsOutput, PutRecordsError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -151,14 +151,14 @@ impl fmt::Debug for KinesisService {
 struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = PutRecordsError;
+    type Error = RusotoError<PutRecordsError>;
     type Response = PutRecordsOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            PutRecordsError::HttpDispatch(_) => true,
-            PutRecordsError::ProvisionedThroughputExceeded(_) => true,
-            PutRecordsError::Unknown(res) if res.status.is_server_error() => true,
+            RusotoError::HttpDispatch(_) => true,
+            RusotoError::Service(PutRecordsError::ProvisionedThroughputExceeded(_)) => true,
+            RusotoError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }
     }
@@ -168,7 +168,7 @@ impl RetryLogic for KinesisRetryLogic {
 enum HealthcheckError {
     #[snafu(display("ListStreams failed: {}", source))]
     ListStreamsFailed {
-        source: rusoto_kinesis::ListStreamsError,
+        source: RusotoError<rusoto_kinesis::ListStreamsError>,
     },
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
