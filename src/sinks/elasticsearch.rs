@@ -39,6 +39,7 @@ pub struct ElasticSearchConfig {
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
+    #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
 
     // Tower Request based configuration
