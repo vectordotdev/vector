@@ -642,7 +642,7 @@ mod integration_tests {
             Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
             Err(e) => match e {
                 RusotoError::Unknown(b) => {
-                    let body = String::from_utf8(b.body.clone()).unwrap();
+                    let body = String::from_utf8_lossy(&b.body[..]);
                     panic!("Couldn't create bucket: {:?}; Body {}", b, body);
                 }
                 _ => panic!("Couldn't create bucket: {}", e),

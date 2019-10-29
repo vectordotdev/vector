@@ -8,6 +8,7 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig},
 };
+use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use rand::random;
 use rusoto_core::{RusotoError, RusotoFuture};
@@ -243,6 +244,8 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
+    let data = Bytes::from(data);
+
     Some(PutRecordsRequestEntry {
         data,
         partition_key,
@@ -369,7 +372,7 @@ mod integration_tests {
 
         let mut output_lines = records
             .into_iter()
-            .map(|e| String::from_utf8(e.data).unwrap())
+            .map(|e| String::from_utf8(e.data.to_vec()).unwrap())
             .collect::<Vec<_>>();
 
         input_lines.sort();
