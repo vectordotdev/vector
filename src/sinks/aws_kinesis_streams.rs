@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -9,6 +8,7 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig},
 };
+use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use rand::random;
 use rusoto_core::{RusotoError, RusotoFuture};
