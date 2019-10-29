@@ -262,7 +262,7 @@ fn es(
                     // to play games here
                     let body = request.payload.take().unwrap();
                     match body {
-                        SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
+                        SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
                         _ => unreachable!(),
                     }
                 }

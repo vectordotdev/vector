@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -243,6 +244,8 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
+    let data = Bytes::from(data);
+
     Some(PutRecordsRequestEntry {
         data,
         partition_key,
@@ -369,7 +372,7 @@ mod integration_tests {
 
         let mut output_lines = records
             .into_iter()
-            .map(|e| String::from_utf8(e.data).unwrap())
+            .map(|e| String::from_utf8(e.data.to_vec()).unwrap())
             .collect::<Vec<_>>();
 
         input_lines.sort();
