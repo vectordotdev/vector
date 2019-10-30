@@ -56,7 +56,7 @@ impl SourceConfig for JournaldConfig {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let journal = Journal::open(local_only, false).context(JournaldError)?;
         if self.current_boot_only.unwrap_or(true) {
-            journal.seek_boot()?;
+            journal.setup_current_boot()?;
         }
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 
