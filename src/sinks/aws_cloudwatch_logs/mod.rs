@@ -15,7 +15,7 @@ use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use rusoto_core::{
     request::{BufferedHttpResponse, HttpClient},
-    Region,
+    Region, RusotoError,
 };
 use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_logs::{
@@ -119,10 +119,10 @@ pub struct RequestConfig {
 
 #[derive(Debug)]
 pub enum CloudwatchError {
-    Put(PutLogEventsError),
-    Describe(DescribeLogStreamsError),
-    CreateStream(CreateLogStreamError),
-    CreateGroup(CreateLogGroupError),
+    Put(RusotoError<PutLogEventsError>),
+    Describe(RusotoError<DescribeLogStreamsError>),
+    CreateStream(RusotoError<CreateLogStreamError>),
+    CreateGroup(RusotoError<CreateLogGroupError>),
     NoStreamsFound,
     ServiceDropped,
     MakeService,
@@ -398,7 +398,7 @@ fn partition(
 enum HealthcheckError {
     #[snafu(display("DescribeLogStreams failed: {}", source))]
     DescribeLogStreamsFailed {
-        source: rusoto_logs::DescribeLogGroupsError,
+        source: RusotoError<rusoto_logs::DescribeLogGroupsError>,
     },
     #[snafu(display("No log group found"))]
     NoLogGroup,
@@ -476,17 +476,17 @@ impl RetryLogic for CloudwatchRetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             CloudwatchError::Put(err) => match err {
-                PutLogEventsError::ServiceUnavailable(error) => {
+                RusotoError::Service(PutLogEventsError::ServiceUnavailable(error)) => {
                     error!(message = "put logs service unavailable.", %error);
                     true
                 }
 
-                PutLogEventsError::HttpDispatch(error) => {
+                RusotoError::HttpDispatch(error) => {
                     error!(message = "put logs http dispatch.", %error);
                     true
                 }
 
-                PutLogEventsError::Unknown(res)
+                RusotoError::Unknown(res)
                     if res.status.is_server_error()
                         || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
                 {
@@ -502,12 +502,12 @@ impl RetryLogic for CloudwatchRetryLogic {
             },
 
             CloudwatchError::Describe(err) => match err {
-                DescribeLogStreamsError::ServiceUnavailable(error) => {
+                RusotoError::Service(DescribeLogStreamsError::ServiceUnavailable(error)) => {
                     error!(message = "describe streams service unavailable.", %error);
                     true
                 }
 
-                DescribeLogStreamsError::Unknown(res)
+                RusotoError::Unknown(res)
                     if res.status.is_server_error()
                         || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
                 {
@@ -519,7 +519,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     true
                 }
 
-                DescribeLogStreamsError::HttpDispatch(error) => {
+                RusotoError::HttpDispatch(error) => {
                     error!(message = "describe streams http dispatch.", %error);
                     true
                 }
@@ -528,12 +528,12 @@ impl RetryLogic for CloudwatchRetryLogic {
             },
 
             CloudwatchError::CreateStream(err) => match err {
-                CreateLogStreamError::ServiceUnavailable(error) => {
+                RusotoError::Service(CreateLogStreamError::ServiceUnavailable(error)) => {
                     error!(message = "create stream service unavailable.", %error);
                     true
                 }
 
-                CreateLogStreamError::Unknown(res)
+                RusotoError::Unknown(res)
                     if res.status.is_server_error()
                         || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
                 {
@@ -545,7 +545,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     true
                 }
 
-                CreateLogStreamError::HttpDispatch(error) => {
+                RusotoError::HttpDispatch(error) => {
                     error!(message = "create stream http dispatch.", %error);
                     true
                 }
@@ -579,14 +579,14 @@ impl fmt::Display for CloudwatchError {
 
 impl std::error::Error for CloudwatchError {}
 
-impl From<PutLogEventsError> for CloudwatchError {
-    fn from(e: PutLogEventsError) -> Self {
+impl From<RusotoError<PutLogEventsError>> for CloudwatchError {
+    fn from(e: RusotoError<PutLogEventsError>) -> Self {
         CloudwatchError::Put(e)
     }
 }
 
-impl From<DescribeLogStreamsError> for CloudwatchError {
-    fn from(e: DescribeLogStreamsError) -> Self {
+impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
+    fn from(e: RusotoError<DescribeLogStreamsError>) -> Self {
         CloudwatchError::Describe(e)
     }
 }

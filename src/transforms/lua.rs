@@ -121,6 +121,28 @@ impl rlua::UserData for Event {
                 Ok(None)
             }
         });
+
+        methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: Event| {
+            let state = ctx.create_table()?;
+            {
+                let keys =
+                    ctx.create_table_from(event.as_log().keys().map(|k| (k.to_string(), true)))?;
+                state.set("event", event)?;
+                state.set("keys", keys)?;
+            }
+            let function =
+                ctx.create_function(|ctx, (state, prev): (rlua::Table, Option<String>)| {
+                    let event: Event = state.get("event")?;
+                    let keys: rlua::Table = state.get("keys")?;
+                    let next: rlua::Function = ctx.globals().get("next")?;
+                    let key: Option<String> = next.call((keys, prev))?;
+                    match key.clone().and_then(|k| event.as_log().get(&k.into())) {
+                        Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
+                        None => Ok((None, None)),
+                    }
+                })?;
+            Ok((function, state))
+        });
     }
 }
 
@@ -352,5 +374,31 @@ mod tests {
         let event = transform.transform(event).unwrap();
 
         assert_eq!(event.as_log()[&"new field".into()], "new value".into());
+    }
+
+    #[test]
+    fn lua_pairs() {
+        let mut transform = Lua::new(
+            r#"
+              for k,v in pairs(event) do
+                event[k] = k .. v
+              end
+            "#,
+            vec![],
+        )
+        .unwrap();
+
+        let mut event = Event::new_empty_log();
+        event
+            .as_mut_log()
+            .insert_explicit("name".into(), "Bob".into());
+        event
+            .as_mut_log()
+            .insert_explicit("friend".into(), "Alice".into());
+
+        let event = transform.transform(event).unwrap();
+
+        assert_eq!(event.as_log()[&"name".into()], "nameBob".into());
+        assert_eq!(event.as_log()[&"friend".into()], "friendAlice".into());
     }
 }

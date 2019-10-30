@@ -130,13 +130,17 @@ impl ElasticSearchCommon {
                 if region.is_none() {
                     return Err(ParseError::AWSRequiresRegion.into());
                 }
-                Some(
-                    DefaultCredentialsProvider::new()
-                        .context(AWSCredentialsProviderFailed)?
-                        .credentials()
-                        .wait()
-                        .context(AWSCredentialsGenerateFailed)?,
-                )
+
+                let provider =
+                    DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
+
+                let mut rt = tokio::runtime::current_thread::Runtime::new()?;
+
+                let credentials = rt
+                    .block_on(provider.credentials())
+                    .context(AWSCredentialsGenerateFailed)?;
+
+                Some(credentials)
             }
         };
 
@@ -258,7 +262,7 @@ fn es(
                     // to play games here
                     let body = request.payload.take().unwrap();
                     match body {
-                        SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
+                        SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
                         _ => unreachable!(),
                     }
                 }

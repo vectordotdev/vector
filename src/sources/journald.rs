@@ -20,6 +20,8 @@ use std::time;
 use string_cache::DefaultAtom as Atom;
 use tracing::{dispatcher, field};
 
+const DEFAULT_BATCH_SIZE: usize = 16;
+
 lazy_static! {
     static ref MESSAGE: Atom = Atom::from("MESSAGE");
     static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
@@ -35,10 +37,11 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
-    pub current_runtime_only: Option<bool>,
+    pub current_boot_only: Option<bool>,
     pub local_only: Option<bool>,
     pub units: Vec<String>,
     pub data_dir: Option<PathBuf>,
+    pub batch_size: Option<usize>,
 }
 
 #[typetag::serde(name = "journald")]
@@ -50,9 +53,12 @@ impl SourceConfig for JournaldConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let local_only = self.local_only.unwrap_or(true);
-        let runtime_only = self.current_runtime_only.unwrap_or(true);
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
-        let journal = Journal::open(local_only, runtime_only).context(JournaldError)?;
+        let journal = Journal::open(local_only, false).context(JournaldError)?;
+        if self.current_boot_only.unwrap_or(true) {
+            journal.seek_boot()?;
+        }
+        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.
@@ -71,7 +77,13 @@ impl SourceConfig for JournaldConfig {
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
 
-        Ok(journald_source(journal, out, checkpointer, units))
+        Ok(journald_source(
+            journal,
+            out,
+            checkpointer,
+            units,
+            batch_size,
+        ))
     }
 
     fn output_type(&self) -> DataType {
@@ -84,6 +96,7 @@ fn journald_source<J>(
     out: mpsc::Sender<Event>,
     checkpointer: Checkpointer,
     units: HashSet<String>,
+    batch_size: usize,
 ) -> super::Source
 where
     J: Iterator<Item = Result<Record, io::Error>> + JournalCursor + Send + 'static,
@@ -103,6 +116,7 @@ where
             channel: out,
             shutdown: shutdown_rx,
             checkpointer,
+            batch_size,
         };
         let span = info_span!("journald-server");
         let dispatcher = dispatcher::get_default(|d| d.clone());
@@ -161,6 +175,7 @@ struct JournaldServer<J, T> {
     channel: T,
     shutdown: std::sync::mpsc::Receiver<()>,
     checkpointer: Checkpointer,
+    batch_size: usize,
 }
 
 impl<J, T> JournaldServer<J, T>
@@ -180,6 +195,13 @@ where
                         message = "Could not seek journald to stored cursor",
                         error = field::display(&err)
                     );
+                // The cursor now points to the last successfully read
+                // record, so skip past it to any newer records.
+                } else if let Some(Err(err)) = self.journal.next() {
+                    error!(
+                        message = "Could not fetch next record after seeking to cursor",
+                        error = field::display(&err)
+                    );
                 }
             }
             Ok(None) => {}
@@ -190,11 +212,15 @@ where
         }
 
         loop {
-            let mut saw_records = false;
+            use LoopState::*;
+            let mut state = NoOp;
 
-            loop {
+            for _ in 0..self.batch_size {
                 let record = match self.journal.next() {
-                    None => break,
+                    None => {
+                        state = AtEnd;
+                        break;
+                    }
                     Some(Ok(record)) => record,
                     Some(Err(err)) => {
                         error!(
@@ -204,7 +230,7 @@ where
                         break;
                     }
                 };
-                saw_records = true;
+                state = SawRecord;
                 if !self.units.is_empty() {
                     // Make sure the systemd unit is exactly one of the specified units
                     if let Some(unit) = record.get("_SYSTEMD_UNIT") {
@@ -221,7 +247,7 @@ where
                 }
             }
 
-            if saw_records {
+            if state != NoOp {
                 match self.journal.cursor() {
                     Ok(cursor) => {
                         if let Err(err) = self.checkpointer.set(&cursor) {
@@ -238,13 +264,22 @@ where
                 }
             }
 
-            match self.shutdown.recv_timeout(timeout) {
-                Ok(()) => unreachable!(), // The sender should never actually send
-                Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => return,
+            if state == AtEnd {
+                match self.shutdown.recv_timeout(timeout) {
+                    Ok(()) => unreachable!(), // The sender should never actually send
+                    Err(RecvTimeoutError::Timeout) => {}
+                    Err(RecvTimeoutError::Disconnected) => return,
+                }
             }
         }
     }
+}
+
+#[derive(PartialEq)]
+enum LoopState {
+    NoOp,
+    AtEnd,
+    SawRecord,
 }
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
@@ -379,7 +414,7 @@ mod tests {
         }
         fn seek_cursor(&mut self, cursor: &str) -> Result<(), io::Error> {
             let cursor = cursor.parse::<usize>().expect("Invalid cursor");
-            for _ in 0..cursor {
+            for _ in 1..cursor {
                 self.records.pop();
             }
             Ok(())
@@ -406,7 +441,7 @@ mod tests {
         }
 
         let journal = fake_journal();
-        let source = journald_source(journal, tx, checkpointer, units);
+        let source = journald_source(journal, tx, checkpointer, units, DEFAULT_BATCH_SIZE);
         let mut rt = runtime();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
