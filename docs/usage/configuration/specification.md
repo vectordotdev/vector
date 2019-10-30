@@ -267,12 +267,20 @@ data_dir = "/var/lib/vector"
   # * must be: "journald"
   type = "journald"
 
-  # Include only entries from the current runtime (boot)
+  # The systemd journal is read in batches, and a checkpoint is set at the end of
+  # each batch. This option limits the size of the batch.
+  # 
+  # * optional
+  # * default: 16
+  # * type: int
+  batch_size = 16
+
+  # Include only entries from the current boot.
   # 
   # * optional
   # * default: true
   # * type: bool
-  current_runtime_only = true
+  current_boot_only = true
 
   # The directory used to persist the journal checkpoint position. By default,
   # the global `data_dir` is used. Please make sure the Vector project has write

@@ -13,7 +13,7 @@ use futures::{Future, Poll};
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
-use rusoto_core::{Region, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{convert::TryInto, time::Duration};
@@ -194,7 +194,7 @@ impl CloudWatchMetricsSvc {
 
 impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
     type Response = ();
-    type Error = PutMetricDataError;
+    type Error = RusotoError<PutMetricDataError>;
     type Future = RusotoFuture<(), PutMetricDataError>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -217,14 +217,14 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
 struct CloudWatchMetricsRetryLogic;
 
 impl RetryLogic for CloudWatchMetricsRetryLogic {
-    type Error = PutMetricDataError;
+    type Error = RusotoError<PutMetricDataError>;
     type Response = ();
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            PutMetricDataError::HttpDispatch(_) => true,
-            PutMetricDataError::InternalServiceFault(_) => true,
-            PutMetricDataError::Unknown(res)
+            RusotoError::HttpDispatch(_) => true,
+            RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
+            RusotoError::Unknown(res)
                 if res.status.is_server_error()
                     || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
             {

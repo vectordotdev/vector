@@ -16,6 +16,12 @@ const SD_JOURNAL_RUNTIME_ONLY: c_int = 2;
 #[allow(non_camel_case_types)]
 enum sd_journal {}
 
+#[allow(non_camel_case_types)]
+#[repr(C)]
+struct sd_id128_t {
+    pub bytes: [u8; 16],
+}
+
 #[derive(WrapperApi)]
 struct LibSystemd {
     sd_journal_open: extern "C" fn(ret: *mut *mut sd_journal, flags: c_int) -> c_int,
@@ -28,6 +34,9 @@ struct LibSystemd {
     sd_journal_seek_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
     sd_journal_get_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const *mut c_char) -> c_int,
     sd_journal_test_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
+    sd_id128_get_boot: extern "C" fn(ret: *mut sd_id128_t) -> c_int,
+    sd_journal_seek_monotonic_usec:
+        extern "C" fn(j: *mut sd_journal, boot_id: sd_id128_t, usec: u64) -> c_int,
 }
 
 fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
@@ -123,6 +132,17 @@ impl Journal {
         sd_result(
             self.lib
                 .sd_journal_seek_cursor(self.journal, cursor.as_ptr()),
+        )?;
+        Ok(())
+    }
+
+    /// Seek the journal to the first record in the current boot.
+    pub fn seek_boot(&self) -> io::Result<()> {
+        let mut boot_id = sd_id128_t { bytes: [0; 16] };
+        sd_result(self.lib.sd_id128_get_boot(&mut boot_id))?;
+        sd_result(
+            self.lib
+                .sd_journal_seek_monotonic_usec(self.journal, boot_id, 0),
         )?;
         Ok(())
     }
