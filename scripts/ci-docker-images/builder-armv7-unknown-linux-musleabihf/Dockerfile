@@ -330,3 +330,5 @@ ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target armv7-unknown-linux-mu
 
 # Set env vars for the scripts/build-archive.sh file
 ENV TARGET=armv7-unknown-linux-musleabihf
+
+RUN apt-get update && apt-get install -y qemu-user
