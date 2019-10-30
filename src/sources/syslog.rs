@@ -79,6 +79,10 @@ impl SourceConfig for SyslogConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "syslog"
+    }
 }
 
 #[derive(Debug, Clone)]

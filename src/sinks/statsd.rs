@@ -67,6 +67,10 @@ impl SinkConfig for StatsdSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn sink_type(&self) -> &'static str {
+        "statsd"
+    }
 }
 
 impl StatsdSvc {

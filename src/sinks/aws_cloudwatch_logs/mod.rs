@@ -162,6 +162,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "aws_cloudwatch_logs"
+    }
 }
 
 impl CloudwatchLogsPartitionSvc {

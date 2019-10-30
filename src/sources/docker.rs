@@ -74,6 +74,10 @@ impl SourceConfig for DockerConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "docker"
+    }
 }
 
 struct DockerSourceCore {

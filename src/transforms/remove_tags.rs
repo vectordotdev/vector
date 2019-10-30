@@ -29,6 +29,10 @@ impl TransformConfig for RemoveTagsConfig {
     fn output_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn transform_type(&self) -> &'static str {
+        "remove_tags"
+    }
 }
 
 impl RemoveTags {

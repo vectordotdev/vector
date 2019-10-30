@@ -105,6 +105,10 @@ impl SinkConfig for HttpSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "http"
+    }
 }
 
 fn http(

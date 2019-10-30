@@ -30,6 +30,10 @@ impl SinkConfig for BlackholeConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "blackhole"
+    }
 }
 
 fn healthcheck() -> impl Future<Item = (), Error = crate::Error> {

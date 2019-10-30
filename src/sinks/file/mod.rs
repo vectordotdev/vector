@@ -52,6 +52,10 @@ impl SinkConfig for FileSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "file"
+    }
 }
 
 #[derive(Debug, Default)]

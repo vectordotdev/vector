@@ -42,6 +42,10 @@ impl SourceConfig for UdpConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "udp"
+    }
 }
 
 pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> super::Source {

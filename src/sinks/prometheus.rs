@@ -85,6 +85,10 @@ impl SinkConfig for PrometheusSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn sink_type(&self) -> &'static str {
+        "prometheus"
+    }
 }
 
 struct PrometheusSink {

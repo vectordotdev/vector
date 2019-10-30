@@ -84,6 +84,10 @@ impl SinkConfig for ElasticSearchConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "elasticsearch"
+    }
 }
 
 struct ElasticSearchCommon {

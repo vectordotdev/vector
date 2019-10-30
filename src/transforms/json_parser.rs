@@ -30,6 +30,10 @@ impl TransformConfig for JsonParserConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "json_parser"
+    }
 }
 
 pub struct JsonParser {

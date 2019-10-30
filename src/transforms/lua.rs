@@ -36,6 +36,10 @@ impl TransformConfig for LuaConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "lua"
+    }
 }
 
 pub struct Lua {

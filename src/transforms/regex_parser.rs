@@ -63,6 +63,10 @@ impl TransformConfig for RegexParserConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "regex"
+    }
 }
 
 pub struct RegexParser {

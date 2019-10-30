@@ -47,6 +47,10 @@ impl SourceConfig for VectorConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "vector"
+    }
 }
 
 #[derive(Debug, Clone)]

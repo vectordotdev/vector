@@ -142,6 +142,10 @@ impl SourceConfig for FileConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "file"
+    }
 }
 
 pub fn file_source(
