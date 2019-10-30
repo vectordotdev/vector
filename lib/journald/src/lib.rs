@@ -24,19 +24,21 @@ struct sd_id128_t {
 
 #[derive(WrapperApi)]
 struct LibSystemd {
-    sd_journal_open: extern "C" fn(ret: *mut *mut sd_journal, flags: c_int) -> c_int,
+    sd_id128_get_boot: extern "C" fn(ret: *mut sd_id128_t) -> c_int,
+    sd_id128_to_string: extern "C" fn(sd: sd_id128_t, s: *mut [c_uchar; 33]) -> *mut c_char,
+
     sd_journal_close: extern "C" fn(j: *mut sd_journal),
-    sd_journal_next: extern "C" fn(j: *mut sd_journal) -> c_int,
-    sd_journal_seek_head: extern "C" fn(j: *mut sd_journal) -> c_int,
-    sd_journal_restart_data: extern "C" fn(j: *mut sd_journal),
     sd_journal_enumerate_data:
         extern "C" fn(j: *mut sd_journal, data: *const *mut u8, l: *mut size_t) -> c_int,
-    sd_journal_seek_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
     sd_journal_get_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const *mut c_char) -> c_int,
-    sd_journal_test_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
-    sd_id128_get_boot: extern "C" fn(ret: *mut sd_id128_t) -> c_int,
+    sd_journal_next: extern "C" fn(j: *mut sd_journal) -> c_int,
+    sd_journal_open: extern "C" fn(ret: *mut *mut sd_journal, flags: c_int) -> c_int,
+    sd_journal_restart_data: extern "C" fn(j: *mut sd_journal),
+    sd_journal_seek_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
+    sd_journal_seek_head: extern "C" fn(j: *mut sd_journal) -> c_int,
     sd_journal_seek_monotonic_usec:
         extern "C" fn(j: *mut sd_journal, boot_id: sd_id128_t, usec: u64) -> c_int,
+    sd_journal_test_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
 }
 
 fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
