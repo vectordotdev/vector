@@ -250,7 +250,7 @@ mod tests {
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
         let event = &hec_event.event;
-        let kv = event.get("key".into()).unwrap();
+        let kv = event.get(&"key".to_string()).unwrap();
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
