@@ -89,6 +89,19 @@ event["parent.child"] = "nested value"
 event["parent.child"] = nil
 ```
 
+### Iterate over fields
+
+To iterate over all fields of an `event` use the `pairs` method.  For example:
+
+```lua
+# Remove all fields where the value is "-"
+for f,v in pairs(event) do
+  if v == "-" then
+    event[f] = nil
+  end
+end
+```
+
 ### Search Directories
 
 Vector provides a `search_dirs` option that allows you to specify absolute
