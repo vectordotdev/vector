@@ -263,6 +263,31 @@ mod tests {
         }
     }
 
+    #[test]
+    fn create_file() {
+        let path = temp_file();
+
+        // create just the directory and not the file
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+
+        let (mut input1, events) = random_lines_with_stream(100, 16);
+        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+
+        // Reopen the file to add more content to it
+        let (mut input2, events) = random_lines_with_stream(100, 16);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+
+        let mut input = vec![];
+        input.append(&mut input1);
+        input.append(&mut input2);
+
+        assert_eq!(output.len(), input.len());
+
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
     fn test_unpartitioned_with_encoding<S>(
         events: S,
         encoding: Encoding,
