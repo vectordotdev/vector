@@ -16,6 +16,7 @@ use lapin_futures::{
     BasicProperties, Client, ConfirmationFuture, ConnectionProperties,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum SASLMechanismDef {
@@ -127,6 +128,7 @@ pub struct RabbitMQSink {
     in_flight: FuturesUnordered<MetadataFuture<ConfirmationFuture<()>, usize>>,
     seqno: usize,
     queue_name: String,
+    pending_acks: HashSet<usize>,
 }
 
 impl RabbitMQSink {
@@ -150,6 +152,7 @@ impl RabbitMQSink {
             in_flight: FuturesUnordered::new(),
             seqno: 0,
             queue_name: config.queue_name,
+            pending_acks: HashSet::new(),
         })
     }
 }
@@ -181,6 +184,7 @@ impl Sink for RabbitMQSink {
             BasicProperties::default(),
         );
         self.in_flight.push(future.join(future::ok(self.seqno)));
+        self.pending_acks.insert(self.seqno);
         self.seqno += 1;
 
         Ok(AsyncSink::Ready)
@@ -197,8 +201,12 @@ impl Sink for RabbitMQSink {
 
                 // request finished, check for success
                 Ok(Async::Ready(Some(((), seqno)))) => {
-                    self.acker.ack(seqno);
-                    trace!("published message to rabbitmq");
+                    if self.pending_acks.remove(&seqno) {
+                        self.acker.ack(1);
+                        trace!("published message to rabbitmq");
+                    } else {
+                        error!("message already published");
+                    }
                 }
 
                 Err(e) => error!("publishing message failed: {}", e),
