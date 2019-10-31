@@ -70,6 +70,10 @@ impl SinkConfig for KinesisSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "aws_kinesis_streams"
+    }
 }
 
 impl KinesisService {

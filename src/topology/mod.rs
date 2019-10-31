@@ -1,6 +1,7 @@
 pub mod builder;
 pub mod config;
 mod fanout;
+mod task;
 
 pub use self::config::Config;
 
@@ -321,8 +322,8 @@ impl RunningTopology {
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("sink", %name));
+        let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
+        let task = handle_errors(task.instrument(span), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -336,8 +337,8 @@ impl RunningTopology {
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("transform", %name));
+        let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
+        let task = handle_errors(task.instrument(span), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -351,8 +352,9 @@ impl RunningTopology {
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("source-pump", %name));
+        let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
+
+        let task = handle_errors(task.instrument(span.clone()), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -363,8 +365,7 @@ impl RunningTopology {
             .insert(name.to_string(), shutdown_trigger);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone());
-        let source_task = source_task.instrument(info_span!("source", %name));
+        let source_task = handle_errors(source_task.instrument(span), self.abort_tx.clone());
         self.source_tasks.insert(
             name.to_string(),
             oneshot::spawn(source_task, &rt.executor()),
@@ -510,7 +511,7 @@ where
 }
 
 fn handle_errors(
-    task: builder::Task,
+    task: impl Future<Item = (), Error = ()>,
     abort_tx: mpsc::UnboundedSender<()>,
 ) -> impl Future<Item = (), Error = ()> {
     AssertUnwindSafe(task)

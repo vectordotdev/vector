@@ -57,6 +57,10 @@ impl SourceConfig for TcpConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "tcp"
+    }
 }
 
 #[derive(Debug, Clone)]

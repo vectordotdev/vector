@@ -89,6 +89,10 @@ impl SourceConfig for JournaldConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "journald"
+    }
 }
 
 fn journald_source<J>(

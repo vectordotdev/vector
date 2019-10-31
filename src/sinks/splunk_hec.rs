@@ -76,6 +76,10 @@ impl SinkConfig for HecSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "splunk_hec"
+    }
 }
 
 pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {

@@ -55,6 +55,10 @@ impl SinkConfig for ClickhouseConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "clickhouse"
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

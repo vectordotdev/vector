@@ -65,6 +65,10 @@ impl SourceConfig for KafkaSourceConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "kafka"
+    }
 }
 
 fn kafka_source(

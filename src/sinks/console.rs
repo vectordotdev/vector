@@ -60,6 +60,10 @@ impl SinkConfig for ConsoleSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Any
     }
+
+    fn sink_type(&self) -> &'static str {
+        "console"
+    }
 }
 
 fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {

@@ -107,6 +107,10 @@ impl SinkConfig for TcpSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "tcp"
+    }
 }
 
 pub struct TcpSink {

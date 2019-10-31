@@ -89,6 +89,10 @@ impl SinkConfig for S3SinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "aws_s3"
+    }
 }
 
 #[derive(Debug, Snafu)]

@@ -76,6 +76,10 @@ impl SourceConfig for MockSourceConfig {
     fn output_type(&self) -> DataType {
         DataType::Any
     }
+
+    fn source_type(&self) -> &'static str {
+        "mock"
+    }
 }
 
 pub struct MockTransform {
@@ -158,6 +162,10 @@ impl TransformConfig for MockTransformConfig {
     fn output_type(&self) -> DataType {
         DataType::Any
     }
+
+    fn transform_type(&self) -> &'static str {
+        "mock"
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -201,5 +209,9 @@ impl SinkConfig for MockSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Any
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "mock"
     }
 }

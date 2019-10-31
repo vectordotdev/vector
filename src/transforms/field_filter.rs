@@ -29,6 +29,10 @@ impl TransformConfig for FieldFilterConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "field_filter"
+    }
 }
 
 pub struct FieldFilter {
