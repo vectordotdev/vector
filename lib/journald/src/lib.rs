@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::io;
 use std::iter;
-use std::os::raw::{c_char, c_int, c_void};
+use std::os::raw::{c_char, c_int, c_uchar, c_void};
 use std::ptr::null_mut;
 
 const SD_JOURNAL_LOCAL_ONLY: c_int = 1;
@@ -18,25 +18,31 @@ enum sd_journal {}
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct sd_id128_t {
     pub bytes: [u8; 16],
 }
 
 #[derive(WrapperApi)]
 struct LibSystemd {
-    sd_journal_open: extern "C" fn(ret: *mut *mut sd_journal, flags: c_int) -> c_int,
+    sd_id128_get_boot: extern "C" fn(ret: *mut sd_id128_t) -> c_int,
+    sd_id128_to_string: extern "C" fn(sd: sd_id128_t, s: *mut [c_uchar; 33]) -> *mut c_char,
+
+    sd_journal_add_match:
+        extern "C" fn(j: *mut sd_journal, data: *const c_void, size: size_t) -> c_int,
     sd_journal_close: extern "C" fn(j: *mut sd_journal),
-    sd_journal_next: extern "C" fn(j: *mut sd_journal) -> c_int,
-    sd_journal_seek_head: extern "C" fn(j: *mut sd_journal) -> c_int,
-    sd_journal_restart_data: extern "C" fn(j: *mut sd_journal),
     sd_journal_enumerate_data:
         extern "C" fn(j: *mut sd_journal, data: *const *mut u8, l: *mut size_t) -> c_int,
-    sd_journal_seek_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
+    sd_journal_flush_matches: extern "C" fn(j: *mut sd_journal),
     sd_journal_get_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const *mut c_char) -> c_int,
-    sd_journal_test_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
-    sd_id128_get_boot: extern "C" fn(ret: *mut sd_id128_t) -> c_int,
+    sd_journal_next: extern "C" fn(j: *mut sd_journal) -> c_int,
+    sd_journal_open: extern "C" fn(ret: *mut *mut sd_journal, flags: c_int) -> c_int,
+    sd_journal_restart_data: extern "C" fn(j: *mut sd_journal),
+    sd_journal_seek_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
+    sd_journal_seek_head: extern "C" fn(j: *mut sd_journal) -> c_int,
     sd_journal_seek_monotonic_usec:
         extern "C" fn(j: *mut sd_journal, boot_id: sd_id128_t, usec: u64) -> c_int,
+    sd_journal_test_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
 }
 
 fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
@@ -136,14 +142,31 @@ impl Journal {
         Ok(())
     }
 
-    /// Seek the journal to the first record in the current boot.
-    pub fn seek_boot(&self) -> io::Result<()> {
+    /// Limit the returned records to those from the current boot.
+    pub fn setup_current_boot(&self) -> io::Result<()> {
         let mut boot_id = sd_id128_t { bytes: [0; 16] };
         sd_result(self.lib.sd_id128_get_boot(&mut boot_id))?;
+
+        let mut boot_str = [0u8; 33];
+        self.lib.sd_id128_to_string(boot_id, &mut boot_str);
+        let boot_str = String::from_utf8_lossy(&boot_str[0..32]);
+
+        // Seek to the first record of the current boot.
         sd_result(
             self.lib
                 .sd_journal_seek_monotonic_usec(self.journal, boot_id, 0),
         )?;
+
+        // Journald does not guarantee that the following records are
+        // only from the current boot, so a filter is also needed.
+        let filter = format!("_BOOT_ID={}", boot_str);
+        sd_result(self.lib.sd_journal_add_match(
+            self.journal,
+            filter.as_ptr() as *const c_void,
+            filter.len(),
+        ))?;
+        self.lib.sd_journal_flush_matches(self.journal);
+
         Ok(())
     }
 }
