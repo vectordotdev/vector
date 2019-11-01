@@ -448,7 +448,6 @@ mod integration_tests {
         topology::config::SinkConfig,
         Event,
     };
-    use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
@@ -484,16 +483,16 @@ mod integration_tests {
         // make sure writes all all visible
         block_on(flush(&config)).unwrap();
 
-        let client = SyncClientBuilder::new().build().unwrap();
-
-        let response = client
-            .search::<Value>()
-            .index(index)
-            .body(json!({
+        let response = reqwest::Client::new()
+            .get(&format!("{}/{}/_search", config.host, index))
+            .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
+
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
@@ -583,7 +582,7 @@ mod integration_tests {
             }))
             .send()
             .unwrap()
-            .json::<elastic::client::responses::search::SearchResponse<Value>>()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
