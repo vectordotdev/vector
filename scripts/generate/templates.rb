@@ -212,7 +212,7 @@ class Templates
     description
   end
 
-  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true, unit: true)
+  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true, short: false, unit: true)
     tags = []
 
     if optionality
@@ -225,7 +225,7 @@ class Templates
 
     if default
       if !option.default.nil?
-        if default == :short
+        if short
           tags << "default"
         else
           tags << "default: #{option.default.inspect}"
@@ -236,11 +236,15 @@ class Templates
     end
 
     if type
-      tags << "type: #{option.type}"
+      if short
+        tags << option.type
+      else
+        tags << "type: #{option.type}"
+      end
     end
 
     if unit && !option.unit.nil?
-      if unit == :short
+      if short
         tags << option.unit
       else
         tags << "unit: #{option.unit}"
@@ -258,15 +262,19 @@ class Templates
     end
 
     if enum && option.enum
-      escaped_values = option.enum.keys.collect { |enum| enum.to_toml }
-      if escaped_values.length > 1
-        tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+      if short
+        tags << "enum"
       else
-        tag = "must be: #{escaped_values.first}"
-        if option.optional?
-          tag << " (if supplied)"
+        escaped_values = option.enum.keys.collect { |enum| enum.to_toml }
+        if escaped_values.length > 1
+          tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+        else
+          tag = "must be: #{escaped_values.first}"
+          if option.optional?
+            tag << " (if supplied)"
+          end
+          tags << tag
         end
-        tags << tag
       end
     end
 
@@ -282,7 +290,7 @@ class Templates
     options.collect { |option| "`#{option.name}`" }
   end
 
-  def options_sections(options, depth: 1, path: nil)
+  def options_sections(options, filters: true, heading_depth: 1, level: 1, path: nil)
     if !options.is_a?(Array)
       raise options.class.inspect
       raise ArgumentError.new("Options must be an Array")

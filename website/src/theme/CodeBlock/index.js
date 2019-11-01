@@ -45,7 +45,7 @@ export default ({children, className: languageClassName}) => {
 
     setTimeout(() => setShowCopied(false), 2000);
   };
-
+  
   return (
     <Highlight
       {...defaultProps}

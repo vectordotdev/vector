@@ -42,7 +42,7 @@ description = "Options for basic authentication."
 
 [sinks.clickhouse.options.basic_auth.options.password]
 type = "string"
-examples = ["password"]
+examples = ["password", "${PASSWORD_ENV_VAR}"]
 null = false
 description = "The basic authentication password."
 

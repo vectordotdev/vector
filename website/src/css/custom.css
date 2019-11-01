@@ -13,8 +13,18 @@
  */
 :root {
   --ifm-blockquote-color: var(--ifm-color-primary-lighter);
-  --ifm-color-black-alpha-025: rgba(0, 0, 0, 0.025);
-  --ifm-color-black-alpha-075: rgba(0, 0, 0, 0.075);
+  --ifm-color-black-alpha-025: rgba(0, 40, 60, 0.025);
+  --ifm-color-black-alpha-04: rgba(0, 40, 60, 0.04);
+  --ifm-color-black-alpha-05: rgba(0, 40, 60, 0.05);
+  --ifm-color-black-alpha-075: rgba(0, 40, 60, 0.075);
+  --ifm-color-black-alpha-10: rgba(0, 40, 60, 0.1);
+  --ifm-color-black-alpha-15: rgba(0, 40, 60, 0.15);
+  --ifm-color-black-alpha-20: rgba(0, 40, 60, 0.2);
+  --ifm-color-black-alpha-30: rgba(0, 40, 60, 0.3);
+  --ifm-color-black-alpha-40: rgba(0, 40, 60, 0.4);
+  --ifm-color-black-alpha-50: rgba(0, 40, 60, 0.5);
+  --ifm-color-black-alpha-60: rgba(0, 40, 60, 0.6);
+  --ifm-color-black-alpha-80: rgba(0, 40, 60, 0.8);
   --ifm-color-emphasis-alpha-025: var(--ifm-color-black-alpha-025);
   --ifm-color-emphasis-alpha-075: var(--ifm-color-black-alpha-075);
   --ifm-color-primary: #28D9F2;
@@ -26,6 +36,7 @@
   --ifm-color-primary-lightest: #83F5FF;
   --ifm-container-width: none;
   --ifm-contents-border-color: var(--ifm-color-emphasis-alpha-075);
+  --ifm-contents-padding-left: var(--ifm-spacing-horizontal);
   --ifm-code-background: #f5f7f9;
   --ifm-code-font-size: 85%;
   --ifm-font-base-color: #3B454E;
@@ -36,6 +47,7 @@
   --ifm-global-shadow-md: 0 3px 8px 0px var(--ifm-hr-border-color);
   --ifm-heading-color: #001B3D;
   --ifm-hr-border-color: var(--ifm-contents-border-color);
+  --ifm-leading: calc(var(--ifm-leading-desktop) * 1em);
   --ifm-line-height-base: 1.7;
   --ifm-navbar-link-color: var(--ifm-heading-color);
   --ifm-pre-line-height: var(--ifm-line-height-base);
@@ -63,83 +75,81 @@ html, body {
   }
 }
 
+li + li {
+  margin-top: 0;
+}
+
+/**
+ * Components
+ */
+
 blockquote {
   border-left: 4px solid var(--ifm-hr-border-color);
   color: var(--ifm-color-emphasis-alpha-40);
   padding-left: 1.5rem;
 }
 
-header h1[class^='docTitle_'] {
-  border-bottom: 2px solid var(--ifm-hr-border-color);
-  font-family: Ubuntu, var(--ifm-font-family-base);
+.component-statuses {
+  background: black;
+  margin-top: calc( -1.5 * var(--ifm-leading) );
+  margin-bottom: calc( 1.5 * var(--ifm-leading) );
+}
+
+.component-statuses .col {
+  text-align: center;
+}
+
+.component-statuses .value {
   font-size: 2rem;
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
 }
 
-li + li {
-  margin-top: 0;
+.feather {
+  font-size: inherit !important;
 }
 
-/**
- * Docs
- */
-
-ul.contents li {
-  margin-right: 0;
+header {
+  border-bottom: 2px solid var(--ifm-hr-border-color);
+  margin-bottom: calc( 1.5 * var(--ifm-leading) );
+  padding-bottom: calc( 1.5 * var(--ifm-leading) );
 }
 
-main[class^='docMainContainer_'] div.container div.row div.col.col--3 {
-  padding-left: 0;
+header .badges {
+  float: right;
+  margin-top: 0.25rem;
 }
 
-div[class^='docItemContainer_'] {
-  max-width: none;
+header .badges .badge {
+  display: inline-block;
+  margin-left: 3px;
 }
 
-div[class^='docSidebarContainer_'] {
-  background-color: var(--ifm-sidebar-background);
-  border-right-color: var(--ifm-sidebar-border-color);
-  max-width: 250px;
-  min-width: 250px;
+header h1 {
+  font-family: Ubuntu, var(--ifm-font-family-base);
+  font-size: 2rem !important;
+  margin-bottom: 0.5rem !important;
 }
 
-div[class^='docSidebarContainer_'] .menu {
-  background-color: var(--ifm-sidebar-background);
+header .description {
+  color: var(--ifm-color-emphasis-alpha-50);
 }
 
-div[class^='sidebar_'] .menu {
-  font-size: 0.9rem;
-  margin-right: calc( var(--ifm-spacing-horizontal) * -1);
-}
-
-@media (min-width: 997px) {
-  div[class^='docItemContainer_'] {
-    max-width: none;
-    padding: 0 calc( var(--ifm-spacing-horizontal) * 2);
-  }
-
-  div[class^='sidebar_'] {
-    padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal) !important;
-  }
-}
-
-/**
- * Markdown
- */
-
- .markdown {
-  --ifm-h1-h2-vertical-rhythm-top: 1.5;
+.markdown {
+  --ifm-h1-h2-vertical-rhythm-top: 1;
   --ifm-h1-h2-vertical-rhythm-bottom: var(--ifm-h1-h2-vertical-rhythm-top);
-  --ifm-h3-vertical-rhythm-top: 2;
+  --ifm-h3-vertical-rhythm-top: 1.25;
   --ifm-h3-vertical-rhythm-bottom: calc( var(--ifm-h3-vertical-rhythm-top) / 2 );
-  --ifm-h4-vertical-rhythm-top: 1.5;
+  --ifm-h4-vertical-rhythm-top: 1.25;
   --ifm-h4-vertical-rhythm-bottom: calc( var(--ifm-h4-vertical-rhythm-top) / 2 );
   --ifm-h5-vertical-rhythm-top: 1.25;
   --ifm-h5-vertical-rhythm-bottom: calc( var(--ifm-h5-vertical-rhythm-top) / 2 );
-  --ifm-h6-vertical-rhythm-top: 1.125;
+  --ifm-h6-vertical-rhythm-top: 1.25;
   --ifm-h6-vertical-rhythm-bottom: calc( var(--ifm-h6-vertical-rhythm-top) / 2 );
- }
+}
+
+.markdown .component-status {
+  margin-top: calc( (var(--ifm-h1-h2-vertical-rhythm-top) * var(--ifm-leading)) * -1 ) !important;
+  margin-bottom: calc( (var(--ifm-h1-h2-vertical-rhythm-top) * var(--ifm-leading)) * -1 ) !important;
+}
 
 .markdown > h1,
 .markdown > h2 {
@@ -174,31 +184,31 @@ div[class^='sidebar_'] .menu {
   font-size: 90%;
 }
 
-.markdown > table {
+.markdown table {
   display: table;
   width: 100%;
   border-collapse: collapse;
   page-break-inside: auto;
 }
 
-.markdown > table > thead > tr,
-.markdown > table > tbody > tr {
+.markdown table > thead > tr,
+.markdown table > tbody > tr {
   border: none;
   border-bottom: 1px solid #E6ECF1;
   page-break-after: auto;
   page-break-inside: avoid;
 }
 
-.markdown > table > thead > tr {
+.markdown table > thead > tr {
   border-bottom-width: 2px;
 }
 
-.markdown > table > thead > tr > th:not([align]) {
+.markdown table > thead > tr > th:not([align]) {
   text-align: left;
 }
 
-.markdown > table > thead > tr > th,
-.markdown > table > tbody > tr > td {
+.markdown table > thead > tr > th,
+.markdown table > tbody > tr > td {
   width: auto;
   padding: 8px;
   align-self: start;
@@ -209,44 +219,66 @@ div[class^='sidebar_'] .menu {
   -ms-grid-row-align: start;
 }
 
-.markdown > table > thead > tr > th:first-child,
-.markdown > table > tbody > tr > td:first-child {
+.markdown table > thead > tr > th:first-child,
+.markdown table > tbody > tr > td:first-child {
   padding-left: 0;
 }
 
-.markdown > table > thead > tr > th:last-child,
-.markdown > table > tbody > tr > td:last-child {
+.markdown table > thead > tr > th:last-child,
+.markdown table > tbody > tr > td:last-child {
   padding-right: 0;
 }
 
-.markdown > table > thead > tr {
+.markdown table > thead > tr {
   border-bottom-size: 2px;
 }
 
-.markdown > table > tbody > tr:hover {
+.markdown table > tbody > tr:hover {
   background: var(--ifm-color-emphasis-alpha-025);
+}
+
+.menu > ul.menu__list li {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .menu > ul.menu__list li > a {
   padding-left: 0;
+  padding-right: 0;
+}
+
+.menu > ul.menu__list > li.menu__list-item div.title {
+  color: var(--ifm-color-emphasis-alpha-20);
+  cursor: text;
+  margin-top: calc( var(--ifm-spacing-vertical) * 1.5 );
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.menu > ul.menu__list > li.menu__list-item:first-child div.title {
+  margin-top: 0;
 }
 
 .menu > ul.menu__list ul.menu__list {
   border-left: 1px solid var(--ifm-hr-border-color);
   margin-left: 0;
-  padding-left: 0;
-}
-
-.menu > ul.menu__list ul.menu__list a.menu__link {
-  font-size: 1em;
   padding-left: var(--ifm-menu-link-padding-horizontal);
 }
 
-.menu .menu__link:hover {
+.menu > ul.menu__list ul.menu__list a.menu__link {
+  border-radius: 0;
+  font-size: 1em;
+  margin-left: calc( var(--ifm-menu-link-padding-horizontal) * -1 );
+  padding-left: var(--ifm-menu-link-padding-horizontal);
+}
+
+.menu .menu__link,
+.menu .menu__link:hover,
+.menu .menu__link.menu__link--active:not(.menu__link--sublist) {
   background: none;
 }
 
-.menu .menu__link:not(.menu__link--sublist) {
+/*.menu .menu__link:not(.menu__link--sublist) {
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
 }
@@ -256,10 +288,10 @@ div[class^='sidebar_'] .menu {
   border-top: 1px solid var(--ifm-hr-border-color);
   border-bottom: 1px solid var(--ifm-hr-border-color);
   border-radius: 0;
-}
+}*/
 
 .menu .menu__link.menu__link--sublist::after {
-  background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-5 -4 30 30"><path fill="rgba(0,0,0,0.3)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
+  background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-6 -6 38 38"><path fill="rgba(0,0,0,0.3)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
   -webkit-transform: rotate(180deg);
   transform: rotate(180deg);
   transition: 250ms ease;
@@ -267,7 +299,7 @@ div[class^='sidebar_'] .menu {
 
 .menu .menu__link.menu__link--sublist:hover::after,
 .menu .menu__link.menu__link--sublist.menu__link--active::after {
-  background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-5 -4 30 30"><path fill="rgb(40,217,242)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
+  background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-6 -6 38 38"><path fill="rgb(40,217,242)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
 }
 
 .menu .menu__list-item.menu__list-item--collapsed .menu__link--sublist::after {
@@ -291,4 +323,127 @@ div[class^='sidebar_'] .menu {
   border-color: var(--ifm-color-emphasis-alpha-10);
   box-shadow: var(--ifm-global-shadow-md);
   transition: border 250ms ease;
+}
+
+div[class^='tableOfContents_'] {
+  color: var(--ifm-color-emphasis-alpha-30);
+  font-size: 0.8rem;
+}
+
+div[class^='tableOfContents_'] .section {
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  padding: 0 0 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
+div[class^='tableOfContents_'] .section:last-child {
+  border-bottom: 0px none;
+  margin-bottom: 0;
+}
+
+div[class^='tableOfContents_'] .status {
+  font-weight: bold;
+  padding: 0 0 var(--ifm-contents-padding-vertical) 0;
+}
+
+div[class^='tableOfContents_'] .title {
+  color: var(--ifm-color-emphasis-alpha-20);
+  font-weight: bold;
+  margin-bottom: var(--ifm-contents-padding-vertical);
+  text-transform: uppercase;
+}
+
+div[class^='tableOfContents_'] ul.contents {
+  font-weight: bold;
+  font-size: 0.75rem;
+  padding: 0;
+}
+
+div[class^='tableOfContents_'] ul.contents li {
+  margin-right: 0;
+  margin-left: 0;
+}
+
+ul.tabs {
+  background-color: var(--ifm-color-black-alpha-04);
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+ul.tabs li.tab-item {
+  border-right: 1px solid transparent;
+  border-left: 1px solid transparent;
+  border-bottom: 0px none;
+  border-top: 0px none;
+  color: var(--ifm-color-emphasis-alpha-30);
+  padding: 0.4rem 1.5rem;
+}
+
+ul.tabs li.tab-item.tab-item--active {
+  background: white;
+  border-top: 2px solid var(--ifm-tabs-color-active);
+  border-right: 1px solid var(--ifm-hr-border-color);
+  border-left: 1px solid var(--ifm-hr-border-color);
+  border-bottom: 0;
+  color: var(--ifm-font-base-color);
+  position: relative;
+  bottom: -1px;
+}
+
+/*
+ * Docs
+ */
+
+div[class^='docItemContainer_'] {
+  max-width: none;
+}
+
+@media (min-width: 997px) {
+  div[class^='docItemContainer_'] {
+    max-width: none;
+    padding: 0 calc( var(--ifm-spacing-horizontal) * 2);
+  }
+}
+
+main[class^='docMainContainer_'] div.container div.row div.col.col--3 {
+  padding-left: 0;
+}
+
+div[class^='docSidebarContainer_'] {
+  background-color: var(--ifm-sidebar-background);
+  border-right-color: var(--ifm-sidebar-border-color);
+  max-width: 250px;
+  min-width: 250px;
+}
+
+div[class^='sidebar_'] {
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+div[class^='sidebar_'] .menu {
+  margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+div[class^='sidebar_'] .menu {
+  margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
+}
+
+div[class^='sidebar_'] .menu a.menu__link {
+  padding-right: var(--ifm-menu-link-padding-horizontal);
+}
+
+div[class^='sidebar_'] a.menu__link.menu__link--active:not(.menu__link--sublist) {
+  border-radius: 0;
+  border-left: 1px solid var(--ifm-color-primary);
+  position: relative;
+  left: -1px;
+}
+
+@media (min-width: 997px) {
+  div[class^='sidebar_'] {
+    padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+  }
 }

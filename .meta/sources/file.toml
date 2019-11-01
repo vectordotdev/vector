@@ -118,7 +118,7 @@ type = "int"
 default = 256
 null = false
 unit = "bytes"
-relevant_when = {"fingerprinting.strategy" = "checksum"}
+relevant_when = {strategy = "checksum"}
 description = """\
 The number of bytes read off the head of the file to generate a unique \
 fingerprint.\
@@ -129,7 +129,7 @@ type = "int"
 default = 0
 null = false
 unit = "bytes"
-relevant_when = {"fingerprinting.strategy" = "checksum"}
+relevant_when = {strategy = "checksum"}
 description = """\
 The number of bytes to skip ahead (or ignore) when generating a unique \
 fingerprint. This is helpful if all files share a common header.\

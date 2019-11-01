@@ -17,6 +17,7 @@
     "prismjs": "^1.17.1",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",
+    "remarkable": "^1.7.4",
     "swizzle": "^1.1.0"
   },
   "browserslist": {

@@ -74,7 +74,7 @@ function Home() {
           <p className="hero__subtitle">{siteConfig.tagline}</p>
           <div className={styles.buttons}>
             <Link
-              className={classnames(
+              classnames={classnames(
                 'button button--outline button--secondary button--lg',
                 styles.getStarted,
               )}

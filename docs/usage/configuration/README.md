@@ -73,11 +73,34 @@ data_dir = "/var/lib/vector"
 
 ## Global Options
 
+import Option from '@site/src/components/Option';
+import Options from '@site/src/components/Options';
+
+<Options filters={true}>
+
+
+<Option
+  defaultValue={null}
+  enumValues={null}
+  examples={["/var/lib/vector"]}
+  name={"data_dir"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  simple={false}
+  type={"string"}
+  unit={null}>
+
 ### data_dir
 
-`optional` `no default` `type: string` `example: "/var/lib/vector"`
-
 The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
+
+
+</Option>
+
+
+</Options>
 
 ## Sources
 

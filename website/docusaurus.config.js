@@ -15,12 +15,13 @@ module.exports = {
       links: [
         {to: 'use_cases', label: 'Use Cases', position: 'right'},
         {to: 'Integrations', label: 'Integrations', position: 'right'},
-        {to: 'docs/test', label: 'Docs', position: 'right'},
+        {to: 'docs/README', label: 'Docs', position: 'right'},
         {to: 'blog', label: 'Blog', position: 'right'},
         {to: 'community', label: 'Community', position: 'right'},
         {
           href: 'https://github.com/timberio/vector',
-          label: 'GitHub',
+          label: "GitHub",
+          icon: "test",
           position: 'right',
         },
       ],
@@ -79,7 +80,9 @@ module.exports = {
       },
     ],
   ],
+  scripts: [],
   stylesheets: [
-    'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro'
+    'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
+    'https://at.alicdn.com/t/font_o5hd5vvqpoqiwwmi.css'
   ]
 };

@@ -1,19 +1,6 @@
 ---
-description: <%= component_description(component).remove_markdown_links %>
+title: <%= "#{component.name} #{component.type}".to_json %> 
+sidebar_label: <%= component.name.to_json %>
 ---
-
-# <%= component.name %> <%= component.type %>
-
-![][assets.<%= component.id %>]
-
-<% if component.beta? -%>
-{% hint style="warning" %}
-The `<%= component.name %>` <%= component.type %> is in beta. Please see the current
-[enhancements][urls.<%= component.id %>_enhancements] and
-[bugs][urls.<%= component.id %>_bugs] for known issues.
-We kindly ask that you [add any missing issues][urls.new_<%= component.id %>_issue]
-as it will help shape the roadmap of this component.
-{% endhint %}
-<% end -%>
 
 The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>

@@ -1,14 +1,34 @@
-{% code-tabs %}
-{% code-tabs-item title="vector.toml<% if component.advanced_relevant? %> (simple)<% end %>" %}
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<%- if component.advanced_relevant? -%>
+<Tabs
+  defaultValue="simple"
+  values={[
+    { label: 'Simple', value: 'simple', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+<TabItem value="simple">
+<%- end -%>
+
 ```toml
 <%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", simple: true) %>
 ```
-{% endcode-tabs-item %}
+
 <%- if component.advanced_relevant? -%>
-{% code-tabs-item title="vector.toml (advanced)" %}
+</TabItem>
+<TabItem value="advanced">
+
 ```toml
 <%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
 ```
-{% endcode-tabs-item %}
+
+</TabItem>
 <%- end -%>
-{% endcode-tabs %}
+
+<% if component.advanced_relevant? -%>
+</Tabs>
+<%- end -%>
+
+You can learn more

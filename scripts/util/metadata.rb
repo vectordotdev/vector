@@ -180,4 +180,16 @@ class Metadata
   def relesed_versions
     releases
   end
+
+  def sinks_list
+    @sinks_list ||= sinks.to_h.values.sort
+  end
+
+  def sources_list
+    @sources_list ||= sources.to_h.values.sort
+  end
+
+  def transforms_list
+    @transforms_list ||= transforms.to_h.values.sort
+  end
 end

@@ -45,13 +45,14 @@ class Sink < Component
 
     # Healthcheck option
 
-    @options.healthcheck = Option.new({
-      "name" => "healthcheck",
-      "default" => true,
-      "description" => "Enables/disables the sink healthcheck upon start.",
-      "null" => false,
-      "type" => "bool"
-    })
+    @options.healthcheck =
+      Option.new({
+        "name" => "healthcheck",
+        "default" => true,
+        "description" => "Enables/disables the sink healthcheck upon start.",
+        "null" => false,
+        "type" => "bool"
+      })
 
     # Compression option
 

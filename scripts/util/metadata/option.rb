@@ -64,6 +64,8 @@ class Option
     if @examples.empty?
       if !@enum.nil?
         @examples = @enum.keys
+      elsif @type == "bool"
+        @examples = [true, false]
       elsif !@default.nil?
         @examples = [@default]
       end

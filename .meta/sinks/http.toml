@@ -26,7 +26,7 @@ description = "Options for basic authentication."
 
 [sinks.http.options.basic_auth.options.password]
 type = "string"
-examples = ["password"]
+examples = ["password", "${PASSWORD_ENV_VAR}"]
 null = false
 description = "The basic authentication password."
 
@@ -43,7 +43,10 @@ description = "Options for custom headers."
 
 [sinks.http.options.headers.options."*"]
 type = "string"
-examples = [{ name = "X-Powered-By", value = "Vector"}]
+examples = [
+  {name = "Authorization", value = "my-token"},
+  {name = "X-Powered-By", value = "Vector"},
+]
 null = false
 description = "A custom header to be added to each outgoing HTTP request."
 

@@ -1,32 +1,36 @@
+<%- if level == 1 -%>
+import Option from '@site/src/components/Option';
+import Options from '@site/src/components/Options';
+<%- end -%>
+
+<Options filters={<%= filters.to_json %>}>
+
 <%- options.each do |option| -%>
 <%- full_path = [path, option.name].compact.join(".") -%>
+
+<Option
+  defaultValue={<%= option.default.to_json %>}
+  enumValues={<%= option.enum.to_json %>}
+  examples={<%= option.examples.to_json %>}
+  name={<%= option.name.to_json %>}
+  nullable={<%= option.null %>}
+  path={<%= path.to_json %>}
+  relevantWhen={<%= option.relevant_when.to_json %>}
+  required={<%= option.required? %>}
+  simple={<%= option.simple? %>}
+  type={<%= option.type.to_json %>}
+  unit={<%= option.unit.to_json %>}>
+
+<%= "#" * heading_depth %> <%= option.name %>
+
+<%= option.description %>[[references:<%= option.name %>]]
+
 <%- if option.options.any? -%>
-<%= "#" * depth %> <%= full_path %>
-
-<%= option_tags(option, default: false, enum: false).collect { |tag| "`#{tag}`" }.join(" ") %>
-<%- if option.description -%>
-
-<%= option.description %>
+<%= options_sections(option.options, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
 <%- end -%>
 
-<%= options_sections(option.options, depth: depth + 1, path: full_path) %>
-
-<%- else -%>
-<%= "#" * depth %> <%= full_path %>
-
-<%= option_tags(option, enum: false, relevant_when: false).collect { |tag| "`#{tag}`" }.join(" ") %>
-
-<%= option_description(option) %>[[references:<%= option.name %>]]
-<%- if !option.enum.nil? -%>
-
-The field is an enumeration and only accepts the following values:
-
-| Value | Description |
-|:------|:------------|
-<%- option.enum.each do |value, description| -%>
-| `<%= value.to_toml %>`<% if value  == option.default %> *(default)*<% end %> | <%= description %> |
-<%- end -%>
-<%- end -%>
+</Option>
 
 <%- end -%>
-<%- end -%>
+
+</Options>
