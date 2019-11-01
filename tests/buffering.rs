@@ -8,8 +8,7 @@ use vector::test_util::{
     block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, sinks, sources, runtime};
-
+use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 #[test]
 fn test_buffering() {

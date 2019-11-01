@@ -15,6 +15,7 @@ pub mod buffers;
 pub mod event;
 pub mod metrics;
 pub mod region;
+pub mod runtime;
 pub mod sinks;
 pub mod sources;
 pub mod template;
@@ -23,7 +24,6 @@ pub mod topology;
 pub mod trace;
 pub mod transforms;
 pub mod types;
-pub mod runtime;
 
 pub use event::Event;
 

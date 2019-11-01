@@ -213,12 +213,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_all(
-        &mut self,
-        new_config: Config,
-        mut new_pieces: Pieces,
-        rt: &mut runtime::Runtime,
-    ) {
+    fn spawn_all(&mut self, new_config: Config, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
         // Sources
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);

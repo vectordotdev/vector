@@ -12,8 +12,7 @@ use vector::test_util::{
 };
 use vector::topology::{self, config};
 use vector::{
-    runtime,
-    sinks,
+    runtime, sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
 

@@ -5,7 +5,7 @@ use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{runtime, buffers::BufferConfig, sinks, sources};
+use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;

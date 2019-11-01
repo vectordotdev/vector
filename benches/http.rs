@@ -5,8 +5,7 @@ use hyper::{Body, Response, Server};
 use std::net::SocketAddr;
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
-    runtime,
-    sinks, sources,
+    runtime, sinks, sources,
     topology::{self, config},
 };
 

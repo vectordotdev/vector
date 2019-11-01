@@ -1,5 +1,5 @@
-use crate::Event;
 use crate::runtime::Runtime;
+use crate::Event;
 
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use rand::distributions::Alphanumeric;
