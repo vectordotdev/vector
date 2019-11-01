@@ -1,5 +1,6 @@
 use crate::event::Metric;
 use chrono::{offset::TimeZone, DateTime, Utc};
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -12,13 +13,16 @@ lazy_static! {
     static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum ParserType {
+    Untyped,
     Counter,
     Gauge,
-    // Histogram,
+    Histogram,
     // Summary,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ParserHeader {
     name: String,
     kind: ParserType,
@@ -30,6 +34,17 @@ struct ParserMetric {
     value: f64,
     tags: Option<HashMap<String, String>>,
     timestamp: Option<DateTime<Utc>>,
+}
+
+struct ParserAggregate {
+    // id: String,
+    name: String,
+    buckets: Vec<f64>,
+    counts: Vec<u32>,
+    count: u32,
+    sum: f64,
+    tags: Option<HashMap<String, String>>,
+    // timestamp: Option<DateTime<Utc>>,
 }
 
 fn is_header(input: &str) -> bool {
@@ -52,8 +67,9 @@ fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
     let name = tokens[2];
     let kind = match tokens[3] {
         "counter" => ParserType::Counter,
-        "gauge" | "untyped" => ParserType::Gauge,
-        "histogram" => ParserType::Gauge,
+        "gauge" => ParserType::Gauge,
+        "untyped" => ParserType::Untyped,
+        "histogram" => ParserType::Histogram,
         "summary" => ParserType::Gauge,
         other => {
             return Err(ParserError::UnknownMetricType(other.to_string()));
@@ -113,7 +129,7 @@ fn parse_tags(input: &str) -> Result<HashMap<String, String>, ParserError> {
 }
 
 fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
-    // check is labels are present
+    // check if labels are present
     if let Some(pos) = input.find('}') {
         // example: http_requests_total{method="post",code="200"} 1027 1395066363000
         // first comes name and labels
@@ -159,18 +175,17 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
     }
 }
 
-pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
-    // https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
+fn group_metrics(packet: &str) -> Result<IndexMap<ParserHeader, Vec<String>>, ParserError> {
+    let mut result = IndexMap::new();
 
-    let mut result = Vec::new();
-    // this will store information parsed from headers
-    let mut known_types = HashMap::new();
-    // this will be used for deduplication
-    let mut processed_metrics = HashSet::new();
+    let mut current_header = ParserHeader {
+        name: "".into(),
+        kind: ParserType::Untyped,
+    };
 
     for line in packet.lines() {
         let line = line.trim();
-        let line = WHITESPACE.replace_all(&line, " ");
+        let line: String = WHITESPACE.replace_all(&line, " ").to_string();
 
         if line.is_empty() {
             continue;
@@ -179,33 +194,176 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
         if is_header(&line) {
             // parse expected name and type from TYPE header
             let header = parse_header(&line)?;
-            known_types.insert(header.name, header.kind);
-            continue;
+            if !result.contains_key(&header) {
+                result.insert(header.clone(), Vec::new());
+            }
+            // we will need it to analyse the consequent lines
+            current_header = header;
         } else if is_comment(&line) {
             // skip comments and HELP strings
-            continue;
         } else {
+            // parse the data line
             let metric = parse_metric(&line)?;
-            // skip duplicates
-            if !processed_metrics.contains(&metric.id) {
-                let kind = known_types.get(&metric.name).unwrap_or(&ParserType::Gauge);
-                let m = match kind {
-                    ParserType::Counter => Metric::Counter {
-                        name: metric.name,
-                        val: metric.value,
-                        timestamp: metric.timestamp,
-                        tags: metric.tags,
-                    },
-                    ParserType::Gauge => Metric::Gauge {
-                        name: metric.name,
-                        val: metric.value,
-                        direction: None,
-                        timestamp: metric.timestamp,
-                        tags: metric.tags,
-                    },
-                };
-                result.push(m);
-                processed_metrics.insert(metric.id);
+
+            current_header = match current_header.kind {
+                ParserType::Histogram => {
+                    // check if this is still a histogram
+                    if metric.name.starts_with(&current_header.name)
+                        && (metric.name.ends_with("_bucket")
+                            || metric.name.ends_with("_count")
+                            || metric.name.ends_with("_sum"))
+                    {
+                        current_header
+                    } else {
+                        // nope it's a new unrelated metric
+                        ParserHeader {
+                            name: metric.name,
+                            kind: ParserType::Untyped,
+                        }
+                    }
+                }
+                _ => {
+                    if metric.name == current_header.name {
+                        current_header
+                    } else {
+                        ParserHeader {
+                            name: metric.name,
+                            kind: ParserType::Untyped,
+                        }
+                    }
+                }
+            };
+
+            if let Some(lines) = result.get_mut(&current_header) {
+                lines.push(line);
+            } else {
+                result.insert(current_header.clone(), vec![line]);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
+    // https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
+    let mut result = Vec::new();
+    // this will be used for deduplication
+    let mut processed_metrics = HashSet::new();
+
+    for (header, group) in group_metrics(packet)? {
+        // just a header without measurements
+        if group.is_empty() {
+            continue;
+        }
+
+        match header.kind {
+            ParserType::Counter => {
+                for line in group {
+                    let metric = parse_metric(&line)?;
+                    if !processed_metrics.contains(&metric.id) {
+                        let counter = Metric::Counter {
+                            name: metric.name,
+                            val: metric.value,
+                            timestamp: metric.timestamp,
+                            tags: metric.tags,
+                        };
+                        result.push(counter);
+                        processed_metrics.insert(metric.id);
+                    }
+                }
+            }
+            ParserType::Gauge | ParserType::Untyped => {
+                for line in group {
+                    let metric = parse_metric(&line)?;
+                    if !processed_metrics.contains(&metric.id) {
+                        let gauge = Metric::Gauge {
+                            name: metric.name,
+                            val: metric.value,
+                            direction: None,
+                            timestamp: metric.timestamp,
+                            tags: metric.tags,
+                        };
+                        result.push(gauge);
+                        processed_metrics.insert(metric.id);
+                    }
+                }
+            }
+            ParserType::Histogram => {
+                let mut aggregates = IndexMap::new();
+
+                for line in group {
+                    let metric = parse_metric(&line)?;
+                    let mut tags = if let Some(tags) = metric.tags {
+                        tags
+                    } else {
+                        HashMap::new()
+                    };
+
+                    let bucket = tags.remove("le");
+
+                    let v: Vec<_> = metric.name.rsplitn(2, '_').collect();
+                    if v.len() < 2 {
+                        return Err(ParserError::Malformed("expected histogram name suffix"));
+                    }
+
+                    let mut id: Vec<_> = tags.iter().collect();
+                    id.sort();
+                    let id = format!("{:?}{:?}", v[1], id);
+
+                    let tags = if !tags.is_empty() { Some(tags) } else { None };
+
+                    let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
+                        name: v[1].to_owned(),
+                        buckets: Vec::new(),
+                        counts: Vec::new(),
+                        count: 0,
+                        sum: 0.0,
+                        tags,
+                    });
+
+                    match v[0] {
+                        "bucket" => {
+                            if let Some(b) = bucket {
+                                // last bucket is implicit, because we store its value in 'count'
+                                if b != "+Inf" {
+                                    aggregate.buckets.push(parse_value(&b)?);
+                                    aggregate.counts.push(metric.value as u32);
+                                }
+                            } else {
+                                return Err(ParserError::Malformed(
+                                    "expected \"le\" tag in histogram bucket",
+                                ));
+                            }
+                        }
+                        "sum" => {
+                            aggregate.sum = metric.value;
+                        }
+                        "count" => {
+                            aggregate.count = metric.value as u32;
+                        }
+                        _ => {
+                            return Err(ParserError::Malformed("unknown histogram name prefix"));
+                        }
+                    }
+                }
+
+                for (id, aggregate) in aggregates {
+                    if !processed_metrics.contains(&id) {
+                        let hist = Metric::AggregatedHistogram {
+                            name: aggregate.name,
+                            buckets: aggregate.buckets,
+                            counts: (0..).zip(aggregate.counts.into_iter()).collect(),
+                            count: aggregate.count,
+                            sum: aggregate.sum,
+                            stats: None,
+                            timestamp: None,
+                            tags: aggregate.tags,
+                        };
+                        result.push(hist);
+                        processed_metrics.insert(id);
+                    }
+                }
             }
         }
     }
@@ -570,62 +728,150 @@ mod test {
 
         assert_eq!(
             parse(exp),
+            Ok(vec![Metric::AggregatedHistogram {
+                name: "http_request_duration_seconds".into(),
+                buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
+                counts: vec![
+                    (0, 24054),
+                    (1, 33444),
+                    (2, 100392),
+                    (3, 129389),
+                    (4, 133988)
+                ]
+                .into_iter()
+                .collect(),
+                count: 144320,
+                sum: 53423.0,
+                stats: None,
+                timestamp: None,
+                tags: None,
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_with_labels() {
+        let exp = r##"
+            # HELP gitlab_runner_job_duration_seconds Histogram of job durations
+            # TYPE gitlab_runner_job_duration_seconds histogram
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="30"} 327
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="60"} 474
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="300"} 535
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="600"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="1800"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="3600"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="7200"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="10800"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="18000"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="36000"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="z",le="+Inf"} 536
+            gitlab_runner_job_duration_seconds_sum{runner="z"} 19690.129384881966
+            gitlab_runner_job_duration_seconds_count{runner="z"} 536
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="30"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="60"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="300"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="600"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="1800"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="3600"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="7200"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="10800"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="18000"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="36000"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="x",le="+Inf"} 1
+            gitlab_runner_job_duration_seconds_sum{runner="x"} 28.975436316
+            gitlab_runner_job_duration_seconds_count{runner="x"} 1
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="30"} 285
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="60"} 1165
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="300"} 3071
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="600"} 3151
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="1800"} 3252
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="3600"} 3255
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="7200"} 3255
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="10800"} 3255
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="18000"} 3255
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="36000"} 3255
+            gitlab_runner_job_duration_seconds_bucket{runner="y",le="+Inf"} 3255
+            gitlab_runner_job_duration_seconds_sum{runner="y"} 381111.7498891335
+            gitlab_runner_job_duration_seconds_count{runner="y"} 3255
+        "##;
+
+        assert_eq!(
+            parse(exp),
             Ok(vec![
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_bucket".into(),
-                    val: 24054.0,
-                    direction: None,
+                Metric::AggregatedHistogram {
+                    name: "gitlab_runner_job_duration_seconds".into(),
+                    buckets: vec![
+                        30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
+                    ],
+                    counts: vec![
+                        (0, 327),
+                        (1, 474),
+                        (2, 535),
+                        (3, 536),
+                        (4, 536),
+                        (5, 536),
+                        (6, 536),
+                        (7, 536),
+                        (8, 536),
+                        (9, 536),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    count: 536,
+                    sum: 19690.129384881966,
+                    stats: None,
                     timestamp: None,
-                    tags: Some(vec![("le".into(), "0.05".into())].into_iter().collect()),
+                    tags: Some(vec![("runner".into(), "z".into())].into_iter().collect()),
                 },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_bucket".into(),
-                    val: 33444.0,
-                    direction: None,
+                Metric::AggregatedHistogram {
+                    name: "gitlab_runner_job_duration_seconds".into(),
+                    buckets: vec![
+                        30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
+                    ],
+                    counts: vec![
+                        (0, 1),
+                        (1, 1),
+                        (2, 1),
+                        (3, 1),
+                        (4, 1),
+                        (5, 1),
+                        (6, 1),
+                        (7, 1),
+                        (8, 1),
+                        (9, 1),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    count: 1,
+                    sum: 28.975436316,
+                    stats: None,
                     timestamp: None,
-                    tags: Some(vec![("le".into(), "0.1".into())].into_iter().collect()),
+                    tags: Some(vec![("runner".into(), "x".into())].into_iter().collect()),
                 },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_bucket".into(),
-                    val: 100392.0,
-                    direction: None,
+                Metric::AggregatedHistogram {
+                    name: "gitlab_runner_job_duration_seconds".into(),
+                    buckets: vec![
+                        30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
+                    ],
+                    counts: vec![
+                        (0, 285),
+                        (1, 1165),
+                        (2, 3071),
+                        (3, 3151),
+                        (4, 3252),
+                        (5, 3255),
+                        (6, 3255),
+                        (7, 3255),
+                        (8, 3255),
+                        (9, 3255),
+                    ]
+                    .into_iter()
+                    .collect(),
+                    count: 3255,
+                    sum: 381111.7498891335,
+                    stats: None,
                     timestamp: None,
-                    tags: Some(vec![("le".into(), "0.2".into())].into_iter().collect()),
-                },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_bucket".into(),
-                    val: 129389.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(vec![("le".into(), "0.5".into())].into_iter().collect()),
-                },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_bucket".into(),
-                    val: 133988.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(vec![("le".into(), "1".into())].into_iter().collect()),
-                },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_bucket".into(),
-                    val: 144320.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(vec![("le".into(), "+Inf".into())].into_iter().collect()),
-                },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_sum".into(),
-                    val: 53423.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: None,
-                },
-                Metric::Gauge {
-                    name: "http_request_duration_seconds_count".into(),
-                    val: 144320.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: None,
+                    tags: Some(vec![("runner".into(), "y".into())].into_iter().collect()),
                 }
             ]),
         );
