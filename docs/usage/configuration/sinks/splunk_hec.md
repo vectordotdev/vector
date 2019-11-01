@@ -48,10 +48,6 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   # OPTIONAL - General
   healthcheck = true # default
   
-  # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, seconds
-  
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 10 # default
@@ -59,6 +55,11 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   request_timeout_secs = 60 # default, seconds
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
+  
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    size = 1049000 # default, bytes
+    timeout = 1 # default, seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -81,17 +82,23 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 
 ## Options
 
-### batch_size
+### batch
+
+`optional` `type: table`
+
+Configures the batching options for this sink.
+
+#### batch.size
 
 `optional` `default: 1049000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed.
 
-### batch_timeout
+#### batch.timeout
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed.
 
 ### buffer
 
@@ -260,8 +267,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch_timeout` (default: `1 seconds`).
-2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
+1. The batch age meets or exceeds the configured `batch.timeout`.
+2. The batch size meets or exceeds the configured `batch.size`.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

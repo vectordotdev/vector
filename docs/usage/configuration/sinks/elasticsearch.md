@@ -50,10 +50,6 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   provider = "default" # default, enum: "default" or "aws"
   region = "us-east-1" # no default
   
-  # OPTIONAL - Batching
-  batch_size = 10490000 # default, bytes
-  batch_timeout = 1 # default, seconds
-  
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -66,6 +62,11 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   [sinks.my_sink_id.basic_auth]
     password = "password"
     user = "username"
+  
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    size = 10490000 # default, bytes
+    timeout = 1 # default, seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -114,17 +115,23 @@ The basic authentication password.
 
 The basic authentication user name.
 
-### batch_size
+### batch
+
+`optional` `type: table`
+
+Configures the batching options for this sink.
+
+#### batch.size
 
 `optional` `default: 10490000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed.
 
-### batch_timeout
+#### batch.timeout
 
 `optional` `default: 1` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed.
 
 ### buffer
 
@@ -347,8 +354,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch_timeout` (default: `1 seconds`).
-2. The batch size meets or exceeds the configured `batch_size` (default: `10490000 bytes`).
+1. The batch age meets or exceeds the configured `batch.timeout`.
+2. The batch size meets or exceeds the configured `batch.size`.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

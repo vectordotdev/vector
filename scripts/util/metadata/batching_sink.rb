@@ -28,9 +28,8 @@ class BatchingSink < Sink
 
     # Common options - batching
 
-    @options.batch_size =
-      Option.new({
-        "name" => "batch_size",
+    batch_options = {
+      "size" => {
         "category" => "Batching",
         "default" => @batch_size,
         "description" => "The maximum size of a batch before it is flushed.",
@@ -38,11 +37,8 @@ class BatchingSink < Sink
         "simple" => batch_is_simple,
         "type" => "int",
         "unit" => "bytes"
-      })
-
-    @options.batch_timeout =
-      Option.new({
-        "name" => "batch_timeout",
+      },
+      "timeout" => {
         "category" => "Batching",
         "default" => @batch_timeout,
         "description" => "The maximum age of a batch before it is flushed.",
@@ -50,6 +46,16 @@ class BatchingSink < Sink
         "simple" => batch_is_simple,
         "type" => "int",
         "unit" => "seconds"
+      },
+    }
+
+    @options.batch =
+      Option.new({
+        "name" => "batch",
+        "description" => "Configures the batching options for this sink.",
+        "null" => true,
+        "type" => "table",
+        "options" => batch_options,
       })
 
     # Common options - requests

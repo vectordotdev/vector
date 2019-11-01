@@ -1,6 +1,13 @@
 use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct BatchConfig {
+    pub timeout: Option<u64>,
+    pub size: Option<usize>,
+}
 
 pub trait Batch {
     type Input;

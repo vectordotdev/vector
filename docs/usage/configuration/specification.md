@@ -1298,26 +1298,6 @@ end
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
@@ -1369,6 +1349,27 @@ end
   # * type: int
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batch
+  #
+
+  [sinks.aws_cloudwatch_logs.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout = 1
 
   #
   # Buffer
@@ -1510,26 +1511,6 @@ end
   partition_key_field = "user_id"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
@@ -1581,6 +1562,27 @@ end
   # * type: int
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batch
+  #
+
+  [sinks.aws_kinesis_streams.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout = 1
 
   #
   # Buffer
@@ -1670,26 +1672,6 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * type: int
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 300
 
   #
   # Object Names
@@ -1782,6 +1764,27 @@ end
   # * type: int
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batch
+  #
+
+  [sinks.aws_s3.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout = 300
 
   #
   # Buffer
@@ -1904,26 +1907,6 @@ end
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
@@ -2005,6 +1988,27 @@ end
     # * required
     # * type: string
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.clickhouse.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout = 1
 
   #
   # Tls
@@ -2160,26 +2164,6 @@ end
   host = "https://api.datadoghq.eu"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 20
-  # * type: int
-  # * unit: bytes
-  batch_size = 20
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
@@ -2231,6 +2215,27 @@ end
   # * type: int
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batch
+  #
+
+  [sinks.datadog_metrics.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 20
+    # * type: int
+    # * unit: bytes
+    size = 20
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout = 1
 
 # Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 [sinks.elasticsearch]
@@ -2305,26 +2310,6 @@ end
   region = "us-east-1"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * type: int
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
@@ -2393,6 +2378,27 @@ end
     # * required
     # * type: string
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.elasticsearch.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout = 1
 
   #
   # Buffer
@@ -2624,26 +2630,6 @@ end
   encoding = "text"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 5
-
-  #
   # Requests
   #
 
@@ -2712,6 +2698,27 @@ end
     # * required
     # * type: string
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.http.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: seconds
+    timeout = 5
 
   #
   # Buffer
@@ -3068,26 +3075,6 @@ end
   encoding = "text"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
@@ -3139,6 +3126,27 @@ end
   # * type: int
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batch
+  #
+
+  [sinks.splunk_hec.batch]
+    # The maximum size of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    # 
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout = 1
 
   #
   # Buffer

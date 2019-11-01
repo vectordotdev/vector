@@ -247,7 +247,7 @@ fn bad_s3_region() {
         [sinks.out1]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
+        batch.size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -256,7 +256,7 @@ fn bad_s3_region() {
         [sinks.out2]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
+        batch.size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -266,7 +266,7 @@ fn bad_s3_region() {
         [sinks.out3]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
+        batch.size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -277,7 +277,7 @@ fn bad_s3_region() {
         [sinks.out4]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
+        batch.size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
