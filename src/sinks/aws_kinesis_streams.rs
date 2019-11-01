@@ -2,7 +2,6 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     region::RegionOrEndpoint,
-    runtime,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, SinkExt,
@@ -323,8 +322,8 @@ mod integration_tests {
     use super::*;
     use crate::{
         buffers::Acker,
-        runtime,
         region::RegionOrEndpoint,
+        runtime,
         test_util::{random_lines_with_stream, random_string},
     };
     use futures::{Future, Sink};
