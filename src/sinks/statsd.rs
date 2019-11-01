@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{metric::Direction, Event, Metric},
-    sinks::util::{BatchConfig, BatchServiceSink, Buffer, SinkExt},
+    sinks::util::{BatchConfig, BatchServiceSink, BatchSettings, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig},
 };
 use futures::{future, sink::Sink, Future, Poll};
@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::time::Duration;
 use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
@@ -48,7 +47,7 @@ pub struct StatsdSinkConfig {
     pub namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub batch: BatchConfig,
+    pub batch: Option<BatchConfig>,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -79,8 +78,7 @@ impl StatsdSvc {
         // However we need to leave some space for +1 extra trailing event in the buffer.
         // Also one might keep an eye on server side limitations, like
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch_size = config.batch.size.unwrap_or(1300);
-        let batch_timeout = config.batch.timeout.unwrap_or(1);
+        let batch = BatchSettings::from_option(&config.batch, 1300, 1);
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;
@@ -89,11 +87,7 @@ impl StatsdSvc {
         let svc = ServiceBuilder::new().service(service);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(
-                Buffer::new(false),
-                batch_size,
-                Duration::from_secs(batch_timeout),
-            )
+            .batched_with_min(Buffer::new(false), batch.size, batch.timeout)
             .with(move |event| encode_event(event, &namespace));
 
         Ok(Box::new(sink))
@@ -306,10 +300,10 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch: BatchConfig {
+            batch: Some(BatchConfig {
                 size: Some(512),
                 timeout: Some(1),
-            },
+            }),
         };
 
         let mut rt = runtime();

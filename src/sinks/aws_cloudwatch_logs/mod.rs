@@ -6,7 +6,8 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, BatchSettings, PartitionBuffer, PartitionInnerBuffer,
+        SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -58,7 +59,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub encoding: Encoding,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
-    pub batch: BatchConfig,
+    pub batch: Option<BatchConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -130,8 +131,7 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch_timeout = self.batch.timeout.unwrap_or(1);
-        let batch_size = self.batch.size.unwrap_or(1000);
+        let batch = BatchSettings::from_option(&self.batch, 1000, 1);
 
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
@@ -146,8 +146,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             let svc_sink = BatchServiceSink::new(svc, acker)
                 .partitioned_batched_with_min(
                     PartitionBuffer::new(Vec::new()),
-                    batch_size,
-                    Duration::from_secs(batch_timeout),
+                    batch.size,
+                    batch.timeout,
                 )
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
@@ -881,10 +881,10 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            batch: BatchConfig {
+            batch: Some(BatchConfig {
                 timeout: None,
                 size: Some(2),
-            },
+            }),
             ..Default::default()
         };
 

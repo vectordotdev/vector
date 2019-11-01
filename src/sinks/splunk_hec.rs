@@ -5,7 +5,7 @@ use crate::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, BatchSettings, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -36,7 +36,7 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
-    pub batch: BatchConfig,
+    pub batch: Option<BatchConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -90,8 +90,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_size = config.batch.size.unwrap_or(bytesize::mib(1u64) as usize);
-    let batch_timeout = config.batch.timeout.unwrap_or(1);
+    let batch = BatchSettings::from_option(&config.batch, bytesize::mib(1u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
@@ -141,11 +140,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
         .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
     Ok(Box::new(sink))
@@ -543,10 +538,10 @@ mod integration_tests {
             host_field: "host".into(),
             compression: Some(Compression::None),
             encoding,
-            batch: BatchConfig {
+            batch: Some(BatchConfig {
                 size: Some(1),
                 timeout: None,
-            },
+            }),
             ..Default::default()
         }
     }

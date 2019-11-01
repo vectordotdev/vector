@@ -13,7 +13,7 @@ use std::hash::Hash;
 use std::time::Duration;
 use tower::Service;
 
-pub use batch::{Batch, BatchConfig, BatchSink};
+pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
 pub use buffer::metrics::MetricBuffer;
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};

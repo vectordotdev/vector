@@ -5,7 +5,7 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, BatchSettings, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -47,7 +47,7 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
-    pub batch: BatchConfig,
+    pub batch: Option<BatchConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -121,8 +121,7 @@ fn http(
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch.timeout.unwrap_or(1);
-    let batch_size = config.batch.size.unwrap_or(bytesize::mib(10u64) as usize);
+    let batch = BatchSettings::from_option(&config.batch, bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(30);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
@@ -189,11 +188,7 @@ fn http(
 
     let encoding = config.encoding.clone();
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))

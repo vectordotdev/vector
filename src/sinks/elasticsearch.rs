@@ -6,7 +6,7 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, BatchSettings, Buffer, Compression, SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -37,7 +37,7 @@ pub struct ElasticSearchConfig {
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
-    pub batch: BatchConfig,
+    pub batch: Option<BatchConfig>,
     #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
 
@@ -180,8 +180,7 @@ fn es(
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch.size.unwrap_or(bytesize::mib(10u64) as usize);
-    let batch_timeout = config.batch.timeout.unwrap_or(1);
+    let batch = BatchSettings::from_option(&config.batch, bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -281,11 +280,7 @@ fn es(
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
     Box::new(sink)
@@ -614,10 +609,10 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchConfig {
+            batch: Some(BatchConfig {
                 size: Some(1),
                 timeout: None,
-            },
+            }),
             ..Default::default()
         }
     }

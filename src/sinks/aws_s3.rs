@@ -4,7 +4,8 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, BatchSettings, Buffer, PartitionBuffer,
+        PartitionInnerBuffer, SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -47,7 +48,7 @@ pub struct S3SinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     pub compression: Compression,
-    pub batch: BatchConfig,
+    pub batch: Option<BatchConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -126,8 +127,7 @@ impl S3Sink {
         };
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch_timeout = config.batch.timeout.unwrap_or(300);
-        let batch_size = config.batch.size.unwrap_or(bytesize::mib(10u64) as usize);
+        let batch = BatchSettings::from_option(&config.batch, bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
             Template::from(kp.as_str())
@@ -154,8 +154,8 @@ impl S3Sink {
         let sink = BatchServiceSink::new(svc, acker)
             .partitioned_batched_with_min(
                 PartitionBuffer::new(Buffer::new(compression)),
-                batch_size,
-                Duration::from_secs(batch_timeout),
+                batch.size,
+                batch.timeout,
             )
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
@@ -414,7 +414,7 @@ mod integration_tests {
 
     #[test]
     fn s3_insert_message_into() {
-        let config = config(1);
+        let config = config(1000000);
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
@@ -623,10 +623,10 @@ mod integration_tests {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch: BatchConfig {
+            batch: Some(BatchConfig {
                 size: Some(batch_size),
                 timeout: Some(5),
-            },
+            }),
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
         }
