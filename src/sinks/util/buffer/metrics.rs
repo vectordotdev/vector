@@ -571,7 +571,7 @@ mod test {
             let event = Event::Metric(Metric::AggregatedHistogram {
                 name: "buckets-2".into(),
                 buckets: vec![1.0, 2.0, 4.0],
-                counts: vec![(0, 1), (1, 2), (2, 4)].into_iter().collect(),
+                counts: vec![1, 2, 4],
                 count: 6,
                 sum: 10.0,
                 stats: None,
@@ -585,9 +585,7 @@ mod test {
             let event = Event::Metric(Metric::AggregatedHistogram {
                 name: format!("buckets-{}", i),
                 buckets: vec![1.0, 2.0, 4.0],
-                counts: vec![(0, 1 * i), (1, 2 * i), (2, 4 * i)]
-                    .into_iter()
-                    .collect(),
+                counts: vec![1 * i, 2 * i, 4 * i],
                 count: 6 * i,
                 sum: 10.0,
                 stats: None,
@@ -611,7 +609,7 @@ mod test {
                 Metric::AggregatedHistogram {
                     name: "buckets-2".into(),
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![(0, 5), (1, 10), (2, 20)].into_iter().collect(),
+                    counts: vec![5, 10, 20],
                     count: 6 * 5,
                     sum: 40.0,
                     stats: None,
@@ -621,7 +619,7 @@ mod test {
                 Metric::AggregatedHistogram {
                     name: "buckets-3".into(),
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![(0, 3), (1, 6), (2, 12)].into_iter().collect(),
+                    counts: vec![3, 6, 12],
                     count: 6 * 3,
                     sum: 10.0,
                     stats: None,
@@ -631,7 +629,7 @@ mod test {
                 Metric::AggregatedHistogram {
                     name: "buckets-4".into(),
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![(0, 4), (1, 8), (2, 16)].into_iter().collect(),
+                    counts: vec![4, 8, 16],
                     count: 6 * 4,
                     sum: 10.0,
                     stats: None,

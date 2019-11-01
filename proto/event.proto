@@ -54,7 +54,7 @@ message Histogram {
 message AggregatedHistogram {
   string name = 1;
   repeated double buckets = 2;
-  map<uint32, uint32> counts = 3;
+  repeated uint32 counts = 3;
   uint32 count = 4;
   double sum = 5;
   Stats stats = 6;

@@ -353,7 +353,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         let hist = Metric::AggregatedHistogram {
                             name: aggregate.name,
                             buckets: aggregate.buckets,
-                            counts: (0..).zip(aggregate.counts.into_iter()).collect(),
+                            counts: aggregate.counts,
                             count: aggregate.count,
                             sum: aggregate.sum,
                             stats: None,
@@ -731,15 +731,7 @@ mod test {
             Ok(vec![Metric::AggregatedHistogram {
                 name: "http_request_duration_seconds".into(),
                 buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
-                counts: vec![
-                    (0, 24054),
-                    (1, 33444),
-                    (2, 100392),
-                    (3, 129389),
-                    (4, 133988)
-                ]
-                .into_iter()
-                .collect(),
+                counts: vec![24054, 33444, 100392, 129389, 133988],
                 count: 144320,
                 sum: 53423.0,
                 stats: None,
@@ -803,20 +795,7 @@ mod test {
                     buckets: vec![
                         30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
                     ],
-                    counts: vec![
-                        (0, 327),
-                        (1, 474),
-                        (2, 535),
-                        (3, 536),
-                        (4, 536),
-                        (5, 536),
-                        (6, 536),
-                        (7, 536),
-                        (8, 536),
-                        (9, 536),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    counts: vec![327, 474, 535, 536, 536, 536, 536, 536, 536, 536],
                     count: 536,
                     sum: 19690.129384881966,
                     stats: None,
@@ -828,20 +807,7 @@ mod test {
                     buckets: vec![
                         30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
                     ],
-                    counts: vec![
-                        (0, 1),
-                        (1, 1),
-                        (2, 1),
-                        (3, 1),
-                        (4, 1),
-                        (5, 1),
-                        (6, 1),
-                        (7, 1),
-                        (8, 1),
-                        (9, 1),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    counts: vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                     count: 1,
                     sum: 28.975436316,
                     stats: None,
@@ -853,20 +819,7 @@ mod test {
                     buckets: vec![
                         30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
                     ],
-                    counts: vec![
-                        (0, 285),
-                        (1, 1165),
-                        (2, 3071),
-                        (3, 3151),
-                        (4, 3252),
-                        (5, 3255),
-                        (6, 3255),
-                        (7, 3255),
-                        (8, 3255),
-                        (9, 3255),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    counts: vec![285, 1165, 3071, 3151, 3252, 3255, 3255, 3255, 3255, 3255],
                     count: 3255,
                     sum: 381111.7498891335,
                     stats: None,

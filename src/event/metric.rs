@@ -35,7 +35,7 @@ pub enum Metric {
     AggregatedHistogram {
         name: String,
         buckets: Vec<f64>,
-        counts: HashMap<u32, u32>,
+        counts: Vec<u32>,
         count: u32,
         sum: f64,
         stats: Option<Stats>,
@@ -198,8 +198,8 @@ impl Metric {
                 },
             ) => {
                 if name == new_name && buckets == new_buckets {
-                    for (i, c) in counts.iter_mut() {
-                        *c += new_counts[i];
+                    for i in 0..counts.len() {
+                        counts[i] += new_counts[i];
                     }
                     *sum += new_sum;
                     *count += new_count;
@@ -394,7 +394,7 @@ mod test {
         let mut hist1 = Metric::AggregatedHistogram {
             name: "hist".into(),
             buckets: vec![1.0, 2.0, 4.0],
-            counts: vec![(0, 1), (1, 5), (2, 15)].into_iter().collect(),
+            counts: vec![1, 5, 15],
             count: 21,
             sum: 10.0,
             stats: None,
@@ -405,7 +405,7 @@ mod test {
         let hist2 = Metric::AggregatedHistogram {
             name: "hist".into(),
             buckets: vec![1.0, 2.0, 4.0],
-            counts: vec![(0, 2), (1, 10), (2, 30)].into_iter().collect(),
+            counts: vec![2, 10, 30],
             count: 42,
             sum: 20.0,
             stats: None,
@@ -419,7 +419,7 @@ mod test {
             Metric::AggregatedHistogram {
                 name: "hist".into(),
                 buckets: vec![1.0, 2.0, 4.0],
-                counts: vec![(0, 3), (1, 15), (2, 45)].into_iter().collect(),
+                counts: vec![3, 15, 45],
                 count: 63,
                 sum: 30.0,
                 stats: None,
