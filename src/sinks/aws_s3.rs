@@ -400,6 +400,7 @@ mod integration_tests {
         assert_downcast_matches,
         event::Event,
         region::RegionOrEndpoint,
+        runtime::Runtime,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
     };
@@ -502,7 +503,7 @@ mod integration_tests {
         let (tx, rx) = futures::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(pump);
 
         let mut tx = tx.wait();
@@ -588,7 +589,7 @@ mod integration_tests {
 
     #[test]
     fn s3_healthchecks() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
 
         let healthcheck = S3Sink::healthcheck(&config()).unwrap();
         rt.block_on(healthcheck).unwrap();
@@ -596,7 +597,7 @@ mod integration_tests {
 
     #[test]
     fn s3_healthchecks_invalid_bucket() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
 
         let config = S3SinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),

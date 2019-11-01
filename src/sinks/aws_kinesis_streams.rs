@@ -330,13 +330,13 @@ mod integration_tests {
     use crate::{
         buffers::Acker,
         region::RegionOrEndpoint,
+        runtime,
         test_util::{random_lines_with_stream, random_string},
     };
     use futures::{Future, Sink};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
-    use tokio::runtime::Runtime;
 
     #[test]
     fn kinesis_put_records() {
@@ -356,7 +356,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         let sink = KinesisService::new(config, Acker::Null).unwrap();
 

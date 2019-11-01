@@ -102,6 +102,7 @@ impl TcpSource for RawTcpSource {
 mod test {
     use super::TcpConfig;
     use crate::event;
+    use crate::runtime;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
@@ -116,7 +117,7 @@ mod test {
         let server = TcpConfig::new(addr.into())
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -160,7 +161,7 @@ mod test {
         let server = config
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 

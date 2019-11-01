@@ -10,7 +10,7 @@ use vector::test_util::{
 };
 use vector::topology::config::TransformConfig;
 use vector::topology::{self, config};
-use vector::{sinks, sources, transforms};
+use vector::{runtime, sinks, sources, transforms};
 
 mod batch;
 mod buffering;
@@ -61,7 +61,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -107,7 +107,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -153,7 +153,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -200,7 +200,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -264,7 +264,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines1 = count_receive(&out_addr1);
                     let output_lines2 = count_receive(&out_addr2);
@@ -331,7 +331,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         &["filter"],
                         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -485,7 +485,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         &["filter_500"],
                         sinks::tcp::TcpSinkConfig::new(out_addr_500.to_string()),
                     );
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines_all = count_receive(&out_addr_all);
                     let output_lines_sampled = count_receive(&out_addr_sampled);

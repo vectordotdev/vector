@@ -100,7 +100,7 @@ mod test {
         let server = VectorConfig::new(addr.into())
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 
