@@ -569,26 +569,22 @@ mod integration_tests {
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest08::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-        let http_client = reqwest08::Client::builder()
+        let client = reqwest::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .expect("Could not build HTTP client");
-        let client = SyncClientBuilder::new()
-            .http_client(http_client)
-            .base_url(config.host)
-            .build()
-            .expect("Building test client failed");
 
         let response = client
-            .search::<Value>()
-            .index(index)
-            .body(json!({
+            .get(&format!("{}/{}/_search", config.host, index))
+            .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
-            .expect("Issuing test query failed");
+            .unwrap()
+            .json::<elastic::client::responses::search::SearchResponse<Value>>()
+            .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
         let input = input
