@@ -391,7 +391,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -449,7 +449,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -507,7 +507,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx

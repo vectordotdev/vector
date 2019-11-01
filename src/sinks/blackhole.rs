@@ -98,6 +98,6 @@ mod tests {
 
         let (_input_lines, events) = random_events_with_stream(100, 10);
 
-        sink.send_all(events).wait().unwrap();
+        let _ = sink.send_all(events).wait().unwrap();
     }
 }

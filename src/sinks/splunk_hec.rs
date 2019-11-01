@@ -333,7 +333,7 @@ mod integration_tests {
 
         let pump = sink.send_all(events);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
 
         let mut found_all = false;
         for _ in 0..20 {

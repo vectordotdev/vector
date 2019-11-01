@@ -558,7 +558,7 @@ mod integration_tests {
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        block_on(pump).expect("Sending events failed");
+        let _ = block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
         block_on(flush(&config)).expect("Flushing writes failed");

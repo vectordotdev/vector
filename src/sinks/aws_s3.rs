@@ -422,7 +422,7 @@ mod integration_tests {
         let (lines, events) = random_lines_with_stream(100, 10);
 
         let pump = sink.send_all(events);
-        block_on(pump).unwrap();
+        let _ = block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 1);
@@ -566,7 +566,7 @@ mod integration_tests {
         let (lines, events) = random_lines_with_stream(100, 500);
 
         let pump = sink.send_all(events);
-        block_on(pump).unwrap();
+        let _ = block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 2);
