@@ -497,7 +497,8 @@ mod integration_tests {
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+        let doc = hit.document().unwrap();
+        assert_eq!(Some("42"), doc["my_id"].as_str());
 
         let value = hit.into_document().unwrap();
         let expected = json!({
@@ -568,15 +569,15 @@ mod integration_tests {
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
-        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+        let test_ca = reqwest08::Certificate::from_pem(&test_ca).unwrap();
 
-        let http_client = reqwest::Client::builder()
+        let http_client = reqwest08::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .expect("Could not build HTTP client");
         let client = SyncClientBuilder::new()
             .http_client(http_client)
-            .static_node(config.host)
+            .base_url(config.host)
             .build()
             .expect("Building test client failed");
 
