@@ -574,7 +574,6 @@ mod test {
                 counts: vec![1, 2, 4],
                 count: 6,
                 sum: 10.0,
-                stats: None,
                 timestamp: None,
                 tags: Some(tag("production")),
             });
@@ -588,7 +587,6 @@ mod test {
                 counts: vec![1 * i, 2 * i, 4 * i],
                 count: 6 * i,
                 sum: 10.0,
-                stats: None,
                 timestamp: None,
                 tags: Some(tag("production")),
             });
@@ -612,7 +610,6 @@ mod test {
                     counts: vec![5, 10, 20],
                     count: 6 * 5,
                     sum: 40.0,
-                    stats: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
@@ -622,7 +619,6 @@ mod test {
                     counts: vec![3, 6, 12],
                     count: 6 * 3,
                     sum: 10.0,
-                    stats: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
@@ -632,7 +628,6 @@ mod test {
                     counts: vec![4, 8, 16],
                     count: 6 * 4,
                     sum: 10.0,
-                    stats: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                 }

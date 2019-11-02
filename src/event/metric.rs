@@ -38,19 +38,9 @@ pub enum Metric {
         counts: Vec<u32>,
         count: u32,
         sum: f64,
-        stats: Option<Stats>,
         timestamp: Option<DateTime<Utc>>,
         tags: Option<HashMap<String, String>>,
     },
-}
-
-// https://github.com/influxdata/telegraf/tree/master/plugins/parsers/dropwizard
-// https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#publishingDataPoints1
-// https://docs.datadoghq.com/developers/faq/data-aggregation-with-dogstatsd-threadstats/#aggregation-rules-per-metric-type
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub struct Stats {
-    pub min: f64,
-    pub max: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -182,7 +172,6 @@ impl Metric {
                     ref mut counts,
                     ref mut count,
                     ref mut sum,
-                    ref mut stats,
                     ref mut timestamp,
                     ref mut tags,
                 },
@@ -192,7 +181,6 @@ impl Metric {
                     counts: new_counts,
                     count: new_count,
                     sum: new_sum,
-                    stats: new_stats,
                     timestamp: new_timestamp,
                     tags: new_tags,
                 },
@@ -203,18 +191,6 @@ impl Metric {
                     }
                     *sum += new_sum;
                     *count += new_count;
-                    match (&stats, &new_stats) {
-                        (None, Some(_)) => {
-                            *stats = new_stats.clone();
-                        }
-                        (Some(s1), Some(s2)) => {
-                            *stats = Some(Stats {
-                                min: s1.min.min(s2.min),
-                                max: s1.max.max(s2.max),
-                            });
-                        }
-                        _ => {}
-                    };
                     *timestamp = *new_timestamp;
                     *tags = new_tags.clone();
                 }
@@ -397,7 +373,6 @@ mod test {
             counts: vec![1, 5, 15],
             count: 21,
             sum: 10.0,
-            stats: None,
             timestamp: None,
             tags: None,
         };
@@ -408,7 +383,6 @@ mod test {
             counts: vec![2, 10, 30],
             count: 42,
             sum: 20.0,
-            stats: None,
             timestamp: Some(ts()),
             tags: Some(tags()),
         };
@@ -422,7 +396,6 @@ mod test {
                 counts: vec![3, 15, 45],
                 count: 63,
                 sum: 30.0,
-                stats: None,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
             }

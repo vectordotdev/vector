@@ -57,14 +57,8 @@ message AggregatedHistogram {
   repeated uint32 counts = 3;
   uint32 count = 4;
   double sum = 5;
-  Stats stats = 6;
   google.protobuf.Timestamp timestamp = 7;
   map<string, string> tags = 8;
-}
-
-message Stats {
-  double min = 3;
-  double max = 4;
 }
 
 message Gauge {

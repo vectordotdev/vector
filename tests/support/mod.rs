@@ -118,7 +118,6 @@ impl Transform for MockTransform {
                 counts: _,
                 count,
                 sum,
-                stats: _,
                 timestamp: _,
                 tags: _,
             }) => {

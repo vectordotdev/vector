@@ -401,18 +401,12 @@ impl From<proto::EventWrapper> for Event {
                             None
                         };
 
-                        let stats = hist.stats.map(|s| metric::Stats {
-                            min: s.min,
-                            max: s.max,
-                        });
-
                         Event::Metric(Metric::AggregatedHistogram {
                             name: hist.name,
                             buckets: hist.buckets,
                             counts: hist.counts,
                             count: hist.count,
                             sum: hist.sum,
-                            stats,
                             timestamp,
                             tags,
                         })
@@ -558,7 +552,6 @@ impl From<Event> for proto::EventWrapper {
                 counts,
                 count,
                 sum,
-                stats,
                 timestamp,
                 tags,
             }) => {
@@ -569,18 +562,12 @@ impl From<Event> for proto::EventWrapper {
 
                 let tags = tags.unwrap_or_default();
 
-                let stats = stats.map(|s| proto::Stats {
-                    min: s.min,
-                    max: s.max,
-                });
-
                 let hist = proto::AggregatedHistogram {
                     name,
                     buckets,
                     counts,
                     count,
                     sum,
-                    stats,
                     timestamp,
                     tags,
                 };
