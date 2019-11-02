@@ -109,7 +109,7 @@ impl KinesisService {
             .service(kinesis);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(Vec::new(), batch.size, batch.timeout)
+            .batched_with_min(Vec::new(), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)

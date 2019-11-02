@@ -87,7 +87,7 @@ impl StatsdSvc {
         let svc = ServiceBuilder::new().service(service);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(Buffer::new(false), batch.size, batch.timeout)
+            .batched_with_min(Buffer::new(false), &batch)
             .with(move |event| encode_event(event, &namespace));
 
         Ok(Box::new(sink))

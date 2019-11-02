@@ -280,7 +280,7 @@ fn es(
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
     Box::new(sink)

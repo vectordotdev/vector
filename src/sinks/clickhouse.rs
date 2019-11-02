@@ -137,7 +137,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with(move |event: Event| {
             let mut body = serde_json::to_vec(&event.as_log().all_fields())
                 .expect("Events should be valid json!");

@@ -152,11 +152,7 @@ impl S3Sink {
             .service(s3);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .partitioned_batched_with_min(
-                PartitionBuffer::new(Buffer::new(compression)),
-                batch.size,
-                batch.timeout,
-            )
+            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))

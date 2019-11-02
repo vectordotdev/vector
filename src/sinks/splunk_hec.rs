@@ -140,7 +140,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
     Ok(Box::new(sink))

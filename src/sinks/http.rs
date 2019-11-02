@@ -188,7 +188,7 @@ fn http(
 
     let encoding = config.encoding.clone();
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(Buffer::new(gzip), batch.size, batch.timeout)
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))

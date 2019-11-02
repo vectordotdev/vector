@@ -146,11 +146,8 @@ impl DatadogSvc {
             .timeout(Duration::from_secs(timeout))
             .service(datadog_http_service);
 
-        let sink = BatchServiceSink::new(service, acker).batched_with_max(
-            MetricBuffer::new(),
-            batch.size,
-            batch.timeout,
-        );
+        let sink =
+            BatchServiceSink::new(service, acker).batched_with_max(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }

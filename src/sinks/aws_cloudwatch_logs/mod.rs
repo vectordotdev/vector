@@ -144,11 +144,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker)
-                .partitioned_batched_with_min(
-                    PartitionBuffer::new(Vec::new()),
-                    batch.size,
-                    batch.timeout,
-                )
+                .partitioned_batched_with_min(PartitionBuffer::new(Vec::new()), &batch)
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
         };
