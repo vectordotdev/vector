@@ -32,7 +32,7 @@ struct ParserMetric {
     id: String,
     name: String,
     value: f64,
-    tags: Option<HashMap<String, String>>,
+    tags: HashMap<String, String>,
     timestamp: Option<DateTime<Utc>>,
 }
 
@@ -43,7 +43,7 @@ struct ParserAggregate {
     counts: Vec<u32>,
     count: u32,
     sum: f64,
-    tags: Option<HashMap<String, String>>,
+    tags: HashMap<String, String>,
     // timestamp: Option<DateTime<Utc>>,
 }
 
@@ -137,7 +137,6 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         let parts = first.split('{').collect::<Vec<_>>();
         let name = parts[0];
         let tags = parse_tags(parts[1])?;
-        let tags = if !tags.is_empty() { Some(tags) } else { None };
         // second is value and optional timestamp
         let parts = &second[1..].trim().split(' ').collect::<Vec<_>>();
         let value = parse_value(parts[0])?;
@@ -169,7 +168,7 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
             id: name.to_string(),
             name: name.to_string(),
             value,
-            tags: None,
+            tags: HashMap::new(),
             timestamp,
         })
     }
@@ -262,11 +261,12 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for line in group {
                     let metric = parse_metric(&line)?;
                     if !processed_metrics.contains(&metric.id) {
+                        let tags = if !metric.tags.is_empty() { Some(metric.tags) } else { None };
                         let counter = Metric::Counter {
                             name: metric.name,
                             val: metric.value,
                             timestamp: metric.timestamp,
-                            tags: metric.tags,
+                            tags,
                         };
                         result.push(counter);
                         processed_metrics.insert(metric.id);
@@ -277,12 +277,13 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for line in group {
                     let metric = parse_metric(&line)?;
                     if !processed_metrics.contains(&metric.id) {
+                        let tags = if !metric.tags.is_empty() { Some(metric.tags) } else { None };
                         let gauge = Metric::Gauge {
                             name: metric.name,
                             val: metric.value,
                             direction: None,
                             timestamp: metric.timestamp,
-                            tags: metric.tags,
+                            tags,
                         };
                         result.push(gauge);
                         processed_metrics.insert(metric.id);
@@ -294,12 +295,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                 for line in group {
                     let metric = parse_metric(&line)?;
-                    let mut tags = if let Some(tags) = metric.tags {
-                        tags
-                    } else {
-                        HashMap::new()
-                    };
-
+                    let mut tags = metric.tags;
                     let bucket = tags.remove("le");
 
                     let v: Vec<_> = metric.name.rsplitn(2, '_').collect();
@@ -310,8 +306,6 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     let mut id: Vec<_> = tags.iter().collect();
                     id.sort();
                     let id = format!("{:?}{:?}", v[1], id);
-
-                    let tags = if !tags.is_empty() { Some(tags) } else { None };
 
                     let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
                         name: v[1].to_owned(),
@@ -350,6 +344,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                 for (id, aggregate) in aggregates {
                     if !processed_metrics.contains(&id) {
+                        let tags = if !aggregate.tags.is_empty() { Some(aggregate.tags) } else { None };
                         let hist = Metric::AggregatedHistogram {
                             name: aggregate.name,
                             buckets: aggregate.buckets,
@@ -357,7 +352,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             count: aggregate.count,
                             sum: aggregate.sum,
                             timestamp: None,
-                            tags: aggregate.tags,
+                            tags,
                         };
                         result.push(hist);
                         processed_metrics.insert(id);
