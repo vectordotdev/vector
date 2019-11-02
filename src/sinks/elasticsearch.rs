@@ -458,7 +458,7 @@ mod integration_tests {
     fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200/".into(),
+            host: "http://localhost:9200".into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
@@ -492,6 +492,8 @@ mod integration_tests {
             .unwrap()
             .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
+
+        println!("response {:?}", response);
 
         assert_eq!(1, response.total());
 
