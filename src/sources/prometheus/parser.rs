@@ -19,7 +19,7 @@ enum ParserType {
     Counter,
     Gauge,
     Histogram,
-    // Summary,
+    Summary,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -39,8 +39,8 @@ struct ParserMetric {
 struct ParserAggregate {
     // id: String,
     name: String,
-    buckets: Vec<f64>,
-    counts: Vec<u32>,
+    bounds: Vec<f64>,
+    values: Vec<f64>,
     count: u32,
     sum: f64,
     tags: HashMap<String, String>,
@@ -70,7 +70,7 @@ fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
         "gauge" => ParserType::Gauge,
         "untyped" => ParserType::Untyped,
         "histogram" => ParserType::Histogram,
-        "summary" => ParserType::Gauge,
+        "summary" => ParserType::Summary,
         other => {
             return Err(ParserError::UnknownMetricType(other.to_string()));
         }
@@ -207,14 +207,27 @@ fn group_metrics(packet: &str) -> Result<IndexMap<ParserHeader, Vec<String>>, Pa
             current_header = match current_header.kind {
                 ParserType::Histogram => {
                     // check if this is still a histogram
-                    if metric.name.starts_with(&current_header.name)
-                        && (metric.name.ends_with("_bucket")
-                            || metric.name.ends_with("_count")
-                            || metric.name.ends_with("_sum"))
+                    if metric.name == format!("{}_bucket", current_header.name)
+                        || metric.name == format!("{}_count", current_header.name)
+                        || metric.name == format!("{}_sum", current_header.name)
                     {
                         current_header
                     } else {
                         // nope it's a new unrelated metric
+                        ParserHeader {
+                            name: metric.name,
+                            kind: ParserType::Untyped,
+                        }
+                    }
+                }
+                ParserType::Summary => {
+                    // check if this is still a summary
+                    if metric.name == current_header.name
+                        || metric.name == format!("{}_count", current_header.name)
+                        || metric.name == format!("{}_sum", current_header.name)
+                    {
+                        current_header
+                    } else {
                         ParserHeader {
                             name: metric.name,
                             kind: ParserType::Untyped,
@@ -261,7 +274,11 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for line in group {
                     let metric = parse_metric(&line)?;
                     if !processed_metrics.contains(&metric.id) {
-                        let tags = if !metric.tags.is_empty() { Some(metric.tags) } else { None };
+                        let tags = if !metric.tags.is_empty() {
+                            Some(metric.tags)
+                        } else {
+                            None
+                        };
                         let counter = Metric::Counter {
                             name: metric.name,
                             val: metric.value,
@@ -277,7 +294,11 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for line in group {
                     let metric = parse_metric(&line)?;
                     if !processed_metrics.contains(&metric.id) {
-                        let tags = if !metric.tags.is_empty() { Some(metric.tags) } else { None };
+                        let tags = if !metric.tags.is_empty() {
+                            Some(metric.tags)
+                        } else {
+                            None
+                        };
                         let gauge = Metric::Gauge {
                             name: metric.name,
                             val: metric.value,
@@ -309,8 +330,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
                         name: v[1].to_owned(),
-                        buckets: Vec::new(),
-                        counts: Vec::new(),
+                        bounds: Vec::new(),
+                        values: Vec::new(),
                         count: 0,
                         sum: 0.0,
                         tags,
@@ -321,8 +342,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             if let Some(b) = bucket {
                                 // last bucket is implicit, because we store its value in 'count'
                                 if b != "+Inf" {
-                                    aggregate.buckets.push(parse_value(&b)?);
-                                    aggregate.counts.push(metric.value as u32);
+                                    aggregate.bounds.push(parse_value(&b)?);
+                                    aggregate.values.push(metric.value);
                                 }
                             } else {
                                 return Err(ParserError::Malformed(
@@ -337,24 +358,101 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             aggregate.count = metric.value as u32;
                         }
                         _ => {
-                            return Err(ParserError::Malformed("unknown histogram name prefix"));
+                            return Err(ParserError::Malformed("unknown histogram name suffix"));
                         }
                     }
                 }
 
                 for (id, aggregate) in aggregates {
                     if !processed_metrics.contains(&id) {
-                        let tags = if !aggregate.tags.is_empty() { Some(aggregate.tags) } else { None };
+                        let tags = if !aggregate.tags.is_empty() {
+                            Some(aggregate.tags)
+                        } else {
+                            None
+                        };
                         let hist = Metric::AggregatedHistogram {
                             name: aggregate.name,
-                            buckets: aggregate.buckets,
-                            counts: aggregate.counts,
+                            buckets: aggregate.bounds,
+                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
                             count: aggregate.count,
                             sum: aggregate.sum,
                             timestamp: None,
                             tags,
                         };
                         result.push(hist);
+                        processed_metrics.insert(id);
+                    }
+                }
+            }
+            ParserType::Summary => {
+                let mut aggregates = IndexMap::new();
+
+                for line in group {
+                    let metric = parse_metric(&line)?;
+                    let mut tags = metric.tags;
+                    let bucket = tags.remove("quantile");
+
+                    let (name, suffix) =
+                        if metric.name.ends_with("_sum") || metric.name.ends_with("_count") {
+                            let v: Vec<_> = metric.name.rsplitn(2, '_').collect();
+                            (v[1], v[0])
+                        } else {
+                            (&metric.name[..], "")
+                        };
+
+                    let mut id: Vec<_> = tags.iter().collect();
+                    id.sort();
+                    let id = format!("{:?}{:?}", name, id);
+
+                    let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
+                        name: name.to_owned(),
+                        bounds: Vec::new(),
+                        values: Vec::new(),
+                        count: 0,
+                        sum: 0.0,
+                        tags,
+                    });
+
+                    match suffix {
+                        "" => {
+                            if let Some(b) = bucket {
+                                aggregate.bounds.push(parse_value(&b)?);
+                                aggregate.values.push(metric.value);
+                            } else {
+                                return Err(ParserError::Malformed(
+                                    "expected \"quantile\" tag in summary bucket",
+                                ));
+                            }
+                        }
+                        "sum" => {
+                            aggregate.sum = metric.value;
+                        }
+                        "count" => {
+                            aggregate.count = metric.value as u32;
+                        }
+                        _ => {
+                            return Err(ParserError::Malformed("unknown summary name suffix"));
+                        }
+                    }
+                }
+
+                for (id, aggregate) in aggregates {
+                    if !processed_metrics.contains(&id) {
+                        let tags = if !aggregate.tags.is_empty() {
+                            Some(aggregate.tags)
+                        } else {
+                            None
+                        };
+                        let summary = Metric::AggregatedSummary {
+                            name: aggregate.name,
+                            quantiles: aggregate.bounds,
+                            values: aggregate.values,
+                            count: aggregate.count,
+                            sum: aggregate.sum,
+                            timestamp: None,
+                            tags,
+                        };
+                        result.push(summary);
                         processed_metrics.insert(id);
                     }
                 }
@@ -825,84 +923,48 @@ mod test {
         let exp = r##"
             # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
             # TYPE rpc_duration_seconds summary
-            rpc_duration_seconds{quantile="0.01"} 3102
-            rpc_duration_seconds{quantile="0.05"} 3272
-            rpc_duration_seconds{quantile="0.5"} 4773
-            rpc_duration_seconds{quantile="0.9"} 9001
-            rpc_duration_seconds{quantile="0.99"} 76656
-            rpc_duration_seconds_sum 1.7560473e+07
-            rpc_duration_seconds_count 2693
+            rpc_duration_seconds{service="a",quantile="0.01"} 3102
+            rpc_duration_seconds{service="a",quantile="0.05"} 3272
+            rpc_duration_seconds{service="a",quantile="0.5"} 4773
+            rpc_duration_seconds{service="a",quantile="0.9"} 9001
+            rpc_duration_seconds{service="a",quantile="0.99"} 76656
+            rpc_duration_seconds_sum{service="a"} 1.7560473e+07
+            rpc_duration_seconds_count{service="a"} 2693
+            # HELP go_gc_duration_seconds A summary of the GC invocation durations.
+            # TYPE go_gc_duration_seconds summary
+            go_gc_duration_seconds{quantile="0"} 0.009460965
+            go_gc_duration_seconds{quantile="0.25"} 0.009793382
+            go_gc_duration_seconds{quantile="0.5"} 0.009870205
+            go_gc_duration_seconds{quantile="0.75"} 0.01001838
+            go_gc_duration_seconds{quantile="1"} 0.018827136
+            go_gc_duration_seconds_sum 4668.551713715
+            go_gc_duration_seconds_count 602767
             "##;
 
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::Gauge {
+                Metric::AggregatedSummary {
                     name: "rpc_duration_seconds".into(),
-                    val: 3102.0,
-                    direction: None,
+                    quantiles: vec![0.01, 0.05, 0.5, 0.9, 0.99],
+                    values: vec![3102.0, 3272.0, 4773.0, 9001.0, 76656.0],
+                    count: 2693,
+                    sum: 1.7560473e+07,
                     timestamp: None,
-                    tags: Some(
-                        vec![("quantile".into(), "0.01".into())]
-                            .into_iter()
-                            .collect()
-                    ),
+                    tags: Some(vec![("service".into(), "a".into())].into_iter().collect()),
                 },
-                Metric::Gauge {
-                    name: "rpc_duration_seconds".into(),
-                    val: 3272.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![("quantile".into(), "0.05".into())]
-                            .into_iter()
-                            .collect()
-                    ),
-                },
-                Metric::Gauge {
-                    name: "rpc_duration_seconds".into(),
-                    val: 4773.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![("quantile".into(), "0.5".into())]
-                            .into_iter()
-                            .collect()
-                    ),
-                },
-                Metric::Gauge {
-                    name: "rpc_duration_seconds".into(),
-                    val: 9001.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![("quantile".into(), "0.9".into())]
-                            .into_iter()
-                            .collect()
-                    ),
-                },
-                Metric::Gauge {
-                    name: "rpc_duration_seconds".into(),
-                    val: 76656.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![("quantile".into(), "0.99".into())]
-                            .into_iter()
-                            .collect()
-                    ),
-                },
-                Metric::Gauge {
-                    name: "rpc_duration_seconds_sum".into(),
-                    val: 17560473.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: None,
-                },
-                Metric::Gauge {
-                    name: "rpc_duration_seconds_count".into(),
-                    val: 2693.0,
-                    direction: None,
+                Metric::AggregatedSummary {
+                    name: "go_gc_duration_seconds".into(),
+                    quantiles: vec![0.0, 0.25, 0.5, 0.75, 1.0],
+                    values: vec![
+                        0.009460965,
+                        0.009793382,
+                        0.009870205,
+                        0.01001838,
+                        0.018827136
+                    ],
+                    count: 602767,
+                    sum: 4668.551713715,
                     timestamp: None,
                     tags: None,
                 },

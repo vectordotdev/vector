@@ -33,6 +33,14 @@ impl Hash for MetricEntry {
                     bucket.to_bits().hash(state);
                 }
             }
+            Metric::AggregatedSummary {
+                name, quantiles, ..
+            } => {
+                name.hash(state);
+                for quantile in quantiles {
+                    quantile.to_bits().hash(state);
+                }
+            }
         }
 
         self.0
@@ -112,6 +120,10 @@ impl Batch for MetricBuffer {
             }
             // set observations are simply deduplicated
             Metric::Set { .. } => {
+                self.metrics.insert(new);
+            }
+            // Summaries cannot be aggregated
+            Metric::AggregatedSummary { .. } => {
                 self.metrics.insert(new);
             }
             _ => {
@@ -626,6 +638,68 @@ mod test {
                     name: "buckets-4".into(),
                     buckets: vec![1.0, 2.0, 4.0],
                     counts: vec![4, 8, 16],
+                    count: 6 * 4,
+                    sum: 10.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_aggregated_summaries() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for _ in 0..10 {
+            for i in 2..5 {
+                let event = Event::Metric(Metric::AggregatedSummary {
+                    name: format!("quantiles-{}", i),
+                    quantiles: vec![1.0, 2.0, 4.0],
+                    values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
+                    count: 6 * i,
+                    sum: 10.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                });
+                events.push(event);
+            }
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+
+        assert_eq!(
+            sorted(&buffer[0].clone().finish()),
+            [
+                Metric::AggregatedSummary {
+                    name: "quantiles-2".into(),
+                    quantiles: vec![1.0, 2.0, 4.0],
+                    values: vec![2.0, 4.0, 8.0],
+                    count: 6 * 2,
+                    sum: 10.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::AggregatedSummary {
+                    name: "quantiles-3".into(),
+                    quantiles: vec![1.0, 2.0, 4.0],
+                    values: vec![3.0, 6.0, 12.0],
+                    count: 6 * 3,
+                    sum: 10.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::AggregatedSummary {
+                    name: "quantiles-4".into(),
+                    quantiles: vec![1.0, 2.0, 4.0],
+                    values: vec![4.0, 8.0, 16.0],
                     count: 6 * 4,
                     sum: 10.0,
                     timestamp: None,

@@ -33,6 +33,7 @@ message Metric {
     Gauge gauge = 3;
     Set set = 4;
     AggregatedHistogram aggregated_histogram = 5;
+    AggregatedSummary aggregated_summary = 6;
   }
 }
 
@@ -55,6 +56,16 @@ message AggregatedHistogram {
   string name = 1;
   repeated double buckets = 2;
   repeated uint32 counts = 3;
+  uint32 count = 4;
+  double sum = 5;
+  google.protobuf.Timestamp timestamp = 7;
+  map<string, string> tags = 8;
+}
+
+message AggregatedSummary {
+  string name = 1;
+  repeated double quantiles = 2;
+  repeated double values = 3;
   uint32 count = 4;
   double sum = 5;
   google.protobuf.Timestamp timestamp = 7;

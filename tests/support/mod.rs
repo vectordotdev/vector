@@ -124,6 +124,18 @@ impl Transform for MockTransform {
                 *count += 1;
                 *sum += self.increase;
             }
+            Event::Metric(Metric::AggregatedSummary {
+                name: _,
+                quantiles: _,
+                values: _,
+                count,
+                sum,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *count += 1;
+                *sum += self.increase;
+            }
             Event::Metric(Metric::Gauge {
                 name: _,
                 val,

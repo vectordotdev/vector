@@ -41,6 +41,15 @@ pub enum Metric {
         timestamp: Option<DateTime<Utc>>,
         tags: Option<HashMap<String, String>>,
     },
+    AggregatedSummary {
+        name: String,
+        quantiles: Vec<f64>,
+        values: Vec<f64>,
+        count: u32,
+        sum: f64,
+        timestamp: Option<DateTime<Utc>>,
+        tags: Option<HashMap<String, String>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -56,6 +65,7 @@ impl Metric {
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
+            Metric::AggregatedSummary { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
         }
     }
@@ -66,6 +76,7 @@ impl Metric {
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
+            Metric::AggregatedSummary { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
         }
     }

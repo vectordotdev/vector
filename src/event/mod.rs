@@ -411,6 +411,27 @@ impl From<proto::EventWrapper> for Event {
                             tags,
                         })
                     }
+                    MetricProto::AggregatedSummary(summary) => {
+                        let timestamp = summary
+                            .timestamp
+                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+
+                        let tags = if !summary.tags.is_empty() {
+                            Some(summary.tags)
+                        } else {
+                            None
+                        };
+
+                        Event::Metric(Metric::AggregatedSummary {
+                            name: summary.name,
+                            quantiles: summary.quantiles,
+                            values: summary.values,
+                            count: summary.count,
+                            sum: summary.sum,
+                            timestamp,
+                            tags,
+                        })
+                    }
                     MetricProto::Gauge(gauge) => {
                         let direction = match gauge.direction() {
                             proto::gauge::Direction::None => None,
@@ -573,6 +594,36 @@ impl From<Event> for proto::EventWrapper {
                 };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::AggregatedHistogram(hist)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::AggregatedSummary {
+                name,
+                quantiles,
+                values,
+                count,
+                sum,
+                timestamp,
+                tags,
+            }) => {
+                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                });
+
+                let tags = tags.unwrap_or_default();
+
+                let summary = proto::AggregatedSummary {
+                    name,
+                    quantiles,
+                    values,
+                    count,
+                    sum,
+                    timestamp,
+                    tags,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::AggregatedSummary(summary)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }
