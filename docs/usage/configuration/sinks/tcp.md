@@ -1,47 +1,57 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22
+
+sidebar_label: "tcp|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/tcp.rs
+status: "prod-ready"
 title: "tcp sink" 
-sidebar_label: "tcp"
 ---
 
 The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "tcp" # enum
-  inputs = ["my-source-id"]
-  address = "92.12.333.224:5000"
+  type = "tcp" # example, must be: "tcp"
+  inputs = ["my-source-id"] # example
+  address = "92.12.333.224:5000" # example
   
   # REQUIRED - requests
-  encoding = "json" # enum
+  encoding = "json" # example, enum
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "tcp" # enum
-  inputs = ["my-source-id"]
-  address = "92.12.333.224:5000"
+  type = "tcp" # example, must be: "tcp"
+  inputs = ["my-source-id"] # example
+  address = "92.12.333.224:5000" # example
   
   # REQUIRED - requests
-  encoding = "json" # enum
+  encoding = "json" # example, enum
   
   # OPTIONAL - General
   healthcheck = true # default
@@ -49,17 +59,17 @@ import TabItem from '@theme/TabItem';
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # no default
-    crt_path = "/path/to/host_certificate.crt" # no default
+    ca_path = "/path/to/certificate_authority.crt" # example, no default
+    crt_path = "/path/to/host_certificate.crt" # example, no default
     enabled = true # default
-    key_pass = "PassWord1" # no default
-    key_path = "/path/to/host_certificate.key" # no default
+    key_pass = "PassWord1" # example, no default
+    key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
     verify_hostname = true # default
 ```
@@ -67,8 +77,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -79,6 +87,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["92.12.333.224:5000"]}
@@ -87,7 +96,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -100,6 +108,7 @@ The TCP address.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -108,7 +117,6 @@ The TCP address.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -120,6 +128,7 @@ Configures the sink specific buffer.
 
 
 <Option
+  common={false}
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
@@ -128,7 +137,6 @@ Configures the sink specific buffer.
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -141,6 +149,7 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
 
 
 <Option
+  common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
@@ -149,7 +158,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -162,6 +170,7 @@ The behavior when the buffer becomes full.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -170,7 +179,6 @@ The behavior when the buffer becomes full.
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -183,6 +191,7 @@ The maximum size of the buffer on the disk.
 
 
 <Option
+  common={false}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -191,7 +200,6 @@ The maximum size of the buffer on the disk.
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"events"}>
 
@@ -209,6 +217,7 @@ The maximum number of [events][docs.event] allowed in the buffer.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
@@ -217,7 +226,6 @@ The maximum number of [events][docs.event] allowed in the buffer.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -230,6 +238,7 @@ The encoding format used to serialize the events before outputting.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -238,7 +247,6 @@ The encoding format used to serialize the events before outputting.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -251,6 +259,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -259,7 +268,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -271,6 +279,7 @@ Configures the TLS options for connections from this sink.
 
 
 <Option
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[true,false]}
@@ -279,7 +288,6 @@ Configures the TLS options for connections from this sink.
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -292,6 +300,7 @@ Enable TLS during connections to the remote.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
@@ -300,7 +309,6 @@ Enable TLS during connections to the remote.
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -313,6 +321,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -321,7 +330,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -334,6 +342,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
@@ -342,7 +351,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -355,6 +363,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["PassWord1"]}
@@ -363,7 +372,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -376,6 +384,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -384,7 +393,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -397,6 +405,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -405,7 +414,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -425,11 +433,6 @@ If `true` (the default), Vector will validate the configured remote host name ag
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -461,37 +464,7 @@ you can set the `healthcheck` option to `false`.
 The `tcp` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `tcp_sink` issues][urls.tcp_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_tcp_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_tcp_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.tcp_sink_issues] - [enhancements][urls.tcp_sink_enhancements] - [bugs][urls.tcp_sink_bugs]
-* [**Source code**][urls.tcp_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+bug
-[urls.new_tcp_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+enhancement
-[urls.tcp_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+bug%22
-[urls.tcp_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+enhancement%22
-[urls.tcp_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22
-[urls.tcp_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/tcp.rs
-[urls.vector_chat]: https://chat.vector.dev

@@ -1,40 +1,50 @@
 ---
+event_types: ["log","metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
+
+sidebar_label: "blackhole|[\"log\",\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
+status: "prod-ready"
 title: "blackhole sink" 
-sidebar_label: "blackhole"
 ---
 
 The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
-  type = "blackhole" # enum
-  inputs = ["my-source-id"]
-  print_amount = 1000
+  type = "blackhole" # example, must be: "blackhole"
+  inputs = ["my-source-id"] # example
+  print_amount = 1000 # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "blackhole" # enum
-  inputs = ["my-source-id"]
-  print_amount = 1000
+  type = "blackhole" # example, must be: "blackhole"
+  inputs = ["my-source-id"] # example
+  print_amount = 1000 # example
   
   # OPTIONAL
   healthcheck = true # default
@@ -43,8 +53,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -55,6 +63,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -63,7 +72,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -76,6 +84,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[1000]}
@@ -84,7 +93,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"int"}
   unit={null}>
 
@@ -99,11 +107,6 @@ The number of events that must be received in order to print a summary of activi
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -135,37 +138,7 @@ you can set the `healthcheck` option to `false`.
 The `blackhole` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `blackhole_sink` issues][urls.blackhole_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_blackhole_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_blackhole_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.blackhole_sink_issues] - [enhancements][urls.blackhole_sink_enhancements] - [bugs][urls.blackhole_sink_bugs]
-* [**Source code**][urls.blackhole_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+bug%22
-[urls.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+enhancement%22
-[urls.blackhole_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
-[urls.blackhole_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
-[urls.new_blackhole_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+bug
-[urls.new_blackhole_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

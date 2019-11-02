@@ -1,53 +1,61 @@
 ---
+event_types: ["metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
+
+sidebar_label: "aws_cloudwatch_metrics|[\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
+status: "beta"
 title: "aws_cloudwatch_metrics sink" 
-sidebar_label: "aws_cloudwatch_metrics"
 ---
 
 The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
-  type = "aws_cloudwatch_metrics" # enum
-  inputs = ["my-source-id"]
-  namespace = "service"
-  region = "us-east-1"
+  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"] # example
+  namespace = "service" # example
+  region = "us-east-1" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "aws_cloudwatch_metrics" # enum
-  inputs = ["my-source-id"]
-  namespace = "service"
-  region = "us-east-1"
+  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"] # example
+  namespace = "service" # example
+  region = "us-east-1" # example
   
   # OPTIONAL
-  endpoint = "127.0.0.0:5000" # no default
+  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 ```
 
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -58,6 +66,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000"]}
@@ -66,7 +75,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -79,6 +87,7 @@ Custom endpoint for use with AWS-compatible services.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -87,7 +96,6 @@ Custom endpoint for use with AWS-compatible services.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -100,6 +108,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
@@ -108,7 +117,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -121,6 +129,7 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
@@ -129,7 +138,6 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -163,11 +171,6 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
-
-### Delivery Guarantee
-
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Environment Variables
 
@@ -222,44 +225,13 @@ useful in distributed setting, however it should be used with care.
 The `aws_cloudwatch_metrics` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `aws_cloudwatch_metrics_sink` issues][urls.aws_cloudwatch_metrics_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_aws_cloudwatch_metrics_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_aws_cloudwatch_metrics_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.aws_cloudwatch_metrics_sink_issues] - [enhancements][urls.aws_cloudwatch_metrics_sink_enhancements] - [bugs][urls.aws_cloudwatch_metrics_sink_bugs]
-* [**Source code**][urls.aws_cloudwatch_metrics_sink_source]
-* [**Service Limits**][urls.aws_cw_metrics_service_limits]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[urls.aws_cloudwatch_metrics_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22+label%3A%22Type%3A+bug%22
-[urls.aws_cloudwatch_metrics_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22+label%3A%22Type%3A+enhancement%22
-[urls.aws_cloudwatch_metrics_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
-[urls.aws_cloudwatch_metrics_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_cw_metrics_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
-[urls.aws_cw_metrics_service_limits]: https://docs.aws.amazon.com/en_pv/AmazonCloudWatch/latest/monitoring/cloudwatch_limits.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[urls.new_aws_cloudwatch_metrics_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_metrics&labels=Type%3A+bug
-[urls.new_aws_cloudwatch_metrics_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_metrics&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

@@ -101,12 +101,12 @@ class Templates
     send("#{component.type}_description", component)
   end
 
-  def component_header(component)
-    render("_partials/_component_header.md", binding).strip
+  def component_guides(component)
+
   end
 
-  def component_resources(component)
-    render("_partials/_component_resources.md", binding).strip
+  def component_header(component)
+    render("_partials/_component_header.md", binding).strip
   end
 
   def component_sections(component)
@@ -121,17 +121,13 @@ class Templates
     render("_partials/_components_table.md", binding).strip
   end
 
-  def component_troubleshooting(component)
-    render("_partials/_component_troubleshooting.md", binding).strip
-  end
-
-  def config_example(options, array: false, path: nil, simple: false, titles: true)
+  def config_example(options, array: false, common: false, path: nil, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    if simple
-      options = options.select(&:simple?)
+    if common
+      options = options.select(&:common?)
     end
 
     options = options.sort_by(&:config_file_sort_token)
@@ -212,7 +208,7 @@ class Templates
     description
   end
 
-  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true, short: false, unit: true)
+  def option_tags(option, default: true, enum: true, example: false, optionality: true, relevant_when: true, type: true, short: false, unit: true)
     tags = []
 
     if optionality
@@ -220,6 +216,12 @@ class Templates
         tags << "required"
       else
         tags << "optional"
+      end
+    end
+
+    if example
+      if option.default.nil?
+        tags << "example"
       end
     end
 
@@ -251,18 +253,8 @@ class Templates
       end
     end
 
-    if example && option.default.nil? && option.enum.nil? && option.examples.any?
-      value = option.examples.first
-
-      if value.is_a?(Hash)
-        tags << "example: #{value.fetch("name")} = #{value.fetch("value").to_toml}"
-      else
-        tags << "example: #{value.to_toml}"
-      end
-    end
-
     if enum && option.enum
-      if short
+      if short && option.enum.keys.length > 1
         tags << "enum"
       else
         escaped_values = option.enum.keys.collect { |enum| enum.to_toml }

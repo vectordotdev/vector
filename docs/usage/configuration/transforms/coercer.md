@@ -1,25 +1,40 @@
 ---
+event_types: ["log","log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
+output_types: ["log"]
+sidebar_label: "coercer|[\"log\",\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
+status: "prod-ready"
 title: "coercer transform" 
-sidebar_label: "coercer"
 ---
 
 The `coercer` transform accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [transforms.my_transform_id]
-  type = "coercer" # enum
-  inputs = ["my-source-id"]
+  # REQUIRED - General
+  type = "coercer" # example, must be: "coercer"
+  inputs = ["my-source-id"] # example
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
-
-
-
-You can learn more
 
 ## Options
 
@@ -30,6 +45,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -38,7 +54,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -50,6 +65,7 @@ Key/Value pairs representing mapped log field types.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string."}}
   examples={[{"name":"status","value":"int"},{"name":"duration","value":"float"},{"name":"success","value":"bool"},{"name":"timestamp","value":"timestamp|%s","comment":"unix"},{"name":"timestamp","value":"timestamp|%+","comment":"iso8601 (date and time)"},{"name":"timestamp","value":"timestamp|%F","comment":"iso8601 (date)"},{"name":"timestamp","value":"timestamp|%a %b %e %T %Y","comment":"custom strftime format"}]}
@@ -58,7 +74,6 @@ Key/Value pairs representing mapped log field types.
   path={"types"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -102,7 +117,7 @@ And the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.<transform-id>]
   type = "coercer"
 
@@ -141,44 +156,7 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `coercer_transform` issues][urls.coercer_transform_issues].
-2. If encountered a bug, please [file a bug report][urls.new_coercer_transform_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_coercer_transform_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-
-### Alternatives
-
-Finally, consider the following alternatives:
-
-* [`lua` transform][docs.transforms.lua]
-
-## Resources
-
-* [**Issues**][urls.coercer_transform_issues] - [enhancements][urls.coercer_transform_enhancements] - [bugs][urls.coercer_transform_bugs]
-* [**Source code**][urls.coercer_transform_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.coercer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+bug%22
-[urls.coercer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+enhancement%22
-[urls.coercer_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
-[urls.coercer_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
-[urls.new_coercer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+coercer&labels=Type%3A+bug
-[urls.new_coercer_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+coercer&labels=Type%3A+enhancement
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[urls.vector_chat]: https://chat.vector.dev

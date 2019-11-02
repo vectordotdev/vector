@@ -1,0 +1,10 @@
+.code-header {
+  background: var(--ifm-color-emphasis-alpha-05);
+  color: var(--ifm-color-emphasis-alpha-40);
+  font-size: 0.8rem;
+  padding: 2px 8px;
+}
+
+.code-header .learn-more {
+  float: right;
+}

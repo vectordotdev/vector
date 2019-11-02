@@ -10,7 +10,7 @@ type = "string"
 examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
 null = true
 relevant_when = {mode = ["tcp", "udp"]}
-simple = true
+common = true
 description = """The TCP or UDP address to listen for connections on, \
 or "systemd#N" to use the Nth socket passed by systemd socket activation. \
 """
@@ -50,7 +50,7 @@ type = "string"
 examples = ["/path/to/socket"]
 null = true
 relevant_when = {mode = "unix"}
-simple = true
+common = true
 description = """\
 The unix socket path. *This should be absolute path.*
 """

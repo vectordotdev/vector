@@ -1,42 +1,52 @@
 ---
+event_types: ["metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
+
+sidebar_label: "datadog_metrics|[\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
+status: "beta"
 title: "datadog_metrics sink" 
-sidebar_label: "datadog_metrics"
 ---
 
 The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
-  type = "datadog_metrics" # enum
-  inputs = ["my-source-id"]
-  api_key = "3111111111111111aaaaaaaaaaaaaaaa"
-  namespace = "service"
+  type = "datadog_metrics" # example, must be: "datadog_metrics"
+  inputs = ["my-source-id"] # example
+  api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
+  namespace = "service" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "datadog_metrics" # enum
-  inputs = ["my-source-id"]
-  api_key = "3111111111111111aaaaaaaaaaaaaaaa"
-  namespace = "service"
+  type = "datadog_metrics" # example, must be: "datadog_metrics"
+  inputs = ["my-source-id"] # example
+  api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
+  namespace = "service" # example
   
   # OPTIONAL - General
   healthcheck = true # default
@@ -59,8 +69,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -70,6 +78,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["3111111111111111aaaaaaaaaaaaaaaa"]}
@@ -78,7 +87,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -91,6 +99,7 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 
 
 <Option
+  common={false}
   defaultValue={20}
   enumValues={null}
   examples={[20]}
@@ -99,7 +108,6 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -112,6 +120,7 @@ The maximum size of a batch before it is flushed.
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -120,7 +129,6 @@ The maximum size of a batch before it is flushed.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -133,6 +141,7 @@ The maximum age of a batch before it is flushed.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -141,7 +150,6 @@ The maximum age of a batch before it is flushed.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -154,6 +162,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={false}
   defaultValue={"https://api.datadoghq.com"}
   enumValues={null}
   examples={["https://api.datadoghq.com","https://api.datadoghq.eu"]}
@@ -162,7 +171,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -175,6 +183,7 @@ Datadog endpoint to send metrics to.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
@@ -183,7 +192,6 @@ Datadog endpoint to send metrics to.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -196,6 +204,7 @@ A prefix that will be added to all metric names.
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -204,7 +213,6 @@ A prefix that will be added to all metric names.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -217,6 +225,7 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -225,7 +234,6 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -238,6 +246,7 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -246,7 +255,6 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -259,6 +267,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Option
+  common={false}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
@@ -267,7 +276,6 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -280,6 +288,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -288,7 +297,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -301,6 +309,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -309,7 +318,6 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -324,11 +332,6 @@ The amount of time to wait before attempting a failed request again. See [Retry 
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -393,38 +396,8 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `datadog_metrics_sink` issues][urls.datadog_metrics_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_datadog_metrics_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_datadog_metrics_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.datadog_metrics_sink_issues] - [enhancements][urls.datadog_metrics_sink_enhancements] - [bugs][urls.datadog_metrics_sink_bugs]
-* [**Source code**][urls.datadog_metrics_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.datadog]: https://www.datadoghq.com
-[urls.datadog_metrics_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22+label%3A%22Type%3A+bug%22
-[urls.datadog_metrics_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22+label%3A%22Type%3A+enhancement%22
-[urls.datadog_metrics_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
-[urls.datadog_metrics_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
-[urls.new_datadog_metrics_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+datadog_metrics&labels=Type%3A+bug
-[urls.new_datadog_metrics_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+datadog_metrics&labels=Type%3A+enhancement
 [urls.new_datadog_metrics_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+datadog_metrics
-[urls.vector_chat]: https://chat.vector.dev

@@ -1,45 +1,55 @@
 ---
+event_types: ["log","metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
+
+sidebar_label: "console|[\"log\",\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
+status: "prod-ready"
 title: "console sink" 
-sidebar_label: "console"
 ---
 
 The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "console" # enum
-  inputs = ["my-source-id"]
+  type = "console" # example, must be: "console"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - requests
-  encoding = "json" # enum
+  encoding = "json" # example, enum
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "console" # enum
-  inputs = ["my-source-id"]
+  type = "console" # example, must be: "console"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - requests
-  encoding = "json" # enum
+  encoding = "json" # example, enum
   
   # OPTIONAL - General
   healthcheck = true # default
@@ -50,8 +60,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -61,6 +69,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
@@ -69,7 +78,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -82,6 +90,7 @@ The encoding format used to serialize the events before outputting.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -90,7 +99,6 @@ The encoding format used to serialize the events before outputting.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -103,6 +111,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={false}
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
@@ -111,7 +120,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -126,11 +134,6 @@ The [standard stream][urls.standard_streams] to write to.
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -162,40 +165,10 @@ you can set the `healthcheck` option to `false`.
 The `console` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `console_sink` issues][urls.console_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_console_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_console_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.console_sink_issues] - [enhancements][urls.console_sink_enhancements] - [bugs][urls.console_sink_bugs]
-* [**Source code**][urls.console_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+bug%22
-[urls.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+enhancement%22
-[urls.console_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
-[urls.console_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
-[urls.new_console_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+bug
-[urls.new_console_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+enhancement
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
 [urls.stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)
-[urls.vector_chat]: https://chat.vector.dev

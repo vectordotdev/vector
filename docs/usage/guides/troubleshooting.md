@@ -12,7 +12,12 @@ and operator friendliness are _very_ important to us, and we urge you to
 [open an issue][urls.new_bug_report] to let us know what's going on. This helps
 us improve Vector.
 
-## 1. Check Vector's logs
+## 1. Check for any known issues
+
+Start by searching [Vector's issues][urls.vector_issues]. You can filter
+to the specific component via the `lable` filter.
+
+## 2. Check Vector's logs
 
 We've taken great care to ensure Vector's logs are high-quality and helpful.
 In most cases the logs will surface the issue:
@@ -49,7 +54,7 @@ tail -f /usr/local/var/log/vector.log
 {% endtab %}
 {% endtabs %}
 
-## 2. Enable backtraces
+## 3. Enable backtraces
 
 {% hint style="info" %}
 You can skip to the [next section](#3-enable-debug-logging) if you do not
@@ -66,7 +71,7 @@ RUST_BACKTRACE=full vector --config=/etc/vector/vector.toml
 Backtraces are _critical_ for debugging errors. Once you have the backtrace
 please [open a bug report issue][urls.new_bug_report].
 
-## 3. Enable debug logging
+## 4. Enable debug logging
 
 If you do not see an error in your Vector logs, and the Vector logs appear
 to be frozen, then you'll want to drop your log level to `debug`:
@@ -89,7 +94,7 @@ vector --verbose --config=/etc/vector/vector.toml
 {% endtab %}
 {% endtabs %}
 
-## 4. Get help
+## 5. Get help
 
 At this point we recommend reaching out to the community for help.
 
@@ -102,3 +107,4 @@ At this point we recommend reaching out to the community for help.
 [urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_issues]: https://github.com/timberio/vector/issues

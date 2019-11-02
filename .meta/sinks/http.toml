@@ -44,7 +44,7 @@ description = "Options for custom headers."
 [sinks.http.options.headers.options."*"]
 type = "string"
 examples = [
-  {name = "Authorization", value = "my-token"},
+  {name = "Authorization", value = "${TOKEN_ENV_VAR}"},
   {name = "X-Powered-By", value = "Vector"},
 ]
 null = false

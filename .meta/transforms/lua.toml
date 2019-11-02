@@ -31,7 +31,7 @@ description = "The inline Lua source to evaluate."
 type = "[string]"
 examples = [["/etc/vector/lua"]]
 null = true
-simple = true
+common = true
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\

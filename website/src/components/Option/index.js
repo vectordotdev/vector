@@ -1,20 +1,21 @@
 import React, {useState} from 'react';
 import classnames from 'classnames';
 import {MDXProvider} from '@mdx-js/react';
+import CodeHeader from '@site/src/components/CodeHeader';
 import CodeBlock from '@theme/CodeBlock';
 
 import './styles.css';
 
+function isObject(a) {
+  return (!!a) && (a.constructor === Object);
+};
+
 function toTOML(value) {
-  if (typeof(value) == 'string') {
-    return `"${value}"`;
-  } else {
-    return value.toString();
-  }
+  return JSON.stringify(value);
 }
 
 function exampleToTOML(name, example) {
-  if (typeof(example) == 'object') {
+  if (isObject(example)) {
     return `${example.name} = ${toTOML(example.value)}`;
   } else if (name) {
     return `${name} = ${toTOML(example)}`;
@@ -50,9 +51,13 @@ function Examples({name, path, values}) {
   }
 
   return (
-    <CodeBlock className="language-toml">
-      {code}
-    </CodeBlock>
+    <div>
+      <CodeHeader fileName="vector.toml" />
+
+      <CodeBlock className="language-toml">
+        {code}
+      </CodeBlock>
+    </div>
   );
 }
 
@@ -95,10 +100,11 @@ function OptionFooter({defaultValue, enumValues, examples, name, path, relevantW
   }
 }
 
-function Option({children, defaultValue, depth, enumValues, examples, name, path, relevantWhen, type, unit, required}) {
+function Option({children, common, defaultValue, depth, enumValues, examples, name, path, relevantWhen, type, unit, required}) {
   return (
     <div className={classnames('option', required ? 'option-required' : '')} required={required}>
       <div className="badges">
+        {common && <span className="badge badge--primary" title="Common options are popular options that we recommend for getting started">common</span>}
         <span className="badge badge--secondary">{type}</span>
         {unit && <span className="badge badge--secondary">{unit}</span>}
         {required ?

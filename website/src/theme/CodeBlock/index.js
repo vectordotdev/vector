@@ -8,6 +8,8 @@ import styles from './styles.module.css';
 import Prism from 'prism-react-renderer/prism';
 
 (typeof global !== 'undefined' ? global : window).Prism = Prism;
+require('prismjs/components/prism-protobuf');
+require('prismjs/components/prism-rust');
 require('prismjs/components/prism-toml');
 
 export default ({children, className: languageClassName}) => {

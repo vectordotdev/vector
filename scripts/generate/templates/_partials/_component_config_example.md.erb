@@ -1,24 +1,29 @@
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <%- if component.advanced_relevant? -%>
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 <%- end -%>
 
+<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>"/ >
+
 ```toml
-<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", simple: true) %>
+<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", common: true) %>
 ```
 
 <%- if component.advanced_relevant? -%>
 </TabItem>
 <TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>" />
 
 ```toml
 <%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
@@ -30,5 +35,3 @@ import TabItem from '@theme/TabItem';
 <% if component.advanced_relevant? -%>
 </Tabs>
 <%- end -%>
-
-You can learn more

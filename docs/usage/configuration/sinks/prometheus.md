@@ -1,42 +1,52 @@
 ---
+event_types: ["metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
+
+sidebar_label: "prometheus|[\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
+status: "beta"
 title: "prometheus sink" 
-sidebar_label: "prometheus"
 ---
 
 The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
-  type = "prometheus" # enum
-  inputs = ["my-source-id"]
-  address = "0.0.0.0:9598"
-  namespace = "service"
+  type = "prometheus" # example, must be: "prometheus"
+  inputs = ["my-source-id"] # example
+  address = "0.0.0.0:9598" # example
+  namespace = "service" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "prometheus" # enum
-  inputs = ["my-source-id"]
-  address = "0.0.0.0:9598"
-  namespace = "service"
+  type = "prometheus" # example, must be: "prometheus"
+  inputs = ["my-source-id"] # example
+  address = "0.0.0.0:9598" # example
+  namespace = "service" # example
   
   # OPTIONAL
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
@@ -47,8 +57,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -58,6 +66,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9598"]}
@@ -66,7 +75,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -79,6 +87,7 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping
 
 
 <Option
+  common={false}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
   enumValues={null}
   examples={[[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]]}
@@ -87,7 +96,6 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"[float]"}
   unit={"seconds"}>
 
@@ -100,6 +108,7 @@ Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -108,7 +117,6 @@ Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -121,6 +129,7 @@ Enables/disables the sink healthcheck upon start.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
@@ -129,7 +138,6 @@ Enables/disables the sink healthcheck upon start.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -293,11 +301,6 @@ Due to the nature of Prometheus' pull model design the `prometheus`
 sink does not utilize a buffer. You can read more about this in the [in-memory \
 aggregation](#in-memory-aggregation) section.
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -336,7 +339,7 @@ examples on how you should align them.
 
 The `buckets` option defines the global default buckets for histograms:
 
-```coffeescript
+```toml
 [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 ```
 
@@ -394,22 +397,7 @@ by default. [issue #710][urls.issue_710] addresses the ability to define metrics
 including the ability change their types (such as changing them to `summary`
 types).
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `prometheus_sink` issues][urls.prometheus_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_prometheus_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_prometheus_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-### OOM Errors
+#### OOM Errors
 
 If you experience out of memory (OOM) errors it's likely you're using extremely
 [high cardinality](#high-cardinality) metric names or labels. This is
@@ -419,11 +407,6 @@ logs for high cardinality analysis. [Issue #387][urls.issue_387] discusses the
 ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
 
-## Resources
-
-* [**Issues**][urls.prometheus_sink_issues] - [enhancements][urls.prometheus_sink_enhancements] - [bugs][urls.prometheus_sink_bugs]
-* [**Source code**][urls.prometheus_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric#counters]: ../../../about/data-model/metric.md#counters
@@ -432,24 +415,14 @@ discussion with your use case if you find this to be a problem.
 [docs.data-model.metric#histograms]: ../../../about/data-model/metric.md#histograms
 [docs.data-model.metric#sets]: ../../../about/data-model/metric.md#sets
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710
-[urls.new_prometheus_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus&labels=Type%3A+bug
-[urls.new_prometheus_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus&labels=Type%3A+enhancement
 [urls.prometheus]: https://prometheus.io/
 [urls.prometheus_counter]: https://prometheus.io/docs/concepts/metric_types/#counter
 [urls.prometheus_gauge]: https://prometheus.io/docs/concepts/metric_types/#gauge
 [urls.prometheus_high_cardinality]: https://prometheus.io/docs/practices/naming/#labels
 [urls.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
 [urls.prometheus_metric_naming]: https://prometheus.io/docs/practices/naming/#metric-names
-[urls.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+bug%22
-[urls.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+enhancement%22
-[urls.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
-[urls.prometheus_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
 [urls.prometheus_summary]: https://prometheus.io/docs/concepts/metric_types/#summary
 [urls.prometheus_text_based_exposition_format]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format
 [urls.statsd_set]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#sets
-[urls.vector_chat]: https://chat.vector.dev

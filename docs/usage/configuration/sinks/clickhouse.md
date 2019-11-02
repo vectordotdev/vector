@@ -1,49 +1,61 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
+
+sidebar_label: "clickhouse|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
+status: "beta"
 title: "clickhouse sink" 
-sidebar_label: "clickhouse"
 ---
 
 The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "clickhouse" # enum
-  inputs = ["my-source-id"]
-  host = "http://localhost:8123"
-  table = "mytable"
+  type = "clickhouse" # example, must be: "clickhouse"
+  inputs = ["my-source-id"] # example
+  host = "http://localhost:8123" # example
+  table = "mytable" # example
   
-  # OPTIONAL - requests
-  compression = "gzip" # default, enum
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password" # example
+    user = "username" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "clickhouse" # enum
-  inputs = ["my-source-id"]
-  host = "http://localhost:8123"
-  table = "mytable"
+  type = "clickhouse" # example, must be: "clickhouse"
+  inputs = ["my-source-id"] # example
+  host = "http://localhost:8123" # example
+  table = "mytable" # example
   
   # OPTIONAL - General
-  database = "mydatabase" # no default
+  database = "mydatabase" # example, no default
   healthcheck = true # default
   
   # OPTIONAL - Batching
@@ -59,19 +71,19 @@ import TabItem from '@theme/TabItem';
   retry_backoff_secs = 9223372036854775807 # default, seconds
   
   # OPTIONAL - requests
-  compression = "gzip" # default, enum
+  compression = "gzip" # default, must be: "gzip" (if supplied)
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password"
-    user = "username"
+    password = "password" # example
+    user = "username" # example
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # no default
-    crt_path = "/path/to/host_certificate.crt" # no default
-    key_pass = "PassWord1" # no default
-    key_path = "/path/to/host_certificate.key" # no default
+    ca_path = "/path/to/certificate_authority.crt" # example, no default
+    crt_path = "/path/to/host_certificate.crt" # example, no default
+    key_pass = "PassWord1" # example, no default
+    key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
     verify_hostname = true # default
 ```
@@ -79,8 +91,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -91,6 +101,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -99,7 +110,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -111,6 +121,7 @@ Options for basic authentication.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["password","${PASSWORD_ENV_VAR}"]}
@@ -119,7 +130,6 @@ Options for basic authentication.
   path={"basic_auth"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -132,6 +142,7 @@ The basic authentication password.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["username"]}
@@ -140,7 +151,6 @@ The basic authentication password.
   path={"basic_auth"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -158,6 +168,7 @@ The basic authentication user name.
 
 
 <Option
+  common={false}
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
@@ -166,7 +177,6 @@ The basic authentication user name.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -179,6 +189,7 @@ The maximum size of a batch before it is flushed.
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -187,7 +198,6 @@ The maximum size of a batch before it is flushed.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -200,6 +210,7 @@ The maximum age of a batch before it is flushed.
 
 
 <Option
+  common={false}
   defaultValue={"gzip"}
   enumValues={{"gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
   examples={["gzip"]}
@@ -208,7 +219,6 @@ The maximum age of a batch before it is flushed.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -221,6 +231,7 @@ The compression strategy used to compress the encoded event data before outputti
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["mydatabase"]}
@@ -229,7 +240,6 @@ The compression strategy used to compress the encoded event data before outputti
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -242,6 +252,7 @@ The database that contains the stable that data will be inserted into.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -250,7 +261,6 @@ The database that contains the stable that data will be inserted into.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -263,6 +273,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["http://localhost:8123"]}
@@ -271,7 +282,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -284,6 +294,7 @@ The host url of the [Clickhouse][urls.clickhouse] server.
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -292,7 +303,6 @@ The host url of the [Clickhouse][urls.clickhouse] server.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -305,6 +315,7 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -313,7 +324,6 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -326,6 +336,7 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -334,7 +345,6 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -347,6 +357,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Option
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -355,7 +366,6 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -368,6 +378,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 
 <Option
+  common={false}
   defaultValue={9223372036854775807}
   enumValues={null}
   examples={[9223372036854775807]}
@@ -376,7 +387,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -389,6 +399,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Option
+  common={false}
   defaultValue={9223372036854775807}
   enumValues={null}
   examples={[9223372036854775807]}
@@ -397,7 +408,6 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -410,6 +420,7 @@ The amount of time to wait before attempting a failed request again. See [Retry 
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["mytable"]}
@@ -418,7 +429,6 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -431,6 +441,7 @@ The table that data will be inserted into.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -439,7 +450,6 @@ The table that data will be inserted into.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -451,6 +461,7 @@ Configures the TLS options for connections from this sink.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
@@ -459,7 +470,6 @@ Configures the TLS options for connections from this sink.
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -472,6 +482,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -480,7 +491,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -493,6 +503,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
@@ -501,7 +512,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -514,6 +524,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["PassWord1"]}
@@ -522,7 +533,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -535,6 +545,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -543,7 +554,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -556,6 +566,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -564,7 +575,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -584,11 +594,6 @@ If `true` (the default), Vector will validate the configured remote host name ag
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -634,40 +639,10 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `clickhouse_sink` issues][urls.clickhouse_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_clickhouse_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_clickhouse_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.clickhouse_sink_issues] - [enhancements][urls.clickhouse_sink_enhancements] - [bugs][urls.clickhouse_sink_bugs]
-* [**Source code**][urls.clickhouse_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
-[urls.clickhouse_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22+label%3A%22Type%3A+bug%22
-[urls.clickhouse_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22+label%3A%22Type%3A+enhancement%22
-[urls.clickhouse_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
-[urls.clickhouse_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
 [urls.gzip]: https://www.gzip.org/
-[urls.new_clickhouse_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse&labels=Type%3A+bug
-[urls.new_clickhouse_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse&labels=Type%3A+enhancement
 [urls.new_clickhouse_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse
-[urls.vector_chat]: https://chat.vector.dev

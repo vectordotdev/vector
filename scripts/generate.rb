@@ -24,7 +24,6 @@ require_relative "setup"
 require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
-require_relative "generate/post_processors/toml_syntax_switcher"
 require_relative "generate/templates"
 
 require_relative "generate/core_ext/hash"
@@ -69,7 +68,6 @@ def link_valid?(value)
 end
 
 def post_process(content, doc, links)
-  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content = PostProcessors::SectionSorter.sort!(content)
   content = PostProcessors::SectionReferencer.reference!(content)
   content = PostProcessors::LinkDefiner.define!(content, doc, links)

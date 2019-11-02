@@ -1,35 +1,39 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
+
+sidebar_label: "aws_s3|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
+status: "beta"
 title: "aws_s3 sink" 
-sidebar_label: "aws_s3"
 ---
 
 The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_s3" # enum
-  inputs = ["my-source-id"]
-  bucket = "my-bucket"
-  region = "us-east-1"
-  
-  # OPTIONAL - Batching
-  batch_size = 10490000 # default, bytes
-  batch_timeout = 300 # default, seconds
+  type = "aws_s3" # example, must be: "aws_s3"
+  inputs = ["my-source-id"] # example
+  bucket = "my-bucket" # example
+  region = "us-east-1" # example
   
   # OPTIONAL - Object Names
   key_prefix = "date=%F/" # default
@@ -38,16 +42,18 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_s3" # enum
-  inputs = ["my-source-id"]
-  bucket = "my-bucket"
-  region = "us-east-1"
+  type = "aws_s3" # example, must be: "aws_s3"
+  inputs = ["my-source-id"] # example
+  bucket = "my-bucket" # example
+  region = "us-east-1" # example
   
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # no default
+  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   
   # OPTIONAL - Batching
@@ -71,7 +77,7 @@ import TabItem from '@theme/TabItem';
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
@@ -79,8 +85,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -91,6 +95,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
@@ -99,7 +104,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"int"}
   unit={"bytes"}>
 
@@ -112,6 +116,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 
 <Option
+  common={false}
   defaultValue={300}
   enumValues={null}
   examples={[300]}
@@ -120,7 +125,6 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   path={null}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"int"}
   unit={"seconds"}>
 
@@ -133,6 +137,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my-bucket"]}
@@ -141,7 +146,6 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -154,6 +158,7 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -162,7 +167,6 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -174,6 +178,7 @@ Configures the sink specific buffer.
 
 
 <Option
+  common={false}
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
@@ -182,7 +187,6 @@ Configures the sink specific buffer.
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -195,6 +199,7 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
 
 
 <Option
+  common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
@@ -203,7 +208,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -216,6 +220,7 @@ The behavior when the buffer becomes full.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -224,7 +229,6 @@ The behavior when the buffer becomes full.
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -237,6 +241,7 @@ The maximum size of the buffer on the disk.
 
 
 <Option
+  common={false}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -245,7 +250,6 @@ The maximum size of the buffer on the disk.
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"events"}>
 
@@ -263,6 +267,7 @@ The maximum number of [events][docs.event] allowed in the buffer.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000"]}
@@ -271,7 +276,6 @@ The maximum number of [events][docs.event] allowed in the buffer.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -284,6 +288,7 @@ Custom endpoint for use with AWS-compatible services.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -292,7 +297,6 @@ Custom endpoint for use with AWS-compatible services.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -305,6 +309,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
 
 
 <Option
+  common={false}
   defaultValue={"log"}
   enumValues={null}
   examples={[true,false]}
@@ -313,7 +318,6 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -326,6 +330,7 @@ The extension to use in the object name.
 
 
 <Option
+  common={false}
   defaultValue={"%s"}
   enumValues={null}
   examples={["%s"]}
@@ -334,7 +339,6 @@ The extension to use in the object name.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -347,6 +351,7 @@ The format of the resulting object file name. [`strftime` specifiers][urls.strft
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -355,7 +360,6 @@ The format of the resulting object file name. [`strftime` specifiers][urls.strft
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -368,6 +372,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={true}
   defaultValue={"date=%F"}
   enumValues={null}
   examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
@@ -376,7 +381,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -389,6 +393,7 @@ A prefix to apply to all object key names. This should be used to partition your
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -397,7 +402,6 @@ A prefix to apply to all object key names. This should be used to partition your
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -410,6 +414,7 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -418,7 +423,6 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -431,6 +435,7 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
@@ -439,7 +444,6 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -452,6 +456,7 @@ The [AWS region][urls.aws_s3_regions] of the target S3 bucket.
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -460,7 +465,6 @@ The [AWS region][urls.aws_s3_regions] of the target S3 bucket.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -473,6 +477,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Option
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -481,7 +486,6 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -494,6 +498,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -502,7 +507,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -515,6 +519,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -523,7 +528,6 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -614,11 +618,6 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 Vector has plans to support column formats, such as ORC and Parquet, in
 [`v0.6`][urls.vector_roadmap].
-
-### Delivery Guarantee
-
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Environment Variables
 
@@ -752,6 +751,8 @@ Vector has plans to support [columnar formats](#columnar-formats) in
 [`v0.6`][urls.vector_roadmap] which will allows for very fast and efficient querying on
 S3.
 
+
+
 ### Template Syntax
 
 The `key_prefix` options
@@ -762,7 +763,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [sinks.my_aws_s3_sink_id]
   # ...
   key_prefix = "date=%F/"
@@ -777,37 +778,14 @@ enabling dynamic values derived from the event's data. This syntax accepts
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `aws_s3_sink` issues][urls.aws_s3_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_aws_s3_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_aws_s3_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.aws_s3_sink_issues] - [enhancements][urls.aws_s3_sink_enhancements] - [bugs][urls.aws_s3_sink_bugs]
-* [**Source code**][urls.aws_s3_sink_source]
-* [**Service Limits**][urls.aws_s3_service_limits]
-
 
 [assets.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
-[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_athena]: https://aws.amazon.com/athena/
 [urls.aws_athena_console]: https://console.aws.amazon.com/athena/home
@@ -815,16 +793,8 @@ issue, please:
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
-[urls.aws_s3_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
-[urls.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+bug%22
-[urls.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+enhancement%22
-[urls.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-[urls.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[urls.new_aws_s3_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+bug
-[urls.new_aws_s3_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+enhancement
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
-[urls.vector_chat]: https://chat.vector.dev
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open

@@ -1,21 +1,29 @@
 ---
+event_types: ["log","log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
+output_types: ["log"]
+sidebar_label: "lua|[\"log\",\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
+status: "beta"
 title: "lua transform" 
-sidebar_label: "lua"
 ---
 
 The `lua` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "lua" # enum
-  inputs = ["my-source-id"]
+  type = "lua" # example, must be: "lua"
+  inputs = ["my-source-id"] # example
   source = """
 require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -29,12 +37,8 @@ end
 """
   
   # OPTIONAL
-  search_dirs = ["/etc/vector/lua"] # no default
+  search_dirs = ["/etc/vector/lua"] # example, no default
 ```
-
-
-
-You can learn more
 
 ## Options
 
@@ -45,6 +49,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[["/etc/vector/lua"]]}
@@ -53,7 +58,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"[string]"}
   unit={null}>
 
@@ -66,6 +70,7 @@ A list of directories search when loading a Lua file via the `require` function.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["require(\"script\") # a `script.lua` file must be in your `search_dirs`\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
@@ -74,7 +79,6 @@ A list of directories search when loading a Lua file via the `require` function.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -188,52 +192,13 @@ Vector provides a `search_dirs` option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `lua_transform` issues][urls.lua_transform_issues].
-2. If encountered a bug, please [file a bug report][urls.new_lua_transform_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_lua_transform_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-
-### Alternatives
-
-Finally, consider the following alternatives:
-
-* [`lua` transform][docs.transforms.lua]
-
-## Resources
-
-* [**Issues**][urls.lua_transform_issues] - [enhancements][urls.lua_transform_enhancements] - [bugs][urls.lua_transform_bugs]
-* [**Source code**][urls.lua_transform_source]
-* [**Lua Reference Manual**][urls.lua_manual]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log#default-schema]: ../../../about/data-model/log.md#default-schema
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data_model]: ../../../about/data-model
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/
-[urls.lua_manual]: http://www.lua.org/manual/5.1/manual.html
 [urls.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
 [urls.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
-[urls.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22+label%3A%22Type%3A+bug%22
-[urls.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22+label%3A%22Type%3A+enhancement%22
-[urls.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
-[urls.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 [urls.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
-[urls.new_lua_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua&labels=Type%3A+bug
-[urls.new_lua_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

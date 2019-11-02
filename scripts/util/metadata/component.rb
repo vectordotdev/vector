@@ -76,6 +76,20 @@ class Component
     options_list.select(&:context?)
   end
 
+  def event_types
+    types = []
+
+    if respond_to?(:input_types)
+      types += input_types
+    end
+
+    if respond_to?(:output_types)
+      types += output_types
+    end
+
+    types
+  end
+
   def options_list
     @options_list ||= options.to_h.values.sort
   end
@@ -96,6 +110,10 @@ class Component
     options_list.select do |option|
       !["type", "inputs"].include?(option.name)
     end
+  end
+
+  def status
+    beta? ? "beta" : "prod-ready"
   end
 
   def templateable_options

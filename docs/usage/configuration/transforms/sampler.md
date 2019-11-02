@@ -1,50 +1,58 @@
 ---
+event_types: ["log","log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
+output_types: ["log"]
+sidebar_label: "sampler|[\"log\",\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
+status: "beta"
 title: "sampler transform" 
-sidebar_label: "sampler"
 ---
 
 The `sampler` transform accepts [`log`][docs.data-model.log] events and allows you to sample events with a configurable rate.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [transforms.my_transform_id]
-  type = "sampler" # enum
-  inputs = ["my-source-id"]
-  rate = 10
+  type = "sampler" # example, must be: "sampler"
+  inputs = ["my-source-id"] # example
+  rate = 10 # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "sampler" # enum
-  inputs = ["my-source-id"]
-  rate = 10
+  type = "sampler" # example, must be: "sampler"
+  inputs = ["my-source-id"] # example
+  rate = 10 # example
   
   # OPTIONAL
-  pass_list = ["[error]", "field2"] # no default
+  pass_list = ["[error]", "field2"] # example, no default
 ```
 
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -55,6 +63,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[["[error]","field2"]]}
@@ -63,7 +72,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"[string]"}
   unit={null}>
 
@@ -76,6 +84,7 @@ A list of regular expression patterns to exclude events from sampling. If an eve
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[10]}
@@ -84,7 +93,6 @@ A list of regular expression patterns to exclude events from sampling. If an eve
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"int"}
   unit={null}>
 
@@ -109,43 +117,6 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `sampler_transform` issues][urls.sampler_transform_issues].
-2. If encountered a bug, please [file a bug report][urls.new_sampler_transform_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_sampler_transform_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-
-### Alternatives
-
-Finally, consider the following alternatives:
-
-* [`lua` transform][docs.transforms.lua]
-
-## Resources
-
-* [**Issues**][urls.sampler_transform_issues] - [enhancements][urls.sampler_transform_enhancements] - [bugs][urls.sampler_transform_bugs]
-* [**Source code**][urls.sampler_transform_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+bug
-[urls.new_sampler_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+enhancement
-[urls.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22+label%3A%22Type%3A+bug%22
-[urls.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22+label%3A%22Type%3A+enhancement%22
-[urls.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
-[urls.sampler_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
-[urls.vector_chat]: https://chat.vector.dev

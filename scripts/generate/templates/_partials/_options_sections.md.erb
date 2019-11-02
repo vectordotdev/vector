@@ -9,6 +9,7 @@ import Options from '@site/src/components/Options';
 <%- full_path = [path, option.name].compact.join(".") -%>
 
 <Option
+  common={<%= option.common? %>}
   defaultValue={<%= option.default.to_json %>}
   enumValues={<%= option.enum.to_json %>}
   examples={<%= option.examples.to_json %>}
@@ -17,7 +18,6 @@ import Options from '@site/src/components/Options';
   path={<%= path.to_json %>}
   relevantWhen={<%= option.relevant_when.to_json %>}
   required={<%= option.required? %>}
-  simple={<%= option.simple? %>}
   type={<%= option.type.to_json %>}
   unit={<%= option.unit.to_json %>}>
 

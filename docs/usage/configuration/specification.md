@@ -17,7 +17,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
 {% code-tabs %}
 {% code-tabs-item title="/etc/vector/vector.spec.toml" %}
-```coffeescript
+```toml
 #                                    __   __  __  
 #                                    \ \ / / / /
 #                                     \ V / / /
@@ -85,7 +85,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  include_labels = "key=value"
+  include_labels = "label_key=label_value"
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
@@ -122,7 +122,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  exclude = ["/var/log/nginx/access.log"]
+  exclude = ["/var/log/nginx/*.[0-9]*.log"]
 
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
@@ -2463,6 +2463,7 @@ end
     # 
     # * required
     # * type: string
+    Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
 
   #
@@ -2787,7 +2788,7 @@ end
     # 
     # * required
     # * type: string
-    Authorization = "my-token"
+    Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
 
   #

@@ -1,47 +1,57 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22
+
+sidebar_label: "aws_kinesis_streams|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
+status: "beta"
 title: "aws_kinesis_streams sink" 
-sidebar_label: "aws_kinesis_streams"
 ---
 
 The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
-  type = "aws_kinesis_streams" # enum
-  inputs = ["my-source-id"]
-  region = "us-east-1"
-  stream_name = "my-stream"
+  type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
+  stream_name = "my-stream" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_kinesis_streams" # enum
-  inputs = ["my-source-id"]
-  region = "us-east-1"
-  stream_name = "my-stream"
+  type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
+  stream_name = "my-stream" # example
   
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # no default
+  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
-  partition_key_field = "user_id" # no default
+  partition_key_field = "user_id" # example, no default
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
@@ -58,7 +68,7 @@ import TabItem from '@theme/TabItem';
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
@@ -66,8 +76,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -78,6 +86,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
@@ -86,7 +95,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -99,6 +107,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -107,7 +116,6 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -120,6 +128,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -128,7 +137,6 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -140,6 +148,7 @@ Configures the sink specific buffer.
 
 
 <Option
+  common={false}
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
@@ -148,7 +157,6 @@ Configures the sink specific buffer.
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -161,6 +169,7 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
 
 
 <Option
+  common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
@@ -169,7 +178,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -182,6 +190,7 @@ The behavior when the buffer becomes full.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -190,7 +199,6 @@ The behavior when the buffer becomes full.
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -203,6 +211,7 @@ The maximum size of the buffer on the disk.
 
 
 <Option
+  common={false}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -211,7 +220,6 @@ The maximum size of the buffer on the disk.
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"events"}>
 
@@ -229,6 +237,7 @@ The maximum number of [events][docs.event] allowed in the buffer.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000"]}
@@ -237,7 +246,6 @@ The maximum number of [events][docs.event] allowed in the buffer.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -250,6 +258,7 @@ Custom endpoint for use with AWS-compatible services.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -258,7 +267,6 @@ Custom endpoint for use with AWS-compatible services.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -271,6 +279,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}
@@ -279,7 +288,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -292,6 +300,7 @@ The log field used as the Kinesis record's partition key value. See [Partitionin
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -300,7 +309,6 @@ The log field used as the Kinesis record's partition key value. See [Partitionin
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -313,6 +321,7 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -321,7 +330,6 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -334,6 +342,7 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
@@ -342,7 +351,6 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -355,6 +363,7 @@ The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides.
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -363,7 +372,6 @@ The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -376,6 +384,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Option
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -384,7 +393,6 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -397,6 +405,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -405,7 +414,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -418,6 +426,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -426,7 +435,6 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -439,6 +447,7 @@ The amount of time to wait before attempting a failed request again. See [Retry 
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my-stream"]}
@@ -447,7 +456,6 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -529,11 +537,6 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
-### Delivery Guarantee
-
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -597,6 +600,8 @@ Kinesis provides the ability to
 If they key you're using is dynamic and unpredictable we highly recommend
 recondsidering your ordering policy to allow for even and random distribution.
 
+
+
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
@@ -616,37 +621,14 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `aws_kinesis_streams_sink` issues][urls.aws_kinesis_streams_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_aws_kinesis_streams_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_aws_kinesis_streams_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.aws_kinesis_streams_sink_issues] - [enhancements][urls.aws_kinesis_streams_sink_enhancements] - [bugs][urls.aws_kinesis_streams_sink_bugs]
-* [**Source code**][urls.aws_kinesis_streams_sink_source]
-* [**Service Limits**][urls.aws_kinesis_service_limits]
-
 
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
-[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.add_fields]: ../../../usage/configuration/transforms/add_fields.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
@@ -654,14 +636,6 @@ issue, please:
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
-[urls.aws_kinesis_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
 [urls.aws_kinesis_split_shards]: https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html
-[urls.aws_kinesis_streams_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+bug%22
-[urls.aws_kinesis_streams_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+enhancement%22
-[urls.aws_kinesis_streams_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22
-[urls.aws_kinesis_streams_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[urls.new_aws_kinesis_streams_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_streams&labels=Type%3A+bug
-[urls.new_aws_kinesis_streams_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_streams&labels=Type%3A+enhancement
 [urls.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_streams
-[urls.vector_chat]: https://chat.vector.dev

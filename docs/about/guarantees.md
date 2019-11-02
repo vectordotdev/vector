@@ -67,7 +67,7 @@ based buffers:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [sinks.my_sink_id]
   # ...
 

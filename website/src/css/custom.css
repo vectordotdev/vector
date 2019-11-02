@@ -83,6 +83,14 @@ li + li {
  * Components
  */
 
+a.text--warning:hover {
+  color: var(--ifm-color-warning);
+}
+
+a code {
+  color: var(--ifm-color-primary);
+}
+
 blockquote {
   border-left: 4px solid var(--ifm-hr-border-color);
   color: var(--ifm-color-emphasis-alpha-40);
@@ -115,12 +123,12 @@ header {
 
 header .badges {
   float: right;
-  margin-top: 0.25rem;
+  font-family: monospace;
+  margin-top: 0.5em;
 }
 
 header .badges .badge {
-  display: inline-block;
-  margin-left: 3px;
+  margin-left: 2px;
 }
 
 header h1 {
@@ -250,6 +258,8 @@ header .description {
 .menu > ul.menu__list > li.menu__list-item div.title {
   color: var(--ifm-color-emphasis-alpha-20);
   cursor: text;
+  display: flex;
+  justify-content: space-between;
   margin-top: calc( var(--ifm-spacing-vertical) * 1.5 );
   font-weight: bold;
   text-transform: uppercase;
@@ -270,6 +280,11 @@ header .description {
   font-size: 1em;
   margin-left: calc( var(--ifm-menu-link-padding-horizontal) * -1 );
   padding-left: var(--ifm-menu-link-padding-horizontal);
+}
+
+.menu > ul.menu__list > li > ul.menu__list {
+  border-left: 0px none;
+  padding-left: 0;
 }
 
 .menu .menu__link,
@@ -435,11 +450,35 @@ div[class^='sidebar_'] .menu a.menu__link {
   padding-right: var(--ifm-menu-link-padding-horizontal);
 }
 
+div[class^='sidebar_'] .menu a.menu__link .badges {
+  vertical-align: top;
+}
+
+div[class^='sidebar_'] .menu a.menu__link .badge {
+  background: var(--ifm-color-emphasis-alpha-05);
+  background-clip:  padding-box;
+  border: 1px solid var(--ifm-color-emphasis-alpha-05);
+  color: var(--ifm-color-emphasis-alpha-50);
+  display: inline-block;
+  font-family: monospace;
+  font-size: 0.6em;
+  height: 1.8em;
+  line-height: 1.8em;
+  margin-right: 2px;
+  padding: 0 0.5em;
+  vertical-align: middle;
+}
+
 div[class^='sidebar_'] a.menu__link.menu__link--active:not(.menu__link--sublist) {
   border-radius: 0;
-  border-left: 1px solid var(--ifm-color-primary);
-  position: relative;
-  left: -1px;
+  border-right: 2px solid var(--ifm-color-primary);
+  padding-right: calc( var(--ifm-menu-link-padding-horizontal) - 2px );
+}
+
+div[class^='sidebar_'] a.menu__link.menu__link--active:not(.menu__link--sublist) .badge {
+  background: var(--ifm-color-primary);
+  border: 1px solid var(--ifm-color-primary);
+  color: white;
 }
 
 @media (min-width: 997px) {

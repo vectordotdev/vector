@@ -49,19 +49,6 @@ By default, the `<%= component.name %>` <%= component.type %> will add context
 keys to your events via the <%= option_names(component.context_options).to_sentence %>
 options.
 <%- end -%>
-<% if component.respond_to?(:delivery_guarantee) -%>
-
-### Delivery Guarantee
-
-<% case component.delivery_guarantee -%>
-<% when "at_least_once" -%>
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-<% when "best_effort" -%>
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-<% end -%>
-<% end -%>
 
 ### Environment Variables
 

@@ -1,47 +1,72 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
+
+sidebar_label: "elasticsearch|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
+status: "beta"
 title: "elasticsearch sink" 
-sidebar_label: "elasticsearch"
 ---
 
 The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
-  type = "elasticsearch" # enum
-  inputs = ["my-source-id"]
-  host = "http://10.24.32.122:9000"
+  # REQUIRED - General
+  type = "elasticsearch" # example, must be: "elasticsearch"
+  inputs = ["my-source-id"] # example
+  host = "http://10.24.32.122:9000" # example
+  
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password" # example
+    user = "username" # example
+  
+  # OPTIONAL - Headers
+  [sinks.my_sink_id.headers]
+    Authorization = "${TOKEN_ENV_VAR}" # example
+    X-Powered-By = "Vector" # example
+  
+  # OPTIONAL - Query
+  [sinks.my_sink_id.query]
+    X-Powered-By = "Vector" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "elasticsearch" # enum
-  inputs = ["my-source-id"]
-  host = "http://10.24.32.122:9000"
+  type = "elasticsearch" # example, must be: "elasticsearch"
+  inputs = ["my-source-id"] # example
+  host = "http://10.24.32.122:9000" # example
   
   # OPTIONAL - General
   doc_type = "_doc" # default
   healthcheck = true # default
   index = "vector-%Y-%m-%d" # default
   provider = "default" # default, enum
-  region = "us-east-1" # no default
+  region = "us-east-1" # example, no default
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -57,18 +82,19 @@ import TabItem from '@theme/TabItem';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password"
-    user = "username"
+    password = "password" # example
+    user = "username" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
+    Authorization = "${TOKEN_ENV_VAR}" # example
     X-Powered-By = "Vector" # example
   
   # OPTIONAL - Query
@@ -77,10 +103,10 @@ import TabItem from '@theme/TabItem';
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # no default
-    crt_path = "/path/to/host_certificate.crt" # no default
-    key_pass = "PassWord1" # no default
-    key_path = "/path/to/host_certificate.key" # no default
+    ca_path = "/path/to/certificate_authority.crt" # example, no default
+    crt_path = "/path/to/host_certificate.crt" # example, no default
+    key_pass = "PassWord1" # example, no default
+    key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
     verify_hostname = true # default
 ```
@@ -88,8 +114,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -100,6 +124,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -108,7 +133,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -120,6 +144,7 @@ Options for basic authentication.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["password","${PASSWORD_ENV_VAR}"]}
@@ -128,7 +153,6 @@ Options for basic authentication.
   path={"basic_auth"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -141,6 +165,7 @@ The basic authentication password.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["username"]}
@@ -149,7 +174,6 @@ The basic authentication password.
   path={"basic_auth"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -167,6 +191,7 @@ The basic authentication user name.
 
 
 <Option
+  common={false}
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
@@ -175,7 +200,6 @@ The basic authentication user name.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -188,6 +212,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -196,7 +221,6 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -209,6 +233,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -217,7 +242,6 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -229,6 +253,7 @@ Configures the sink specific buffer.
 
 
 <Option
+  common={false}
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
@@ -237,7 +262,6 @@ Configures the sink specific buffer.
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -250,6 +274,7 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
 
 
 <Option
+  common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
@@ -258,7 +283,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   path={"buffer"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -271,6 +295,7 @@ The behavior when the buffer becomes full.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -279,7 +304,6 @@ The behavior when the buffer becomes full.
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -292,6 +316,7 @@ The maximum size of the buffer on the disk.
 
 
 <Option
+  common={false}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -300,7 +325,6 @@ The maximum size of the buffer on the disk.
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"events"}>
 
@@ -318,6 +342,7 @@ The maximum number of [events][docs.event] allowed in the buffer.
 
 
 <Option
+  common={false}
   defaultValue={"_doc"}
   enumValues={null}
   examples={["_doc"]}
@@ -326,7 +351,6 @@ The maximum number of [events][docs.event] allowed in the buffer.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -339,6 +363,7 @@ The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -347,7 +372,6 @@ The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -359,15 +383,15 @@ Options for custom headers.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"X-Powered-By","value":"Vector"}]}
+  examples={[{"name":"Authorization","value":"${TOKEN_ENV_VAR}"},{"name":"X-Powered-By","value":"Vector"}]}
   name={"*"}
   nullable={false}
   path={"headers"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -385,6 +409,7 @@ A custom header to be added to each outgoing Elasticsearch request.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -393,7 +418,6 @@ A custom header to be added to each outgoing Elasticsearch request.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -406,6 +430,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["http://10.24.32.122:9000"]}
@@ -414,7 +439,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -427,6 +451,7 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
 
 
 <Option
+  common={false}
   defaultValue={"vector-%F"}
   enumValues={null}
   examples={["vector-%Y-%m-%d","application-{{ application_id }}-%Y-%m-%d"]}
@@ -435,7 +460,6 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -448,6 +472,7 @@ Index name to write events to. See [Template Syntax](#template-syntax) for more 
 
 
 <Option
+  common={false}
   defaultValue={"default"}
   enumValues={{"default":"A generic Elasticsearch provider.","aws":"The [AWS Elasticsearch Service][urls.aws_elasticsearch]."}}
   examples={["default","aws"]}
@@ -456,7 +481,6 @@ Index name to write events to. See [Template Syntax](#template-syntax) for more 
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -469,6 +493,7 @@ The provider of the Elasticsearch service. This is used to properly authenticate
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -477,7 +502,6 @@ The provider of the Elasticsearch service. This is used to properly authenticate
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -489,6 +513,7 @@ Custom parameters to Elasticsearch query string.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"X-Powered-By","value":"Vector"}]}
@@ -497,7 +522,6 @@ Custom parameters to Elasticsearch query string.
   path={"query"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -515,6 +539,7 @@ A custom parameter to be added to each Elasticsearch request.
 
 
 <Option
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -523,7 +548,6 @@ A custom parameter to be added to each Elasticsearch request.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -536,6 +560,7 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -544,7 +569,6 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -557,6 +581,7 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
@@ -565,7 +590,6 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -578,6 +602,7 @@ When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -586,7 +611,6 @@ When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -599,6 +623,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Option
+  common={false}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
@@ -607,7 +632,6 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -620,6 +644,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -628,7 +653,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -641,6 +665,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Option
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -649,7 +674,6 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -662,6 +686,7 @@ The amount of time to wait before attempting a failed request again. See [Retry 
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -670,7 +695,6 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -682,6 +706,7 @@ Configures the TLS options for connections from this sink.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
@@ -690,7 +715,6 @@ Configures the TLS options for connections from this sink.
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -703,6 +727,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -711,7 +736,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -724,6 +748,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
@@ -732,7 +757,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -745,6 +769,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["PassWord1"]}
@@ -753,7 +778,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -766,6 +790,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -774,7 +799,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -787,6 +811,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -795,7 +820,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   path={"tls"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -851,11 +875,6 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -888,6 +907,8 @@ Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read
 more about how Vector handles nested documents in the [Data Model
 document][docs.data_model].
 
+
+
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
@@ -917,7 +938,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [sinks.my_elasticsearch_sink_id]
   # ...
   index = "vector-%Y-%m-%d"
@@ -930,26 +951,6 @@ enabling dynamic values derived from the event's data. This syntax accepts
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `elasticsearch_sink` issues][urls.elasticsearch_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_elasticsearch_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_elasticsearch_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.elasticsearch_sink_issues] - [enhancements][urls.elasticsearch_sink_enhancements] - [bugs][urls.elasticsearch_sink_bugs]
-* [**Source code**][urls.elasticsearch_sink_source]
-
 
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
@@ -957,19 +958,9 @@ issue, please:
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data_model]: ../../../about/data-model
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
 [urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[urls.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
-[urls.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22
-[urls.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
-[urls.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-[urls.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+bug
-[urls.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+enhancement
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[urls.vector_chat]: https://chat.vector.dev

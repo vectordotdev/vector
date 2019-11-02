@@ -1,44 +1,54 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
+output_types: ["log"]
+sidebar_label: "file|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/file.rs
+status: "prod-ready"
 title: "file source" 
-sidebar_label: "file"
 ---
 
 The `file` source ingests data through one or more local files and outputs [`log`][docs.data-model.log] events.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sources.my_source_id]
-  type = "file" # enum
-  include = ["/var/log/nginx/*.log"]
+  type = "file" # example, must be: "file"
+  include = ["/var/log/nginx/*.log"] # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "file" # enum
-  include = ["/var/log/nginx/*.log"]
+  type = "file" # example, must be: "file"
+  include = ["/var/log/nginx/*.log"] # example
   
   # OPTIONAL - General
-  data_dir = "/var/lib/vector" # no default
-  exclude = ["/var/log/nginx/access.log"] # no default
+  data_dir = "/var/lib/vector" # example, no default
+  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
   glob_minimum_cooldown = 1000 # default, milliseconds
-  ignore_older = 86400 # no default, seconds
+  ignore_older = 86400 # example, no default, seconds
   max_line_bytes = 102400 # default, bytes
   start_at_beginning = true # default
   
@@ -47,7 +57,7 @@ import TabItem from '@theme/TabItem';
   host_key = "host" # default
   
   # OPTIONAL - Multi-line
-  message_start_indicator = "^(INFO|ERROR)" # no default
+  message_start_indicator = "^(INFO|ERROR)" # example, no default
   multi_line_timeout = 1000 # default, milliseconds
   
   # OPTIONAL - Priority
@@ -65,8 +75,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -76,6 +84,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
@@ -84,7 +93,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -97,15 +105,15 @@ The directory used to persist file checkpoint positions. By default, the [global
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[["/var/log/nginx/access.log"]]}
+  examples={[["/var/log/nginx/*.[0-9]*.log"]]}
   name={"exclude"}
   nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"[string]"}
   unit={null}>
 
@@ -118,6 +126,7 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes pr
 
 
 <Option
+  common={false}
   defaultValue={"file"}
   enumValues={null}
   examples={["file"]}
@@ -126,7 +135,6 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes pr
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -139,6 +147,7 @@ The key name added to each event with the full path of the file. See [Context](#
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -147,7 +156,6 @@ The key name added to each event with the full path of the file. See [Context](#
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"table"}
   unit={null}>
 
@@ -159,6 +167,7 @@ Configuration for how the file source should identify files.
 
 
 <Option
+  common={false}
   defaultValue={"checksum"}
   enumValues={{"checksum":"Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
   examples={["checksum","device_and_inode"]}
@@ -167,7 +176,6 @@ Configuration for how the file source should identify files.
   path={"fingerprinting"}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -180,6 +188,7 @@ The strategy used to uniquely identify files. This is important for [checkpointi
 
 
 <Option
+  common={false}
   defaultValue={256}
   enumValues={null}
   examples={[256]}
@@ -188,7 +197,6 @@ The strategy used to uniquely identify files. This is important for [checkpointi
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -201,6 +209,7 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 
 
 <Option
+  common={false}
   defaultValue={0}
   enumValues={null}
   examples={[0]}
@@ -209,7 +218,6 @@ The number of bytes read off the head of the file to generate a unique fingerpri
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -227,6 +235,7 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
 
 
 <Option
+  common={false}
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
@@ -235,7 +244,6 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"milliseconds"}>
 
@@ -248,6 +256,7 @@ Delay between file discovery calls. This controls the interval at which Vector s
 
 
 <Option
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
@@ -256,7 +265,6 @@ Delay between file discovery calls. This controls the interval at which Vector s
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -269,6 +277,7 @@ The key name added to each event representing the current host. See [Context](#c
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[86400]}
@@ -277,7 +286,6 @@ The key name added to each event representing the current host. See [Context](#c
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -290,6 +298,7 @@ Ignore files with a data modification date that does not exceed this age.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[["/var/log/nginx/*.log"]]}
@@ -298,7 +307,6 @@ Ignore files with a data modification date that does not exceed this age.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"[string]"}
   unit={null}>
 
@@ -311,6 +319,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported. See [File
 
 
 <Option
+  common={false}
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
@@ -319,7 +328,6 @@ Array of file patterns to include. [Globbing](#globbing) is supported. See [File
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -332,6 +340,7 @@ The maximum number of a bytes a line can contain before being discarded. This pr
 
 
 <Option
+  common={false}
   defaultValue={2048}
   enumValues={null}
   examples={[2048]}
@@ -340,7 +349,6 @@ The maximum number of a bytes a line can contain before being discarded. This pr
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -353,6 +361,7 @@ An approximate limit on the amount of data read from a single file at a given ti
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["^(INFO|ERROR)"]}
@@ -361,7 +370,6 @@ An approximate limit on the amount of data read from a single file at a given ti
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -374,6 +382,7 @@ When present, Vector will aggregate multiple lines into a single event, using th
 
 
 <Option
+  common={false}
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
@@ -382,7 +391,6 @@ When present, Vector will aggregate multiple lines into a single event, using th
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"milliseconds"}>
 
@@ -395,6 +403,7 @@ When `message_start_indicator` is present, this sets the amount of time Vector w
 
 
 <Option
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[true,false]}
@@ -403,7 +412,6 @@ When `message_start_indicator` is present, this sets the amount of time Vector w
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -416,6 +424,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
 
 
 <Option
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[true,false]}
@@ -424,7 +433,6 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -497,11 +505,6 @@ By default, the `file` source will add context
 keys to your events via the `file_key` and `host_key`
 options.
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -559,6 +562,9 @@ behavior. If you're dealing with a single logical log stream or if you value
 per-stream ordering over fairness across streams, consider setting
 `oldest_first` to `true`.
 
+
+
+
 ### File Rotation
 
 Vector supports tailing across a number of file rotation strategies. The default
@@ -596,44 +602,14 @@ the `start_at_beginning` option to `true`.
 Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `file_source` issues][urls.file_source_issues].
-2. If encountered a bug, please [file a bug report][urls.new_file_source_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_file_source_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.file_source_issues] - [enhancements][urls.file_source_enhancements] - [bugs][urls.file_source_bugs]
-* [**Source code**][urls.file_source_source]
-
 
 [docs.configuration#data-directory]: ../../../usage/configuration#data-directory
 [docs.configuration#data_dir]: ../../../usage/configuration#data_dir
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
-[urls.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22+label%3A%22Type%3A+bug%22
-[urls.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22+label%3A%22Type%3A+enhancement%22
-[urls.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
-[urls.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
 [urls.inode]: https://en.wikipedia.org/wiki/Inode
-[urls.new_file_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+bug
-[urls.new_file_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

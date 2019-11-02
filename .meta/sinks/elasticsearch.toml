@@ -64,7 +64,10 @@ description = "Options for custom headers."
 
 [sinks.elasticsearch.options.headers.options."*"]
 type = "string"
-examples = [{ name = "X-Powered-By", value = "Vector"}]
+examples = [
+  {name = "Authorization", value = "${TOKEN_ENV_VAR}"},
+  { name = "X-Powered-By", value = "Vector"}
+]
 null = false
 description = "A custom header to be added to each outgoing Elasticsearch request."
 

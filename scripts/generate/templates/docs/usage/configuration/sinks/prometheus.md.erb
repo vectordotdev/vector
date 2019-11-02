@@ -2,7 +2,7 @@
 
 <%= component_header(component) %>
 
-## Example
+## Configuration
 
 <%= component_config_example(component) %>
 
@@ -233,11 +233,7 @@ by default. [issue #710][urls.issue_710] addresses the ability to define metrics
 including the ability change their types (such as changing them to `summary`
 types).
 
-## Troubleshooting [[sort]]
-
-<%= component_troubleshooting(component) %>
-
-### OOM Errors
+#### OOM Errors
 
 If you experience out of memory (OOM) errors it's likely you're using extremely
 [high cardinality](#high-cardinality) metric names or labels. This is
@@ -246,7 +242,3 @@ consider alternative strategies to reduce the cardinality. Such as leveraging
 logs for high cardinality analysis. [Issue #387][urls.issue_387] discusses the
 ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
-
-## Resources
-
-<%= component_resources(component) %>

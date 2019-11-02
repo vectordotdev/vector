@@ -1,38 +1,48 @@
 ---
+event_types: ["log","metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
+output_types: ["log","metric"]
+sidebar_label: "vector|[\"log\",\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/vector.rs
+status: "beta"
 title: "vector source" 
-sidebar_label: "vector"
 ---
 
 The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sources.my_source_id]
-  type = "vector" # enum
-  address = "0.0.0.0:9000"
+  type = "vector" # example, must be: "vector"
+  address = "0.0.0.0:9000" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "vector" # enum
-  address = "0.0.0.0:9000"
+  type = "vector" # example, must be: "vector"
+  address = "0.0.0.0:9000" # example
   
   # OPTIONAL
   shutdown_timeout_secs = 30 # default, seconds
@@ -41,8 +51,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -53,6 +61,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#1"]}
@@ -61,7 +70,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -74,6 +82,7 @@ The TCP address to listen for connections on, or "systemd#N" to use the Nth sock
 
 
 <Option
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -82,7 +91,6 @@ The TCP address to listen for connections on, or "systemd#N" to use the Nth sock
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"seconds"}>
 
@@ -97,11 +105,6 @@ The timeout before a connection is forcefully closed during shutdown.
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Encoding
 
@@ -124,38 +127,8 @@ Currently, Vector does not perform any application level message acknowledgement
 
 Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `vector_source` issues][urls.vector_source_issues].
-2. If encountered a bug, please [file a bug report][urls.new_vector_source_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_vector_source_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.vector_source_issues] - [enhancements][urls.vector_source_enhancements] - [bugs][urls.vector_source_bugs]
-* [**Source code**][urls.vector_source_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[urls.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+bug
-[urls.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev
-[urls.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+bug%22
-[urls.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+enhancement%22
-[urls.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
-[urls.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs

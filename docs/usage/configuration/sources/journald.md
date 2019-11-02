@@ -1,28 +1,36 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
+output_types: ["log"]
+sidebar_label: "journald|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
+status: "beta"
 title: "journald source" 
-sidebar_label: "journald"
 ---
 
 The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "journald" # enum
+  type = "journald" # example, must be: "journald"
   
   # OPTIONAL
   units = ["ntpd", "sysinit.target"] # default
@@ -31,14 +39,16 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "journald" # enum
+  type = "journald" # example, must be: "journald"
   
   # OPTIONAL
   current_runtime_only = true # default
-  data_dir = "/var/lib/vector" # no default
+  data_dir = "/var/lib/vector" # example, no default
   local_only = true # default
   units = ["ntpd", "sysinit.target"] # default
 ```
@@ -46,8 +56,6 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -58,6 +66,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -66,7 +75,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -79,6 +87,7 @@ Include only entries from the current runtime (boot)
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
@@ -87,7 +96,6 @@ Include only entries from the current runtime (boot)
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -100,6 +108,7 @@ The directory used to persist the journal checkpoint position. By default, the g
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -108,7 +117,6 @@ The directory used to persist the journal checkpoint position. By default, the g
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -121,6 +129,7 @@ Include only entries from the local system
 
 
 <Option
+  common={true}
   defaultValue={[]}
   enumValues={null}
   examples={[["ntpd","sysinit.target"]]}
@@ -129,7 +138,6 @@ Include only entries from the local system
   path={null}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"[string]"}
   unit={null}>
 
@@ -219,11 +227,6 @@ the [`regex_parser` transform][docs.transforms.regex_parser].
 
 ## How It Works
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -233,38 +236,8 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `journald_source` issues][urls.journald_source_issues].
-2. If encountered a bug, please [file a bug report][urls.new_journald_source_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_journald_source_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.journald_source_issues] - [enhancements][urls.journald_source_enhancements] - [bugs][urls.journald_source_bugs]
-* [**Source code**][urls.journald_source_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.journald_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22+label%3A%22Type%3A+bug%22
-[urls.journald_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22+label%3A%22Type%3A+enhancement%22
-[urls.journald_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
-[urls.journald_source_source]: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
-[urls.new_journald_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald&labels=Type%3A+bug
-[urls.new_journald_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

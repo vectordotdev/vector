@@ -83,6 +83,6 @@ module.exports = {
   scripts: [],
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
-    'https://at.alicdn.com/t/font_o5hd5vvqpoqiwwmi.css'
+    'https://at-ui.github.io/feather-font/css/iconfont.css'
   ]
 };

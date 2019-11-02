@@ -2,7 +2,7 @@
 
 <%= component_header(component) %>
 
-## Example
+## Configuration
 
 <%= component_config_example(component) %>
 
@@ -79,10 +79,4 @@ Vector will produce an event with this structure.
 Anyone with Syslog experience knows there are often deviations from the Syslog specifications. Vector tries its best to account for these (note the tests here). In the event Vector fails to parse your format, we recommend that you open an issue informing us of this, and then proceed to use the `tcp`, `udp`, or `unix` source coupled with a parser [transform][docs.transforms] transform of your choice.
 
 
-## Troubleshooting
 
-<%= component_troubleshooting(component) %>
-
-## Resources
-
-<%= component_resources(component) %>

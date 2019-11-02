@@ -3,7 +3,20 @@ module.exports = {
     {
       type: 'category',
       label: 'Introduction',
-      items: ['what_is_vector', 'about/concepts'],
+      items: [
+        'what_is_vector',
+        'about/concepts',
+        {
+          type: 'category',
+          label: 'Data Model',
+          items: [
+            'about/data-model/README',
+            'about/data-model/log',
+            'about/data-model/metric',
+          ],
+        },
+        'about/guarantees',
+      ],
     },
     {
       type: 'category',

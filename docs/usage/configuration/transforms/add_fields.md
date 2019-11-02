@@ -1,21 +1,29 @@
 ---
+event_types: ["log","log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
+output_types: ["log"]
+sidebar_label: "add_fields|[\"log\",\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
+status: "prod-ready"
 title: "add_fields transform" 
-sidebar_label: "add_fields"
 ---
 
 The `add_fields` transform accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "add_fields" # enum
-  inputs = ["my-source-id"]
+  type = "add_fields" # example, must be: "add_fields"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
@@ -29,10 +37,6 @@ import TabItem from '@theme/TabItem';
     my_list = ["first", "second", "third"] # example
 ```
 
-
-
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -42,6 +46,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -50,7 +55,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"table"}
   unit={null}>
 
@@ -62,6 +66,7 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"my_string_field","value":"string value"},{"name":"my_env_var_field","value":"${ENV_VAR}"},{"name":"my_int_field","value":1},{"name":"my_float_field","value":1.2},{"name":"my_bool_field","value":true},{"name":"my_timestamp_field","value":"1979-05-27 00:32:00 -0700"},{"name":"my_nested_fields","value":{"key1":"value1","key2":"value2"}},{"name":"my_list","value":["first","second","third"]}]}
@@ -70,7 +75,6 @@ A table of key/value pairs representing the keys to be added to the event.
   path={"fields"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"*"}
   unit={null}>
 
@@ -146,7 +150,7 @@ The `add_fields` transform will support [TOML arrays][urls.toml_array]. Keep in
 mind that the values must be simple type (not tables), and each value must the
 same type. You cannot mix types:
 
-```coffeescript
+```toml
 [transforms.<transform-id>]
   # ...
   
@@ -226,34 +230,6 @@ All supported [configuration value types][docs.configuration#value-types] are ac
 This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `add_fields_transform` issues][urls.add_fields_transform_issues].
-2. If encountered a bug, please [file a bug report][urls.new_add_fields_transform_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_add_fields_transform_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-
-### Alternatives
-
-Finally, consider the following alternatives:
-
-* [`lua` transform][docs.transforms.lua]
-* [`remove_fields` transform][docs.transforms.remove_fields]
-
-## Resources
-
-* [**Issues**][urls.add_fields_transform_issues] - [enhancements][urls.add_fields_transform_enhancements] - [bugs][urls.add_fields_transform_bugs]
-* [**Source code**][urls.add_fields_transform_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#value-types]: ../../../usage/configuration#value-types
@@ -261,16 +237,7 @@ Finally, consider the following alternatives:
 [docs.data-model.log#special-characters]: ../../../about/data-model/log.md#special-characters
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model]: ../../../about/data-model
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.remove_fields]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+bug%22
-[urls.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+enhancement%22
-[urls.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
-[urls.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
-[urls.new_add_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+add_fields&labels=Type%3A+bug
-[urls.new_add_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+add_fields&labels=Type%3A+enhancement
 [urls.toml_array]: https://github.com/toml-lang/toml#array
 [urls.toml_table]: https://github.com/toml-lang/toml#table
-[urls.vector_chat]: https://chat.vector.dev

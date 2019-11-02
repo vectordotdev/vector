@@ -3,13 +3,13 @@ import React, {useState} from 'react';
 import './styles.css';
 
 function Options({children, filters}) {
-  const [onlySimple, setOnlySimple] = useState(false);
+  const [onlyCommon, setOnlyCommon] = useState(false);
   const [searchTerm, setSearchTerm] = useState(null);
 
   let filteredChildren = children;
 
-  if (onlySimple) {
-    filteredChildren = filteredChildren.filter(child => child.props.simple);
+  if (onlyCommon) {
+    filteredChildren = filteredChildren.filter(child => child.props.common);
   }
 
   if (searchTerm) {
@@ -17,8 +17,6 @@ function Options({children, filters}) {
       child.props.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }
-
-  console.log(filteredChildren)
 
   return (
     <div className="options">
@@ -32,12 +30,12 @@ function Options({children, filters}) {
               placeholder="Search options..." />
           </div>
           <div className="text--right checkboxes">
-            <label title="Simple options are popular/common options to simplify getting started">
-              simple options only
+            <label title="Common options are popular options that we recommend for getting started">
+              common options only
               <input
                 type="checkbox"
-                onChange={(event) => setOnlySimple(event.currentTarget.checked)}
-                checked={onlySimple} />
+                onChange={(event) => setOnlyCommon(event.currentTarget.checked)}
+                checked={onlyCommon} />
             </label>
           </div>
         </div>) :

@@ -1,27 +1,31 @@
 ---
+event_types: ["log","metric","log","metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
+output_types: ["log","metric"]
+sidebar_label: "field_filter|[\"log\",\"metric\",\"log\",\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
+status: "beta"
 title: "field_filter transform" 
-sidebar_label: "field_filter"
 ---
 
 The `field_filter` transform accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [transforms.my_transform_id]
-  type = "field_filter" # enum
-  inputs = ["my-source-id"]
-  field = "file"
-  value = "/var/log/nginx.log"
+  type = "field_filter" # example, must be: "field_filter"
+  inputs = ["my-source-id"] # example
+  field = "file" # example
+  value = "/var/log/nginx.log" # example
 ```
-
-
-
-You can learn more
 
 ## Options
 
@@ -32,6 +36,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["file"]}
@@ -40,7 +45,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -53,6 +57,7 @@ The target log field to compare against the `value`.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/var/log/nginx.log"]}
@@ -61,7 +66,6 @@ The target log field to compare against the `value`.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -85,6 +89,8 @@ transform that accepts more complex filtering.
 
 We've opened [issue 479][urls.issue_479] for more complex filtering.
 
+
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -94,45 +100,8 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `field_filter_transform` issues][urls.field_filter_transform_issues].
-2. If encountered a bug, please [file a bug report][urls.new_field_filter_transform_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_field_filter_transform_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-
-### Alternatives
-
-Finally, consider the following alternatives:
-
-* [`lua` transform][docs.transforms.lua]
-
-## Resources
-
-* [**Issues**][urls.field_filter_transform_issues] - [enhancements][urls.field_filter_transform_enhancements] - [bugs][urls.field_filter_transform_bugs]
-* [**Source code**][urls.field_filter_transform_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.field_filter_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22+label%3A%22Type%3A+bug%22
-[urls.field_filter_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22+label%3A%22Type%3A+enhancement%22
-[urls.field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
-[urls.field_filter_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 [urls.issue_479]: https://github.com/timberio/vector/issues/479
-[urls.new_field_filter_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+field_filter&labels=Type%3A+bug
-[urls.new_field_filter_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+field_filter&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

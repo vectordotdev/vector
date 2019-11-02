@@ -35,14 +35,21 @@ function DocItem(props) {
   const {url: siteUrl} = siteConfig;
   const {metadata, content: DocContent} = props;
   const {
+    delivery_guarantee,
     description,
-    title,
-    permalink,
-    image: metaImage,
     editUrl,
+    event_types: eventTypes,
+    image: metaImage,
+    input_types: inputTypes,
+    issues_url: issuesUrl,
+    keywords,
     lastUpdatedAt,
     lastUpdatedBy,
-    keywords,
+    output_types: outputTypes,
+    permalink,
+    source_url: sourceUrl,
+    status,
+    title,
   } = metadata;
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
@@ -72,6 +79,10 @@ function DocItem(props) {
               <div className={styles.docItemContainer}>
                 {!metadata.hide_title && (
                   <header>
+                    <div class="badges">
+                      {eventTypes && eventTypes.includes("log") && <span class="badge badge--primary" title="This component works with log events.">L</span>}
+                      {eventTypes && eventTypes.includes("metric") && <span class="badge badge--primary" title="This component works with metric events.">M</span>}
+                    </div>
                     <h1 className={styles.docTitle}>{metadata.title}</h1>
                   </header>
                 )}
@@ -88,11 +99,32 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className={styles.tableOfContents}>
-                  <div className="section">
-                    <div className="title">Status</div>
-                    <div className="status text--primary"><i className="feather icon-check"></i> prod-ready</div>
-                    <div className="status text--warning"><i className="feather icon-shield"></i> best-effort</div>
-                  </div>
+                  {(status || delivery_guarantee) &&
+                    <div className="section">
+                      <div className="title">Status</div>
+                      {status == "beta" ?
+                        <div>
+                          <a href="#" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
+                            <i className="feather icon-alert-triangle"></i> beta
+                          </a>
+                        </div> :
+                        <div>
+                          <a href="#" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
+                            <i className="feather icon-award"></i> prod-ready
+                          </a>
+                        </div>}
+                      {delivery_guarantee == "best_effort" ?
+                        <div>
+                          <a href="#" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
+                            <i className="feather icon-shield-off"></i> best-effort
+                          </a>
+                        </div> :
+                        <div>
+                          <a href="#" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
+                            <i className="feather icon-shield"></i> at-least-once
+                          </a>
+                        </div>}
+                    </div>}
                   <div className="section">
                     <div className="title">Contents</div>
                     <Headings headings={DocContent.rightToc} />
@@ -100,9 +132,9 @@ function DocItem(props) {
                   <div className="section">
                     <div className="title">Resources</div>
                     <ul className="contents">
-                      {editUrl && (<li><a href={editUrl} className="contents__link"><i className="feather icon-edit-1"></i> Edit this page</a></li>)}
-                      <li><a href="#" className="contents__link"><i className="feather icon-message-circle"></i> View Issues</a></li>
-                      <li><a href="#" className="contents__link"><i className="feather icon-github"></i> View Source</a></li>
+                      {editUrl && (<li><a href={editUrl} className="contents__link" target="_blank"><i className="feather icon-edit-1"></i> Edit this page</a></li>)}
+                      {issuesUrl && (<li><a href={issuesUrl} className="contents__link" target="_blank"><i className="feather icon-message-circle"></i> View Issues</a></li>)}
+                      {sourceUrl && (<li><a href={sourceUrl} className="contents__link" target="_blank"><i className="feather icon-github"></i> View Source</a></li>)}
                     </ul>
                   </div>
                   <div className="section">

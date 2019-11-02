@@ -1,36 +1,44 @@
 ---
+event_types: ["log","metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
+output_types: ["metric"]
+sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
+status: "prod-ready"
 title: "log_to_metric transform" 
-sidebar_label: "log_to_metric"
 ---
 
 The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "log_to_metric" # enum
-  inputs = ["my-source-id"]
+  type = "log_to_metric" # example, must be: "log_to_metric"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
     # REQUIRED
-    type = "counter" # enum
-    field = "duration"
-    name = "duration_total"
+    type = "counter" # example, enum
+    field = "duration" # example
+    name = "duration_total" # example
     
     # OPTIONAL
     [transforms.my_transform_id.metrics.tags]
@@ -42,18 +50,20 @@ import TabItem from '@theme/TabItem';
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "log_to_metric" # enum
-  inputs = ["my-source-id"]
+  type = "log_to_metric" # example, must be: "log_to_metric"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
     # REQUIRED
-    type = "counter" # enum
-    field = "duration"
-    name = "duration_total"
+    type = "counter" # example, enum
+    field = "duration" # example
+    name = "duration_total" # example
     
     # OPTIONAL
     increment_by_value = true # default, relevant when type = "counter"
@@ -67,8 +77,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -78,6 +86,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -86,7 +95,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"[table]"}
   unit={null}>
 
@@ -98,6 +106,7 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
   examples={["counter","gauge","histogram","set"]}
@@ -106,7 +115,6 @@ A table of key/value pairs representing the keys to be added to the event.
   path={"metrics"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -119,6 +127,7 @@ The metric type.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["duration"]}
@@ -127,7 +136,6 @@ The metric type.
   path={"metrics"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -140,6 +148,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 
 <Option
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[true,false]}
@@ -148,7 +157,6 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -161,6 +169,7 @@ If `true` the metric will be incremented by the `field` value. If `false` the me
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["duration_total"]}
@@ -169,7 +178,6 @@ If `true` the metric will be incremented by the `field` value. If `false` the me
   path={"metrics"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -182,6 +190,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -190,7 +199,6 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   path={"metrics"}
   relevantWhen={null}
   required={false}
-  simple={true}
   type={"table"}
   unit={null}>
 
@@ -202,6 +210,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"host","value":"${HOSTNAME}"},{"name":"region","value":"us-east-1"},{"name":"status","value":"{{status}}"}]}
@@ -210,7 +219,6 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   path={"metrics.tags"}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -257,7 +265,7 @@ You can convert the `time` field into a `histogram` metric:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
   
@@ -314,7 +322,7 @@ You can count the number of responses by status code:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
   
@@ -371,7 +379,7 @@ field's value:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
   
@@ -428,7 +436,7 @@ You can reduce this logs into multiple `gauge` metrics:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
   
@@ -513,7 +521,7 @@ You can count the number of unique `remote_addr` values by using a set:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
   
@@ -579,26 +587,6 @@ happens depends on your metrics storage. For example, the
 for the next scrape, while other metrics sinks will proceed to forward the
 individual metrics for reduction in the metrics storage itself.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `log_to_metric_transform` issues][urls.log_to_metric_transform_issues].
-2. If encountered a bug, please [file a bug report][urls.new_log_to_metric_transform_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_log_to_metric_transform_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.log_to_metric_transform_issues] - [enhancements][urls.log_to_metric_transform_enhancements] - [bugs][urls.log_to_metric_transform_bugs]
-* [**Source code**][urls.log_to_metric_transform_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model#counters]: ../../../about/data-model#counters
@@ -608,13 +596,4 @@ issue, please:
 [docs.data-model#tags]: ../../../about/data-model#tags
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
-[urls.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22
-[urls.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-[urls.log_to_metric_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
-[urls.new_log_to_metric_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+bug
-[urls.new_log_to_metric_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

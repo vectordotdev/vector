@@ -1,38 +1,48 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22
+output_types: ["log"]
+sidebar_label: "udp|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/udp.rs
+status: "prod-ready"
 title: "udp source" 
-sidebar_label: "udp"
 ---
 
 The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sources.my_source_id]
-  type = "udp" # enum
-  address = "0.0.0.0:9000"
+  type = "udp" # example, must be: "udp"
+  address = "0.0.0.0:9000" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "udp" # enum
-  address = "0.0.0.0:9000"
+  type = "udp" # example, must be: "udp"
+  address = "0.0.0.0:9000" # example
   
   # OPTIONAL - General
   max_length = 102400 # default, bytes
@@ -45,8 +55,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -56,6 +64,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000"]}
@@ -64,7 +73,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -77,6 +85,7 @@ The address to bind the socket to.
 
 
 <Option
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
@@ -85,7 +94,6 @@ The address to bind the socket to.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -98,6 +106,7 @@ The key name added to each event representing the current host. See [Context](#c
 
 
 <Option
+  common={false}
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
@@ -106,7 +115,6 @@ The key name added to each event representing the current host. See [Context](#c
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"bytes"}>
 
@@ -158,11 +166,6 @@ By default, the `udp` source will add context
 keys to your events via the `host_key`
 options.
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -176,38 +179,8 @@ section.
 
 Each line is read until a new line delimiter (the `0xA` byte) is found.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `udp_source` issues][urls.udp_source_issues].
-2. If encountered a bug, please [file a bug report][urls.new_udp_source_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_udp_source_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.udp_source_issues] - [enhancements][urls.udp_source_enhancements] - [bugs][urls.udp_source_bugs]
-* [**Source code**][urls.udp_source_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.new_udp_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+bug
-[urls.new_udp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+enhancement
-[urls.udp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22+label%3A%22Type%3A+bug%22
-[urls.udp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22+label%3A%22Type%3A+enhancement%22
-[urls.udp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22
-[urls.udp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/udp.rs
-[urls.vector_chat]: https://chat.vector.dev

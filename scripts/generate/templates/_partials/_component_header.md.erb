@@ -1,6 +1,11 @@
 ---
+event_types: <%= component.event_types.to_json %>
+issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
+<% if component.respond_to?(:output_types) %>output_types: <%= component.output_types.to_json %><% end %>
+sidebar_label: <%= "#{component.name}|#{component.event_types.to_json}".to_json %>
+source_url: <%= metadata.links.fetch("urls.#{component.id}_source") %>
+status: <%= component.status.to_json %>
 title: <%= "#{component.name} #{component.type}".to_json %> 
-sidebar_label: <%= component.name.to_json %>
 ---
 
 The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>

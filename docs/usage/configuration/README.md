@@ -80,6 +80,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
@@ -88,7 +89,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -250,7 +250,7 @@ And the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [sinks.my_s3_sink_id]
   type = "aws_s3"
   key_prefix = "date=%Y-%m-%d"
@@ -285,7 +285,7 @@ And the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [sinks.my_s3_sink_id]
   type = "aws_s3"
   key_prefix = "application_id={{ application_id }}/date=%Y-%m-%d"

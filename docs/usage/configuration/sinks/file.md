@@ -1,47 +1,57 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
+
+sidebar_label: "file|[\"log\"]"
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
+status: "prod-ready"
 title: "file sink" 
-sidebar_label: "file"
 ---
 
 The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a file.
 
-## Config Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "file" # enum
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
+  type = "file" # example, must be: "file"
+  inputs = ["my-source-id"] # example
+  path = "vector-%Y-%m-%d.log" # example
   
   # REQUIRED - requests
-  encoding = "ndjson" # enum
+  encoding = "ndjson" # example, enum
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "file" # enum
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
+  type = "file" # example, must be: "file"
+  inputs = ["my-source-id"] # example
+  path = "vector-%Y-%m-%d.log" # example
   
   # REQUIRED - requests
-  encoding = "ndjson" # enum
+  encoding = "ndjson" # example, enum
   
   # OPTIONAL - General
   healthcheck = true # default
@@ -52,8 +62,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-You can learn more
-
 ## Options
 
 import Option from '@site/src/components/Option';
@@ -63,6 +71,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
@@ -71,7 +80,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -84,6 +92,7 @@ The encoding format used to serialize the events before outputting.
 
 
 <Option
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -92,7 +101,6 @@ The encoding format used to serialize the events before outputting.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"bool"}
   unit={null}>
 
@@ -105,6 +113,7 @@ Enables/disables the sink healthcheck upon start.
 
 
 <Option
+  common={false}
   defaultValue={"30"}
   enumValues={null}
   examples={["30"]}
@@ -113,7 +122,6 @@ Enables/disables the sink healthcheck upon start.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={null}>
 
@@ -127,6 +135,7 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["vector-%Y-%m-%d.log","application-{{ application_id }}-%Y-%m-%d.log"]}
@@ -135,7 +144,6 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -150,11 +158,6 @@ File name to write events to. See [Template Syntax](#template-syntax) for more i
 </Options>
 
 ## How It Works
-
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -180,7 +183,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [sinks.my_file_sink_id]
   # ...
   path = "vector-%Y-%m-%d.log"
@@ -193,38 +196,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `file_sink` issues][urls.file_sink_issues].
-2. If encountered a bug, please [file a bug report][urls.new_file_sink_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_file_sink_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.file_sink_issues] - [enhancements][urls.file_sink_enhancements] - [bugs][urls.file_sink_bugs]
-* [**Source code**][urls.file_sink_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22
-[urls.file_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+enhancement%22
-[urls.file_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
-[urls.file_sink_source]: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
-[urls.new_file_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+bug
-[urls.new_file_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+enhancement
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[urls.vector_chat]: https://chat.vector.dev

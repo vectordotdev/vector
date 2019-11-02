@@ -1,54 +1,62 @@
 ---
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
+output_types: ["log"]
+sidebar_label: "kafka|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
+status: "beta"
 title: "kafka source" 
-sidebar_label: "kafka"
 ---
 
 The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events.
 
-## Example
+## Configuration
 
+import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 <Tabs
-  defaultValue="simple"
+  defaultValue="common"
   values={[
-    { label: 'Simple', value: 'simple', },
+    { label: 'Common', value: 'common', },
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
-<TabItem value="simple">
+<TabItem value="common">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration"/ >
+
+```toml
 [sources.my_source_id]
-  type = "kafka" # enum
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-  group_id = "consumer-group-name"
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  type = "kafka" # example, must be: "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
+  group_id = "consumer-group-name" # example
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"] # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-```coffeescript
+<CodeHeader fileName="vector.toml" learnMoreUrl="/usage/configuration" />
+
+```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "kafka" # enum
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-  group_id = "consumer-group-name"
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  type = "kafka" # example, must be: "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
+  group_id = "consumer-group-name" # example
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"] # example
   
   # OPTIONAL
   auto_offset_reset = "smallest" # default
-  key_field = "user_id" # no default
+  key_field = "user_id" # example, no default
   session_timeout_ms = 5000 # default, milliseconds
 ```
 
 </TabItem>
 
 </Tabs>
-
-You can learn more
 
 ## Options
 
@@ -59,6 +67,7 @@ import Options from '@site/src/components/Options';
 
 
 <Option
+  common={false}
   defaultValue={"largest"}
   enumValues={null}
   examples={["smallest","earliest","beginning","largest","latest","end","error"]}
@@ -67,7 +76,6 @@ import Options from '@site/src/components/Options';
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -80,6 +88,7 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["10.14.22.123:9092,10.14.23.332:9092"]}
@@ -88,7 +97,6 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -101,6 +109,7 @@ A comma-separated list of host and port pairs that are the addresses of the Kafk
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["consumer-group-name"]}
@@ -109,7 +118,6 @@ A comma-separated list of host and port pairs that are the addresses of the Kafk
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"string"}
   unit={null}>
 
@@ -123,6 +131,7 @@ The consumer group name to be used to consume events from Kafka.
 
 
 <Option
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}
@@ -131,7 +140,6 @@ The consumer group name to be used to consume events from Kafka.
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"string"}
   unit={null}>
 
@@ -144,6 +152,7 @@ The log field name to use for the topic key. If unspecified, the key would not b
 
 
 <Option
+  common={false}
   defaultValue={10000}
   enumValues={null}
   examples={[5000,10000]}
@@ -152,7 +161,6 @@ The log field name to use for the topic key. If unspecified, the key would not b
   path={null}
   relevantWhen={null}
   required={false}
-  simple={false}
   type={"int"}
   unit={"milliseconds"}>
 
@@ -166,6 +174,7 @@ The Kafka session timeout in milliseconds.
 
 
 <Option
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[["topic-1","topic-2","^(prefix1|prefix2)-.+"]]}
@@ -174,7 +183,6 @@ The Kafka session timeout in milliseconds.
   path={null}
   relevantWhen={null}
   required={true}
-  simple={true}
   type={"[string]"}
   unit={null}>
 
@@ -221,11 +229,6 @@ the [`regex_parser` transform][docs.transforms.regex_parser].
 
 ## How It Works
 
-### Delivery Guarantee
-
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -235,39 +238,9 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-## Troubleshooting
-
-The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring#logs]. This is typically located at
-`/var/log/vector.log`, then proceed to follow the
-[Troubleshooting Guide][docs.troubleshooting].
-
-If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
-issue, please:
-
-1. Check for any [open `kafka_source` issues][urls.kafka_source_issues].
-2. If encountered a bug, please [file a bug report][urls.new_kafka_source_bug].
-3. If encountered a missing feature, please [file a feature request][urls.new_kafka_source_enhancement].
-4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
-
-## Resources
-
-* [**Issues**][urls.kafka_source_issues] - [enhancements][urls.kafka_source_enhancements] - [bugs][urls.kafka_source_bugs]
-* [**Source code**][urls.kafka_source_source]
-
 
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
-[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[urls.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22
-[urls.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+enhancement%22
-[urls.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
-[urls.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-[urls.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+bug
-[urls.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+enhancement
-[urls.vector_chat]: https://chat.vector.dev

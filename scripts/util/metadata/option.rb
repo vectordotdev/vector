@@ -33,16 +33,16 @@ class Option
       @options = []
     end
 
-    @name = hash.fetch("name")
+    @common = hash["common"] == true
     @default = hash["default"]
     @display = hash["display"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @name = hash.fetch("name")
     @null = hash.fetch("null")
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
-    @simple = hash["simple"] == true
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
@@ -90,12 +90,24 @@ class Option
     if options.any?
       options.any?(&:advanced?)
     else
-      !simple?
+      !common?
     end
   end
 
   def array?(inner_type)
     type == "[#{inner_type}]"
+  end
+
+  def common?
+    if options.any?
+      @common == true || common_options.any?
+    else
+      @common == true || required?
+    end
+  end
+
+  def common_options
+    @common_options ||= options.select(&:common?)
   end
 
   def config_file_sort_token
@@ -172,18 +184,6 @@ class Option
 
   def required?
     default.nil? && null == false
-  end
-
-  def simple?
-    if options.any?
-      @simple == true || (required? && simple_options.any?)
-    else
-      @simple == true || required?
-    end
-  end
-
-  def simple_options
-    @simple_options ||= options.select(&:simple?)
   end
 
   def table?

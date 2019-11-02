@@ -32,7 +32,9 @@ function DocSidebarItem({item, level, onItemClick}) {
       if(level == 1) {
         return (
           <li className={classnames('menu__list-item')} key={label}>
-            <div className="title">{label}</div>
+            <div className="title">
+              {label}
+            </div>
             <ul className="menu__list">
               {items.map(childItem => (
                 <DocSidebarItem
@@ -76,14 +78,28 @@ function DocSidebarItem({item, level, onItemClick}) {
 
     case 'link':
     default:
+      let eventTypes = [];
+      let processedLabel = label;
+
+      if (label.includes('|')) {
+        let parts = label.split('|', 2);
+        processedLabel = parts[0];
+        eventTypes = JSON.parse(parts[1]);
+      }
+
       return (
-        <li className="menu__list-item" key={label}>
+        <li className="menu__list-item" key={processedLabel}>
           <Link
             activeClassName="menu__link--active"
             className="menu__link"
             to={href}
             onClick={onItemClick}>
-            {label}
+            {processedLabel}
+            {eventTypes.length > 0 &&
+              <span className="badges">
+                {eventTypes.includes("log") && <span className="badge" title="This component works with log events.">L</span>}
+                {eventTypes.includes("metric") && <span className="badge" title="This component works with metric events.">M</span>}
+              </span>}
           </Link>
         </li>
       );

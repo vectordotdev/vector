@@ -17,7 +17,7 @@ Vector characterizes a `log` event as a _flat_ map of fields:
 
 {% code-tabs %}
 {% code-tabs-item title="log.proto" %}
-```coffeescript
+```protobuf
 message Log {
   map<string, Value> fields = 1;
 }
