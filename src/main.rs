@@ -12,7 +12,7 @@ use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{metrics, topology, trace};
+use vector::{metrics, runtime, topology, trace};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -206,12 +206,9 @@ fn main() {
     });
 
     let mut rt = {
-        let mut builder = tokio::runtime::Builder::new();
-
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
-        builder.core_threads(min(4, threads));
-
-        builder.build().expect("Unable to create async runtime")
+        let num_threads = min(4, threads);
+        runtime::Runtime::with_thread_count(num_threads).expect("Unable to create async runtime")
     };
 
     let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();

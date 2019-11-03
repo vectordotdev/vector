@@ -1,4 +1,7 @@
-use super::fanout::{self, Fanout};
+use super::{
+    fanout::{self, Fanout},
+    task::Task,
+};
 use crate::buffers;
 use futures::{
     future::{lazy, Either},
@@ -8,9 +11,6 @@ use futures::{
 use std::{collections::HashMap, time::Duration};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::util::FutureExt;
-use tracing_futures::Instrument;
-
-pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -111,6 +111,8 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     for (name, source) in &config.sources {
         let (tx, rx) = mpsc::channel(1000);
 
+        let typetag = source.source_type();
+
         let server = match source.build(&name, &config.global, tx) {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
@@ -123,10 +125,10 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
         let (output, control) = Fanout::new();
         let pump = rx.forward(output).map(|_| ());
-        let pump: Task = Box::new(pump);
+        let pump = Task::new(&name, &typetag, pump);
 
         let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
-        let server: Task = Box::new(server);
+        let server = Task::new(&name, &typetag, server);
 
         outputs.insert(name.clone(), control);
         tasks.insert(name.clone(), pump);
@@ -137,6 +139,9 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     // Build transforms
     for (name, transform) in &config.transforms {
         let trans_inputs = &transform.inputs;
+
+        let typetag = &transform.inner.transform_type();
+
         let mut transform = match transform.inner.build() {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
@@ -150,7 +155,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
         let (output, control) = Fanout::new();
 
-        let task = input_rx
+        let transform = input_rx
             .map(move |event| {
                 let mut output = Vec::with_capacity(1);
                 transform.transform_into(&mut output, event);
@@ -159,7 +164,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
             .flatten()
             .forward(output)
             .map(|_| ());
-        let task: Task = Box::new(task);
+        let task = Task::new(&name, &typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
         outputs.insert(name.clone(), control);
@@ -170,6 +175,8 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     for (name, sink) in &config.sinks {
         let sink_inputs = &sink.inputs;
         let enable_healthcheck = sink.healthcheck;
+
+        let typetag = sink.inner.sink_type();
 
         let buffer = sink.buffer.build(&config.global.data_dir, &name);
         let (tx, rx, acker) = match buffer {
@@ -188,8 +195,8 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
-        let task = rx.forward(sink).map(|_| ());
-        let task: Task = Box::new(task);
+        let sink = rx.forward(sink).map(|_| ());
+        let task = Task::new(&name, &typetag, sink);
 
         let healthcheck_task = if enable_healthcheck {
             let healthcheck_task = healthcheck
@@ -204,11 +211,10 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
                 Ok(())
             }))
         };
-        let healthcheck_fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static> =
-            Box::new(healthcheck_task.instrument(info_span!("healthcheck", %name)));
+        let healthcheck_task = Task::new(&name, &typetag, healthcheck_task);
 
         inputs.insert(name.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(name.clone(), healthcheck_fut);
+        healthchecks.insert(name.clone(), healthcheck_task);
         tasks.insert(name.clone(), task);
     }
 

@@ -28,6 +28,10 @@ impl crate::topology::config::TransformConfig for CoercerConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "coercer"
+    }
 }
 
 pub struct Coercer {

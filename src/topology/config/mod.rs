@@ -115,6 +115,8 @@ pub trait SourceConfig: core::fmt::Debug {
     ) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
+
+    fn source_type(&self) -> &'static str;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -136,6 +138,8 @@ pub trait SinkConfig: core::fmt::Debug {
     ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
+
+    fn sink_type(&self) -> &'static str;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -152,6 +156,8 @@ pub trait TransformConfig: core::fmt::Debug {
     fn input_type(&self) -> DataType;
 
     fn output_type(&self) -> DataType;
+
+    fn transform_type(&self) -> &'static str;
 }
 
 // Helper methods for programming construction during tests

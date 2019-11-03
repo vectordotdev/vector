@@ -57,6 +57,10 @@ impl TransformConfig for GrokParserConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "grok_parser"
+    }
 }
 
 pub struct GrokParser {

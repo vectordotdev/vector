@@ -32,6 +32,10 @@ impl TransformConfig for AddFieldsConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "add_fields"
+    }
 }
 
 impl AddFields {

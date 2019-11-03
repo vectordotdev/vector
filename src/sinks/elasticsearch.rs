@@ -39,6 +39,7 @@ pub struct ElasticSearchConfig {
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
+    #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
 
     // Tower Request based configuration
@@ -83,6 +84,10 @@ impl SinkConfig for ElasticSearchConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "elasticsearch"
     }
 }
 

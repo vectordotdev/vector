@@ -46,6 +46,10 @@ impl SourceConfig for StdinConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "stdin"
+    }
 }
 
 pub fn stdin_source<R>(stdin: R, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source

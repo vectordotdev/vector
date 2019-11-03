@@ -51,6 +51,10 @@ impl TransformConfig for TokenizerConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "tokenizer"
+    }
 }
 
 pub struct Tokenizer {

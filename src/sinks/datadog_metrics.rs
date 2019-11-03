@@ -96,6 +96,10 @@ impl SinkConfig for DatadogConfig {
     fn input_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn sink_type(&self) -> &'static str {
+        "datadog"
+    }
 }
 
 impl DatadogSvc {

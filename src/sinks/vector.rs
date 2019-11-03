@@ -47,6 +47,10 @@ impl SinkConfig for VectorSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "vector"
+    }
 }
 
 pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::RouterSink {
