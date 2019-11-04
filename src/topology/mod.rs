@@ -38,7 +38,8 @@ pub fn start(
     rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    validate(&config).and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
+    validate(&config, rt.executor())
+        .and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
 }
 
 pub fn start_validated(
@@ -67,8 +68,8 @@ pub fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-pub fn validate(config: &Config) -> Option<Pieces> {
-    match builder::build_pieces(config) {
+pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> {
+    match builder::build_pieces(config, exec) {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -167,7 +168,7 @@ impl RunningTopology {
             return false;
         }
 
-        match validate(&new_config) {
+        match validate(&new_config, rt.executor()) {
             Some(mut new_pieces) => {
                 if !self.run_healthchecks(&new_config, &mut new_pieces, rt, require_healthy) {
                     return false;

@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig},
 };
 use indexmap::IndexMap;
@@ -20,7 +21,7 @@ pub struct AddTags {
 
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone())))
     }
 

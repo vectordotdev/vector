@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::{
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig},
     Event,
 };
@@ -18,7 +19,7 @@ pub struct RemoveTags {
 
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 

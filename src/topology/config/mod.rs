@@ -1,4 +1,4 @@
-use crate::{event::Event, sinks, sources, transforms};
+use crate::{event::Event, runtime::TaskExecutor, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -151,7 +151,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 

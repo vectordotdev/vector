@@ -1,8 +1,9 @@
 use vector::topology::{self, Config};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
+    let rt = vector::runtime::Runtime::single_threaded().unwrap();
     Config::load(config.as_bytes())
-        .and_then(|c| topology::builder::build_pieces(&c))
+        .and_then(|c| topology::builder::build_pieces(&c, rt.executor()))
         .map(|(_topology, warnings)| warnings)
 }
 

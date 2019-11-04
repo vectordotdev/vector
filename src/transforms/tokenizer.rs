@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -28,7 +29,7 @@ pub struct TokenizerConfig {
 
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
@@ -251,6 +252,7 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(text);
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
@@ -261,7 +263,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             ..Default::default()
         }
-        .build()
+        .build(rt.executor())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

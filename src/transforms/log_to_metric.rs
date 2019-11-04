@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     event::metric::Metric,
     event::{self, ValueKind},
+    runtime::TaskExecutor,
     template::Template,
     topology::config::{DataType, TransformConfig},
     Event,
@@ -70,7 +71,7 @@ pub struct LogToMetric {
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
