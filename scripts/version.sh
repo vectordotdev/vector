@@ -11,7 +11,7 @@
 
 set -e
 
-VERSION="$(sed -n 's/^version\s= "\(.*\)"/\1/p' Cargo.toml)"
+VERSION="$(sed -n 's/^version\s=\s"\(.*\)"/\1/p' Cargo.toml)"
 if [ "$NIGHTLY" == 1 ]; then
   VERSION="$VERSION-nightly"
 fi
