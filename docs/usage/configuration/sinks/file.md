@@ -90,6 +90,12 @@ File name to write events to. This option supports dynamic values via [Vector's 
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
+### Dynamic file and directory creation
+
+Vector will attempt to create the entire directory structure and the file when
+emitting events to the file sink. This requires that the Vector agent have
+the correct permissions to create and write to files in the specified directories.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
