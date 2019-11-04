@@ -67,6 +67,15 @@ jobs:
           name: Check generate
           command: make check-generate
 
+  check-version:
+    docker:
+      - image: timberiodev/vector-checker:latest
+    steps:
+      - checkout
+      - run:
+          name: Check version
+          command: make check-version
+
   test-stable:
     resource_class: xlarge
     docker:
@@ -558,6 +567,12 @@ release-filters: &release-filters
     tags:
       only: /v.*/
 
+master-filters: &master-filters
+  filters:
+    branches:
+      only:
+        - master
+
 require-tests-checks-and-verifications: &require-tests-checks-and-verifications
   requires:
     - check-code
@@ -591,6 +606,8 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-version:
+          <<: *master-filters
       - test-stable
 
       # Build & verify
@@ -733,9 +750,7 @@ workflows:
     triggers:
       - schedule:
           cron: "0 0 * * *"
-          filters:
-            branches:
-              only: master
+          <<: *master-filters
 
     jobs:
       - check-code
@@ -812,10 +827,7 @@ workflows:
       - test-install-script-without-sudo
 
       - sync-install:
-          filters:
-            branches:
-              only: master
-
+          <<: *master-filters
           requires:
             - test-install-script-on-amazon-linux-1
             - test-install-script-on-amazon-linux-2
@@ -834,9 +846,7 @@ workflows:
     triggers:
       - schedule:
           cron: "0 0 * * *"
-          filters:
-            branches:
-              only: master
+          <<: *master-filters
 
     jobs:
       - check-remote-install-script
