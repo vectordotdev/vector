@@ -573,10 +573,6 @@ master-filters: &master-filters
       only:
         - master
 
-nightly-env: &nightly-env
-  environment:
-    NIGHTLY: 1
-
 require-tests-checks-and-verifications: &require-tests-checks-and-verifications
   requires:
     - check-code
@@ -764,16 +760,12 @@ workflows:
 
       # Build & verify
 
-      - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
-          <<: *nightly-env
-      - build-x86_64-unknown-linux-musl-archive:
-          <<: *nightly-env
-      - build-x86_64-apple-darwin-archive:
-          <<: *nightly-env
+      - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - build-x86_64-unknown-linux-musl-archive
+      - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-          <<: *nightly-env
 
       # Verify
 
@@ -816,10 +808,8 @@ workflows:
 
       - release-docker:
           <<: *require-tests-checks-and-verifications
-          <<: *nightly-env
       - release-s3:
           <<: *require-tests-checks-and-verifications
-          <<: *nightly-env
 
   install-script:
     jobs:
