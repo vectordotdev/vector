@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         retries::FixedRetryPolicy,
-        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -16,7 +16,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::time::Duration;
 use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
@@ -46,15 +45,18 @@ pub struct DatadogConfig {
     pub api_key: String,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+    #[serde(default, flatten)]
+    pub request: TowerRequestConfig,
 }
+
+const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+    request_in_flight_limit: Some(5),
+    request_timeout_secs: Some(60),
+    request_rate_limit_duration_secs: Some(1),
+    request_rate_limit_num: Some(5),
+    request_retry_attempts: Some(5),
+    request_retry_backoff_secs: None,
+};
 
 pub fn default_host() -> String {
     String::from("https://api.datadoghq.com")
@@ -109,17 +111,11 @@ impl SinkConfig for DatadogConfig {
 impl DatadogSvc {
     pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
         let batch = config.batch.unwrap_or(20, 1);
-
-        let timeout = config.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(5);
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
+            request.retry_attempts,
+            request.retry_backoff,
             HttpRetryLogic,
         );
 
@@ -145,10 +141,10 @@ impl DatadogSvc {
         };
 
         let service = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+            .concurrency_limit(request.in_flight_limit)
+            .rate_limit(request.rate_limit_num, request.rate_limit_duration)
             .retry(policy)
-            .timeout(Duration::from_secs(timeout))
+            .timeout(request.timeout)
             .service(datadog_http_service);
 
         let sink =

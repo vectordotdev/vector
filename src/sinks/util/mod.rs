@@ -8,8 +8,10 @@ use crate::buffers::Acker;
 use futures::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::time::Duration;
 use tower::Service;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
@@ -311,4 +313,59 @@ mod test {
         std::thread::sleep(std::time::Duration::from_millis(50));
         assert_eq!(15, ack_counter.load(Ordering::Relaxed));
     }
+}
+
+/// Tower Request based configuration
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+pub struct TowerRequestConfig {
+    pub request_in_flight_limit: Option<usize>,        // 5
+    pub request_timeout_secs: Option<u64>,             // 60
+    pub request_rate_limit_duration_secs: Option<u64>, // 1
+    pub request_rate_limit_num: Option<u64>,           // 5
+    pub request_retry_attempts: Option<usize>,         // max_value()
+    pub request_retry_backoff_secs: Option<u64>,       // 1
+}
+
+impl TowerRequestConfig {
+    pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
+        TowerRequestSettings {
+            in_flight_limit: self
+                .request_in_flight_limit
+                .or(defaults.request_in_flight_limit)
+                .unwrap_or(5),
+            timeout: Duration::from_secs(
+                self.request_timeout_secs
+                    .or(defaults.request_timeout_secs)
+                    .unwrap_or(60),
+            ),
+            rate_limit_duration: Duration::from_secs(
+                self.request_rate_limit_duration_secs
+                    .or(defaults.request_rate_limit_duration_secs)
+                    .unwrap_or(1),
+            ),
+            rate_limit_num: self
+                .request_rate_limit_num
+                .or(defaults.request_rate_limit_num)
+                .unwrap_or(5),
+            retry_attempts: self
+                .request_retry_attempts
+                .or(defaults.request_retry_attempts)
+                .unwrap_or(usize::max_value()),
+            retry_backoff: Duration::from_secs(
+                self.request_retry_backoff_secs
+                    .or(defaults.request_retry_backoff_secs)
+                    .unwrap_or(1),
+            ),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TowerRequestSettings {
+    pub in_flight_limit: usize,
+    pub timeout: Duration,
+    pub rate_limit_duration: Duration,
+    pub rate_limit_num: u64,
+    pub retry_attempts: usize,
+    pub retry_backoff: Duration,
 }

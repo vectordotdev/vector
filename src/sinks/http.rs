@@ -5,7 +5,7 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -19,7 +19,6 @@ use hyper::{Body, Request};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::time::Duration;
 use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
@@ -49,17 +48,19 @@ pub struct HttpSinkConfig {
     pub encoding: Encoding,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(default, flatten)]
+    pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }
+
+const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+    request_in_flight_limit: Some(10),
+    request_timeout_secs: Some(30),
+    request_rate_limit_duration_secs: Some(1),
+    request_rate_limit_num: Some(10),
+    request_retry_attempts: None,
+    request_retry_backoff_secs: None,
+};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -128,21 +129,16 @@ fn http(
         Compression::Gzip => true,
     };
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-    let timeout = config.request_timeout_secs.unwrap_or(30);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
     let encoding = config.encoding.clone();
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
     let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
+        request.retry_attempts,
+        request.retry_backoff,
         HttpRetryLogic,
     );
 
@@ -192,10 +188,10 @@ fn http(
             });
 
     let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+        .concurrency_limit(request.in_flight_limit)
+        .rate_limit(request.rate_limit_num, request.rate_limit_duration)
         .retry(policy)
-        .timeout(Duration::from_secs(timeout))
+        .timeout(request.timeout)
         .service(http_service);
 
     let encoding = config.encoding.clone();

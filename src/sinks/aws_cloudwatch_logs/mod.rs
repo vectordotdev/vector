@@ -7,6 +7,7 @@ use crate::{
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -24,7 +25,7 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
+use std::{collections::HashMap, convert::TryInto, fmt};
 use tower::{
     buffer::Buffer,
     limit::{
@@ -60,15 +61,18 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_stream: Option<bool>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+    #[serde(default, flatten)]
+    pub request: TowerRequestConfig,
 }
+
+const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+    request_in_flight_limit: Some(5),
+    request_timeout_secs: None,
+    request_rate_limit_duration_secs: Some(1),
+    request_rate_limit_num: Some(5),
+    request_retry_attempts: None,
+    request_retry_backoff_secs: None,
+};
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
@@ -96,7 +100,7 @@ type Svc = Buffer<
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
-    request_config: RequestConfig,
+    request_settings: TowerRequestSettings,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -106,15 +110,6 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Json,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct RequestConfig {
-    timeout_secs: u64,
-    rate_limit_duration_secs: u64,
-    rate_limit_num: u64,
-    retry_attempts: usize,
-    retry_backoff_secs: u64,
 }
 
 #[derive(Debug)]
@@ -132,14 +127,13 @@ pub enum CloudwatchError {
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch = self.batch.unwrap_or(1000, 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
-
         let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
+            .concurrency_limit(request.in_flight_limit)
             .service(CloudwatchLogsPartitionSvc::new(self.clone())?);
 
         let sink = {
@@ -165,24 +159,12 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsPartitionSvc {
     pub fn new(config: CloudwatchLogsSinkConfig) -> crate::Result<Self> {
-        let timeout_secs = config.request_timeout_secs.unwrap_or(60);
-        let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
-
-        let request_config = RequestConfig {
-            timeout_secs,
-            rate_limit_duration_secs,
-            rate_limit_num,
-            retry_attempts,
-            retry_backoff_secs,
-        };
+        let request_settings = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         Ok(Self {
             config,
             clients: HashMap::new(),
-            request_config,
+            request_settings,
         })
     }
 }
@@ -199,37 +181,29 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
     fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
         let (events, key) = req.into_parts();
 
-        let RequestConfig {
-            timeout_secs,
-            rate_limit_duration_secs,
+        let TowerRequestSettings {
+            in_flight_limit: _,
+            timeout,
+            rate_limit_duration,
             rate_limit_num,
             retry_attempts,
-            retry_backoff_secs,
-        } = self.request_config;
+            retry_backoff,
+        } = self.request_settings;
 
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
             let svc = {
-                let policy = FixedRetryPolicy::new(
-                    retry_attempts,
-                    Duration::from_secs(retry_backoff_secs),
-                    CloudwatchRetryLogic,
-                );
+                let policy =
+                    FixedRetryPolicy::new(retry_attempts, retry_backoff, CloudwatchRetryLogic);
 
                 let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key).unwrap();
-                let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout_secs));
+                let timeout = Timeout::new(cloudwatch, timeout);
 
                 let buffer = Buffer::new(timeout, 1);
                 let retry = Retry::new(policy, buffer);
 
-                let rate = RateLimit::new(
-                    retry,
-                    Rate::new(
-                        rate_limit_num,
-                        Duration::from_secs(rate_limit_duration_secs),
-                    ),
-                );
+                let rate = RateLimit::new(retry, Rate::new(rate_limit_num, rate_limit_duration));
                 let concurrency = ConcurrencyLimit::new(rate, 1);
 
                 Buffer::new(concurrency, 1)

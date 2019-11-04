@@ -5,7 +5,7 @@ use crate::{
         http::{HttpRetryLogic, HttpService, Response},
         retries::{FixedRetryPolicy, RetryLogic},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -18,7 +18,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
-use std::time::Duration;
 use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -31,17 +30,19 @@ pub struct ClickhouseConfig {
     pub basic_auth: Option<ClickHouseBasicAuthConfig>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(default, flatten)]
+    pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }
+
+const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+    request_in_flight_limit: Some(5),
+    request_timeout_secs: Some(60),
+    request_rate_limit_duration_secs: Some(1),
+    request_rate_limit_num: Some(5),
+    request_retry_attempts: None,
+    request_retry_backoff_secs: None,
+};
 
 inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
@@ -90,19 +91,13 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     };
 
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
     let basic_auth = config.basic_auth.clone();
 
     let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
+        request.retry_attempts,
+        request.retry_backoff,
         ClickhouseRetryLogic {
             inner: HttpRetryLogic,
         },
@@ -135,10 +130,10 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
             });
 
     let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+        .concurrency_limit(request.in_flight_limit)
+        .rate_limit(request.rate_limit_num, request.rate_limit_duration)
         .retry(policy)
-        .timeout(Duration::from_secs(timeout))
+        .timeout(request.timeout)
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
@@ -280,7 +275,10 @@ mod integration_tests {
                 batch_size: Some(1),
                 batch_timeout: None,
             },
-            request_retry_attempts: Some(1),
+            request: TowerRequestConfig {
+                request_retry_attempts: Some(1),
+                ..Default::default()
+            },
             ..Default::default()
         };
 
