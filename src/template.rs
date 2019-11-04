@@ -14,6 +14,7 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 use std::fmt;
+use std::path::PathBuf;
 use string_cache::DefaultAtom as Atom;
 
 lazy_static! {
@@ -36,6 +37,12 @@ impl From<&str> for Template {
             has_ts: StrftimeItems::new(src).filter(is_dynamic).count() > 0,
             has_fields: RE.is_match(src),
         }
+    }
+}
+
+impl From<PathBuf> for Template {
+    fn from(p: PathBuf) -> Self {
+        Template::from(&*p.to_string_lossy())
     }
 }
 
