@@ -139,7 +139,7 @@ reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
-elastic = { git = "https://github.com/elastic-rs/elastic" }
+elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
 proptest = "0.9"

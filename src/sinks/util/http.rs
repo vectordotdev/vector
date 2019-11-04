@@ -230,7 +230,7 @@ mod test {
 
         rt.block_on(req).unwrap();
 
-        rt.shutdown_now();
+        let _ = rt.shutdown_now();
 
         let (body, _rest) = rx.into_future().wait().unwrap();
         assert_eq!(body.unwrap().unwrap(), "hello");

@@ -448,7 +448,6 @@ mod integration_tests {
         topology::config::SinkConfig,
         Event,
     };
-    use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
@@ -459,7 +458,7 @@ mod integration_tests {
     fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200/".into(),
+            host: "http://localhost:9200".into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
@@ -484,20 +483,23 @@ mod integration_tests {
         // make sure writes all all visible
         block_on(flush(&config)).unwrap();
 
-        let client = SyncClientBuilder::new().build().unwrap();
-
-        let response = client
-            .search::<Value>()
-            .index(index)
-            .body(json!({
+        let response = reqwest::Client::new()
+            .get(&format!("{}/{}/_search", config.host, index))
+            .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
+
+        println!("response {:?}", response);
+
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+        let doc = hit.document().unwrap();
+        assert_eq!(Some("42"), doc["my_id"].as_str());
 
         let value = hit.into_document().unwrap();
         let expected = json!({
@@ -558,7 +560,7 @@ mod integration_tests {
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        block_on(pump).expect("Sending events failed");
+        let _ = block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
         block_on(flush(&config)).expect("Flushing writes failed");
@@ -570,24 +572,20 @@ mod integration_tests {
             .unwrap();
         let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-        let http_client = reqwest::Client::builder()
+        let client = reqwest::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .expect("Could not build HTTP client");
-        let client = SyncClientBuilder::new()
-            .http_client(http_client)
-            .static_node(config.host)
-            .build()
-            .expect("Building test client failed");
 
         let response = client
-            .search::<Value>()
-            .index(index)
-            .body(json!({
+            .get(&format!("{}/{}/_search", config.host, index))
+            .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
-            .expect("Issuing test query failed");
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
         let input = input

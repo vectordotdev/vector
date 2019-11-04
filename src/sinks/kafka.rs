@@ -341,7 +341,7 @@ mod integration_test {
         let (input, events) = random_lines_with_stream(100, num_events);
 
         let pump = sink.send_all(events);
-        block_on(pump).unwrap();
+        let _ = block_on(pump).unwrap();
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();

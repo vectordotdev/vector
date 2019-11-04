@@ -365,7 +365,7 @@ mod integration_tests {
         let (mut input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
