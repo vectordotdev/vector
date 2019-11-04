@@ -1,7 +1,6 @@
 pub mod batch;
 pub mod buffer;
 pub mod http;
-pub mod partition;
 pub mod retries;
 pub mod tls;
 
@@ -15,8 +14,9 @@ use std::time::Duration;
 use tower::Service;
 
 pub use batch::{Batch, BatchSink};
+pub use buffer::metrics::MetricBuffer;
+pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
-pub use partition::{Partition, PartitionedBatchSink};
 
 pub trait SinkExt<T>
 where
@@ -38,6 +38,13 @@ where
         T: Batch,
     {
         BatchSink::new_min(self, batch, min, Some(delay))
+    }
+
+    fn batched_with_max(self, batch: T, max: usize, delay: Duration) -> BatchSink<T, Self>
+    where
+        T: Batch,
+    {
+        BatchSink::new_max(self, batch, max, Some(delay))
     }
 
     fn partitioned_batched_with_min<K>(
@@ -212,10 +219,10 @@ where
 mod test {
     use super::BatchServiceSink;
     use crate::buffers::Acker;
+    use crate::runtime::Runtime;
     use crate::test_util::wait_for;
     use futures::{stream, sync::oneshot, Future, Poll, Sink};
     use std::sync::{atomic::Ordering, Arc, Mutex};
-    use tokio::runtime::Runtime;
     use tower::Service;
 
     struct FakeService {

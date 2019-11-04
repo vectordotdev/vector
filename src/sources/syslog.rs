@@ -1,4 +1,4 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
@@ -33,7 +33,7 @@ pub struct SyslogConfig {
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp { address: SocketAddr },
+    Tcp { address: SocketListenAddr },
     Udp { address: SocketAddr },
     Unix { path: PathBuf },
 }
@@ -78,6 +78,10 @@ impl SourceConfig for SyslogConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "syslog"
     }
 }
 
@@ -200,7 +204,7 @@ pub fn unix(
 // null byte delimiter in place of newline
 
 fn event_from_str(
-    host_key: &String,
+    host_key: &str,
     default_host: Option<Bytes>,
     raw: impl AsRef<str>,
 ) -> Option<Event> {
@@ -218,17 +222,17 @@ fn event_from_str(
             if let Some(host) = &parsed.hostname {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.clone().into(), host.clone().into());
+                    .insert_implicit(host_key.into(), host.clone().into());
             } else if let Some(default_host) = default_host {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.clone().into(), default_host.into());
+                    .insert_implicit(host_key.into(), default_host.into());
             }
 
             let timestamp = parsed
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                .unwrap_or(Utc::now());
+                .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
                 .insert_implicit(event::TIMESTAMP.clone(), timestamp.into());

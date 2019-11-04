@@ -12,7 +12,7 @@ use vector::test_util::{
 };
 use vector::topology::{self, config};
 use vector::{
-    sinks,
+    runtime, sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
 
@@ -24,10 +24,15 @@ fn test_tcp_syslog() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", SyslogConfig::new(Mode::Tcp { address: in_addr }));
+    config.add_source(
+        "in",
+        SyslogConfig::new(Mode::Tcp {
+            address: in_addr.into(),
+        }),
+    );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
@@ -68,7 +73,7 @@ fn test_udp_syslog() {
     config.add_source("in", SyslogConfig::new(Mode::Udp { address: in_addr }));
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
@@ -131,7 +136,7 @@ fn test_unix_stream_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 

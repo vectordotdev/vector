@@ -14,7 +14,9 @@ mod vars;
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    #[serde(default)]
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
@@ -61,7 +63,7 @@ impl GlobalOptions {
         let data_dir = local_data_dir
             .or(self.data_dir.as_ref())
             .ok_or_else(|| DataDirError::MissingDataDir)
-            .map_err(|err| Box::new(err))?
+            .map_err(Box::new)?
             .to_path_buf();
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
@@ -113,6 +115,8 @@ pub trait SourceConfig: core::fmt::Debug {
     ) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
+
+    fn source_type(&self) -> &'static str;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -134,6 +138,8 @@ pub trait SinkConfig: core::fmt::Debug {
     ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
+
+    fn sink_type(&self) -> &'static str;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -150,6 +156,8 @@ pub trait TransformConfig: core::fmt::Debug {
     fn input_type(&self) -> DataType;
 
     fn output_type(&self) -> DataType;
+
+    fn transform_type(&self) -> &'static str;
 }
 
 // Helper methods for programming construction during tests
@@ -208,18 +216,7 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars)
-            .map_err(|e| vec![e.to_string()])
-            .and_then(|config: Config| {
-                if config.sources.is_empty() {
-                    return Err(vec!["No sources defined in the config.".to_owned()]);
-                }
-                if config.sinks.is_empty() {
-                    return Err(vec!["No sinks defined in the config.".to_owned()]);
-                }
-
-                Ok(config)
-            })
+        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn contains_cycle(&self) -> bool {
@@ -263,6 +260,7 @@ mod test {
       [sinks.out]
       type = "console"
       inputs = ["in"]
+      encoding = "json"
       "#,
         )
         .unwrap();

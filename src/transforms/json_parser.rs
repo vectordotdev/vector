@@ -30,6 +30,10 @@ impl TransformConfig for JsonParserConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "json_parser"
+    }
 }
 
 pub struct JsonParser {
@@ -83,10 +87,8 @@ impl Transform for JsonParser {
             for (name, value) in object {
                 insert(&mut event, name, value);
             }
-        } else {
-            if self.drop_invalid {
-                return None;
-            }
+        } else if self.drop_invalid {
+            return None;
         }
 
         if self.drop_field {

@@ -39,6 +39,7 @@ pub struct ElasticSearchConfig {
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
+    #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
 
     // Tower Request based configuration
@@ -83,6 +84,10 @@ impl SinkConfig for ElasticSearchConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "elasticsearch"
     }
 }
 
@@ -130,13 +135,17 @@ impl ElasticSearchCommon {
                 if region.is_none() {
                     return Err(ParseError::AWSRequiresRegion.into());
                 }
-                Some(
-                    DefaultCredentialsProvider::new()
-                        .context(AWSCredentialsProviderFailed)?
-                        .credentials()
-                        .wait()
-                        .context(AWSCredentialsGenerateFailed)?,
-                )
+
+                let provider =
+                    DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
+
+                let mut rt = tokio::runtime::current_thread::Runtime::new()?;
+
+                let credentials = rt
+                    .block_on(provider.credentials())
+                    .context(AWSCredentialsGenerateFailed)?;
+
+                Some(credentials)
             }
         };
 
@@ -258,7 +267,7 @@ fn es(
                     // to play games here
                     let body = request.payload.take().unwrap();
                     match body {
-                        SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
+                        SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
                         _ => unreachable!(),
                     }
                 }
@@ -286,7 +295,7 @@ fn es(
 fn encode_event(
     event: Event,
     index: &Template,
-    doc_type: &String,
+    doc_type: &str,
     id_key: &Option<String>,
 ) -> Option<Vec<u8>> {
     let index = index

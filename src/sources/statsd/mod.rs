@@ -31,6 +31,10 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
     fn output_type(&self) -> crate::topology::config::DataType {
         crate::topology::config::DataType::Metric
     }
+
+    fn source_type(&self) -> &'static str {
+        "statsd"
+    }
 }
 
 fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {

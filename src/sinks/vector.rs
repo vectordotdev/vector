@@ -47,13 +47,17 @@ impl SinkConfig for VectorSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "vector"
+    }
 }
 
 pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
         TcpSink::new(hostname, addr, None)
             .stream_ack(acker)
-            .with(move |event| encode_event(event)),
+            .with(encode_event),
     )
 }
 

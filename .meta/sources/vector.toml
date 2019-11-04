@@ -8,9 +8,11 @@ through_description = "another upstream Vector instance"
 
 [sources.vector.options.address]
 type = "string"
-examples = ["0.0.0.0:9000"]
+examples = ["0.0.0.0:9000", "systemd", "systemd#1"]
 null = false
-description = "The TCP address to bind to."
+description = """The TCP address to listen for connections on, \
+or "systemd#N" to use the Nth socket passed by systemd socket activation. \
+"""
 
 [sources.vector.options.shutdown_timeout_secs]
 type = "int"

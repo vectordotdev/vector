@@ -51,6 +51,10 @@ impl TransformConfig for TokenizerConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "tokenizer"
+    }
 }
 
 pub struct Tokenizer {
@@ -133,7 +137,7 @@ pub fn parse(input: &str) -> Vec<&str> {
     );
 
     // fall back to returning the rest of the input, if any
-    let remainder = verify(rest, |s: &str| s.len() > 0);
+    let remainder = verify(rest, |s: &str| !s.is_empty());
     let field = alt((bracket, string, simple, remainder));
 
     all_consuming(many0(terminated(field, space0)))(input)

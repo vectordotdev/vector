@@ -76,6 +76,10 @@ impl SinkConfig for HecSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "splunk_hec"
+    }
 }
 
 pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
@@ -182,7 +186,7 @@ pub fn healthcheck(token: String, host: String) -> crate::Result<super::Healthch
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> crate::Result<()> {
+pub fn validate_host(host: &str) -> crate::Result<()> {
     let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme_part() {
@@ -194,7 +198,7 @@ pub fn validate_host(host: &String) -> crate::Result<()> {
 fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let mut event = event.into_log();
 
-    let host = event.get(&host_field).map(|h| h.clone());
+    let host = event.get(&host_field).cloned();
     let timestamp = if let Some(ValueKind::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
         ts.timestamp()
     } else {
@@ -202,12 +206,12 @@ fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<
     };
 
     let mut body = match encoding {
-        &Encoding::Json => json!({
+        Encoding::Json => json!({
             "fields": event.explicit_fields(),
             "event": event.unflatten(),
             "time": timestamp,
         }),
-        &Encoding::Text => json!({
+        Encoding::Text => json!({
             "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
@@ -250,7 +254,7 @@ mod tests {
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
         let event = &hec_event.event;
-        let kv = event.get("key".into()).unwrap();
+        let kv = event.get(&"key".to_string()).unwrap();
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(

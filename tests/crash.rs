@@ -28,6 +28,10 @@ impl config::SinkConfig for PanicSink {
     fn input_type(&self) -> config::DataType {
         config::DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "panic"
+    }
 }
 
 impl Sink for PanicSink {
@@ -54,7 +58,7 @@ fn test_sink_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
     config.add_sink(
         "out",
         &["in"],
@@ -100,6 +104,10 @@ impl config::SinkConfig for ErrorSink {
     fn input_type(&self) -> config::DataType {
         config::DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "panic"
+    }
 }
 
 impl Sink for ErrorSink {
@@ -126,7 +134,7 @@ fn test_sink_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
     config.add_sink(
         "out",
         &["in"],
@@ -173,6 +181,10 @@ impl config::SourceConfig for ErrorSourceConfig {
     fn output_type(&self) -> config::DataType {
         config::DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "tcp"
+    }
 }
 
 #[test]
@@ -183,7 +195,7 @@ fn test_source_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
     config.add_source("error", ErrorSourceConfig);
     config.add_sink(
         "out",
@@ -232,6 +244,10 @@ impl config::SourceConfig for PanicSourceConfig {
     fn output_type(&self) -> config::DataType {
         config::DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "tcp"
+    }
 }
 
 #[test]
@@ -242,7 +258,7 @@ fn test_source_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
     config.add_source("panic", PanicSourceConfig);
     config.add_sink(
         "out",

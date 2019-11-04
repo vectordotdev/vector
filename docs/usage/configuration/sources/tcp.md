@@ -50,7 +50,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 
 `required` `type: string` `example: "0.0.0.0:9000"`
 
-The address to bind the socket to.
+The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 ### host_key
 

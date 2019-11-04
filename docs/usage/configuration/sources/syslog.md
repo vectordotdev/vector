@@ -23,8 +23,13 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
+  # REQUIRED
   type = "syslog" # must be: "syslog"
   mode = "tcp" # enum: "tcp", "udp", and "unix"
+  
+  # OPTIONAL
+  address = "0.0.0.0:9000" # no default, relevant when mode = "tcp" or mode = "udp"
+  path = "/path/to/socket" # no default, relevant when mode = "unix"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
@@ -51,7 +56,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 
 `optional` `no default` `type: string` `example: "0.0.0.0:9000"`
 
-The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "udp".
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. Only relevant when mode = "tcp" or mode = "udp".
 
 ### host_key
 

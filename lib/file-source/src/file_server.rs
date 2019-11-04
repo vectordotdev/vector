@@ -327,8 +327,8 @@ impl Checkpointer {
         let directory = data_dir.join("checkpoints");
         let glob_string = directory.join("*").to_string_lossy().into_owned();
         Checkpointer {
-            directory: directory,
-            glob_string: glob_string,
+            directory,
+            glob_string,
             checkpoints: HashMap::new(),
         }
     }

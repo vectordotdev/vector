@@ -76,6 +76,10 @@ impl SinkConfig for KafkaSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "kafka"
+    }
 }
 
 impl KafkaSinkConfig {
@@ -228,15 +232,15 @@ fn encode_event(
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
-        .unwrap_or(Vec::new());
+        .unwrap_or_default();
 
     let body = match encoding {
-        &Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
-        &Encoding::Text => event
+        Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
+        Encoding::Text => event
             .as_log()
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
-            .unwrap_or(Vec::new()),
+            .unwrap_or_default(),
     };
 
     (key, body)

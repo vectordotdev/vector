@@ -31,6 +31,10 @@ impl TransformConfig for AddTagsConfig {
     fn output_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn transform_type(&self) -> &'static str {
+        "add_tags"
+    }
 }
 
 impl AddTags {

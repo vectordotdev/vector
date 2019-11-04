@@ -28,6 +28,10 @@ impl crate::topology::config::TransformConfig for CoercerConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "coercer"
+    }
 }
 
 pub struct Coercer {
@@ -42,10 +46,11 @@ impl Transform for Coercer {
                 match conv.convert(value) {
                     Ok(converted) => log.insert_explicit(field.into(), converted),
                     Err(error) => {
-                        debug!(
+                        warn!(
                             message = "Could not convert types.",
                             field = &field[..],
                             %error,
+                            rate_limit_secs = 10,
                         );
                     }
                 }

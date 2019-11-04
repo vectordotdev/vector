@@ -81,6 +81,10 @@ impl TransformConfig for LogToMetricConfig {
     fn output_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn transform_type(&self) -> &'static str {
+        "log_to_metric"
+    }
 }
 
 impl LogToMetric {

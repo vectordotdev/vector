@@ -12,10 +12,9 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
-use rusoto_core::{Region, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
-    HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
-    S3Client, S3,
+    HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -89,6 +88,10 @@ impl SinkConfig for S3SinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "aws_s3"
     }
 }
 
@@ -171,7 +174,7 @@ impl S3Sink {
 
         let bucket = config.bucket.clone();
         let healthcheck = response.map_err(|err| match err {
-            HeadBucketError::Unknown(response) => match response.status {
+            RusotoError::Unknown(response) => match response.status {
                 http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                 http::status::StatusCode::NOT_FOUND => {
                     HealthcheckError::UnknownBucket { bucket }.into()
@@ -208,7 +211,7 @@ impl S3Sink {
 
 impl Service<PartitionInnerBuffer<Vec<u8>, Bytes>> for S3Sink {
     type Response = PutObjectOutput;
-    type Error = PutObjectError;
+    type Error = RusotoError<PutObjectError>;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -255,13 +258,13 @@ impl Service<PartitionInnerBuffer<Vec<u8>, Bytes>> for S3Sink {
 struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
-    type Error = PutObjectError;
+    type Error = RusotoError<PutObjectError>;
     type Response = PutObjectOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            PutObjectError::HttpDispatch(_) => true,
-            PutObjectError::Unknown(res) if res.status.is_server_error() => true,
+            RusotoError::HttpDispatch(_) => true,
+            RusotoError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }
     }
@@ -321,7 +324,7 @@ fn encode_event(
             let mut bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
-                .unwrap_or(Vec::new());
+                .unwrap_or_default();
             bytes.push(b'\n');
             bytes
         }
@@ -397,6 +400,7 @@ mod integration_tests {
         assert_downcast_matches,
         event::Event,
         region::RegionOrEndpoint,
+        runtime::Runtime,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
     };
@@ -499,7 +503,7 @@ mod integration_tests {
         let (tx, rx) = futures::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(pump);
 
         let mut tx = tx.wait();
@@ -585,7 +589,7 @@ mod integration_tests {
 
     #[test]
     fn s3_healthchecks() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
 
         let healthcheck = S3Sink::healthcheck(&config()).unwrap();
         rt.block_on(healthcheck).unwrap();
@@ -593,7 +597,7 @@ mod integration_tests {
 
     #[test]
     fn s3_healthchecks_invalid_bucket() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
 
         let config = S3SinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
@@ -640,10 +644,10 @@ mod integration_tests {
         let res = client.create_bucket(req);
 
         match res.sync() {
-            Ok(_) | Err(CreateBucketError::BucketAlreadyOwnedByYou(_)) => {}
+            Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
             Err(e) => match e {
-                CreateBucketError::Unknown(b) => {
-                    let body = String::from_utf8(b.body.clone()).unwrap();
+                RusotoError::Unknown(b) => {
+                    let body = String::from_utf8_lossy(&b.body[..]);
                     panic!("Couldn't create bucket: {:?}; Body {}", b, body);
                 }
                 _ => panic!("Couldn't create bucket: {}", e),
@@ -675,7 +679,7 @@ mod integration_tests {
         client()
             .get_object(rusoto_s3::GetObjectRequest {
                 bucket: BUCKET.to_string(),
-                key: key,
+                key,
                 ..Default::default()
             })
             .sync()

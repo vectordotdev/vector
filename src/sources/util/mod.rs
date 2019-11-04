@@ -1,3 +1,3 @@
 mod tcp;
 
-pub use tcp::TcpSource;
+pub use tcp::{SocketListenAddr, TcpSource};

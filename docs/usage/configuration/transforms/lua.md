@@ -164,6 +164,19 @@ variable representing the event:
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
 
+### Iterate over fields
+
+To iterate over all fields of an `event` use the `pairs` method.  For example:
+
+```lua
+# Remove all fields where the value is "-"
+for f,v in pairs(event) do
+  if v == "-" then
+    event[f] = nil
+  end
+end
+```
+
 ### Nested Fields
 
 As described in the [Data Model document][docs.data_model], Vector flatten

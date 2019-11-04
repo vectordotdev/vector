@@ -85,7 +85,7 @@ And the following configuration:
 [transforms.<transform-id>.types]
   bytes_in = "int"
   bytes_out = "int"
-  timestamp = "timestamp|%m/%d/%Y:%H:%M:%S %z"
+  timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
   status = "int"
 ```
 {% endcode-tabs-item %}

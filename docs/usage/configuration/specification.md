@@ -267,12 +267,20 @@ data_dir = "/var/lib/vector"
   # * must be: "journald"
   type = "journald"
 
-  # Include only entries from the current runtime (boot)
+  # The systemd journal is read in batches, and a checkpoint is set at the end of
+  # each batch. This option limits the size of the batch.
+  # 
+  # * optional
+  # * default: 16
+  # * type: int
+  batch_size = 16
+
+  # Include only entries from the current boot.
   # 
   # * optional
   # * default: true
   # * type: bool
-  current_runtime_only = true
+  current_boot_only = true
 
   # The directory used to persist the journal checkpoint position. By default,
   # the global `data_dir` is used. Please make sure the Vector project has write
@@ -434,13 +442,16 @@ data_dir = "/var/lib/vector"
   mode = "udp"
   mode = "unix"
 
-  # The TCP or UDP address to listen on.
+  # The TCP or UDP address to listen for connections on, or "systemd#N" to use
+  # the Nth socket passed by systemd socket activation.
   # 
   # * optional
   # * no default
   # * type: string
   # * relevant when mode = "tcp" or mode = "udp"
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#2"
 
   # The maximum bytes size of incoming messages before they are discarded.
   # 
@@ -483,11 +494,14 @@ data_dir = "/var/lib/vector"
   # * must be: "tcp"
   type = "tcp"
 
-  # The address to bind the socket to.
+  # The address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation.
   # 
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#3"
 
   # The maximum bytes size of incoming messages before they are discarded.
   # 
@@ -565,11 +579,14 @@ data_dir = "/var/lib/vector"
   # * must be: "vector"
   type = "vector"
 
-  # The TCP address to bind to.
+  # The TCP address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation.
   # 
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#1"
 
   # The timeout before a connection is forcefully closed during shutdown.
   # 
@@ -2047,6 +2064,10 @@ end
 
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `console`.
   # 
@@ -2062,20 +2083,33 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The standard stream to write to.
-  # 
-  # * required
-  # * type: string
-  # * enum: "stdout" or "stderr"
-  target = "stdout"
-  target = "stderr"
-
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   # * type: bool
   healthcheck = true
+
+  # The standard stream to write to.
+  # 
+  # * optional
+  # * default: "stdout"
+  # * type: string
+  # * enum: "stdout" or "stderr"
+  target = "stdout"
+  target = "stderr"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  # 
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
 
 # Batches `metric` events to Datadog metrics service using HTTP API.
 [sinks.datadog_metrics]

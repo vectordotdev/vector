@@ -32,6 +32,10 @@ impl TransformConfig for AddFieldsConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn transform_type(&self) -> &'static str {
+        "add_fields"
+    }
 }
 
 impl AddFields {
@@ -49,7 +53,7 @@ impl AddFields {
 impl Transform for AddFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
-            event.as_mut_log().insert_explicit(key, value.into());
+            event.as_mut_log().insert_explicit(key, value);
         }
 
         Some(event)

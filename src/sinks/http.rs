@@ -105,6 +105,10 @@ impl SinkConfig for HttpSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "http"
+    }
 }
 
 fn http(
@@ -289,6 +293,7 @@ mod tests {
     use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches,
+        runtime::Runtime,
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkConfig,
@@ -383,7 +388,7 @@ mod tests {
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         rt.block_on(pump).unwrap();
@@ -441,7 +446,7 @@ mod tests {
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         rt.block_on(pump).unwrap();
@@ -499,7 +504,7 @@ mod tests {
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         rt.block_on(pump).unwrap();
