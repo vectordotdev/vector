@@ -9,6 +9,7 @@
 # ENV VARS
 #
 #   $FEATURES - a list of Vector features to include when building, defaults to all
+#   $NIGHTLY - indicates whether a nightly version is to be built
 #   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
 #   $RUST_LTO - possible values are "lto", "lto=thin", ""
 #   $STRIP - whether or not to strip the binary
@@ -18,9 +19,14 @@ NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
+NIGHTLY=${NIGHTLY:-}
 
 if [ -z "$FEATURES" ]; then
     FEATURES="default"
+fi
+
+if [ "$NIGHTLY" == "1" ]; then
+  FEATURES="$FEATURES nightly"
 fi
 
 set -eu
