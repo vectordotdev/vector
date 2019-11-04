@@ -93,7 +93,7 @@ Due to the nature of this component, it offers a
 ### Dynamic file and directory creation
 
 Vector will attempt to create the entire directory structure and the file when
-emitting events to the file sink. This requires that the Vector agent must have
+emitting events to the file sink. This requires that the Vector agent have
 the correct permissions to create and write to files in the specified directories.
 
 ### Environment Variables
