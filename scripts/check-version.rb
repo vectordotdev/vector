@@ -41,8 +41,8 @@ git_tag = git.describe("HEAD", { :tags => true, :abbrev => 0 })
 git_version = git_tag.delete_prefix("v").to_version
 
 # determine minimal required Cargo version using commits since the last Git tag
-commit_messages = git.log.since(git_tag).map { |commit| commit.message.lines.first }
-min_cargo_version = commit_messages.map { |message| git_version.after_conventional_commit(message) }.max
+commit_messages = git.log.between(git_tag, "HEAD").map { |commit| commit.message.lines.first }
+min_cargo_version = commit_messages.map { |message| git_version.after_conventional_commit(message) }.max || git_version
 
 puts "Latest tagged version: #{git_version}"
 puts "Version in Cargo.toml: #{cargo_version}"
