@@ -1,4 +1,5 @@
 use crate::{event::Event, sinks, sources, transforms};
+use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -160,6 +161,25 @@ pub trait TransformConfig: core::fmt::Debug {
 
     fn transform_type(&self) -> &'static str;
 }
+
+pub struct BoxTransformConfig {
+    pub inner: Box<dyn TransformConfig>,
+}
+
+impl<T> From<T> for BoxTransformConfig
+where
+    T: TransformConfig + 'static,
+{
+    fn from(inner: T) -> Self {
+        BoxTransformConfig {
+            inner: Box::new(inner),
+        }
+    }
+}
+
+pub type TransformDescription = ComponentDescription<BoxTransformConfig>;
+
+inventory::collect!(TransformDescription);
 
 // Helper methods for programming construction during tests
 impl Config {
