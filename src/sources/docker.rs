@@ -841,6 +841,8 @@ mod tests {
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
 
+    static BUXYBOX_IMAGE_TAG: &'static str = "1.31.1";
+
     fn pull(image: &str, docker: &Docker, rt: &mut runtime::Runtime) {
         let list_option = shiplift::ImageListOptions::builder()
             .filter_name(image)
@@ -850,10 +852,11 @@ mod tests {
             .block_on(docker.images().list(&list_option))
             .map_err(|e| error!(%e))
         {
+            trace!("Pulling image");
             if images.is_empty() {
                 let options = shiplift::PullOptions::builder()
                     .image(image)
-                    .tag("latest")
+                    .tag(BUXYBOX_IMAGE_TAG)
                     .build();
                 let _ = rt
                     .block_on(docker.images().pull(&options).collect())
@@ -966,6 +969,7 @@ mod tests {
         rt: &mut runtime::Runtime,
     ) -> Option<String> {
         pull("busybox", docker, rt);
+        trace!("Creating container");
         let mut options = shiplift::builder::ContainerOptions::builder("busybox");
         options
             .name(name)
@@ -990,6 +994,7 @@ mod tests {
         docker: &Docker,
         rt: &mut runtime::Runtime,
     ) -> Result<(), shiplift::errors::Error> {
+        trace!("Starting container");
         let future = docker.containers().get(id).start();
         rt.block_on(future)
     }
@@ -1001,6 +1006,7 @@ mod tests {
         docker: &Docker,
         rt: &mut runtime::Runtime,
     ) -> Result<(), shiplift::errors::Error> {
+        trace!("Waiting container");
         let future = docker.containers().get(id).wait();
         rt.block_on(future)
             .map(|exit| info!("Container exited with status code: {}", exit.status_code))
@@ -1018,6 +1024,7 @@ mod tests {
     }
 
     fn container_remove(id: &str, docker: &Docker, rt: &mut runtime::Runtime) {
+        trace!("Removing container");
         let future = docker
             .containers()
             .get(id)
@@ -1035,7 +1042,7 @@ mod tests {
         log: &str,
         docker: &Docker,
         rt: &mut runtime::Runtime,
-    ) {
+    ) -> String {
         let id = log_container(name, label, log, docker, rt);
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker, rt) {
@@ -1044,21 +1051,32 @@ mod tests {
             }
         }
         container_remove(&id, docker, rt);
+        id
     }
 
     #[test]
     fn newly_started() {
         let message = "9";
         let name = "vector_test_newly_started";
+        let label = "vector_test_label_newly_started";
 
         let (out, mut rt) = source(name, None);
         let docker = docker();
 
-        container_log_n(1, name, None, message, &docker, &mut rt);
+        let id = container_log_n(1, name, label, message, &docker, &mut rt);
 
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        let log = events[0].as_log();
+        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::CONTAINER], id.into());
+        assert!(log.get(&event::CREATED_AT).is_some());
+        assert_eq!(log[&event::IMAGE], "busybox".into());
+        assert!(log.get(&format!("label.{}", label).into()).is_some());
+        assert_eq!(
+            events[0].as_log()[&"names[0]".to_owned().into()],
+            name.into()
+        );
     }
 
     #[test]
@@ -1121,61 +1139,7 @@ mod tests {
     fn currently_running() {
         let message = "14";
         let name = "vector_test_currently_running";
-        let delay = 3; // sec
-
-        let mut rt = test_util::runtime();
-        let docker = docker();
-
-        let id = delayed_container(name, None, message, delay, &docker, &mut rt);
-        if let Err(error) = container_start(&id, &docker, &mut rt) {
-            container_remove(&id, &docker, &mut rt);
-            panic!("Container start failed with error: {:?}", error);
-        }
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        let out = source_with(name, None, &mut rt);
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-        let _ = container_wait(&id, &docker, &mut rt);
-        container_remove(&id, &docker, &mut rt);
-
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
-    }
-
-    #[test]
-    fn metadata() {
-        let message = "15";
-        let name = "vector_test_metadata";
-        let label = "vector_label_test_metadata";
-
-        let (out, mut rt) = source(name, label);
-        let docker = docker();
-
-        let id = log_container(name, label, message, &docker, &mut rt);
-        if let Err(error) = container_run(&id, &docker, &mut rt) {
-            container_remove(&id, &docker, &mut rt);
-            panic!("Container start failed with error: {:?}", error);
-        }
-        container_remove(&id, &docker, &mut rt);
-
-        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-
-        let log = events[0].as_log();
-        assert_eq!(log[&event::MESSAGE], message.into());
-        assert_eq!(log[&event::CONTAINER], id.into());
-        assert!(log.get(&event::CREATED_AT).is_some());
-        assert_eq!(log[&event::IMAGE], "busybox".into());
-        assert!(log.get(&format!("label.{}", label).into()).is_some());
-        assert_eq!(
-            events[0].as_log()[&"names[0]".to_owned().into()],
-            name.into()
-        );
-    }
-
-    #[test]
-    fn metadata_running() {
-        let message = "16";
-        let name = "vector_test_running";
-        let label = "vector_test_label_running";
+        let label = "vector_test_label_currently_running";
         let delay = 3; // sec
 
         let mut rt = test_util::runtime();
