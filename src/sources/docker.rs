@@ -786,7 +786,12 @@ impl ContainerMetadata {
             .names
             .iter()
             .enumerate()
-            .map(|(i, name)| (format!("names[{}]", i).into(), name.as_str().into()))
+            .map(|(i, name)| {
+                (
+                    format!("names[{}]", i).into(),
+                    remove_slash(name.as_str()).into(),
+                )
+            })
             .collect();
 
         ContainerMetadata {
@@ -809,7 +814,10 @@ impl ContainerMetadata {
             })
             .unwrap_or_default();
 
-        let names = vec![("names[0]".to_owned().into(), details.name.as_str().into())];
+        let names = vec![(
+            "names[0]".to_owned().into(),
+            remove_slash(details.name.as_str()).into(),
+        )];
 
         Ok(ContainerMetadata {
             labels,
@@ -820,6 +828,11 @@ impl ContainerMetadata {
                 .into(),
         })
     }
+}
+
+/// Removes / at the start of str
+fn remove_slash(s: &str) -> &str {
+    s.trim_start_matches("/")
 }
 
 #[cfg(all(test, feature = "docker-integration-tests"))]
@@ -1154,15 +1167,15 @@ mod tests {
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(
             events[0].as_log()[&"names[0]".to_owned().into()],
-            format!("/{}", name).into()
+            name.into()
         );
     }
 
     #[test]
     fn metadata_running() {
         let message = "16";
-        let name = "vector_test_running_metadata";
-        let label = "vector_test_label_running_metadata";
+        let name = "vector_test_running";
+        let label = "vector_test_label_running";
         let delay = 3; // sec
 
         let mut rt = test_util::runtime();
@@ -1188,7 +1201,7 @@ mod tests {
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(
             events[0].as_log()[&"names[0]".to_owned().into()],
-            format!("/{}", name).into()
+            name.into()
         );
     }
 }
