@@ -1,9 +1,9 @@
 use crate::{
-    event::{self, Event},
+    event::{self, Event, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Bytes, BytesMut};
-use chrono::{DateTime, FixedOffset};
+use chrono::{offset::TimeZone, DateTime, FixedOffset, Utc};
 use futures::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
@@ -12,11 +12,14 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
+    rep::{Container, ContainerDetails},
     tty::{Chunk, StreamType},
     Docker,
 };
 use std::borrow::Borrow;
+use std::sync::Arc;
 use std::{collections::HashMap, env};
+use string_cache::DefaultAtom as Atom;
 use tracing::field;
 
 /// The begining of image names of vector docker images packaged by vector.
@@ -312,9 +315,11 @@ impl DockerSource {
                         continue;
                     }
 
-                    let id = ContainerId::new(container.id);
+                    let id = ContainerId::new(container.id.clone());
+                    let metadata = ContainerMetadata::from_container(&container);
 
-                    self.containers.insert(id.clone(), self.esb.start(id));
+                    self.containers
+                        .insert(id.clone(), self.esb.start(id, metadata));
                 }
 
                 // Sort for efficient lookup
@@ -393,7 +398,7 @@ impl Future for DockerSource {
                                             if !ignore_flag && include_name {
                                                 // Included
                                                 self.containers
-                                                    .insert(id.clone(), self.esb.start(id));
+                                                    .insert(id.clone(), self.esb.start(id, None));
                                             } else {
                                                 // Ignore
                                             }
@@ -430,8 +435,9 @@ impl Future for DockerSource {
 }
 
 /// Used to construct and start event stream futures
+#[derive(Clone)]
 struct EventStreamBuilder {
-    core: DockerSourceCore,
+    core: Arc<DockerSourceCore>,
     /// Event stream futures send events through this
     out: Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
@@ -445,17 +451,46 @@ impl EventStreamBuilder {
         main_send: UnboundedSender<ContainerLogInfo>,
     ) -> Self {
         EventStreamBuilder {
-            core,
+            core: Arc::new(core),
             out,
             main_send,
         }
     }
 
     /// Constructs and runs event stream
-    fn start(&self, id: ContainerId) -> ContainerState {
-        let mut state = ContainerState::new(id, self.core.now_timestamp);
-        self.restart(&mut state);
-        state
+    fn start<O: Into<Option<ContainerMetadata>>>(
+        &self,
+        id: ContainerId,
+        metadata: O,
+    ) -> ContainerState {
+        if let Some(metadata) = metadata.into() {
+            self.start_event_stream(ContainerLogInfo::new(id, metadata, self.core.now_timestamp));
+        } else {
+            let metadata_fetch = self
+                .core
+                .docker
+                .containers()
+                .get(id.as_str())
+                .inspect()
+                .map_err(|error| error!(message="Fetching container details failed",%error))
+                .and_then(|details| {
+                    ContainerMetadata::from_details(&details)
+                        .map_err(|error| error!(message="Metadata extraction failed",%error))
+                });
+
+            let this = self.clone();
+            let create = metadata_fetch.map(move |metadata| {
+                this.start_event_stream(ContainerLogInfo::new(
+                    id,
+                    metadata,
+                    this.core.now_timestamp,
+                ));
+            });
+
+            tokio::spawn(create);
+        }
+
+        ContainerState::new()
     }
 
     /// If info is present, restarts event stream
@@ -562,17 +597,10 @@ struct ContainerState {
 }
 
 impl ContainerState {
-    /// Container docker ID
-    /// Unix timestamp of event which created this struct
-    fn new(id: ContainerId, created: i64) -> Self {
-        let info = ContainerLogInfo {
-            id,
-            created,
-            last_log: None,
-            generation: 0,
-        };
+    /// It's ContainerLogInfo pair must be created exactly once.
+    fn new() -> Self {
         ContainerState {
-            info: Some(info),
+            info: None,
             running: true,
             generation: 0,
         }
@@ -617,9 +645,23 @@ struct ContainerLogInfo {
     last_log: Option<(DateTime<FixedOffset>, u64)>,
     /// generation of ContainerState at event_stream creation
     generation: u64,
+    ///
+    metadata: ContainerMetadata,
 }
 
 impl ContainerLogInfo {
+    /// Container docker ID
+    /// Unix timestamp of event which created this struct
+    fn new(id: ContainerId, metadata: ContainerMetadata, created: i64) -> Self {
+        ContainerLogInfo {
+            id,
+            created,
+            last_log: None,
+            generation: 0,
+            metadata,
+        }
+    }
+
     /// Only logs after or equal to this point need to be fetched
     #[allow(dead_code)]
     fn log_since(&self) -> i64 {
@@ -671,7 +713,7 @@ impl ContainerLogInfo {
                 // Supply timestamp
                 log_event.insert_explicit(
                     event::TIMESTAMP.clone(),
-                    timestamp.with_timezone(&chrono::Utc).into(),
+                    timestamp.with_timezone(&Utc).into(),
                 );
 
                 self.last_log = Some((timestamp, self.generation));
@@ -703,9 +745,80 @@ impl ContainerLogInfo {
         // Supply container
         log_event.insert_implicit(event::CONTAINER.clone(), self.id.0.clone().into());
 
+        // Add Metadata
+        for (key, value) in self
+            .metadata
+            .labels
+            .iter()
+            .chain(self.metadata.names.iter())
+        {
+            log_event.insert_implicit(key.clone(), value.clone());
+        }
+        log_event.insert_implicit(event::IMAGE.clone(), self.metadata.image.clone());
+        log_event.insert_implicit(event::CREATED_AT.clone(), self.metadata.created_at.clone());
+
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
         Some(event)
+    }
+}
+
+struct ContainerMetadata {
+    /// label.key -> String
+    labels: Vec<(Atom, ValueKind)>,
+    /// names -> Vec<String>
+    names: Vec<(Atom, ValueKind)>,
+    /// image -> String
+    image: ValueKind,
+    /// created_at -> DateTime<Utc>
+    created_at: ValueKind,
+}
+
+impl ContainerMetadata {
+    fn from_container(container: &Container) -> Self {
+        let labels = container
+            .labels
+            .iter()
+            .map(|(key, value)| (("label.".to_owned() + key).into(), value.as_str().into()))
+            .collect();
+
+        let names = container
+            .names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (format!("names[{}]", i).into(), name.as_str().into()))
+            .collect();
+
+        ContainerMetadata {
+            labels,
+            names,
+            image: container.image.as_str().into(),
+            created_at: Utc.timestamp(container.created as i64, 0).into(),
+        }
+    }
+
+    fn from_details(details: &ContainerDetails) -> Result<Self, chrono::format::ParseError> {
+        let labels = details
+            .config
+            .labels
+            .as_ref()
+            .map(|map| {
+                map.iter()
+                    .map(|(key, value)| (("label.".to_owned() + key).into(), value.as_str().into()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let names = vec![("names[0]".to_owned().into(), details.name.as_str().into())];
+
+        Ok(ContainerMetadata {
+            labels,
+            names,
+            image: details.config.image.as_str().into(),
+            created_at: DateTime::parse_from_rfc3339(details.created.as_str())?
+                .with_timezone(&Utc)
+                .into(),
+        })
     }
 }
 
@@ -1013,5 +1126,69 @@ mod tests {
         container_remove(&id, &docker, &mut rt);
 
         assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+    }
+
+    #[test]
+    fn metadata() {
+        let message = "15";
+        let name = "vector_test_metadata";
+        let label = "vector_label_test_metadata";
+
+        let (out, mut rt) = source(name, label);
+        let docker = docker();
+
+        let id = log_container(name, label, message, &docker, &mut rt);
+        if let Err(error) = container_run(&id, &docker, &mut rt) {
+            container_remove(&id, &docker, &mut rt);
+            panic!("Container start failed with error: {:?}", error);
+        }
+        container_remove(&id, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        let log = events[0].as_log();
+        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::CONTAINER], id.into());
+        assert!(log.get(&event::CREATED_AT).is_some());
+        assert_eq!(log[&event::IMAGE], "busybox".into());
+        assert!(log.get(&format!("label.{}", label).into()).is_some());
+        assert_eq!(
+            events[0].as_log()[&"names[0]".to_owned().into()],
+            format!("/{}", name).into()
+        );
+    }
+
+    #[test]
+    fn metadata_running() {
+        let message = "16";
+        let name = "vector_test_running_metadata";
+        let label = "vector_test_label_running_metadata";
+        let delay = 3; // sec
+
+        let mut rt = test_util::runtime();
+        let docker = docker();
+
+        let id = delayed_container(name, label, message, delay, &docker, &mut rt);
+        if let Err(error) = container_start(&id, &docker, &mut rt) {
+            container_remove(&id, &docker, &mut rt);
+            panic!("Container start failed with error: {:?}", error);
+        }
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let out = source_with(name, None, &mut rt);
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+        let _ = container_wait(&id, &docker, &mut rt);
+        container_remove(&id, &docker, &mut rt);
+
+        let log = events[0].as_log();
+        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::CONTAINER], id.into());
+        assert!(log.get(&event::CREATED_AT).is_some());
+        assert_eq!(log[&event::IMAGE], "busybox".into());
+        assert!(log.get(&format!("label.{}", label).into()).is_some());
+        assert_eq!(
+            events[0].as_log()[&"names[0]".to_owned().into()],
+            format!("/{}", name).into()
+        );
     }
 }
