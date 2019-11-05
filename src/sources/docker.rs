@@ -537,28 +537,28 @@ impl EventStreamBuilder {
                             }
                             // !Hot code: to here
                         }
-                        Ok(Async::Ready(None)) => {
-                            let (main, info) = state.take().expect("They are present here");
-                            // End of stream
-                            info!(
-                                message = "Stoped listening logs on docker container",
-                                id = field::display(info.id.as_str())
-                            );
-                            // TODO: I am not sure that it's necessary to drive this future to completition
-                            tokio::spawn(
-                                main.send(info)
-                                    .map_err(|e| error!(message="Unable to return ContainerLogInfo to main",%e))
-                                    .map(|_| ()),
-                            );
-                            Ok(Async::Ready(None))
-                        }
+                        Ok(Async::Ready(None)) => break,
                         Ok(Async::NotReady) => Ok(Async::NotReady),
                         Err(error) => {
                             error!(message = "docker API container logging error",%error);
-                            Err(())
+                            // On any error, restart connection
+                            break;
                         }
                     };
                 }
+
+                let (main, info) = state.take().expect("They are present here");
+                // End of stream
+                info!(
+                    message = "Stoped listening logs on docker container",
+                    id = field::display(info.id.as_str())
+                );
+                // TODO: I am not sure that it's necessary to drive this future to completition
+                tokio::spawn(
+                    main.send(info)
+                        .map_err(|e| error!(message="Unable to return ContainerLogInfo to main",%e))
+                        .map(|_| ()),
+                );
             }
 
             Ok(Async::Ready(None))
@@ -852,8 +852,8 @@ mod tests {
             .block_on(docker.images().list(&list_option))
             .map_err(|e| error!(%e))
         {
-            trace!("Pulling image");
             if images.is_empty() {
+                trace!("Pulling image");
                 let options = shiplift::PullOptions::builder()
                     .image(image)
                     .tag(BUXYBOX_IMAGE_TAG)
