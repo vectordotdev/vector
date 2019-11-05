@@ -86,6 +86,7 @@ files.\
 
 [sources.file.options.start_at_beginning]
 type = "bool"
+common = true
 null = false
 default = false
 description = """\
@@ -173,6 +174,7 @@ time.\
 [sources.file.options.oldest_first]
 type = "bool"
 category = "Priority"
+common = true
 default = false
 null = true
 description = """\

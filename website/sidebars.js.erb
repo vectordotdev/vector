@@ -1,0 +1,125 @@
+module.exports = {
+  docs: [
+    {
+      type: 'category',
+      label: 'About',
+      items: [
+        'what_is_vector',
+        'about/concepts',
+        'about/data-model',
+        'about/guarantees',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Setup',
+      items: [
+        {
+          type: 'category',
+          label: 'Installation',
+          items: [
+            <%= metadata.links.fetch_id("docs.installation.script").to_json %>,
+            {
+              type: 'category',
+              label: 'Platforms',
+              items: [
+                <%- metadata.installation.platforms.each do |platform| -%>
+                  <%= metadata.links.fetch_id("docs.platforms.#{platform.id}").to_json %>,
+                <%- end -%>
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Package Managers',
+              items: [
+                <%- metadata.installation.package_managers.each do |package_manager| -%>
+                  <%= metadata.links.fetch_id("docs.package_managers.#{package_manager.id}").to_json %>,
+                <%- end -%>
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Operating Systems',
+              items: [
+                <%- metadata.installation.operating_systems.each do |operating_system| -%>
+                  <%= metadata.links.fetch_id("docs.operating_systems.#{operating_system.id}").to_json %>,
+                <%- end -%>
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Manual',
+              items: [
+                <%= metadata.links.fetch_id("docs.from-archives").to_json %>,
+                <%= metadata.links.fetch_id("docs.from-source").to_json %>,              
+              ],
+            },
+          ],
+        },
+        <%= metadata.links.fetch_id("docs.configuration").to_json %>,
+        {
+          type: 'category',
+          label: 'Deployment',
+          items: [
+            <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,
+            {
+              type: 'category',
+              label: 'Roles',
+              items: [
+                <%= metadata.links.fetch_id("docs.roles.agent").to_json %>,
+                <%= metadata.links.fetch_id("docs.roles.service").to_json %>,
+              ]
+            },
+          ]
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Components',
+      items: [
+        <%= metadata.links.fetch_id("docs.components").to_json %>,
+        {
+          type: 'category',
+          label: 'Sources',
+          items: <%= metadata.sources_list.collect { |s| metadata.links.fetch_id("docs.sources.#{s.name}") }.to_json  %>,
+        },
+        {
+          type: 'category',
+          label: 'Transforms',
+          items: <%= metadata.transforms_list.collect { |t| metadata.links.fetch_id("docs.transforms.#{t.name}") }.to_json  %>,
+        },
+        {
+          type: 'category',
+          label: 'Sinks',
+          items: [
+            <%= metadata.links.fetch_id("docs.sinks").to_json %>,
+            <% metadata.sinks_list.each do |s| %>
+              <%= metadata.links.fetch_id("docs.sinks.#{s.name}").to_json %>,
+            <% end %>
+          ],
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Administration',
+      items: [
+        <%= metadata.links.fetch_id("docs.administration.process-management").to_json %>,
+        <%= metadata.links.fetch_id("docs.administration.monitoring").to_json %>,
+        <%= metadata.links.fetch_id("docs.administration.tuning").to_json %>,
+        <%= metadata.links.fetch_id("docs.administration.updating").to_json %>,
+        <%= metadata.links.fetch_id("docs.administration.validating").to_json %>,
+        <%= metadata.links.fetch_id("docs.administration.env-vars").to_json %>,
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Meta',
+      items: [
+        <%= metadata.links.fetch_id("docs.meta.glossary").to_json %>,
+        <%= metadata.links.fetch_id("docs.meta.conventions").to_json %>,
+      ],
+    },
+  ]
+};

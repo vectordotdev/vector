@@ -1,6 +1,6 @@
 .code-header {
-  background: var(--ifm-color-emphasis-alpha-05);
-  color: var(--ifm-color-emphasis-alpha-40);
+  background: var(--ifm-color-emphasis-50);
+  color: var(--ifm-color-emphasis-400);
   font-size: 0.8rem;
   padding: 2px 8px;
 }

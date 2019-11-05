@@ -1,0 +1,29 @@
+---
+title: Sinks
+sidebar_label: hidden
+---
+
+Sinks are last in the [pipeline][docs.configuration#composition], responsible
+for sending [events][docs.data-model#event] downstream.
+
+import Component from '@site/src/components/Component';
+import Components from '@site/src/components/Components';
+
+<Components>
+
+<%- metadata.sinks_list.each do |component| -%>
+<Component
+  delivery_guarantee={<%= (component.respond_to?(:delivery_guarantee) ? component.delivery_guarantee : nil).to_json %>}
+  description={<%= component_description(component).remove_markdown_links.to_json %>}
+  event_types={<%= component.event_types.to_json %>}
+  id={<%= component.id.to_json %>}
+  name={<%= component.name.to_json %>}
+  path={<%= metadata.links.fetch("docs.#{component.type.pluralize}.#{component.name}").to_json %>}
+  status={<%= component.status.to_json %>}
+  type={<%= component.type.to_json %>} />
+<%- end -%>
+
+</Components>
+
+
+[+ request a new sink][urls.new_sink]

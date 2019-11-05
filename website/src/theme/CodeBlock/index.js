@@ -15,7 +15,7 @@ require('prismjs/components/prism-toml');
 export default ({children, className: languageClassName}) => {
   const {
     siteConfig: {
-      themeConfig: {prismTheme},
+      themeConfig: {prismTheme, darkPrismTheme},
     },
   } = useDocusaurusContext();
   const [showCopied, setShowCopied] = useState(false);
@@ -47,11 +47,29 @@ export default ({children, className: languageClassName}) => {
 
     setTimeout(() => setShowCopied(false), 2000);
   };
-  
+
+  let currentTheme =
+    typeof document !== 'undefined'
+      ? document.querySelector('html').getAttribute('data-theme')
+      : null;
+
+  if (!currentTheme) {
+    currentTheme = localStorage.getItem('theme')
+  }
+
+  if (!currentTheme) {
+    let utcDate = new Date();
+    let offset = (new Date().getTimezoneOffset() / 60) * -1;
+    let date = new Date(utcDate.getTime() + offset);
+    currentTheme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
+  }
+
+  let theme = (currentTheme == 'dark' ? darkPrismTheme : prismTheme);
+
   return (
     <Highlight
       {...defaultProps}
-      theme={prismTheme || defaultTheme}
+      theme={theme || defaultTheme}
       code={children.trim()}
       language={language}>
       {({className, style, tokens, getLineProps, getTokenProps}) => (

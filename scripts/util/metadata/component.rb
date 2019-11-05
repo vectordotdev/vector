@@ -87,7 +87,7 @@ class Component
       types += output_types
     end
 
-    types
+    types.uniq
   end
 
   def options_list

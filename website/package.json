@@ -10,10 +10,10 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.30",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.30",
+    "@docusaurus/core": "^2.0.0-alpha.32",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.32",
     "classnames": "^2.2.6",
-    "docusaurus": "^2.0.0-alpha.30",
+    "docusaurus": "^2.0.0-alpha.32",
     "prismjs": "^1.17.1",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",

@@ -1,0 +1,283 @@
+---
+title: Data Model
+description: A deep dive into Vector's data model
+---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import TabItem from '@theme/TabItem';
+import Tabs from '@theme/Tabs';
+
+This document provides a deeper look at Vector's data model. Understanding this
+goes a long way in properly [configuring][docs.configuration] Vector for your
+use case.
+
+## Events
+
+To begin, all data flowing through Vector are considered an "events".
+The general flow looks like this:
+
+![][assets.data-model-log]
+
+Events must be classified as a [`log`](#log) or [`metric`](#metric) event. Each
+type is described below in more detail. To better understand why Vector
+classifies events, please see the "[Why not just event?](#why-not-just-events)"
+FAQ.
+
+## Log
+
+![][assets.data-model-log]
+
+A `log` event is a structured represention of a point-in-time event. It contains
+an arbitrary set of fields (key/value pairs) that describe the event.
+
+### Schema
+
+<CodeHeader fileName="log.proto" links={[{href: "https://github.com/timberio/vector/blob/master/proto/event.proto"}]} />
+
+```protobuf
+message Log {
+  map<string, Value> fields = 1;
+}
+
+message Value {
+  oneof kind {
+    bytes raw_bytes = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    int64 integer = 4;
+    double float = 5;
+    bool boolean = 6;
+  }
+}
+```
+
+Vector's `log` events are simple key/value pairs. Vector does not restrict your
+schema in _any_ way, you are free to use whatever fields you like. In places
+where Vector must operate on a field, Vector will default to the
+[special fields](#special-fields) outlined below.
+
+### Special Fields
+
+In all cases where a component must operate on a key, the following schema is
+used as the _default_. Each component will provide configuration options to
+override the fields used, if relevant.
+
+| Name        | Type                      | Description                                                                                                                                                                     |
+|:------------|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp` | [`timestamp`](#timestamp) | A normalized [Rust DateTime struct][urls.rust_date_time] in UTC.                                                                                                                 |
+| `message`   | [`string`](#string)       | A string representing the log message. This is the key used when ingesting raw string data.                                                                                     |
+| `host`      | [`string`](#string)       | A string representing the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_field` option for relevant sources. |
+
+### Nested Fields
+
+Because Vector's `log` events are _flat_ maps, Vector represents nested fields
+with a `.` delimiter. This means that when Vector ingests nested fields, it will
+flatten the fields and delimit hierarchies with a `.` character. Additionally,
+when Vector outputs data it will explode the map back into it's original nested
+structure. For example:
+
+```javascript
+{
+    "parent.child": "..."
+}
+```
+
+### Arrays
+
+Because Vector's `log` events are _flat_ maps, Vector represents arrays by
+suffixing the name with the array index: `[n]`. This means that when Vector
+ingests arrays it will flatten the  items into fields containing the index.
+Additionally, when Vector outputs data it will explode the array back into
+it's original array structure. For example:
+
+```javascript
+{
+    "array[0]": "item1",
+    "array[1]": "item2",
+    "array[2]": "item3"
+}
+```
+
+### Special Key Characters
+
+The following characters are reserved special character used to describe
+complex data structured.
+
+* `.` - used to denote [field nesting](#nested-fields)
+* `[n]` (trailing) - used to denote [arrays](#arrays).
+
+## Metric
+
+![][assets.data-model-metric]
+
+A `metric` event represents a numeric value that must be classified into one of
+four types: `counter`, `histogram`, `gauge`, or `set`. Each are described in
+more detail below.
+
+### Schema
+
+```coffeescript
+message Metric {
+  oneof metric {
+    Counter counter = 1;
+    Histogram histogram = 2;
+    Gauge gauge = 3;
+    Set set = 4;
+  }
+}
+
+message Counter {
+  string name = 1;
+  double val = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
+}
+
+message Histogram {
+  string name = 1;
+  double val = 2;
+  uint32 sample_rate = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> tags = 5;
+}
+
+message Gauge {
+  string name = 1;
+  double val = 2;
+  enum Direction {
+    None = 0;
+    Plus = 1;
+    Minus = 2;
+  }
+  Direction direction = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> tags = 5;
+}
+
+message Set {
+  string name = 1;
+  string val = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
+}
+```
+
+### Counters
+
+A `counter` is a single value that can _only_ be incremented, it cannot be
+decremented. For example:
+
+```javascript
+{
+  "counter": {
+    "name": "login.count",
+    "val": 2.0,
+    "timestamp": "2019-05-02T12:44:21.433184Z", // optional
+    "tags": {                                   // optional
+      "host": "my.host.com"
+    }
+  }
+}
+```
+
+### Histograms
+
+Also called a "timer". A `histogram` represents the frequency distribution of a
+value. This is commonly used for timings, helping to understand quantiles, max,
+min, and other aggregations. For example:
+
+```javascript
+{
+  "histogram": {
+    "name": "duration_ms",
+    "val": 2.0,
+    "sample_rate": 1,
+    "timestamp": "2019-05-02T12:44:21.433184Z", // optional
+    "tags": {                                   // optional
+      "host": "my.host.com"
+    }
+  }
+}
+```
+
+### Gauges
+
+A gauge represents a point-in-time value that can increase and decrease.
+Vector's internal gauge type represents changes to that value. Gauges should be
+used to track fluctuations in values, like current memory or CPU usage. For
+example:
+
+```javascript
+{
+  "gauge": {
+    "name": "memory_rss",
+    "val": 554222.0,
+    "direction": "plus",
+    "tags": {                // optional
+      "host": "my.host.com"
+    }
+  }
+}
+```
+
+### Sets
+
+A set represents a count of unique values, AKA the cardinality. For example:
+
+```javascript
+{
+  "set": {
+    "name": "unique_users",
+    "val": "paul_bunyan",
+    "tags": {                // optional
+      "host": "my.host.com"
+    }
+  }
+}
+```
+
+### Tags
+
+You'll notice that each metric type contains a `tags` key. Tags are simple
+key/value pairs represented as single-level strings.
+
+## How It Works
+
+### Time Zones
+
+If Vector receives a timestamp that does not contain timezone information
+Vector assumes the timestamp is in local time, and will convert the timestamp
+to UTC from the local time. It is important that the host system contain
+time zone data files to properly determine the local time zone. This is
+typically installed through the `tzdata` package. See [issue 551][urls.issue_551]
+for more info.
+
+### Timestamp Coercion
+
+There are cases where Vector interacts with formats that do not have a formal
+timestamp defintion, such as JSON. In these cases, Vector will ingest the
+timestamp in it's primitive form (string or integer). You can then coerce the
+field into a `timestamp` using the
+[`coercer` transform][docs.transforms.coercer]. If you are parsing this data
+out of a string, all Vector parser transforms include a `types` option,
+allowing you to extract and coerce in one step.
+
+
+### Why Not Just Events?
+
+Although Vector generalizes all data flowing through it as "events", we do
+not expose our data structure as such. Instead, we expose the specific event
+types. Here's why:
+
+1. We like the "everything is an event" philosophy a lot.
+2. We recognize that there's a large gap between that idea and a lot of existing tooling.
+3. By starting "simple" (from an integration perspective, i.e. meeting people where they are) and evolving our data model as we encounter the specific needs of new sources/sinks/transforms, we avoid overdesigning yet another grand unified data format.
+4. Starting with support for a little more "old school" model makes us a better tool for supporting incremental progress in existing infrastructures towards more event-based architectures.
+
+
+[assets.data-model-log]: ../assets/data-model-log.svg
+[assets.data-model-metric]: ../assets/data-model-metric.svg
+[docs.configuration]: ../setup/configuration
+[docs.sources]: ../components/sources
+[docs.transforms.coercer]: ../components/transforms/coercer
+[urls.issue_551]: https://github.com/timberio/vector/issues/551
+[urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html

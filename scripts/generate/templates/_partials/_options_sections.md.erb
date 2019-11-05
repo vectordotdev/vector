@@ -1,14 +1,14 @@
 <%- if level == 1 -%>
-import Option from '@site/src/components/Option';
-import Options from '@site/src/components/Options';
+import Field from '@site/src/components/Field';
+import Fields from '@site/src/components/Fields';
 <%- end -%>
 
-<Options filters={<%= filters.to_json %>}>
+<Fields filters={<%= filters.to_json %>}>
 
 <%- options.each do |option| -%>
 <%- full_path = [path, option.name].compact.join(".") -%>
 
-<Option
+<Field
   common={<%= option.common? %>}
   defaultValue={<%= option.default.to_json %>}
   enumValues={<%= option.enum.to_json %>}
@@ -29,8 +29,8 @@ import Options from '@site/src/components/Options';
 <%= options_sections(option.options, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
 <%- end -%>
 
-</Option>
+</Field>
 
 <%- end -%>
 
-</Options>
+</Fields>

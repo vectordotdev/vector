@@ -79,9 +79,9 @@ function DocItem(props) {
               <div className={styles.docItemContainer}>
                 {!metadata.hide_title && (
                   <header>
-                    <div class="badges">
-                      {eventTypes && eventTypes.includes("log") && <span class="badge badge--primary" title="This component works with log events.">L</span>}
-                      {eventTypes && eventTypes.includes("metric") && <span class="badge badge--primary" title="This component works with metric events.">M</span>}
+                    <div className="badges">
+                      {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
+                      {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
                     </div>
                     <h1 className={styles.docTitle}>{metadata.title}</h1>
                   </header>
@@ -125,10 +125,12 @@ function DocItem(props) {
                           </a>
                         </div>}
                     </div>}
-                  <div className="section">
-                    <div className="title">Contents</div>
-                    <Headings headings={DocContent.rightToc} />
-                  </div>
+                  {DocContent.rightToc.length > 0 &&
+                    <div className="section">
+                      <div className="title">Contents</div>
+                      <Headings headings={DocContent.rightToc} />
+                    </div>
+                  }
                   <div className="section">
                     <div className="title">Resources</div>
                     <ul className="contents">
@@ -137,9 +139,27 @@ function DocItem(props) {
                       {sourceUrl && (<li><a href={sourceUrl} className="contents__link" target="_blank"><i className="feather icon-github"></i> View Source</a></li>)}
                     </ul>
                   </div>
-                  <div className="section">
-                    Last edit at 12/12/12 by Ben
-                  </div>
+                  {(lastUpdatedAt || lastUpdatedBy) && (
+                    <div className="section">
+                      Last updated{' '}
+                      {lastUpdatedAt && (
+                        <>
+                          on{' '}
+                          <strong>
+                            {new Date(
+                              lastUpdatedAt * 1000,
+                            ).toLocaleDateString()}
+                          </strong>
+                          {lastUpdatedBy && ' '}
+                        </>
+                      )}
+                      {lastUpdatedBy && (
+                        <>
+                          by <strong>{lastUpdatedBy}</strong>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

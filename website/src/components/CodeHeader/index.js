@@ -2,10 +2,17 @@ import React from 'react';
 
 import './styles.css';
 
-function CodeHeader({fileName, learnMoreUrl}) {
+function CodeHeader({fileName, links}) {
+  let linkElements = [];
+
+  for (var link in links) {
+    linkElements.push(<a href={link.href}>{link.text || "Learn more&hellip;"}</a>);
+  }
+
   return (
     <div className="code-header">
-      {learnMoreUrl && <a href={learnMoreUrl} className="learn-more" title="Learn more about configuring Vector"><i className="feather icon-info"></i> learn more</a>}
+      {linkElements.length > 0 &&
+        <span className="code-header--links">{linkElements}</span>}
       {fileName}
     </div>
   );

@@ -54,9 +54,9 @@ expanding into more specifics.
 
 ### Git Branches
 
-_All_ changes must be made in a branch and submitted as [pull \
-requests](#pull-requests). Vector does not adopt any type of branch naming
-style, but please use something descriptive of your changes.
+_All_ changes must be made in a branch and submitted as [pull requests](#pull-requests).
+Vector does not adopt any type of branch naming style, but please use something
+descriptive of your changes.
 
 ### Git Commits
 

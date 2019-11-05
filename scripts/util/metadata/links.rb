@@ -40,6 +40,7 @@ class Links
     @docs =
       Dir.glob("#{docs_root}/**/*").
       to_a.
+      reject { |p| File.directory?(p) }.
       collect { |f| f.gsub(docs_root, "") }
   end
 
@@ -69,7 +70,7 @@ class Links
       when "assets"
         fetch_asset(name)
       when "docs"
-        fetch_doc(name)
+        fetch_doc(name).gsub(/\.md$/, "")
       when "urls"
         fetch_url(name)
       else
@@ -79,7 +80,7 @@ class Links
 
             #{category.inspect}
 
-          Links must start with `docs.`, `images.`, or `urls.`
+          Links must start with `docs.`, `assets.`, or `urls.`
           EOF
         )
       end
@@ -87,6 +88,11 @@ class Links
     value = [base_value, section].compact.join("#")
     @values[id] ||= value
     value
+  end
+
+  def fetch_id(id)
+    # Docusaurus does not allow a leading `/`
+    fetch(id).gsub(/^\//, "")
   end
 
   private

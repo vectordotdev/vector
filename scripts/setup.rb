@@ -33,23 +33,9 @@ include Printer
 # Constants
 #
 
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
+ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s
 
-DOCS_ROOT = File.join(ROOT_DIR, "docs")
+DOCS_ROOT = File.join(ROOT_DIR, "website", "docs")
 META_ROOT = File.join(ROOT_DIR, ".meta")
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
-TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
-
-#
-# Functions
-#
-
-def load_templates!
-  Templates.new(TEMPLATES_DIR, metadata)
-end
-
-def load_metadata!
-  Metadata.load!(META_ROOT, DOCS_ROOT)
-rescue Exception => e
-  error!(e.message)
-end
+PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials")

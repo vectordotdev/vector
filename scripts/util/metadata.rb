@@ -140,7 +140,7 @@ class Metadata
   end
 
   def components
-    @components ||= sources.to_h.values + transforms.to_h.values + sinks.to_h.values
+    @components ||= sources_list + transforms_list + sinks_list
   end
 
   def latest_patch_releases

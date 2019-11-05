@@ -1,0 +1,34 @@
+.fields .filters {
+  color: var(--ifm-color-emphasis-300);
+  margin-bottom: var(--ifm-spacing-vertical)  ;
+}
+
+.fields .filters .col:first-child {
+  padding-left: 0;
+}
+
+.fields .filters .col:last-child {
+  padding-right: 0;
+}
+
+.fields .filters .checkboxes {
+  font-size: 0.9em;
+  padding-top: calc( var(--ifm-spacing-vertical) / 2 );
+}
+
+.fields .filters .search .feather {
+  position: relative;
+  left: 0;
+}
+
+.fields .filters .search input {
+  margin-left: -15px;
+  padding-right: 15px;
+  padding-left: 20px;
+  width: 90%;
+}
+
+.fields .fields-list {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  margin-left: 0.25em;
+}

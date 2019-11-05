@@ -16,7 +16,7 @@
 }
 
 .copyButton {
-  background: var(--ifm-color-black-alpha-10);
+  background: var(--ifm-color-emphasis-100);
   border: 0px none;
   border-radius: var(--ifm-global-radius);
   color: var(--ifm-font-base-color);

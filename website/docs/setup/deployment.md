@@ -1,0 +1,17 @@
+---
+title: Deployment
+description: How to deploy Vector into your own infrastructure
+---
+
+![Example Topology Made Possible By Vector][assets.centralized-diagram]
+
+This section will cover deploying Vector. Vector is designed to deploy across your entire infrastructure, serving both as an [agent][docs.roles.agent] and a [service][docs.roles.service]. You combine these roles to form [topologies][docs.topologies], enabling Vector to serve the simplest and most complex use cases.
+
+Start by becoming familiar with the possible [topologies][docs.topologies] and then take a closer look at the [roles][docs.roles] used to form these topologies.
+
+
+[assets.centralized-diagram]: ../assets/centralized-diagram.svg
+[docs.roles.agent]: ../setup/deployment/roles/agent
+[docs.roles.service]: ../setup/deployment/roles/service
+[docs.roles]: ../setup/deployment/roles
+[docs.topologies]: ../setup/deployment/topologies

@@ -1,0 +1,244 @@
+---
+
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
+sidebar_label: "json_parser|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
+status: "prod-ready"
+title: "json_parser transform" 
+---
+
+The `json_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value as JSON.
+
+## Configuration
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+<TabItem value="common">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "json_parser" # example, must be: "json_parser"
+  inputs = ["my-source-id"] # example
+  drop_invalid = true # example
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration" />
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED
+  type = "json_parser" # example, must be: "json_parser"
+  inputs = ["my-source-id"] # example
+  drop_invalid = true # example
+  
+  # OPTIONAL
+  field = "message" # default
+```
+
+</TabItem>
+
+</Tabs>
+
+## Options
+
+import Field from '@site/src/components/Field';
+import Fields from '@site/src/components/Fields';
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[true]}
+  name={"drop_invalid"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  type={"bool"}
+  unit={null}>
+
+### drop_invalid
+
+If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"message"}
+  enumValues={null}
+  examples={["message"]}
+  name={"field"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  type={"string"}
+  unit={null}>
+
+### field
+
+The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+
+
+</Field>
+
+
+</Fields>
+
+## Input/Output
+
+{% tabs %}
+{% tab title="Simple" %}
+Given the following log event:
+
+```
+{
+  "message": "{"key": "value"}"
+}
+```
+
+You can parse the JSON with:
+
+```coffeescript
+[transforms.json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "key": "value"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+
+{% endtab %}
+{% tab title="Wrapped" %}
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this log event:
+
+```
+{
+  "message": "{"parent": "{\"child\": \"value2\"}"}"
+}
+```
+
+You could unwrap the JSON with the following transforms:
+
+```coffeescript
+[transforms.root_json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+
+[transforms.parent_json]
+  inputs = ["root_json"]
+  type   = "json_parser"
+  field  = "parent"
+
+[transforms.child_json]
+  inputs = ["parent_json"]
+  type   = "json_parser"
+  field  = "child"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "child": "value2"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+
+{% endtab %}
+{% endtabs %}
+
+## How It Works
+
+### Chaining / Unwrapping
+
+Please see the [I/O section](#i-o) for an example of chaining and unwrapping JSON.
+
+### Correctness
+
+The `json_parser` source has been involved in the following correctness tests:
+
+* [`wrapped_json_correctness`][urls.wrapped_json_correctness_test]
+
+Learn more in the [Correctness][docs.correctness] sections.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+### Invalid JSON
+
+If the value for the specified `field` is not valid JSON you can control keep or discard the event with the `drop_invalid` option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
+
+### Key Conflicts
+
+Any key present in the decoded JSON will override existin keys in the event.
+
+### Nested Fields
+
+If the decoded JSON includes nested fields it will be _deep_ merged into the event. For example, given the following event:
+
+```javascript
+{
+  "message": "{"parent": {"child2": "value2"}}",
+  "parent": {
+    "child1": "value1"
+  }
+}
+```
+
+Parsing the `"message"` field would result the following structure:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+
+[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
+[docs.correctness]: ../../about/correctness
+[docs.data-model#log]: ../../about/data-model#log
+[urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

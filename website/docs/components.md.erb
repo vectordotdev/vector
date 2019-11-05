@@ -1,0 +1,26 @@
+---
+title: Components
+sidebar_label: hidden
+---
+
+Vector components are the entities used to
+[compose pipelines][docs.configuration#composition].
+
+import Component from '@site/src/components/Component';
+import Components from '@site/src/components/Components';
+
+<Components>
+
+<%- metadata.components.each do |component| -%>
+<Component
+  delivery_guarantee={<%= (component.respond_to?(:delivery_guarantee) ? component.delivery_guarantee : nil).to_json %>}
+  description={<%= component_description(component).remove_markdown_links.to_json %>}
+  event_types={<%= component.event_types.to_json %>}
+  id={<%= component.id.to_json %>}
+  name={<%= component.name.to_json %>}
+  path={<%= metadata.links.fetch("docs.#{component.type.pluralize}.#{component.name}").to_json %>}
+  status={<%= component.status.to_json %>}
+  type={<%= component.type.to_json %>} />
+<%- end -%>
+
+</Components>

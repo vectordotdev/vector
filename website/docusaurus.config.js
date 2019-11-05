@@ -10,12 +10,13 @@ module.exports = {
     navbar: {
       logo: {
         alt: 'Vector',
-        src: 'img/logo.svg',
+        src: 'img/logo-light.svg',
+        darkSrc: 'img/logo-dark.svg'
       },
       links: [
         {to: 'use_cases', label: 'Use Cases', position: 'right'},
         {to: 'Integrations', label: 'Integrations', position: 'right'},
-        {to: 'docs/README', label: 'Docs', position: 'right'},
+        {to: 'docs', label: 'Docs', position: 'right'},
         {to: 'blog', label: 'Blog', position: 'right'},
         {to: 'community', label: 'Community', position: 'right'},
         {
@@ -64,14 +65,14 @@ module.exports = {
       copyright: `Copyright © ${new Date().getFullYear()} Facebook, Inc. Built with Docusaurus.`,
     },
     prismTheme: require('prism-react-renderer/themes/github'),
+    darkPrismTheme: require('prism-react-renderer/themes/dracula')
   },
   presets: [
     [
       '@docusaurus/preset-classic',
       {
         docs: {
-          editUrl: 'https://github.com/facebook/docusaurus/edit/master/website/docs/',
-          path: '/Users/benjohnson/Code/timber/vector/docs',
+          editUrl: 'https://github.com/timberio/vector/edit/master/website/docs/',
           sidebarPath: require.resolve('./sidebars.js'),
         },
         theme: {
@@ -84,5 +85,5 @@ module.exports = {
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
     'https://at-ui.github.io/feather-font/css/iconfont.css'
-  ]
+  ],
 };

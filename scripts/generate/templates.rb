@@ -12,7 +12,7 @@ require_relative "templates/options_table"
 #
 # ==== Partials
 #
-# Partials are contained within the `templates/_partials` folder. Partials
+# Partials are contained within the provided `partials_path` folder. Partials
 # can be rendered directly via #render_partial or call from a custom method,
 # as is the case for `#components_table`. Notice that custom methods capture
 # the binding in the method directy, this ensures variables within the
@@ -34,15 +34,16 @@ require_relative "templates/options_table"
 class Templates
   include ActionView::Helpers::NumberHelper
 
-  attr_reader :metadata, :dir
+  attr_reader :metadata, :partials_path, :root_dir
 
-  def initialize(dir, metadata)
-    @dir = dir
+  def initialize(root_dir, metadata)
+    @root_dir = root_dir
+    @partials_path = "scripts/generate/templates/_partials"
     @metadata = metadata
   end
 
   def commit(commit)
-    render("_partials/_commit.md", binding).gsub("\n", "")
+    render("#{partials_path}/_commit.md", binding).gsub("\n", "")
   end
 
   def commit_scope(commit)
@@ -82,19 +83,19 @@ class Templates
         [commit.scope.name, commit.date]
       end
 
-    render("_partials/_commit_type_commits.md", binding)
+    render("#{partials_path}/_commit_type_commits.md", binding)
   end
 
   def commit_type_toc_item(type_name, commits)
-    render("_partials/_commit_type_toc_item.md", binding).gsub(/,$/, "")
+    render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
   end
 
   def component_config_example(component)
-    render("_partials/_component_config_example.md", binding).strip
+    render("#{partials_path}/_component_config_example.md", binding).strip
   end
 
   def component_default(component)
-    render("_partials/_component_default.md.erb", binding).strip
+    render("#{partials_path}/_component_default.md.erb", binding).strip
   end
 
   def component_description(component)
@@ -106,11 +107,11 @@ class Templates
   end
 
   def component_header(component)
-    render("_partials/_component_header.md", binding).strip
+    render("#{partials_path}/_component_header.md", binding).strip
   end
 
   def component_sections(component)
-    render("_partials/_component_sections.md", binding).strip
+    render("#{partials_path}/_component_sections.md", binding).strip
   end
 
   def components_table(components)
@@ -118,7 +119,7 @@ class Templates
       raise ArgumentError.new("Options must be an Array")
     end
 
-    render("_partials/_components_table.md", binding).strip
+    render("#{partials_path}/_components_table.md", binding).strip
   end
 
   def config_example(options, array: false, common: false, path: nil, titles: true)
@@ -132,7 +133,7 @@ class Templates
 
     options = options.sort_by(&:config_file_sort_token)
     example = ConfigExample.new(options)
-    render("_partials/_config_example.toml", binding).strip
+    render("#{partials_path}/_config_example.toml", binding).strip
   end
 
   def config_schema(options, opts = {})
@@ -144,7 +145,7 @@ class Templates
 
     options = options.sort_by(&:config_file_sort_token)
     schema = ConfigSchema.new(options)
-    render("_partials/_config_schema.toml", binding).strip
+    render("#{partials_path}/_config_schema.toml", binding).strip
   end
 
   def config_spec(options, opts = {})
@@ -156,7 +157,7 @@ class Templates
 
     options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
-    content = render("_partials/_config_spec.toml", binding).strip
+    content = render("#{partials_path}/_config_spec.toml", binding).strip
 
     if opts[:path]
       content
@@ -166,7 +167,7 @@ class Templates
   end
 
   def docker_docs
-    render("_partials/_docker_docs.md")
+    render("#{partials_path}/_docker_docs.md")
   end
 
   def encoding_description(encoding)
@@ -186,12 +187,12 @@ class Templates
 
   def event_type_links(types)
     types.collect do |type|
-      "[`#{type}`][docs.data-model.#{type}]"
+      "[`#{type}`][docs.data-model##{type}]"
     end
   end
 
   def full_config_spec
-    render("_partials/_full_config_spec.toml", binding).strip
+    render("#{partials_path}/_full_config_spec.toml", binding).strip
   end
 
   def option_description(option)
@@ -289,7 +290,7 @@ class Templates
     end
 
 
-    render("_partials/_options_sections.md", binding).strip
+    render("#{partials_path}/_options_sections.md", binding).strip
   end
 
   def options_table(options, opts = {})
@@ -301,12 +302,16 @@ class Templates
     opts[:titles] = true unless opts.key?(:titles)
 
     table = OptionsTable.new(options)
-    render("_partials/_options_table.md", binding).strip
+    render("#{partials_path}/_options_table.md", binding).strip
   end
 
   def partial?(template_path)
     basename = File.basename(template_path)
     basename.start_with?("_")
+  end
+
+  def install_command
+    "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
   end
 
   def installation_target_links(targets)
@@ -320,11 +325,11 @@ class Templates
   end
 
   def release_changes(release, grouped: false)
-    render("_partials/_release_changes.md", binding)
+    render("#{partials_path}/_release_changes.md", binding)
   end
 
   def release_notes(release)
-    render("_partials/_release_notes.md", binding)
+    render("#{partials_path}/_release_notes.md", binding)
   end
 
   def release_summary(release)
@@ -347,7 +352,7 @@ class Templates
 
   def render(template_path, template_binding = nil)
     template_binding = binding if template_binding.nil?
-    content = File.read("#{dir}/#{template_path}.erb")
+    content = File.read("#{root_dir}/#{template_path}.erb")
     renderer = ERB.new(content, nil, '-')
     content =
       begin
@@ -357,7 +362,7 @@ class Templates
           <<~EOF
           Error rendering template!
 
-            #{dir.gsub(/#{ROOT_DIR}/, "")}/#{template_path}.erb
+            #{root_dir.gsub(/#{ROOT_DIR}/, "")}/#{template_path}.erb
 
           Error:
 

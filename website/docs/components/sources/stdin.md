@@ -1,0 +1,163 @@
+---
+delivery_guarantee: "at_least_once"
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+stdin%22
+sidebar_label: "stdin|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/stdin.rs
+status: "prod-ready"
+title: "stdin source" 
+---
+
+The `stdin` source ingests data through standard input (STDIN) and outputs [`log`][docs.data-model#log] events.
+
+## Configuration
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+<TabItem value="common">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
+
+```toml
+[sources.my_source_id]
+  type = "stdin" # example, must be: "stdin"
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration" />
+
+```toml
+[sources.my_source_id]
+  # REQUIRED - General
+  type = "stdin" # example, must be: "stdin"
+  
+  # OPTIONAL - General
+  max_length = 102400 # default, bytes
+  
+  # OPTIONAL - Context
+  host_key = "host" # default
+```
+
+</TabItem>
+
+</Tabs>
+
+## Options
+
+import Field from '@site/src/components/Field';
+import Fields from '@site/src/components/Fields';
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host"]}
+  name={"host_key"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  type={"string"}
+  unit={null}>
+
+### host_key
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={102400}
+  enumValues={null}
+  examples={[102400]}
+  name={"max_length"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  type={"int"}
+  unit={"bytes"}>
+
+### max_length
+
+The maxiumum bytes size of a message before it is discarded.
+
+
+</Field>
+
+
+</Fields>
+
+## Input/Output
+
+Given the following input line:
+
+{% code-tabs %}
+{% code-tabs-item title="stdin" %}
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.data-model#log] will be output with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <timestamp> # current time,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "host": "10.2.22.122" # current hostname
+}
+```
+
+The "timestamp" and `"host"` keys were automatically added as context. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+## How It Works
+
+### Context
+
+By default, the `stdin` source will add context
+keys to your events via the `host_key`
+options.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+### Line Delimiters
+
+Each line is read until a new line delimiter (the `0xA` byte) is found.
+
+
+[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
+[docs.data-model#log]: ../../about/data-model#log
+[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
+[docs.transforms]: ../../components/transforms

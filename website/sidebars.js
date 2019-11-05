@@ -2,19 +2,11 @@ module.exports = {
   docs: [
     {
       type: 'category',
-      label: 'Introduction',
+      label: 'About',
       items: [
         'what_is_vector',
         'about/concepts',
-        {
-          type: 'category',
-          label: 'Data Model',
-          items: [
-            'about/data-model/README',
-            'about/data-model/log',
-            'about/data-model/metric',
-          ],
-        },
+        'about/data-model',
         'about/guarantees',
       ],
     },
@@ -25,7 +17,61 @@ module.exports = {
         {
           type: 'category',
           label: 'Installation',
-          items: ['setup/installation/README'],
+          items: [
+            "setup/installation/script",
+            {
+              type: 'category',
+              label: 'Platforms',
+              items: [
+                  "setup/installation/platforms/docker",
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Package Managers',
+              items: [
+                  "setup/installation/package-managers/dpkg",
+                  "setup/installation/package-managers/homebrew",
+                  "setup/installation/package-managers/rpm",
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Operating Systems',
+              items: [
+                  "setup/installation/operating-systems/amazon-linux",
+                  "setup/installation/operating-systems/centos",
+                  "setup/installation/operating-systems/debian",
+                  "setup/installation/operating-systems/macos",
+                  "setup/installation/operating-systems/rhel",
+                  "setup/installation/operating-systems/ubuntu",
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Manual',
+              items: [
+                "setup/installation/manual/from-archives",
+                "setup/installation/manual/from-source",              
+              ],
+            },
+          ],
+        },
+        "setup/configuration",
+        {
+          type: 'category',
+          label: 'Deployment',
+          items: [
+            "setup/deployment/topologies",
+            {
+              type: 'category',
+              label: 'Roles',
+              items: [
+                "setup/deployment/roles/agent",
+                "setup/deployment/roles/service",
+              ]
+            },
+          ]
         },
       ],
     },
@@ -33,32 +79,80 @@ module.exports = {
       type: 'category',
       label: 'Components',
       items: [
+        "components",
         {
           type: 'category',
           label: 'Sources',
-          items: ["usage/configuration/sources/docker","usage/configuration/sources/file","usage/configuration/sources/journald","usage/configuration/sources/kafka","usage/configuration/sources/statsd","usage/configuration/sources/stdin","usage/configuration/sources/syslog","usage/configuration/sources/tcp","usage/configuration/sources/udp","usage/configuration/sources/vector"],
+          items: ["components/sources/docker","components/sources/file","components/sources/journald","components/sources/kafka","components/sources/statsd","components/sources/stdin","components/sources/syslog","components/sources/tcp","components/sources/udp","components/sources/vector"],
         },
         {
           type: 'category',
           label: 'Transforms',
-          items: ["usage/configuration/transforms/add_fields","usage/configuration/transforms/add_tags","usage/configuration/transforms/coercer","usage/configuration/transforms/field_filter","usage/configuration/transforms/grok_parser","usage/configuration/transforms/json_parser","usage/configuration/transforms/log_to_metric","usage/configuration/transforms/lua","usage/configuration/transforms/regex_parser","usage/configuration/transforms/remove_fields","usage/configuration/transforms/remove_tags","usage/configuration/transforms/sampler","usage/configuration/transforms/split","usage/configuration/transforms/tokenizer"],
+          items: ["components/transforms/add_fields","components/transforms/add_tags","components/transforms/coercer","components/transforms/field_filter","components/transforms/grok_parser","components/transforms/json_parser","components/transforms/log_to_metric","components/transforms/lua","components/transforms/regex_parser","components/transforms/remove_fields","components/transforms/remove_tags","components/transforms/sampler","components/transforms/split","components/transforms/tokenizer"],
         },
         {
           type: 'category',
           label: 'Sinks',
-          items: ["usage/configuration/sinks/aws_cloudwatch_logs","usage/configuration/sinks/aws_cloudwatch_metrics","usage/configuration/sinks/aws_kinesis_streams","usage/configuration/sinks/aws_s3","usage/configuration/sinks/blackhole","usage/configuration/sinks/clickhouse","usage/configuration/sinks/console","usage/configuration/sinks/datadog_metrics","usage/configuration/sinks/elasticsearch","usage/configuration/sinks/file","usage/configuration/sinks/http","usage/configuration/sinks/kafka","usage/configuration/sinks/prometheus","usage/configuration/sinks/splunk_hec","usage/configuration/sinks/statsd","usage/configuration/sinks/tcp","usage/configuration/sinks/vector"],
+          items: [
+            "components/sinks",
+            
+              "components/sinks/aws_cloudwatch_logs",
+            
+              "components/sinks/aws_cloudwatch_metrics",
+            
+              "components/sinks/aws_kinesis_streams",
+            
+              "components/sinks/aws_s3",
+            
+              "components/sinks/blackhole",
+            
+              "components/sinks/clickhouse",
+            
+              "components/sinks/console",
+            
+              "components/sinks/datadog_metrics",
+            
+              "components/sinks/elasticsearch",
+            
+              "components/sinks/file",
+            
+              "components/sinks/http",
+            
+              "components/sinks/kafka",
+            
+              "components/sinks/prometheus",
+            
+              "components/sinks/splunk_hec",
+            
+              "components/sinks/statsd",
+            
+              "components/sinks/tcp",
+            
+              "components/sinks/vector",
+            
+          ],
         },
       ],
     },
     {
       type: 'category',
       label: 'Administration',
-      items: ['about/guarantees'],
+      items: [
+        "administration/process-management",
+        "administration/monitoring",
+        "administration/tuning",
+        "administration/updating",
+        "administration/validating",
+        "administration/env-vars",
+      ],
     },
     {
       type: 'category',
       label: 'Meta',
-      items: ['about/guarantees'],
+      items: [
+        "meta/glossary",
+        "meta/conventions",
+      ],
     },
   ]
 };

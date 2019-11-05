@@ -111,6 +111,7 @@ title("Generating files...")
 #
 
 metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
+templates = Templates.new(ROOT_DIR, metadata)
 
 #
 # Create missing component templates
@@ -118,14 +119,14 @@ metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
 
 metadata.components.each do |component|
   # Base .md file to ensure links to the new source work
-  md_path = "#{DOCS_ROOT}/usage/configuration/#{component.type.pluralize}/#{component.name}.md"
+  md_path = "#{DOCS_ROOT}/components/#{component.type.pluralize}/#{component.name}.md"
 
   if !File.exists?(md_path)
     File.open(md_path, 'w+') { |file| file.write("") }
   end
 
   # Configuration templates
-  template_path = "#{TEMPLATES_DIR}/docs/usage/configuration/#{component.type.pluralize}/#{component.name}.md.erb"
+  template_path = "#{DOCS_ROOT}/components/#{component.type.pluralize}/#{component.name}.md.erb"
 
   if !File.exists?(template_path)
     contents = templates.component_default(component)
@@ -137,22 +138,15 @@ end
 # Render templates
 #
 
-templates = Templates.new(TEMPLATES_DIR, metadata)
 
-Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
+Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
   select { |path| !templates.partial?(path) }.
   each do |template_path|
-    target_file = template_path.gsub(/^#{TEMPLATES_DIR}\//, "").gsub(/\.erb$/, "")
-    target_path = "#{ROOT_DIR}/#{target_file}"
-    
-    content =
-      begin
-        templates.render(target_file)
-      rescue Exception => e
-        error!(e.message)
-      end
 
+    target_file = template_path.gsub(/^#{ROOT_DIR}\//, "").gsub(/\.erb$/, "")
+    target_path = "#{ROOT_DIR}/#{target_file}"
+    content = templates.render(target_file)
     content = post_process(content, target_path, metadata.links)
 
 

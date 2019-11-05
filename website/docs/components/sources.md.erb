@@ -1,0 +1,34 @@
+---
+title: Sources
+---
+
+![][assets.sources]
+
+Sources are responsible for ingesting [events][docs.data-model#event] into Vector, they can
+both receive and pull in data. If you're deploying Vector in an [agent
+role][docs.roles.agent], you'll want to look at local data sources like a
+[`file`][docs.sources.file] and [`stdin`][docs.sources.stdin]. If you're deploying
+Vector in a [service role][docs.roles.service], you'll want to look at sources
+that receive data over the network, like the [`vector`][docs.sources.vector],
+[`tcp`][docs.sources.tcp], and [`syslog`][docs.sources.syslog] sources.
+
+import Component from '@site/src/components/Component';
+import Components from '@site/src/components/Components';
+
+<Components>
+
+<%- metadata.components.each do |component| -%>
+<Component
+  delivery_guarantee={<%= (component.respond_to?(:delivery_guarantee) ? component.delivery_guarantee : nil).to_json %>}
+  event_types={<%= component.event_types.to_json %>}
+  id={<%= component.id.to_json %>}
+  name={<%= component.name.to_json %>}
+  path={<%= metadata.links.fetch("docs.#{component.type.pluralize}.#{component.name}").to_json %>}
+  status={<%= component.status.to_json %>}
+  type={<%= component.type.to_json %>} />
+<%- end -%>
+
+</Components>
+
+
+[+ request a new source][urls.new_source]
