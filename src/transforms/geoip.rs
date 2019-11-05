@@ -10,6 +10,7 @@ use string_cache::DefaultAtom as Atom;
 use indexmap::IndexMap;
 use std::net::IpAddr;
 use std::str::FromStr;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -44,7 +45,7 @@ fn default_geoip_target_field() -> String {
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
     fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
-        let reader = maxminddb::Reader::open_readfile(self.database.clone()).unwrap();
+        let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
         Ok(Box::new(Geoip::new(
             reader,
             self.source.clone(),
@@ -58,6 +59,10 @@ impl TransformConfig for GeoipConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "geoip"
     }
 }
 
@@ -79,85 +84,93 @@ impl Transform for Geoip {
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             let mut lookup_results = IndexMap::new();
-            let ip: IpAddr = FromStr::from_str(ipaddress).unwrap();
-            let v = self.dbreader.lookup(ip);
-            if v.is_ok() {
-                let data: maxminddb::geoip2::City = v.unwrap();
-                let city = data.city;
-                if let Some(city) = city {
-                    let city_names = city.names;
-                    if let Some(city_names) = city_names {
-                        let city_name_en = city_names.get("en");
-                        if let Some(city_name_en) = city_name_en {
-                            lookup_results.insert(Atom::from("city_name"), city_name_en.into());
+            let ip_parsed = FromStr::from_str(ipaddress);
+            if ip_parsed.is_ok() {
+                let ip: IpAddr = ip_parsed.unwrap();
+                let v = self.dbreader.lookup(ip);
+                if v.is_ok() {
+                    let data: maxminddb::geoip2::City = v.unwrap();
+                    let city = data.city;
+                    if let Some(city) = city {
+                        let city_names = city.names;
+                        if let Some(city_names) = city_names {
+                            let city_name_en = city_names.get("en");
+                            if let Some(city_name_en) = city_name_en {
+                                lookup_results.insert(Atom::from("city_name"), city_name_en.into());
+                            }
                         }
                     }
-                }
-                let continent_code = data.continent.and_then(|c| c.code);
-                if let Some(continent_code) = continent_code {
-                    lookup_results.insert(Atom::from("continent_code"), continent_code.into());
+                    let continent_code = data.continent.and_then(|c| c.code);
+                    if let Some(continent_code) = continent_code {
+                        lookup_results.insert(Atom::from("continent_code"), continent_code.into());
+                    }
+
+                    let iso_code = data.country.and_then(|cy| cy.iso_code);
+                    if let Some(iso_code) = iso_code {
+                        lookup_results.insert(Atom::from("country_code"), iso_code.into());
+                    }
+
+                    let time_zone = data.location.clone().and_then(|loc| loc.time_zone);
+                    if let Some(time_zone) = time_zone {
+                        lookup_results.insert(Atom::from("time_zone"), time_zone.to_string());
+                    }
+
+                    let latitude = data.location.clone().and_then(|loc| loc.latitude);
+                    if let Some(latitude) = latitude {
+                        lookup_results.insert(Atom::from("latitude"), latitude.to_string());
+                    }
+
+                    let longitude = data.location.clone().and_then(|loc| loc.longitude);
+                    if let Some(longitude) = longitude {
+                        lookup_results.insert(Atom::from("longitude"), longitude.to_string());
+                    }
+
+                    let postal_code = data.postal.clone().and_then(|p| p.code);
+                    if let Some(postal_code) = postal_code {
+                        lookup_results.insert(Atom::from("postal_code"), postal_code.into());
+                    }
                 }
 
-                let iso_code = data.country.and_then(|cy| cy.iso_code);
-                if let Some(iso_code) = iso_code {
-                    lookup_results.insert(Atom::from("country_code"), iso_code.into());
-                }
-
-                let time_zone = data.location.clone().and_then(|loc| loc.time_zone);
-                if let Some(time_zone) = time_zone {
-                    lookup_results.insert(Atom::from("time_zone"), time_zone.to_string());
-                }
-
-                let latitude = data.location.clone().and_then(|loc| loc.latitude);
-                if let Some(latitude) = latitude {
-                    lookup_results.insert(Atom::from("latitude"), latitude.to_string());
-                }
-
-                let longitude = data.location.clone().and_then(|loc| loc.longitude);
-                if let Some(longitude) = longitude {
-                    lookup_results.insert(Atom::from("longitude"), longitude.to_string());
-                }
-
-                let postal_code = data.postal.clone().and_then(|p| p.code);
-                if let Some(postal_code) = postal_code {
-                    lookup_results.insert(Atom::from("postal_code"), postal_code.into());
-                }
+                let geoipdata = GeoipDecodedData {
+                    city_name: lookup_results
+                        .get(&Atom::from("city_name"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                    continent_code: lookup_results
+                        .get(&Atom::from("continent_code"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                    country_code: lookup_results
+                        .get(&Atom::from("country_code"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                    time_zone: lookup_results
+                        .get(&Atom::from("time_zone"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                    latitude: lookup_results
+                        .get(&Atom::from("latitude"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                    longitude: lookup_results
+                        .get(&Atom::from("longitude"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                    postal_code: lookup_results
+                        .get(&Atom::from("postal_code"))
+                        .unwrap_or(&String::from(""))
+                        .to_string(),
+                };
+                event.as_mut_log().insert_explicit(
+                    Atom::from(self.target.clone()),
+                    serde_json::to_string(&geoipdata).unwrap().into(), //FIXME: handle pnic heere
+                );
+            } else {
+                debug!(
+                    message = "IP Address not parsed correctly.",
+                    ipaddr = &field::display(&ipaddress),
+                );
             }
-
-            let geoipdata = GeoipDecodedData {
-                city_name: lookup_results
-                    .get(&Atom::from("city_name"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-                continent_code: lookup_results
-                    .get(&Atom::from("continent_code"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-                country_code: lookup_results
-                    .get(&Atom::from("country_code"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-                time_zone: lookup_results
-                    .get(&Atom::from("time_zone"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-                latitude: lookup_results
-                    .get(&Atom::from("latitude"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-                longitude: lookup_results
-                    .get(&Atom::from("longitude"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-                postal_code: lookup_results
-                    .get(&Atom::from("postal_code"))
-                    .unwrap_or(&String::from(""))
-                    .to_string(),
-            };
-            event.as_mut_log().insert_explicit(
-                Atom::from(self.target.clone()),
-                serde_json::to_string(&geoipdata).unwrap().into(), //FIXME: handle pnic heere
-            );
         } else {
             debug!(
                 message = "Field does not exist.",
