@@ -29,7 +29,7 @@ pub struct GrokParserConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_default::<GrokParserConfig>("grok_parser")
+    TransformDescription::new::<GrokParserConfig>("grok_parser")
 }
 
 #[typetag::serde(name = "grok_parser")]

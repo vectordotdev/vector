@@ -16,7 +16,7 @@ pub struct SamplerConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<SamplerConfig>("sampler")
+    TransformDescription::new_without_default::<SamplerConfig>("sampler")
 }
 
 #[typetag::serde(name = "sampler")]

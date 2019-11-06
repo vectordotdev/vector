@@ -35,7 +35,7 @@ impl Default for RegexParserConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_default::<RegexParserConfig>("regex_parser")
+    TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
 #[typetag::serde(name = "regex_parser")]

@@ -14,7 +14,7 @@ pub struct FieldFilterConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<FieldFilterConfig>("field_filter")
+    TransformDescription::new_without_default::<FieldFilterConfig>("field_filter")
 }
 
 #[typetag::serde(name = "field_filter")]

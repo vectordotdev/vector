@@ -19,7 +19,7 @@ pub struct AddTags {
 }
 
 inventory::submit! {
-    TransformDescription::new::<AddTagsConfig>("add_tags")
+    TransformDescription::new_without_default::<AddTagsConfig>("add_tags")
 }
 
 #[typetag::serde(name = "add_tags")]

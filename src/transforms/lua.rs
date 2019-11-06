@@ -21,7 +21,7 @@ pub struct LuaConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<LuaConfig>("lua")
+    TransformDescription::new_without_default::<LuaConfig>("lua")
 }
 
 #[typetag::serde(name = "lua")]

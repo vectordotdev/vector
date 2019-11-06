@@ -20,7 +20,7 @@ pub struct SplitConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_default::<SplitConfig>("split")
+    TransformDescription::new::<SplitConfig>("split")
 }
 
 #[typetag::serde(name = "split")]

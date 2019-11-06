@@ -27,7 +27,7 @@ pub struct TokenizerConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_default::<TokenizerConfig>("tokenizer")
+    TransformDescription::new::<TokenizerConfig>("tokenizer")
 }
 
 #[typetag::serde(name = "tokenizer")]

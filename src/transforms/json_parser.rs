@@ -18,7 +18,7 @@ pub struct JsonParserConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_default::<JsonParserConfig>("json_parser")
+    TransformDescription::new::<JsonParserConfig>("json_parser")
 }
 
 #[typetag::serde(name = "json_parser")]

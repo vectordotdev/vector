@@ -162,22 +162,7 @@ pub trait TransformConfig: core::fmt::Debug {
     fn transform_type(&self) -> &'static str;
 }
 
-pub struct BoxTransformConfig {
-    pub inner: Box<dyn TransformConfig>,
-}
-
-impl<T> From<T> for BoxTransformConfig
-where
-    T: TransformConfig + 'static,
-{
-    fn from(inner: T) -> Self {
-        BoxTransformConfig {
-            inner: Box::new(inner),
-        }
-    }
-}
-
-pub type TransformDescription = ComponentDescription<BoxTransformConfig>;
+pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
 

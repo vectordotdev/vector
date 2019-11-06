@@ -15,7 +15,7 @@ pub struct CoercerConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_default::<CoercerConfig>("coercer")
+    TransformDescription::new::<CoercerConfig>("coercer")
 }
 
 #[typetag::serde(name = "coercer")]

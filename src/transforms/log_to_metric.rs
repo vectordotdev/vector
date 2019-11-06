@@ -69,7 +69,7 @@ pub struct LogToMetric {
 }
 
 inventory::submit! {
-    TransformDescription::new::<LogToMetricConfig>("log_to_metric")
+    TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
 }
 
 #[typetag::serde(name = "log_to_metric")]

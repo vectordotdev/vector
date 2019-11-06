@@ -17,7 +17,7 @@ pub struct RemoveFields {
 }
 
 inventory::submit! {
-    TransformDescription::new::<RemoveFieldsConfig>("remove_fields")
+    TransformDescription::new_without_default::<RemoveFieldsConfig>("remove_fields")
 }
 
 #[typetag::serde(name = "remove_fields")]
