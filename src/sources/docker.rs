@@ -458,13 +458,17 @@ impl EventStreamBuilder {
     }
 
     /// Constructs and runs event stream
-    fn start<O: Into<Option<ContainerMetadata>>>(
+    fn start(
         &self,
         id: ContainerId,
-        metadata: O,
+        metadata: impl Into<Option<ContainerMetadata>>,
     ) -> ContainerState {
         if let Some(metadata) = metadata.into() {
-            self.start_event_stream(ContainerLogInfo::new(id, metadata, self.core.now_timestamp));
+            tokio::spawn(self.start_event_stream(ContainerLogInfo::new(
+                id,
+                metadata,
+                self.core.now_timestamp,
+            )));
         } else {
             let metadata_fetch = self
                 .core
@@ -479,15 +483,15 @@ impl EventStreamBuilder {
                 });
 
             let this = self.clone();
-            let create = metadata_fetch.map(move |metadata| {
+            let task = metadata_fetch.and_then(move |metadata| {
                 this.start_event_stream(ContainerLogInfo::new(
                     id,
                     metadata,
                     this.core.now_timestamp,
-                ));
+                ))
             });
 
-            tokio::spawn(create);
+            tokio::spawn(task);
         }
 
         ContainerState::new()
@@ -496,11 +500,11 @@ impl EventStreamBuilder {
     /// If info is present, restarts event stream
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
-            self.start_event_stream(info)
+            tokio::spawn(self.start_event_stream(info));
         }
     }
 
-    fn start_event_stream(&self, info: ContainerLogInfo) {
+    fn start_event_stream(&self, info: ContainerLogInfo) -> impl Future<Item = (), Error = ()> {
         // Establish connection
         let mut options = LogsOptions::builder();
         options
@@ -523,7 +527,7 @@ impl EventStreamBuilder {
 
         // Create event streamer
         let mut state = Some((self.main_send.clone(), info));
-        let event_stream = tokio::prelude::stream::poll_fn(move || {
+        tokio::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
                 // Main event loop
@@ -564,10 +568,7 @@ impl EventStreamBuilder {
             Ok(Async::Ready(None))
         })
         .forward(self.out.clone().sink_map_err(|_| ()))
-        .map(|_| ());
-
-        // Run event_stream
-        tokio::spawn(event_stream);
+        .map(|_| ())
     }
 }
 
@@ -645,7 +646,6 @@ struct ContainerLogInfo {
     last_log: Option<(DateTime<FixedOffset>, u64)>,
     /// generation of ContainerState at event_stream creation
     generation: u64,
-    ///
     metadata: ContainerMetadata,
 }
 
