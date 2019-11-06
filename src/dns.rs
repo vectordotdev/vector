@@ -58,7 +58,6 @@ impl DnsResolver {
         options.attempts = 2;
         options.validate = false;
         options.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
-        options.use_hosts_file = false;
         options.num_concurrent_reqs = 1;
 
         let (resolver, worker) = AsyncResolver::new(resolve_config, options);
