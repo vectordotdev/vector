@@ -170,6 +170,28 @@ impl PrometheusSink {
         }
     }
 
+    fn with_aggregated_counter(
+        &mut self,
+        name: String,
+        labels: &HashMap<&str, &str>,
+        f: impl Fn(&prometheus::CounterVec),
+    ) {
+        if let Some(counter) = self.counters.get(&name) {
+            if let Err(e) = self.registry.unregister(Box::new(counter.clone())) {
+                error!("Error unregistering Prometheus counter: {}", e);
+            }
+        };
+        let namespace = &self.config.namespace;
+        let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+        let keys: Vec<_> = labels.keys().copied().collect();
+        let counter = prometheus::CounterVec::new(opts, &keys[..]).unwrap();
+        if let Err(e) = self.registry.register(Box::new(counter.clone())) {
+            error!("Error registering Prometheus counter: {}", e);
+        };
+        f(&counter);
+        self.counters.insert(name, counter);
+    }
+
     fn with_gauge(
         &mut self,
         name: String,
@@ -329,6 +351,22 @@ impl Sink for PrometheusSink {
                 let tags = tags.unwrap_or_default();
                 let labels = tags_to_labels(&tags);
                 self.with_counter(name, &labels, |counter| {
+                    if let Ok(c) = counter.get_metric_with(&labels) {
+                        c.inc_by(val);
+                    } else {
+                        error!(
+                            "Error getting Prometheus counter with labels: {:?}",
+                            &labels
+                        );
+                    }
+                })
+            }
+            Metric::AggregatedCounter {
+                name, val, tags, ..
+            } => {
+                let tags = tags.unwrap_or_default();
+                let labels = tags_to_labels(&tags);
+                self.with_aggregated_counter(name, &labels, |counter| {
                     if let Ok(c) = counter.get_metric_with(&labels) {
                         c.inc_by(val);
                     } else {

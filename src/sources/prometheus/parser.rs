@@ -290,7 +290,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         } else {
                             None
                         };
-                        let counter = Metric::Counter {
+                        let counter = Metric::AggregatedCounter {
                             name: metric.name,
                             val: metric.value,
                             timestamp: metric.timestamp,
@@ -521,7 +521,7 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::Counter {
+            Ok(vec![Metric::AggregatedCounter {
                 name: "uptime".into(),
                 val: 123.0,
                 timestamp: None,
@@ -552,7 +552,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "http_requests_total".into(),
                     val: 1027.0,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
@@ -565,7 +565,7 @@ mod test {
                         .collect()
                     ),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "http_requests_total".into(),
                     val: 3.0,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
@@ -714,7 +714,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "uptime".into(),
                     val: 123.0,
                     timestamp: None,
@@ -727,7 +727,7 @@ mod test {
                     timestamp: None,
                     tags: None,
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "launch_count".into(),
                     val: 10.0,
                     timestamp: None,
@@ -772,7 +772,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "uptime".into(),
                     val: 123.0,
                     timestamp: None,
@@ -803,7 +803,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "uptime".into(),
                     val: 123.0,
                     timestamp: None,

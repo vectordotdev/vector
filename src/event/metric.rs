@@ -32,6 +32,12 @@ pub enum Metric {
         timestamp: Option<DateTime<Utc>>,
         tags: Option<HashMap<String, String>>,
     },
+    AggregatedCounter {
+        name: String,
+        val: f64,
+        timestamp: Option<DateTime<Utc>>,
+        tags: Option<HashMap<String, String>>,
+    },
     AggregatedHistogram {
         name: String,
         buckets: Vec<f64>,
@@ -64,9 +70,10 @@ impl Metric {
             Metric::Counter { tags, .. } => tags,
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
+            Metric::Set { tags, .. } => tags,
+            Metric::AggregatedCounter { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::AggregatedSummary { tags, .. } => tags,
-            Metric::Set { tags, .. } => tags,
         }
     }
 
@@ -75,9 +82,10 @@ impl Metric {
             Metric::Counter { tags, .. } => tags,
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
+            Metric::Set { tags, .. } => tags,
+            Metric::AggregatedCounter { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::AggregatedSummary { tags, .. } => tags,
-            Metric::Set { tags, .. } => tags,
         }
     }
 
@@ -175,6 +183,26 @@ impl Metric {
                     *timestamp = *new_timestamp;
                     *tags = new_tags.clone();
                 };
+            }
+            (
+                Metric::AggregatedCounter {
+                    ref mut name,
+                    ref mut val,
+                    ref mut timestamp,
+                    ref mut tags,
+                },
+                Metric::AggregatedCounter {
+                    name: new_name,
+                    val: new_val,
+                    timestamp: new_timestamp,
+                    tags: new_tags,
+                },
+            ) => {
+                if name == new_name {
+                    *val += *new_val;
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
+                }
             }
             (
                 Metric::AggregatedHistogram {
@@ -370,6 +398,34 @@ mod test {
                 name: "hist".into(),
                 val: 1.0,
                 sample_rate: 30,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
+    }
+
+    #[test]
+    fn merge_aggregated_counter() {
+        let mut counter1 = Metric::AggregatedCounter {
+            name: "counter".into(),
+            val: 1.0,
+            timestamp: None,
+            tags: None,
+        };
+
+        let counter2 = Metric::AggregatedCounter {
+            name: "counter".into(),
+            val: 2.0,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        counter1.merge(&counter2);
+        assert_eq!(
+            counter1,
+            Metric::AggregatedCounter {
+                name: "counter".into(),
+                val: 3.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
             }

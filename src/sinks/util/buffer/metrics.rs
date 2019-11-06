@@ -13,7 +13,7 @@ impl Hash for MetricEntry {
         std::mem::discriminant(&self.0).hash(state);
 
         match &self.0 {
-            Metric::Counter { name, .. } => {
+            Metric::Counter { name, .. } | Metric::AggregatedCounter { name, .. } => {
                 name.hash(state);
             }
             Metric::Gauge { name, .. } => {

@@ -103,6 +103,14 @@ impl Transform for MockTransform {
             }) => {
                 *val += self.increase;
             }
+            Event::Metric(Metric::AggregatedCounter {
+                name: _,
+                val,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *val += self.increase;
+            }
             Event::Metric(Metric::Histogram {
                 name: _,
                 val,

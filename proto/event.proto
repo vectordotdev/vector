@@ -32,12 +32,20 @@ message Metric {
     Histogram histogram = 2;
     Gauge gauge = 3;
     Set set = 4;
-    AggregatedHistogram aggregated_histogram = 5;
-    AggregatedSummary aggregated_summary = 6;
+    AggregatedCounter aggregated_counter = 5;
+    AggregatedHistogram aggregated_histogram = 6;
+    AggregatedSummary aggregated_summary = 7;
   }
 }
 
 message Counter {
+  string name = 1;
+  double val = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
+}
+
+message AggregatedCounter {
   string name = 1;
   double val = 2;
   google.protobuf.Timestamp timestamp = 3;

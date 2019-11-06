@@ -371,6 +371,24 @@ impl From<proto::EventWrapper> for Event {
                             tags,
                         })
                     }
+                    MetricProto::AggregatedCounter(counter) => {
+                        let timestamp = counter
+                            .timestamp
+                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+
+                        let tags = if !counter.tags.is_empty() {
+                            Some(counter.tags)
+                        } else {
+                            None
+                        };
+
+                        Event::Metric(Metric::AggregatedCounter {
+                            name: counter.name,
+                            val: counter.val,
+                            timestamp,
+                            tags,
+                        })
+                    }
                     MetricProto::Histogram(hist) => {
                         let timestamp = hist
                             .timestamp
@@ -538,6 +556,30 @@ impl From<Event> for proto::EventWrapper {
                 };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::Counter(counter)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::AggregatedCounter {
+                name,
+                val,
+                timestamp,
+                tags,
+            }) => {
+                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                });
+
+                let tags = tags.unwrap_or_default();
+
+                let counter = proto::AggregatedCounter {
+                    name,
+                    val,
+                    timestamp,
+                    tags,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::AggregatedCounter(counter)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }
