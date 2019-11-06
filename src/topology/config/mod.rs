@@ -166,7 +166,10 @@ pub trait TransformConfig: core::fmt::Debug {
 impl Config {
     pub fn empty() -> Self {
         Self {
-            global: GlobalOptions { data_dir: None },
+            global: GlobalOptions {
+                data_dir: None,
+                dns: Vec::new(),
+            },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
