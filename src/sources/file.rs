@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
 };
 use bytes::{Bytes, BytesMut};
@@ -116,6 +116,10 @@ impl Default for FileConfig {
             oldest_first: false,
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new::<FileConfig>("file")
 }
 
 #[typetag::serde(name = "file")]

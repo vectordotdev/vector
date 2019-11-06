@@ -121,6 +121,10 @@ pub trait SourceConfig: core::fmt::Debug {
     fn source_type(&self) -> &'static str;
 }
 
+pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
+
+inventory::collect!(SourceDescription);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
     #[serde(default)]

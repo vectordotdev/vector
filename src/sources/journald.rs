@@ -1,7 +1,7 @@
 use crate::{
     event,
     event::{Event, LogEvent, ValueKind},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
 use futures::{future, sync::mpsc, Future, Sink};
@@ -42,6 +42,10 @@ pub struct JournaldConfig {
     pub units: Vec<String>,
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
+}
+
+inventory::submit! {
+    SourceDescription::new::<JournaldConfig>("journald")
 }
 
 #[typetag::serde(name = "journald")]
