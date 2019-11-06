@@ -4,7 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, BatchSettings, SinkExt,
+        BatchConfig, BatchServiceSink, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -37,7 +37,8 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    pub batch: Option<BatchConfig>,
+    #[serde(default)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -82,7 +83,7 @@ impl KinesisService {
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
-        let batch = BatchSettings::from_option(&config.batch, bytesize::mib(1u64), 1);
+        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -350,10 +351,10 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
-            batch: Some(BatchConfig {
+            batch: BatchConfig {
                 size: Some(2),
                 timeout: None,
-            }),
+            },
             ..Default::default()
         };
 

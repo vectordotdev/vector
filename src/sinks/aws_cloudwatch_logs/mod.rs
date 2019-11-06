@@ -6,8 +6,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, BatchSettings, PartitionBuffer, PartitionInnerBuffer,
-        SinkExt,
+        BatchConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -59,7 +58,8 @@ pub struct CloudwatchLogsSinkConfig {
     pub encoding: Encoding,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
-    pub batch: Option<BatchConfig>,
+    #[serde(default)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -131,7 +131,7 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = BatchSettings::from_option(&self.batch, 1000, 1);
+        let batch = self.batch.unwrap_or(1000, 1);
 
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
@@ -877,10 +877,10 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            batch: Some(BatchConfig {
+            batch: BatchConfig {
                 timeout: None,
                 size: Some(2),
-            }),
+            },
             ..Default::default()
         };
 

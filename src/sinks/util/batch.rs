@@ -9,25 +9,18 @@ pub struct BatchConfig {
     pub timeout: Option<u64>,
 }
 
+impl BatchConfig {
+    pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
+        BatchSettings {
+            size: self.size.unwrap_or(size as usize),
+            timeout: Duration::from_secs(self.timeout.unwrap_or(timeout)),
+        }
+    }
+}
+
 pub struct BatchSettings {
     pub size: usize,
     pub timeout: Duration,
-}
-
-impl BatchSettings {
-    pub fn from_option(config: &Option<BatchConfig>, size: u64, timeout: u64) -> Self {
-        let size: usize = size as usize;
-        config
-            .as_ref()
-            .map(|c| Self {
-                size: c.size.unwrap_or(size),
-                timeout: Duration::from_secs(c.timeout.unwrap_or(timeout)),
-            })
-            .unwrap_or(Self {
-                size,
-                timeout: Duration::from_secs(timeout),
-            })
-    }
 }
 
 pub trait Batch {

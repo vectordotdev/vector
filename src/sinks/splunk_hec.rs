@@ -5,7 +5,7 @@ use crate::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, BatchSettings, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -36,7 +36,8 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
-    pub batch: Option<BatchConfig>,
+    #[serde(default)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -90,7 +91,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch = BatchSettings::from_option(&config.batch, bytesize::mib(1u64), 1);
+    let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
@@ -538,10 +539,10 @@ mod integration_tests {
             host_field: "host".into(),
             compression: Some(Compression::None),
             encoding,
-            batch: Some(BatchConfig {
+            batch: BatchConfig {
                 size: Some(1),
                 timeout: None,
-            }),
+            },
             ..Default::default()
         }
     }

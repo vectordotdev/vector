@@ -4,7 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, BatchSettings, MetricBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -31,7 +31,8 @@ pub struct CloudWatchMetricsSinkConfig {
     pub namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub batch: Option<BatchConfig>,
+    #[serde(default)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -66,7 +67,7 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<super::RouterSink> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
-        let batch = BatchSettings::from_option(&config.batch, 20, 1);
+        let batch = config.batch.unwrap_or(20, 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);

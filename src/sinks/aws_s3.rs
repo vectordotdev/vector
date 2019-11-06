@@ -4,8 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, BatchSettings, Buffer, PartitionBuffer,
-        PartitionInnerBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -48,7 +47,8 @@ pub struct S3SinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     pub compression: Compression,
-    pub batch: Option<BatchConfig>,
+    #[serde(default)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -127,7 +127,7 @@ impl S3Sink {
         };
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
-        let batch = BatchSettings::from_option(&config.batch, bytesize::mib(10u64), 300);
+        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
             Template::from(kp.as_str())
@@ -619,10 +619,10 @@ mod integration_tests {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch: Some(BatchConfig {
+            batch: BatchConfig {
                 size: Some(batch_size),
                 timeout: Some(5),
-            }),
+            },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
         }

@@ -6,7 +6,7 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, BatchSettings, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig},
@@ -37,7 +37,8 @@ pub struct ElasticSearchConfig {
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
-    pub batch: Option<BatchConfig>,
+    #[serde(default)]
+    pub batch: BatchConfig,
     #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
 
@@ -180,7 +181,7 @@ fn es(
         Compression::Gzip => true,
     };
 
-    let batch = BatchSettings::from_option(&config.batch, bytesize::mib(10u64), 1);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -609,10 +610,10 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: Some(BatchConfig {
+            batch: BatchConfig {
                 size: Some(1),
                 timeout: None,
-            }),
+            },
             ..Default::default()
         }
     }
