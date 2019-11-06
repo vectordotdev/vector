@@ -6,7 +6,7 @@ use crate::{
         retries::FixedRetryPolicy,
         BatchServiceSink, MetricBuffer, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{Future, Poll};
@@ -84,6 +84,10 @@ pub enum DatadogMetricType {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogPoint(i64, f64);
+
+inventory::submit! {
+    SinkDescription::new::<DatadogConfig>("datadog")
+}
 
 #[typetag::serde(name = "datadog")]
 impl SinkConfig for DatadogConfig {

@@ -6,7 +6,7 @@ use crate::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, MetricBuffer, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{Future, Poll};
@@ -41,6 +41,10 @@ pub struct CloudWatchMetricsSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+inventory::submit! {
+    SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
 }
 
 #[typetag::serde(name = "aws_cloudwatch_metrics")]

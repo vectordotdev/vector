@@ -6,7 +6,7 @@ use crate::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
@@ -56,6 +56,10 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Json,
+}
+
+inventory::submit! {
+    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
 #[typetag::serde(name = "aws_kinesis_streams")]

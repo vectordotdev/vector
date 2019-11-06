@@ -7,7 +7,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{Future, Sink};
 use headers::HeaderMapExt;
@@ -41,6 +41,10 @@ pub struct ClickhouseConfig {
     pub request_retry_backoff_secs: Option<u64>,
 
     pub tls: Option<TlsOptions>,
+}
+
+inventory::submit! {
+    SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
 #[typetag::serde(name = "clickhouse")]

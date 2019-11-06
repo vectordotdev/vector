@@ -7,7 +7,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Sink};
@@ -61,6 +61,10 @@ pub enum Encoding {
 
 fn default_host_field() -> Atom {
     event::HOST.clone()
+}
+
+inventory::submit! {
+    SinkDescription::new::<HecSinkConfig>("splunk_hec")
 }
 
 #[typetag::serde(name = "splunk_hec")]

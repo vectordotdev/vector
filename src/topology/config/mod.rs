@@ -144,6 +144,10 @@ pub trait SinkConfig: core::fmt::Debug {
     fn sink_type(&self) -> &'static str;
 }
 
+pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
+
+inventory::collect!(SinkDescription);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
     pub inputs: Vec<String>,
