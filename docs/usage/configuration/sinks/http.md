@@ -30,6 +30,10 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
   
   # REQUIRED - requests
   encoding = "ndjson" # enum: "ndjson" or "text"
+  
+  # OPTIONAL - Batching
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 5 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
@@ -47,6 +51,10 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
   
+  # OPTIONAL - Batching
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 5 # default, seconds
+  
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 10 # default
@@ -59,11 +67,6 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
   [sinks.my_sink_id.basic_auth]
     password = "password"
     user = "username"
-  
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    size = 1049000 # default, bytes
-    timeout = 5 # default, seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -108,23 +111,17 @@ The basic authentication password.
 
 The basic authentication user name.
 
-### batch
-
-`optional` `type: table`
-
-Configures the batching options for this sink.
-
-#### batch.size
+### batch_size
 
 `optional` `default: 1049000` `type: int` `unit: bytes`
 
-The maximum size of a batch before it is flushed.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
-#### batch.timeout
+### batch_timeout
 
 `optional` `default: 5` `type: int` `unit: seconds`
 
-The maximum age of a batch before it is flushed.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 ### buffer
 
@@ -334,8 +331,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch.timeout`.
-2. The batch size meets or exceeds the configured `batch.size`.
+1. The batch age meets or exceeds the configured `batch_timeout` (default: `5 seconds`).
+2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

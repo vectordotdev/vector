@@ -36,8 +36,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch.timeout`.
-2. The batch size meets or exceeds the configured `batch.size`.
+1. The batch age meets or exceeds the configured `batch_timeout` (default: `<%= component.options.batch_timeout.human_default %>`).
+2. The batch size meets or exceeds the configured `batch_size` (default: `<%= component.options.batch_size.human_default %>`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 <%- end -%>

@@ -29,7 +29,7 @@ pub struct ClickhouseConfig {
     pub database: Option<String>,
     pub compression: Option<Compression>,
     pub basic_auth: Option<ClickHouseBasicAuthConfig>,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
 
     // Tower Request based configuration
@@ -273,8 +273,8 @@ mod integration_tests {
             table: table.clone(),
             compression: Some(Compression::None),
             batch: BatchConfig {
-                size: Some(1),
-                timeout: None,
+                batch_size: Some(1),
+                batch_timeout: None,
             },
             request_retry_attempts: Some(1),
             ..Default::default()
@@ -312,8 +312,8 @@ mod integration_tests {
             table: table.clone(),
             compression: Some(Compression::None),
             batch: BatchConfig {
-                size: Some(1),
-                timeout: None,
+                batch_size: Some(1),
+                batch_timeout: None,
             },
             ..Default::default()
         };

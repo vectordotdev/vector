@@ -47,7 +47,7 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
 
     // Tower Request based configuration

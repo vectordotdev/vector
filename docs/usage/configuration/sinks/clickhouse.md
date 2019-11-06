@@ -53,6 +53,10 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   database = "mydatabase" # no default
   healthcheck = true # default
   
+  # OPTIONAL - Batching
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 1 # default, seconds
+  
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -68,11 +72,6 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   [sinks.my_sink_id.basic_auth]
     password = "password"
     user = "username"
-  
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    size = 1049000 # default, bytes
-    timeout = 1 # default, seconds
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -106,19 +105,13 @@ The basic authentication password.
 
 The basic authentication user name.
 
-### batch
-
-`optional` `type: table`
-
-Configures the batching options for this sink.
-
-#### batch.size
+### batch_size
 
 `optional` `default: 1049000` `type: int` `unit: bytes`
 
 The maximum size of a batch before it is flushed.
 
-#### batch.timeout
+### batch_timeout
 
 `optional` `default: 1` `type: int` `unit: seconds`
 

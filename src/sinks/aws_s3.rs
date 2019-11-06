@@ -47,7 +47,7 @@ pub struct S3SinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     pub compression: Compression,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
 
     // Tower Request based configuration
@@ -620,8 +620,8 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             compression: Compression::None,
             batch: BatchConfig {
-                size: Some(batch_size),
-                timeout: Some(5),
+                batch_size: Some(batch_size),
+                batch_timeout: Some(5),
             },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()

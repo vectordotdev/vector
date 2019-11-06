@@ -49,6 +49,10 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
   healthcheck = true # default
   host = "https://api.datadoghq.com" # default
   
+  # OPTIONAL - Batching
+  batch_size = 20 # default, bytes
+  batch_timeout = 1 # default, seconds
+  
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -56,11 +60,6 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
   request_timeout_secs = 60 # default, seconds
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
-  
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    size = 20 # default, bytes
-    timeout = 1 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -73,19 +72,13 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
 
 Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 
-### batch
-
-`optional` `type: table`
-
-Configures the batching options for this sink.
-
-#### batch.size
+### batch_size
 
 `optional` `default: 20` `type: int` `unit: bytes`
 
 The maximum size of a batch before it is flushed.
 
-#### batch.timeout
+### batch_timeout
 
 `optional` `default: 1` `type: int` `unit: seconds`
 

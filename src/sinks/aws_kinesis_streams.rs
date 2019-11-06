@@ -37,7 +37,7 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
 
     // Tower Request based configuration
@@ -352,8 +352,8 @@ mod integration_tests {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             batch: BatchConfig {
-                size: Some(2),
-                timeout: None,
+                batch_size: Some(2),
+                batch_timeout: None,
             },
             ..Default::default()
         };

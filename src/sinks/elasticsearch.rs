@@ -37,7 +37,7 @@ pub struct ElasticSearchConfig {
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
     #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
@@ -611,8 +611,8 @@ mod integration_tests {
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
             batch: BatchConfig {
-                size: Some(1),
-                timeout: None,
+                batch_size: Some(1),
+                batch_timeout: None,
             },
             ..Default::default()
         }

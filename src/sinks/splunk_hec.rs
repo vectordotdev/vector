@@ -36,7 +36,7 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
 
     // Tower Request based configuration
@@ -540,8 +540,8 @@ mod integration_tests {
             compression: Some(Compression::None),
             encoding,
             batch: BatchConfig {
-                size: Some(1),
-                timeout: None,
+                batch_size: Some(1),
+                batch_timeout: None,
             },
             ..Default::default()
         }

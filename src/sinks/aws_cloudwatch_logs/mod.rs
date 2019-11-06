@@ -58,7 +58,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub encoding: Encoding,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub batch: BatchConfig,
 
     // Tower Request based configuration
@@ -878,8 +878,8 @@ mod integration_tests {
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             batch: BatchConfig {
-                timeout: None,
-                size: Some(2),
+                batch_timeout: None,
+                batch_size: Some(2),
             },
             ..Default::default()
         };
