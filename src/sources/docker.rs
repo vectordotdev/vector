@@ -868,17 +868,17 @@ mod tests {
 
     /// None if docker is not present on the system
     fn source<'a, L: Into<Option<&'a str>>>(
-        name: &str,
+        names: &[&str],
         label: L,
     ) -> (mpsc::Receiver<Event>, runtime::Runtime) {
         let mut rt = test_util::runtime();
-        let source = source_with(name, label, &mut rt);
+        let source = source_with(names, label, &mut rt);
         (source, rt)
     }
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
-        name: &str,
+        names: &[&str],
         label: L,
         rt: &mut runtime::Runtime,
     ) -> mpsc::Receiver<Event> {
@@ -886,7 +886,7 @@ mod tests {
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
             DockerConfig {
-                include_containers: Some(vec![name.to_owned()]),
+                include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
                 include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
                 ..DockerConfig::default()
             }
@@ -1050,7 +1050,6 @@ mod tests {
                 panic!("Container start failed with error: {:?}", error);
             }
         }
-        container_remove(&id, docker, rt);
         id
     }
 
@@ -1060,12 +1059,14 @@ mod tests {
         let name = "vector_test_newly_started";
         let label = "vector_test_label_newly_started";
 
-        let (out, mut rt) = source(name, None);
+        let (out, mut rt) = source(&[name], None);
         let docker = docker();
 
         let id = container_log_n(1, name, label, message, &docker, &mut rt);
 
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        container_remove(&id, &docker, &mut rt);
 
         let log = events[0].as_log();
         assert_eq!(log[&event::MESSAGE], message.into());
@@ -1084,12 +1085,14 @@ mod tests {
         let message = "10";
         let name = "vector_test_restart";
 
-        let (out, mut rt) = source(name, None);
+        let (out, mut rt) = source(&[name], None);
         let docker = docker();
 
-        container_log_n(2, name, None, message, &docker, &mut rt);
+        let id = container_log_n(2, name, None, message, &docker, &mut rt);
 
         let events = rt.block_on(collect_n(out, 2)).ok().unwrap();
+
+        container_remove(&id, &docker, &mut rt);
 
         assert_eq!(events[0].as_log()[&event::MESSAGE], message.into());
         assert_eq!(events[1].as_log()[&event::MESSAGE], message.into());
@@ -1098,22 +1101,19 @@ mod tests {
     #[test]
     fn include_containers() {
         let message = "11";
-        let name = "vector_test_include_container_1";
+        let name0 = "vector_test_include_container_0";
+        let name1 = "vector_test_include_container_1";
 
-        let (out, mut rt) = source(name, None);
+        let (out, mut rt) = source(&[name1], None);
         let docker = docker();
 
-        container_log_n(
-            1,
-            "vector_test_include_container_2",
-            None,
-            "13",
-            &docker,
-            &mut rt,
-        );
-        container_log_n(1, name, None, message, &docker, &mut rt);
+        let id0 = container_log_n(1, name0, None, "13", &docker, &mut rt);
+        let id1 = container_log_n(1, name1, None, message, &docker, &mut rt);
 
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        container_remove(&id0, &docker, &mut rt);
+        container_remove(&id1, &docker, &mut rt);
 
         assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
     }
@@ -1121,16 +1121,20 @@ mod tests {
     #[test]
     fn include_labels() {
         let message = "12";
-        let name = "vector_test_include_labels";
+        let name0 = "vector_test_include_labels_0";
+        let name1 = "vector_test_include_labels_1";
         let label = "vector_test_include_label";
 
-        let (out, mut rt) = source(name, label);
+        let (out, mut rt) = source(&[name0, name1], label);
         let docker = docker();
 
-        container_log_n(1, name, None, "13", &docker, &mut rt);
-        container_log_n(1, name, label, message, &docker, &mut rt);
+        let id0 = container_log_n(1, name0, None, "13", &docker, &mut rt);
+        let id1 = container_log_n(1, name1, label, message, &docker, &mut rt);
 
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        container_remove(&id0, &docker, &mut rt);
+        container_remove(&id1, &docker, &mut rt);
 
         assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
     }
@@ -1152,7 +1156,7 @@ mod tests {
         }
 
         std::thread::sleep(std::time::Duration::from_secs(1));
-        let out = source_with(name, None, &mut rt);
+        let out = source_with(&[name], None, &mut rt);
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
         let _ = container_wait(&id, &docker, &mut rt);
         container_remove(&id, &docker, &mut rt);
