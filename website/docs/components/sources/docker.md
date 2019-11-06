@@ -12,9 +12,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -53,8 +56,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -69,8 +73,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### include_containers
 
@@ -90,8 +96,10 @@ A list of container ids to match against when filtering running containers. This
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### include_labels
 
@@ -102,6 +110,10 @@ A list of container ids to match against when filtering running containers. This
 
 
 </Fields>
+
+## Fields
+
+This component does not automatically add any fields.
 
 ## How It Works
 

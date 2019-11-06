@@ -9,7 +9,7 @@ tradeoffs or your usecase.
 
 ## Delivery Gaurantees
 
-### At Least Once Delivery
+### At Least Once
 
 "At least once" delivery guarantees that an [event][docs.data-model#event] received by
 Vector will be delivered at least once to the configured destination(s). While
@@ -37,7 +37,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 Each [sink][docs.sinks] documents the buffer options.
 
 
-### Best Effort Delivery
+### Best Effort
 
 "Best effort" delivery has no guarantees and means that Vector will make a best
 effort to deliver each event. This means it is possible for the occasional

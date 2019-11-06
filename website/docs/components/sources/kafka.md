@@ -12,9 +12,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -60,8 +63,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -76,8 +80,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### auto_offset_reset
 
@@ -97,8 +103,10 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### bootstrap_servers
 
@@ -118,8 +126,10 @@ A comma-separated list of host and port pairs that are the addresses of the Kafk
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### group_id
 
@@ -140,8 +150,10 @@ The consumer group name to be used to consume events from Kafka.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### key_field
 
@@ -161,8 +173,10 @@ The log field name to use for the topic key. If unspecified, the key would not b
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"milliseconds"}>
+  unit={"milliseconds"}
+  >
 
 ### session_timeout_ms
 
@@ -183,8 +197,10 @@ The Kafka session timeout in milliseconds.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### topics
 
@@ -196,6 +212,10 @@ The Kafka topics names to read events from. Regex is supported if the topic begi
 
 
 </Fields>
+
+## Fields
+
+This component does not automatically add any fields.
 
 ## Input/Output
 

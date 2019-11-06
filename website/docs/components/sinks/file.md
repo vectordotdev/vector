@@ -12,9 +12,7 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model#log] events to a f
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -64,8 +67,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -80,8 +84,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### encoding
 
@@ -101,8 +107,10 @@ The encoding format used to serialize the events before outputting.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### healthcheck
 
@@ -122,8 +130,10 @@ Enables/disables the sink healthcheck upon start.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={null}>
+  unit={null}
+  >
 
 ### idle_timeout_secs
 
@@ -144,8 +154,10 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={true}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### path
 
@@ -175,7 +187,7 @@ event-by-event basis. It does not batch data.
 
 ### Template Syntax
 
-The `path` options
+The[`path`](#path) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][urls.strftime_specifiers] as well as the

@@ -12,7 +12,7 @@ use case.
 To begin, all data flowing through Vector are considered an "events". The
 general lifecycle of an event is demonstrated below:
 
-![][assets.data-model]
+<%= embed_svg("data-model-event") %>
 
 Events must be classified as a [`log`](#log) or [`metric`](#metric) event. Each
 type is described below in more detail. To better understand why Vector
@@ -27,7 +27,7 @@ import Fields from '@site/src/components/Fields';
 A `log` event is a structured represention of a point-in-time event. It contains
 an arbitrary set of fields (key/value pairs) that describe the event.
 
-![][assets.data-model-log]
+<%= embed_svg("data-model-log") %>
 
 <Fields filters={true}>
 
@@ -87,7 +87,7 @@ A `metric` event represents a numeric value that must be classified into one of
 four types: `counter`, `histogram`, `gauge`, or `set`. Each are described in
 more detail below.
 
-![][assets.data-model-metric]
+<%= embed_svg("data-model-metric") %>
 
 <Fields filters={true}>
 

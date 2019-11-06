@@ -12,9 +12,7 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -71,8 +74,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -87,8 +91,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### api_key
 
@@ -108,8 +114,10 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 ### batch_size
 
@@ -129,8 +137,10 @@ The maximum size of a batch before it is flushed.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"seconds"}>
+  unit={"seconds"}
+  >
 
 ### batch_timeout
 
@@ -150,8 +160,10 @@ The maximum age of a batch before it is flushed.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### healthcheck
 
@@ -171,8 +183,10 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### host
 
@@ -192,8 +206,10 @@ Datadog endpoint to send metrics to.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### namespace
 
@@ -213,8 +229,10 @@ A prefix that will be added to all metric names.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"seconds"}>
+  unit={"seconds"}
+  >
 
 ### rate_limit_duration
 
@@ -234,12 +252,14 @@ The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={null}>
+  unit={null}
+  >
 
 ### rate_limit_num
 
-The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the[`rate_limit_duration`](#rate_limit_duration) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -255,8 +275,10 @@ The maximum number of requests allowed within the `rate_limit_duration` window. 
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={null}>
+  unit={null}
+  >
 
 ### request_in_flight_limit
 
@@ -276,8 +298,10 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"seconds"}>
+  unit={"seconds"}
+  >
 
 ### request_timeout_secs
 
@@ -297,8 +321,10 @@ The maximum time a request can take before being aborted. It is highly recommend
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={null}>
+  unit={null}
+  >
 
 ### retry_attempts
 
@@ -318,8 +344,10 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"seconds"}>
+  unit={"seconds"}
+  >
 
 ### retry_backoff_secs
 
@@ -346,17 +374,21 @@ section.
 
 Health checks ensure that the downstream service is accessible and ready to
 accept data. This check is performed upon sink initialization.
-
 If the health check fails an error will be logged and Vector will proceed to
-start. If you'd like to exit immediately upon health check failure, you can
+start.
+
+#### Require Health Checks
+
+If you'd like to exit immediately upon a health check failure, you can
 pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-And finally, if you'd like to disable health checks entirely for this sink
-you can set the `healthcheck` option to `false`.
+#### Disable Health Checks
+
+If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
 
 ### Metric Types
 
@@ -380,10 +412,10 @@ The following matrix outlines how Vector metric types are mapped into Datadog me
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
+downstream service. Start with the[`rate_limit_duration`](#rate_limit_duration) and[`rate_limit_num`](#rate_limit_num)
 options to ensure Vector does not exceed the specified number of requests in
 the specified window. You can further control the pace at which this window is
-saturated with the `request_in_flight_limit` option, which will guarantee no
+saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which will guarantee no
 more than the specified number of requests are in-flight at any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
@@ -394,7 +426,7 @@ with the Vector team by [opening an issie][urls.new_datadog_metrics_sink_issue].
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry_backoff_secs`](#retry_backoff_secs) options.
 
 
 [docs.configuration#environment-variables]: ../../setup/configuration#environment-variables

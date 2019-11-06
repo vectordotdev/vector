@@ -4,7 +4,7 @@ module.exports = {
       type: 'category',
       label: 'About',
       items: [
-        'what_is_vector',
+        'index',
         'about/concepts',
         'about/data-model',
         'about/guarantees',
@@ -82,12 +82,22 @@ module.exports = {
         {
           type: 'category',
           label: 'Sources',
-          items: <%= metadata.sources_list.collect { |s| metadata.links.fetch_id("docs.sources.#{s.name}") }.to_json  %>,
+          items: [
+            <%= metadata.links.fetch_id("docs.sources").to_json %>,
+            <% metadata.sources_list.each do |s| %>
+              <%= metadata.links.fetch_id("docs.sources.#{s.name}").to_json %>,
+            <% end %>
+          ]
         },
         {
           type: 'category',
           label: 'Transforms',
-          items: <%= metadata.transforms_list.collect { |t| metadata.links.fetch_id("docs.transforms.#{t.name}") }.to_json  %>,
+          items: [
+            <%= metadata.links.fetch_id("docs.transforms").to_json %>,
+            <% metadata.transforms_list.each do |t| %>
+              <%= metadata.links.fetch_id("docs.transforms.#{t.name}").to_json %>,
+            <% end %>
+          ]
         },
         {
           type: 'category',
@@ -118,7 +128,6 @@ module.exports = {
       label: 'Meta',
       items: [
         <%= metadata.links.fetch_id("docs.meta.glossary").to_json %>,
-        <%= metadata.links.fetch_id("docs.meta.conventions").to_json %>,
       ],
     },
   ]

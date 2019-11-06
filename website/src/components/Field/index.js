@@ -67,7 +67,7 @@ function RelevantWhen({value}) {
 
   return (
     <span>
-      <code>{relKey}</code> = <code>{toTOML(relValue)}</code>
+      <code><a href={`#${relKey}`}>{relKey}</a></code> = <code>{toTOML(relValue)}</code>
     </span>
   );
 }
@@ -100,19 +100,29 @@ function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWh
   }
 }
 
-function Field({children, common, defaultValue, enumValues, examples, name, path, relevantWhen, type, unit, required}) {
+function Field({children, common, defaultValue, enumValues, examples, name, path, relevantWhen, templateable, type, unit, required}) {
+  const [collapse, setCollapse] = useState(false);
+
+  let filteredChildren = children;
+
+  if (collapse) {
+    filteredChildren = filteredChildren.filter(child => child.props.originalType != 'p');
+  }
+
   return (
-    <div className={classnames('field', required ? 'field-required' : '')} required={required}>
+    <div className={classnames('field', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
         {common && <span className="badge badge--primary" title="This is a popular  that we recommend for getting started">common</span>}
+        {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
         <span className="badge badge--secondary">{type}</span>
         {unit && <span className="badge badge--secondary">{unit}</span>}
         {required ?
           <span className="badge badge--danger">required</span> :
           <span className="badge badge--secondary">optional</span>}
       </div>
-      {children}
-      <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} />
+      {filteredChildren}
+      {!collapse && 
+        <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} />}
     </div>
   );
 }

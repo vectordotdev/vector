@@ -13,9 +13,6 @@ The `coercer` transform accepts [`log`][docs.data-model#log] events and allows y
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -38,8 +35,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -54,8 +52,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### types
 
@@ -74,8 +74,10 @@ Key/Value pairs representing mapped log field types.
   path={"types"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### *
 

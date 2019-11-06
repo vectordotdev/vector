@@ -1,15 +1,15 @@
 ---
 title: Transforms
+sidebar_label: hidden
 ---
 
-![][assets.transforms]
+Transforms are in the middle of the [pipeline][docs.configuration#composition],
+sitting in-between [sources][docs.sources] and [sinks][docs.sinks]. They
+transform [events][docs.data-model#event] or the stream as a whole.
 
-Transforms are in the middle of the [pipeline][docs.configuration#composition], sitting
-in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
-[events][docs.data-model#event] or the stream as a whole.
+import Components from '@site/src/components/Components';
 
 import Component from '@site/src/components/Component';
-import Components from '@site/src/components/Components';
 
 <Components>
 
@@ -347,7 +347,6 @@ import Components from '@site/src/components/Components';
 [+ request a new transform][urls.new_transform]
 
 
-[assets.transforms]: ../assets/transforms.svg
 [docs.configuration#composition]: ../setup/configuration#composition
 [docs.data-model#event]: ../about/data-model#event
 [docs.sinks]: ../components/sinks

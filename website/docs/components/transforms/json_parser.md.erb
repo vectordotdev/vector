@@ -24,7 +24,7 @@ Given the following log event:
 
 You can parse the JSON with:
 
-```coffeescript
+```toml
 [transforms.json]
   inputs = ["<source_id>"]
   type   = "json_parser"
@@ -55,7 +55,7 @@ nested JSON documents. For example, give this log event:
 
 You could unwrap the JSON with the following transforms:
 
-```coffeescript
+```toml
 [transforms.root_json]
   inputs = ["<source_id>"]
   type   = "json_parser"

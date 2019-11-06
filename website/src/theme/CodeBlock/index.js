@@ -1,18 +1,30 @@
+/**
+ * Copyright (c) 2017-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import React, {useEffect, useState, useRef} from 'react';
 import classnames from 'classnames';
 import Highlight, {defaultProps} from 'prism-react-renderer';
 import defaultTheme from 'prism-react-renderer/themes/palenight';
 import Clipboard from 'clipboard';
+import rangeParser from 'parse-numeric-range';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import styles from './styles.module.css';
 import Prism from 'prism-react-renderer/prism';
+import useTheme from '@theme/hooks/useTheme';
 
 (typeof global !== 'undefined' ? global : window).Prism = Prism;
+require('prismjs/components/prism-http');
 require('prismjs/components/prism-protobuf');
 require('prismjs/components/prism-rust');
 require('prismjs/components/prism-toml');
 
-export default ({children, className: languageClassName}) => {
+const highlightLinesRangeRegex = /{([\d,-]+)}/;
+
+export default ({children, className: languageClassName, metastring}) => {
   const {
     siteConfig: {
       themeConfig: {prismTheme, darkPrismTheme},
@@ -21,6 +33,13 @@ export default ({children, className: languageClassName}) => {
   const [showCopied, setShowCopied] = useState(false);
   const target = useRef(null);
   const button = useRef(null);
+  const [theme] = useTheme();
+  let highlightLines = [];
+
+  if (metastring && highlightLinesRangeRegex.test(metastring)) {
+    const highlightLinesRange = metastring.match(highlightLinesRangeRegex)[1];
+    highlightLines = rangeParser.parse(highlightLinesRange).filter(n => n > 0);
+  }
 
   useEffect(() => {
     let clipboard;
@@ -48,28 +67,12 @@ export default ({children, className: languageClassName}) => {
     setTimeout(() => setShowCopied(false), 2000);
   };
 
-  let currentTheme =
-    typeof document !== 'undefined'
-      ? document.querySelector('html').getAttribute('data-theme')
-      : null;
-
-  if (!currentTheme) {
-    currentTheme = localStorage.getItem('theme')
-  }
-
-  if (!currentTheme) {
-    let utcDate = new Date();
-    let offset = (new Date().getTimezoneOffset() / 60) * -1;
-    let date = new Date(utcDate.getTime() + offset);
-    currentTheme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
-  }
-
-  let theme = (currentTheme == 'dark' ? darkPrismTheme : prismTheme);
+  let themePrismTheme = (theme == 'dark' ? darkPrismTheme : prismTheme);
 
   return (
     <Highlight
       {...defaultProps}
-      theme={theme || defaultTheme}
+      theme={themePrismTheme || defaultTheme}
       code={children.trim()}
       language={language}>
       {({className, style, tokens, getLineProps, getTokenProps}) => (
@@ -78,13 +81,21 @@ export default ({children, className: languageClassName}) => {
             ref={target}
             className={classnames(className, styles.codeBlock)}
             style={style}>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({line, key: i})}>
-                {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({token, key})} />
-                ))}
-              </div>
-            ))}
+            {tokens.map((line, i) => {
+              const lineProps = getLineProps({line, key: i});
+
+              if (highlightLines.includes(i + 1)) {
+                lineProps.className = `${lineProps.className} docusaurus-highlight-code-line`;
+              }
+
+              return (
+                <div key={i} {...lineProps}>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({token, key})} />
+                  ))}
+                </div>
+              );
+            })}
           </pre>
           <button
             ref={button}

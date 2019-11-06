@@ -65,17 +65,17 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
               'menu__list-item--collapsed': collapsed,
             })}
             key={label}>
-            <a
+            <Link
+              activeClassName="menu__link--active"
               className={classnames('menu__link', {
                 'menu__link--sublist': collapsible,
-                'menu__link--active': collapsible && !item.collapsed,
               })}
-              href={categoryHref}
+              to={categoryHref}
               onClick={
-                collapsible ? () => setCollapsed(!collapsed) : undefined
+                collapsible && categoryHref == '#!' ? () => setCollapsed(!collapsed) : undefined
               }>
               {label}
-            </a>
+            </Link>
             <ul className="menu__list">
               {items.map(childItem => (
                 <DocSidebarItem

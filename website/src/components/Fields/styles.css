@@ -1,31 +1,27 @@
 .fields .filters {
   color: var(--ifm-color-emphasis-300);
-  margin-bottom: var(--ifm-spacing-vertical)  ;
-}
-
-.fields .filters .col:first-child {
-  padding-left: 0;
-}
-
-.fields .filters .col:last-child {
-  padding-right: 0;
+  margin-bottom: var(--ifm-spacing-vertical);
 }
 
 .fields .filters .checkboxes {
   font-size: 0.9em;
-  padding-top: calc( var(--ifm-spacing-vertical) / 2 );
+  padding: calc( var(--ifm-spacing-vertical) / 2 ) var(--ifm-spacing-horizontal);
 }
 
-.fields .filters .search .feather {
-  position: relative;
-  left: 0;
+.fields .filters .checkboxes label {
+  margin-right: 1em;
+}
+
+.fields .filters .checkboxes label input {
+  margin-right: 0.5em;
+}
+
+.fields .filters .checkboxes .result-count {
+  float: right;
 }
 
 .fields .filters .search input {
-  margin-left: -15px;
-  padding-right: 15px;
-  padding-left: 20px;
-  width: 90%;
+  width: 100%;
 }
 
 .fields .fields-list {

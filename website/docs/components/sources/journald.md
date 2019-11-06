@@ -12,9 +12,7 @@ The `journald` source ingests data through log records from journald and outputs
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -59,8 +62,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -75,8 +79,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### current_runtime_only
 
@@ -96,12 +102,14 @@ Include only entries from the current runtime (boot)
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### data_dir
 
-The directory used to persist the journal checkpoint position. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. 
+The directory used to persist the journal checkpoint position. By default, the global[`data_dir`](#data_dir) is used. Please make sure the Vector project has write permissions to this dir. 
 
 
 </Field>
@@ -117,8 +125,10 @@ The directory used to persist the journal checkpoint position. By default, the g
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### local_only
 
@@ -138,8 +148,10 @@ Include only entries from the local system
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### units
 
@@ -150,6 +162,10 @@ The list of units names to monitor. If empty or not present, all units are accep
 
 
 </Fields>
+
+## Fields
+
+This component does not automatically add any fields.
 
 ## Input/Output
 

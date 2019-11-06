@@ -13,9 +13,6 @@ The `field_filter` transform accepts [`log`][docs.data-model#log] and [`metric`]
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -29,8 +26,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -45,12 +43,14 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### field
 
-The target log field to compare against the `value`.
+The target log field to compare against the[`value`](#value).
 
 
 </Field>
@@ -66,12 +66,14 @@ The target log field to compare against the `value`.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### value
 
-If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.
+If the value of the specified[`field`](#field) matches this value then the event will be permitted, otherwise it is dropped.
 
 
 </Field>

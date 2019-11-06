@@ -12,9 +12,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model#log] events to a TC
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -80,8 +83,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -96,8 +100,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### address
 
@@ -117,8 +123,10 @@ The TCP address.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### buffer
 
@@ -137,8 +145,10 @@ Configures the sink specific buffer.
   path={"buffer"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### type
 
@@ -158,8 +168,10 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   path={"buffer"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### when_full
 
@@ -179,8 +191,10 @@ The behavior when the buffer becomes full.
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 #### max_size
 
@@ -200,8 +214,10 @@ The maximum size of the buffer on the disk.
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"events"}>
+  unit={"events"}
+  >
 
 #### num_items
 
@@ -226,8 +242,10 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### encoding
 
@@ -247,8 +265,10 @@ The encoding format used to serialize the events before outputting.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### healthcheck
 
@@ -268,8 +288,10 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### tls
 
@@ -288,8 +310,10 @@ Configures the TLS options for connections from this sink.
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 #### enabled
 
@@ -309,8 +333,10 @@ Enable TLS during connections to the remote.
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### ca_path
 
@@ -330,12 +356,14 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### crt_path
 
-Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,[`key_path`](#key_path) must also be set.
 
 
 </Field>
@@ -351,12 +379,14 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### key_path
 
-Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set,[`crt_path`](#crt_path) must also be set.
 
 
 </Field>
@@ -372,12 +402,14 @@ Absolute path to a certificate key file used to identify this connection, in DER
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless[`key_pass`](#key_pass) above is set.
 
 
 </Field>
@@ -393,8 +425,10 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless `ke
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 #### verify_certificate
 
@@ -414,8 +448,10 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   path={"tls"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 #### verify_hostname
 
@@ -447,17 +483,21 @@ section.
 
 Health checks ensure that the downstream service is accessible and ready to
 accept data. This check is performed upon sink initialization.
-
 If the health check fails an error will be logged and Vector will proceed to
-start. If you'd like to exit immediately upon health check failure, you can
+start.
+
+#### Require Health Checks
+
+If you'd like to exit immediately upon a health check failure, you can
 pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-And finally, if you'd like to disable health checks entirely for this sink
-you can set the `healthcheck` option to `false`.
+#### Disable Health Checks
+
+If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
 
 ### Streaming
 

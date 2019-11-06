@@ -10,6 +10,18 @@
 
 <%= options_sections(component.specific_options_list, heading_depth: 3) %>
 
+<%- if component.respond_to?(:fields) -%>
+## Fields
+
+<%%- if component.fields_list.any? -%>
+The following fields are automatically added to each event as they are ingested.
+
+<%%= fields(component.fields_list, heading_depth: 3) %>
+<%%- end -%>
+This component does not automatically add any fields.
+<%%- end -%>
+<%- end -%>
+
 ## How It Works [[sort]]
 
 <%%= component_sections(component) %>

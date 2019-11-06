@@ -8,10 +8,10 @@
 import React from 'react';
 
 import Head from '@docusaurus/Head';
+import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import DocPaginator from '@theme/DocPaginator';
-
 import styles from './styles.module.css';
 
 function Headings({headings, isChild}) {
@@ -104,25 +104,25 @@ function DocItem(props) {
                       <div className="title">Status</div>
                       {status == "beta" ?
                         <div>
-                          <a href="#" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
+                          <Link to="/docs/about/guarantees#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
                             <i className="feather icon-alert-triangle"></i> beta
-                          </a>
+                          </Link>
                         </div> :
                         <div>
-                          <a href="#" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
+                          <Link to="/docs/about/guarantees#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
                             <i className="feather icon-award"></i> prod-ready
-                          </a>
+                          </Link>
                         </div>}
                       {delivery_guarantee == "best_effort" ?
                         <div>
-                          <a href="#" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
+                          <Link to="/docs/about/guarantees#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
                             <i className="feather icon-shield-off"></i> best-effort
-                          </a>
+                          </Link>
                         </div> :
                         <div>
-                          <a href="#" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
+                          <Link to="/docs/about/guarantees#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
                             <i className="feather icon-shield"></i> at-least-once
-                          </a>
+                          </Link>
                         </div>}
                     </div>}
                   {DocContent.rightToc.length > 0 &&

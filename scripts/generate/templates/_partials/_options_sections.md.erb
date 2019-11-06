@@ -1,8 +1,3 @@
-<%- if level == 1 -%>
-import Field from '@site/src/components/Field';
-import Fields from '@site/src/components/Fields';
-<%- end -%>
-
 <Fields filters={<%= filters.to_json %>}>
 
 <%- options.each do |option| -%>
@@ -18,8 +13,10 @@ import Fields from '@site/src/components/Fields';
   path={<%= path.to_json %>}
   relevantWhen={<%= option.relevant_when.to_json %>}
   required={<%= option.required? %>}
+  templateable={<%= option.templateable? %>}
   type={<%= option.type.to_json %>}
-  unit={<%= option.unit.to_json %>}>
+  unit={<%= option.unit.to_json %>}
+  >
 
 <%= "#" * heading_depth %> <%= option.name %>
 

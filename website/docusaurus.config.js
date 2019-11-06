@@ -15,14 +15,13 @@ module.exports = {
       },
       links: [
         {to: 'use_cases', label: 'Use Cases', position: 'right'},
-        {to: 'Integrations', label: 'Integrations', position: 'right'},
-        {to: 'docs', label: 'Docs', position: 'right'},
+        {to: 'docs/components', label: 'Integrations', position: 'right'},
+        {href: '/docs', label: 'Docs', position: 'right'},
         {to: 'blog', label: 'Blog', position: 'right'},
         {to: 'community', label: 'Community', position: 'right'},
         {
           href: 'https://github.com/timberio/vector',
           label: "GitHub",
-          icon: "test",
           position: 'right',
         },
       ],

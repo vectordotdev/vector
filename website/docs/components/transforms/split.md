@@ -12,9 +12,7 @@ The `split` transform accepts [`log`][docs.data-model#log] events and allows you
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -79,8 +82,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -95,12 +99,14 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### drop_field
 
-If `true` the `field` will be dropped after parsing.
+If `true` the[`field`](#field) will be dropped after parsing.
 
 
 </Field>
@@ -116,8 +122,10 @@ If `true` the `field` will be dropped after parsing.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### field
 
@@ -137,8 +145,10 @@ The field to apply the split on.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### field_names
 
@@ -158,8 +168,10 @@ The field names assigned to the resulting tokens, in order.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### separator
 
@@ -179,8 +191,10 @@ The separator to split the field on. If no separator is given, it will split on 
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### types
 
@@ -199,8 +213,10 @@ Key/Value pairs representing mapped log field types.
   path={"types"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### *
 
@@ -235,7 +251,7 @@ And the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.<transform-id>]
 type = "split"
 field = "message"

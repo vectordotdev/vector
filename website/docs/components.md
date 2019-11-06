@@ -6,8 +6,9 @@ sidebar_label: hidden
 Vector components are the entities used to
 [compose pipelines][docs.configuration#composition].
 
-import Component from '@site/src/components/Component';
 import Components from '@site/src/components/Components';
+
+import Component from '@site/src/components/Component';
 
 <Components>
 

@@ -8,13 +8,11 @@ status: "prod-ready"
 title: "file source" 
 ---
 
-The `file` source ingests data through one or more local files and outputs [`log`][docs.data-model#log] events.
+The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model#log] events.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -84,8 +87,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -100,12 +104,14 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### data_dir
 
-The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
+The directory used to persist file checkpoint positions. By default, the [global[`data_dir`](#data_dir) option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
 
 
 </Field>
@@ -121,8 +127,10 @@ The directory used to persist file checkpoint positions. By default, the [global
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### exclude
 
@@ -142,8 +150,10 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes pr
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### file_key
 
@@ -163,8 +173,10 @@ The key name added to each event with the full path of the file. See [Context](#
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### fingerprinting
 
@@ -176,15 +188,17 @@ Configuration for how the file source should identify files.
 <Field
   common={false}
   defaultValue={"checksum"}
-  enumValues={{"checksum":"Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
+  enumValues={{"checksum":"Read[`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
   examples={["checksum","device_and_inode"]}
   name={"strategy"}
   nullable={true}
   path={"fingerprinting"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### strategy
 
@@ -204,8 +218,10 @@ The strategy used to uniquely identify files. This is important for [checkpointi
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 #### fingerprint_bytes
 
@@ -225,8 +241,10 @@ The number of bytes read off the head of the file to generate a unique fingerpri
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 #### ignored_header_bytes
 
@@ -251,8 +269,10 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"milliseconds"}>
+  unit={"milliseconds"}
+  >
 
 ### glob_minimum_cooldown
 
@@ -272,8 +292,10 @@ Delay between file discovery calls. This controls the interval at which Vector s
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### host_key
 
@@ -293,8 +315,10 @@ The key name added to each event representing the current host. See [Context](#c
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"seconds"}>
+  unit={"seconds"}
+  >
 
 ### ignore_older
 
@@ -314,8 +338,10 @@ Ignore files with a data modification date that does not exceed this age.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[string]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### include
 
@@ -335,8 +361,10 @@ Array of file patterns to include. [Globbing](#globbing) is supported. See [File
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 ### max_line_bytes
 
@@ -356,8 +384,10 @@ The maximum number of a bytes a line can contain before being discarded. This pr
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 ### max_read_bytes
 
@@ -377,8 +407,10 @@ An approximate limit on the amount of data read from a single file at a given ti
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### message_start_indicator
 
@@ -398,12 +430,14 @@ When present, Vector will aggregate multiple lines into a single event, using th
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"milliseconds"}>
+  unit={"milliseconds"}
+  >
 
 ### multi_line_timeout
 
-When `message_start_indicator` is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
+When[`message_start_indicator`](#message_start_indicator) is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
 
 
 </Field>
@@ -419,8 +453,10 @@ When `message_start_indicator` is present, this sets the amount of time Vector w
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### oldest_first
 
@@ -440,8 +476,10 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### start_at_beginning
 
@@ -453,44 +491,16 @@ When `true` Vector will read from the beginning of new files, when `false` Vecto
 
 </Fields>
 
-## Input/Output
+## Fields
 
-Given the following input:
-
-{% code-tabs %}
-{% code-tabs-item title="/var/log/rails.log" %}
-```
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-A [`log` event][docs.data-model#log] will be output with the following structure:
-
-{% code-tabs %}
-{% code-tabs-item title="log" %}
-```javascript
-{
-  "timestamp": <timestamp> # current time,
-  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
-  "file": "/var/log/rails.log", # original file
-  "host": "10.2.22.122" # current nostname
-}
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as
-context. You can further parse the `"message"` key with a
-[transform][docs.transforms], such as the
-[`regex_parser` transform][docs.transforms.regex_parser].
+This component does not automatically add any fields.
 
 ## How It Works
 
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
-patterns. The frequency is controlled via the `glob_minimum_cooldown` option.
+patterns. The frequency is controlled via the[`glob_minimum_cooldown`](#glob_minimum_cooldown) option.
 If a new file is added that matches any of the supplied patterns, Vector will
 begin tailing it. Vector maintains a unique list of files and will not tail a
 file more than once, even if it matches multiple patterns. You can read more
@@ -503,13 +513,13 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global `data_dir` option][docs.configuration#data-directory] but can be
-overridden via the `data_dir` option in the `file` sink directly.
+[global[`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
+overridden via the[`data_dir`](#data_dir) option in the[`file`](#file) sink directly.
 
 ### Context
 
-By default, the `file` source will add context
-keys to your events via the `file_key` and `host_key`
+By default, the[`file`](#file) source will add context
+keys to your events via the[`file_key`](#file_key) and[`host_key`](#host_key)
 options.
 
 ### Environment Variables
@@ -532,7 +542,7 @@ continue reading until it reaches EOF. When a file is no longer findable in the
 By default, Vector identifies files by creating a [cyclic redundancy check
 (CRC)][urls.crc] on the first 256 bytes of the file. This serves as a
 fingerprint to uniquely identify the file. The amount of bytes read can be
-controlled via the `fingerprint_bytes` and `ignored_header_bytes` options.
+controlled via the[`fingerprint_bytes`](#fingerprint_bytes) and[`ignored_header_bytes`](#ignored_header_bytes) options.
 
 This strategy avoids the common pitfalls of using device and inode names since
 inode names can be reused across files. This enables Vector to [properly tail
@@ -555,19 +565,18 @@ This would cause writes from a single logical log stream to be interleaved in
 time and potentially slow down ingestion as a whole, since the fixed total read
 bandwidth is allocated across an increasing number of files.
 
-To address this type of situation, Vector provides the `oldest_first` flag. When
+To address this type of situation, Vector provides the[`oldest_first`](#oldest_first) flag. When
 set, Vector will not read from any file younger than the oldest file that it
 hasn't yet caught up to. In other words, Vector will continue reading from older
 files as long as there is more data to read. Only once it hits the end will it
 then move on to read from younger files.
 
-Whether or not to use the `oldest_first` flag depends on the organization of the
-logs you're configuring Vector to tail. If your `include` glob contains multiple
+Whether or not to use the[`oldest_first`](#oldest_first) flag depends on the organization of the
+logs you're configuring Vector to tail. If your[`include`](#include) glob contains multiple
 independent logical log streams (e.g. nginx's `access.log` and `error.log`, or
 logs from multiple services), you are likely better off with the default
 behavior. If you're dealing with a single logical log stream or if you value
-per-stream ordering over fairness across streams, consider setting
-`oldest_first` to `true`.
+per-stream ordering over fairness across streams, consider setting[`oldest_first`](#oldest_first) to `true`.
 
 
 
@@ -585,7 +594,7 @@ the old log file to a new location before truncating the original. Vector will
 also handle this well out of the box, but there are a couple configuration options
 that will help reduce the very small chance of missed data in some edge cases.
 We recommend a combination of `delaycompress` (if applicable) on the logrotate
-side and including the first rotated file in Vector's `include` option. This
+side and including the first rotated file in Vector's[`include`](#include) option. This
 allows Vector to find the file after rotation, read it uncompressed to identify
 it, and then ensure it has all of the data, including any written in a gap
 between Vector's last read and the actual rotation event.
@@ -593,8 +602,7 @@ between Vector's last read and the actual rotation event.
 ### Globbing
 
 [Globbing][urls.globbing] is supported in all provided file paths, files will
-be [autodiscovered](#auto-discovery) continually at a rate defined by the
-`glob_minimum_cooldown` option.
+be [autodiscovered](#auto-discovery) continually at a rate defined by the[`glob_minimum_cooldown`](#glob_minimum_cooldown) option.
 
 ### Line Delimiters
 
@@ -604,7 +612,7 @@ Each line is read until a new line delimiter (the `0xA` byte) or `EOF` is found.
 
 By default, Vector will read new data only for newly discovered files, similar
 to the `tail` command. You can read from the beginning of the file by setting
-the `start_at_beginning` option to `true`.
+the[`start_at_beginning`](#start_at_beginning) option to `true`.
 
 Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
@@ -615,8 +623,6 @@ read position will resume from the last checkpoint.
 [docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
 [docs.correctness]: ../../about/correctness
 [docs.data-model#log]: ../../about/data-model#log
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[docs.transforms]: ../../components/transforms
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
 [urls.inode]: https://en.wikipedia.org/wiki/Inode

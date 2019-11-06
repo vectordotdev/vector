@@ -12,9 +12,7 @@ The `json_parser` transform accepts [`log`][docs.data-model#log] events and allo
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -56,8 +59,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -72,8 +76,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### drop_invalid
 
@@ -93,8 +99,10 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### field
 
@@ -120,7 +128,7 @@ Given the following log event:
 
 You can parse the JSON with:
 
-```coffeescript
+```toml
 [transforms.json]
   inputs = ["<source_id>"]
   type   = "json_parser"
@@ -151,7 +159,7 @@ nested JSON documents. For example, give this log event:
 
 You could unwrap the JSON with the following transforms:
 
-```coffeescript
+```toml
 [transforms.root_json]
   inputs = ["<source_id>"]
   type   = "json_parser"
@@ -207,7 +215,7 @@ section.
 
 ### Invalid JSON
 
-If the value for the specified `field` is not valid JSON you can control keep or discard the event with the `drop_invalid` option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
+If the value for the specified[`field`](#field) is not valid JSON you can control keep or discard the event with the[`drop_invalid`](#drop_invalid) option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
 
 ### Key Conflicts
 

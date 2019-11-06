@@ -21,24 +21,22 @@ function Fields({children, filters}) {
   return (
     <div className="fields">
       {filters !== false ?
-        (<div className="filters container">
-          <div className="row">
-            <div className="col search">
-              <i className="feather icon-search"></i>
+        (<div className="filters">
+          <div className=" search">
+            <input
+              type="text"
+              onChange={(event) => setSearchTerm(event.currentTarget.value)}
+              placeholder="🔍 Search..." />
+          </div>
+          <div className="checkboxes">
+            <span className="result-count">{filteredChildren.length} items</span>
+            <label title="Only show popular/common results">
               <input
-                type="text"
-                onChange={(event) => setSearchTerm(event.currentTarget.value)}
-                placeholder="Search..." />
-            </div>
-            <div className="col text--right checkboxes">
-              <label title="Only show popular/common results">
-                common only
-                <input
-                  type="checkbox"
-                  onChange={(event) => setOnlyCommon(event.currentTarget.checked)}
-                  checked={onlyCommon} />
-              </label>
-            </div>
+                type="checkbox"
+                onChange={(event) => setOnlyCommon(event.currentTarget.checked)}
+                checked={onlyCommon} />
+              common only
+            </label>
           </div>
         </div>) :
         null}

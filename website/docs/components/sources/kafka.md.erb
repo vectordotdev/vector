@@ -10,6 +10,16 @@
 
 <%= options_sections(component.specific_options_list, heading_depth: 3) %>
 
+## Fields
+
+<%- if component.fields_list.any? -%>
+The following fields are automatically added to each event as they are ingested.
+
+<%= fields(component.fields_list, heading_depth: 3) %>
+<%- else -%>
+This component does not automatically add any fields.
+<%- end -%>
+
 ## Input/Output
 
 Given the following message in a Kafka topic:

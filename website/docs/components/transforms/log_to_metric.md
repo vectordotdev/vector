@@ -12,9 +12,7 @@ The `log_to_metric` transform accepts [`log`][docs.data-model#log] events and al
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -79,8 +82,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -95,8 +99,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[table]"}
-  unit={null}>
+  unit={null}
+  >
 
 ### metrics
 
@@ -115,8 +121,10 @@ A table of key/value pairs representing the keys to be added to the event.
   path={"metrics"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### type
 
@@ -136,8 +144,10 @@ The metric type.
   path={"metrics"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### field
 
@@ -157,12 +167,14 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 #### increment_by_value
 
-If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value.
+If `true` the metric will be incremented by the[`field`](#field) value. If `false` the metric will be incremented by 1 regardless of the[`field`](#field) value.
 
 
 </Field>
@@ -178,8 +190,10 @@ If `true` the metric will be incremented by the `field` value. If `false` the me
   path={"metrics"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### name
 
@@ -199,8 +213,10 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   path={"metrics"}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 #### tags
 
@@ -219,8 +235,10 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   path={"metrics.tags"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ##### *
 
@@ -567,14 +585,14 @@ section.
 
 ### Multiple Metrics
 
-For clarification, when you convert a single `log` event into multiple `metric`
-events, the `metric` events are not emitted as a single array. They are emitted
+For clarification, when you convert a single `log` event into multiple[`metric`](#metric)
+events, the[`metric`](#metric) events are not emitted as a single array. They are emitted
 individually, and the downstream components treat them as individual events.
 Downstream components are not aware they were derived from a single log event.
 
 ### Null Fields
 
-If the target log `field` contains a `null` value it will ignored, and a metric
+If the target log[`field`](#field) contains a `null` value it will ignored, and a metric
 will not be emitted.
 
 ### Reducing

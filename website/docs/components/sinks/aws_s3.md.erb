@@ -10,7 +10,9 @@
 
 <%= options_sections(component.specific_options_list, heading_depth: 3) %>
 
-## Input/Output
+## Output
+
+The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
 
 The `aws_s3` sink batches [`log`][docs.data-model#log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to [AWS S3][urls.aws_s3]
@@ -91,47 +93,5 @@ time.
 
 You can control the resulting name via the `key_prefix`, `filename_time_format`,
 and `filename_append_uuid` options.
-
-### Searching
-
-Storing log data in S3 is a powerful strategy for persisting log data. Mainly
-because data on S3 is searchable. And [AWS Athena][urls.aws_athena] makes this
-easier than ever.
-
-#### Athena
-
-1. Head over to the [Athena console][urls.aws_athena_console].
-
-2. Create a new table, replace the `<...>` variables as needed:
-
-    ```sql
-    CREATE EXTERNAL TABLE logs (
-      timestamp string,
-      message string,
-      host string
-    )   
-    PARTITIONED BY (date string)
-    ROW FORMAT  serde 'org.apache.hive.hcatalog.data.JsonSerDe'
-    with serdeproperties ( 'paths'='timestamp, message, host' )
-    LOCATION 's3://<region>.<key_prefix>';
-    ```
-
-3. Discover your partitions by running the following query:
-
-    ```sql
-    MSCK REPAIR TABLE logs
-    ```
-
-4. Query your data:
-
-    ```sql
-    SELECT host, COUNT(*)
-    FROM logs
-    GROUP BY host
-    ```
-
-Vector has plans to support [columnar formats](#columnar-formats) in
-[`v0.6`][urls.vector_roadmap] which will allows for very fast and efficient querying on
-S3.
 
 

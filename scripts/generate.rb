@@ -21,7 +21,9 @@ require_relative "setup"
 # Requires
 #
 
+require_relative "generate/post_processors/component_importer"
 require_relative "generate/post_processors/link_definer"
+require_relative "generate/post_processors/option_linker"
 require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/templates"
@@ -68,9 +70,11 @@ def link_valid?(value)
 end
 
 def post_process(content, doc, links)
+  content = PostProcessors::ComponentImporter.import!(content)
   content = PostProcessors::SectionSorter.sort!(content)
   content = PostProcessors::SectionReferencer.reference!(content)
   content = PostProcessors::LinkDefiner.define!(content, doc, links)
+  content = PostProcessors::OptionLinker.link!(content)
   content
 end
 

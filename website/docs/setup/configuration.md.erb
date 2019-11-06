@@ -3,12 +3,11 @@ title: Configuration
 description: Configuring Vector
 ---
 
-![][assets.configure]
-
-This section covers configuring Vector and creating [pipelines][docs.configuration#composition]
-like the one shown above. Vector requires only a _single_ [TOML][urls.toml]
-configurable file, which you can specify via the
-[`--config` flag][docs.process-management#flags] when [starting][docs.process-management#starting] vector:
+This section covers configuring Vector and creating
+[pipelines][docs.configuration#composition] like the [example](#example) below.
+Vector requires only a _single_ [TOML][urls.toml] configurable file, which you
+can specify via the [`--config` flag][docs.process-management#flags] when
+[starting][docs.process-management#starting] vector:
 
 ```bash
 vector --config /etc/vector/vector.toml
@@ -18,7 +17,7 @@ vector --config /etc/vector/vector.toml
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 # Set global options
 data_dir = "/var/lib/vector"
 
@@ -115,7 +114,7 @@ with the following syntax:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.add_host]
     type = "add_fields"
     

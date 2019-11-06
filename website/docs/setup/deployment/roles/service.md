@@ -37,7 +37,7 @@ For example:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```c
+[[``](](`c
 data_dir = "/var/lib/vector"
 
 [sinks.backups]
@@ -47,7 +47,7 @@ data_dir = "/var/lib/vector"
     [sinks.backups.buffer]
         type = "disk"
         max_size = 5000000000 # 5gb
-```
+[[``](](`
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 

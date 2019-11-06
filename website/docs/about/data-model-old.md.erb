@@ -3,10 +3,6 @@ title: Data Model
 description: A deep dive into Vector's data model
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
-import TabItem from '@theme/TabItem';
-import Tabs from '@theme/Tabs';
-
 This document provides a deeper look at Vector's data model. Understanding this
 goes a long way in properly [configuring][docs.configuration] Vector for your
 use case.
@@ -115,7 +111,7 @@ more detail below.
 
 ### Schema
 
-```coffeescript
+```toml
 message Metric {
   oneof metric {
     Counter counter = 1;

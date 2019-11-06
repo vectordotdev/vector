@@ -1,16 +1,17 @@
 .component {
-  background: var(--ifm-color-emphasis-50);
-  border: 1px solid var(--ifm-hr-border-color);
-  border-radius: calc( var(--ifm-global-radius) * 2 );
-  color: var(--ifm-color-emphasis-500);
+  background: var(--ifm-panel-background);
+  border: 1px solid var(--ifm-panel-border-color);
+  border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-panel-box-shadow);
   font-weight: 500;
   padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
   transition: var(--ifm-transition-fast) ease;
 }
 
 .component:hover {
-  background-color: rgba(var(--ifm-color-primary-rgb), 0.2);
-  border: 1px solid var(--ifm-color-primary);
+  background: var(--ifm-panel-background-active);
+  border-color: var(--ifm-color-primary);
+  box-shadow: var(--ifm-panel-box-shadow-active);
   text-decoration: none;
 }
 

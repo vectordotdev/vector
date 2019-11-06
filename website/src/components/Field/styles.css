@@ -1,5 +1,6 @@
 .field {
   border-radius: 5px;
+  color: var(--ifm-color-content-secondary);
   font-size: 0.95em;
   padding-top: calc( var(--ifm-spacing-vertical) / 1.5 );
   padding-left: var(--ifm-spacing-horizontal);
@@ -46,6 +47,10 @@
   margin-bottom: 1em;
 }
 
+.field h3:hover {
+  color: var(--ifm-color-primary);
+}
+
 .field .info {
   border-left: 1px solid var(--ifm-hr-border-color);
   color: var(--ifm-color-content-secondary);
@@ -75,4 +80,9 @@
 
 .field .info .examples {
   margin-top: 0.5em;
+}
+
+.field.field-collapsed h3::before,
+.field.field-collapsed h4::before {
+  content: "- ";
 }

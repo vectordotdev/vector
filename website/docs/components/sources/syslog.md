@@ -12,9 +12,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -64,8 +67,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -80,8 +84,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### address
 
@@ -101,8 +107,10 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### host_key
 
@@ -122,8 +130,10 @@ The key name added to each event representing the current host. See [Context](#c
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 ### max_length
 
@@ -143,8 +153,10 @@ The maximum bytes size of incoming messages before they are discarded.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### mode
 
@@ -164,8 +176,10 @@ The input mode.
   path={null}
   relevantWhen={{"mode":"unix"}}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### path
 
@@ -178,46 +192,167 @@ The unix socket path. *This should be absolute path.*
 
 </Fields>
 
-## Input/Output
+## Fields
 
-Given the following input line:
+The following fields are automatically added to each event as they are ingested.
 
-{% code-tabs %}
-{% code-tabs-item title="stdin" %}
-Given the following input
+<Fields filters={true}>
 
-```
-<34>1 2018-10-11T22:14:15.003Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+<Field
+  name={"appname"}
+  path={null}
+  type={"string"}
+  >
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
-```javascript
-{
-  "timestamp": <2018-10-11T22:14:15.003Z> # current time,
-  "message": "<34>1 2018-10-11T22:14:15.003Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8",
-  "host": "mymachine.example.com",
-  "peer_path": "/path/to/unix/socket" # only relevant if `mode` is `unix`
-}
-```
+### appname
 
-Vector only extracts the `"timestamp"` and `"host"` fields and leaves the
-`"message"` in-tact. You can further parse the `"message"` key with a
-[transform][docs.transforms], such as the
-[`regex_parser` transform][docs.transforms.regex_parser].
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a appname is not found, then the key will not be added.
+
+
+
+</Field>
+
+
+<Field
+  name={"container"}
+  path={null}
+  type={"string"}
+  >
+
+### container
+
+The Docker container name that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  name={"facility"}
+  path={null}
+  type={"string"}
+  >
+
+### facility
+
+The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a facility is not found, then the key will not be added.
+
+
+
+</Field>
+
+
+<Field
+  name={"host"}
+  path={null}
+  type={"string"}
+  >
+
+### host
+
+The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream host IP address.
+
+
+</Field>
+
+
+<Field
+  name={"msgid"}
+  path={null}
+  type={"string"}
+  >
+
+### msgid
+
+The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a msgid is not found, then the key will not be added.
+
+
+
+</Field>
+
+
+<Field
+  name={"procid"}
+  path={null}
+  type={"string"}
+  >
+
+### procid
+
+The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a procid is not found, then the key will not be added.
+
+
+
+</Field>
+
+
+<Field
+  name={"severity"}
+  path={null}
+  type={"string"}
+  >
+
+### severity
+
+The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a severity is not found, then the key will not be added.
+
+
+
+</Field>
+
+
+<Field
+  name={"stream"}
+  path={null}
+  type={"string"}
+  >
+
+### stream
+
+The [standard stream][urls.standard_streams] that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  name={"timestamp"}
+  path={null}
+  type={"timestamp"}
+  >
+
+### timestamp
+
+The timestamp extracted from the incoming line. If a timestamp is not found, then Vector will use the current time.
+
+
+</Field>
+
+
+<Field
+  name={"version"}
+  path={null}
+  type={"string"}
+  >
+
+### version
+
+The version extracted from the [Syslog 5424][urls.syslog_5424] line. If a version is not found, then the key will not be added.
+
+
+
+</Field>
+
+
+</Fields>
 
 ## How It Works
 
 ### Context
 
 By default, the `syslog` source will add context
-keys to your events via the `host_key`
+keys to your events via the[`host_key`](#host_key)
 options.
 
 ### Environment Variables
@@ -235,33 +370,17 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 ### Parsing
 
-Vector will parse messages in the [Syslog 5424][urls.syslog_5424] format.
-
-#### Successful parsing
-
-Upon successful parsing, Vector will create a structured event. For example, given this Syslog message:
-
-```
-<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar
-```
-
-Vector will produce an event with this structure.
-
-```javascript
-{
-  "message": "<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar",
-  "timestamp": "2019-02-13T19:48:34+00:00",
-  "host": "74794bfb6795"
-}
-```
-
-#### Unsuccessful parsing
-
-Anyone with Syslog experience knows there are often deviations from the Syslog specifications. Vector tries its best to account for these (note the tests here). In the event Vector fails to parse your format, we recommend that you open an issue informing us of this, and then proceed to use the `tcp`, `udp`, or `unix` source coupled with a parser [transform][docs.transforms] transform of your choice.
+Vector will _only_ parse messages in the [Syslog 5424][urls.syslog_5424] format.
+Vector makes a best effort to parse this format. If parsing fails, the message
+will be dropped and `warning` log line will be emitted. If this is the case, we
+recommend using the [`tcp` source][docs.sources.tcp] combined with the
+[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
+ingestion and parsing scheme.
 
 
 [docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
 [docs.data-model#log]: ../../about/data-model#log
+[docs.sources.tcp]: ../../components/sources/tcp
 [docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[docs.transforms]: ../../components/transforms
+[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

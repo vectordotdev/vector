@@ -23,9 +23,9 @@ how to do this.
 ### Buffers & Batches
 
 <%- if component.partition_options.any? -%> 
-![][assets.sink-flow-partitioned]
+<%= embed_svg("buffers-and-batches-partitioned") %>
 <%- else -%>
-![][assets.sink-flow-serial]
+<%= embed_svg("buffers-and-batches-serial") %>
 <%- end -%>
 
 The `<%= component.name %>` <%= component.type %> buffers & batches data as
@@ -77,17 +77,22 @@ accept data. This check is performed upon sink initialization.
 In order to run this check you must provide a value for the `healthcheck_uri`
 option.
 <%- end -%>
-
 If the health check fails an error will be logged and Vector will proceed to
-start. If you'd like to exit immediately upon health check failure, you can
+start.
+
+#### Require Health Checks
+
+If you'd like to exit immediately upon a health check failure, you can
 pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-And finally, if you'd like to disable health checks entirely for this sink
-you can set the `healthcheck` option to `false`.
+#### Disable Health Checks
+
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 <%- end -%>
 <%- if component.partition_options.any? -%>
 

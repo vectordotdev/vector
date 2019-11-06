@@ -3,17 +3,9 @@
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
-.components .filters .col:first-child {
-  padding-left: 0;
-}
-
-.components .filters .col:last-child {
-  padding-right: 0;
-}
-
 .components .filters .checkboxes {
   font-size: 0.9em;
-  padding-top: calc( var(--ifm-spacing-vertical) / 2 );
+  padding: calc( var(--ifm-spacing-vertical) / 2 ) var(--ifm-spacing-horizontal);
 }
 
 .components .filters .checkboxes label {

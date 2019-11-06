@@ -6,6 +6,19 @@ output_types = ["log"]
 resources = []
 through_description = "the docker engine daemon"
 
+[sources.syslog.fields.container]
+type = "string"
+description = """\
+The Docker container name that the log was collected from.\
+"""
+
+[sources.syslog.fields.stream]
+type = "string"
+enum = ["stdout", "stderr"]
+description = """\
+The [standard stream][urls.standard_streams] that the log was collected from.\
+"""
+
 [sources.docker.options.include_containers]
 type = "[string]"
 examples = ["ffd2bc2cb74a"]

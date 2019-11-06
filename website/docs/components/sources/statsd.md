@@ -13,9 +13,6 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -27,8 +24,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -43,8 +41,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### address
 
@@ -55,6 +55,10 @@ UDP socket address to bind to.
 
 
 </Fields>
+
+## Fields
+
+This component does not automatically add any fields.
 
 ## Input/Output
 

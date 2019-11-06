@@ -104,7 +104,7 @@ mkdir /var/lib/vector
 
 And in your `vector.toml` file:
 
-```coffeescript
+```toml
 data_dir = "/var/lib/vector"
 ```
 

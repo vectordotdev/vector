@@ -4,7 +4,7 @@ module.exports = {
       type: 'category',
       label: 'About',
       items: [
-        'what_is_vector',
+        'index',
         'about/concepts',
         'about/data-model',
         'about/guarantees',
@@ -83,12 +83,66 @@ module.exports = {
         {
           type: 'category',
           label: 'Sources',
-          items: ["components/sources/docker","components/sources/file","components/sources/journald","components/sources/kafka","components/sources/statsd","components/sources/stdin","components/sources/syslog","components/sources/tcp","components/sources/udp","components/sources/vector"],
+          items: [
+            "components/sources",
+            
+              "components/sources/docker",
+            
+              "components/sources/file",
+            
+              "components/sources/journald",
+            
+              "components/sources/kafka",
+            
+              "components/sources/statsd",
+            
+              "components/sources/stdin",
+            
+              "components/sources/syslog",
+            
+              "components/sources/tcp",
+            
+              "components/sources/udp",
+            
+              "components/sources/vector",
+            
+          ]
         },
         {
           type: 'category',
           label: 'Transforms',
-          items: ["components/transforms/add_fields","components/transforms/add_tags","components/transforms/coercer","components/transforms/field_filter","components/transforms/grok_parser","components/transforms/json_parser","components/transforms/log_to_metric","components/transforms/lua","components/transforms/regex_parser","components/transforms/remove_fields","components/transforms/remove_tags","components/transforms/sampler","components/transforms/split","components/transforms/tokenizer"],
+          items: [
+            "components/transforms",
+            
+              "components/transforms/add_fields",
+            
+              "components/transforms/add_tags",
+            
+              "components/transforms/coercer",
+            
+              "components/transforms/field_filter",
+            
+              "components/transforms/grok_parser",
+            
+              "components/transforms/json_parser",
+            
+              "components/transforms/log_to_metric",
+            
+              "components/transforms/lua",
+            
+              "components/transforms/regex_parser",
+            
+              "components/transforms/remove_fields",
+            
+              "components/transforms/remove_tags",
+            
+              "components/transforms/sampler",
+            
+              "components/transforms/split",
+            
+              "components/transforms/tokenizer",
+            
+          ]
         },
         {
           type: 'category',
@@ -151,7 +205,6 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
-        "meta/conventions",
       ],
     },
   ]

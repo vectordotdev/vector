@@ -6,8 +6,9 @@ sidebar_label: hidden
 Sinks are last in the [pipeline][docs.configuration#composition], responsible
 for sending [events][docs.data-model#event] downstream.
 
-import Component from '@site/src/components/Component';
 import Components from '@site/src/components/Components';
+
+import Component from '@site/src/components/Component';
 
 <Components>
 

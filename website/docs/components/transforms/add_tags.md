@@ -13,9 +13,6 @@ The `add_tags` transform accepts [`metric`][docs.data-model#metric] events and a
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -33,8 +30,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -49,8 +47,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### tags
 
@@ -69,8 +69,10 @@ A table of key/value pairs representing the tags to be added to the metric.
   path={"tags"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"*"}
-  unit={null}>
+  unit={null}
+  >
 
 #### *
 

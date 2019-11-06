@@ -1,19 +1,20 @@
 ---
 title: Sources
+sidebar_label: hidden
 ---
 
-![][assets.sources]
+Sources are responsible for ingesting [events][docs.data-model#event] into
+Vector, they can both receive and pull in data. If you're deploying Vector in
+an [agent role][docs.roles.agent], you'll want to user local data sources
+like the [`file`][docs.sources.file] or [`stdin`][docs.sources.stdin] sources.
+If you're deploying Vector in a [service role][docs.roles.service], you'll want
+to use sources that receive data over the network, like the
+[`vector`][docs.sources.vector], [`tcp`][docs.sources.tcp], and
+[`syslog`][docs.sources.syslog] sources.
 
-Sources are responsible for ingesting [events][docs.data-model#event] into Vector, they can
-both receive and pull in data. If you're deploying Vector in an [agent
-role][docs.roles.agent], you'll want to look at local data sources like a
-[`file`][docs.sources.file] and [`stdin`][docs.sources.stdin]. If you're deploying
-Vector in a [service role][docs.roles.service], you'll want to look at sources
-that receive data over the network, like the [`vector`][docs.sources.vector],
-[`tcp`][docs.sources.tcp], and [`syslog`][docs.sources.syslog] sources.
+import Components from '@site/src/components/Components';
 
 import Component from '@site/src/components/Component';
-import Components from '@site/src/components/Components';
 
 <Components>
 
@@ -352,7 +353,6 @@ import Components from '@site/src/components/Components';
 [+ request a new source][urls.new_source]
 
 
-[assets.sources]: ../assets/sources.svg
 [docs.data-model#event]: ../about/data-model#event
 [docs.roles.agent]: ../setup/deployment/roles/agent
 [docs.roles.service]: ../setup/deployment/roles/service

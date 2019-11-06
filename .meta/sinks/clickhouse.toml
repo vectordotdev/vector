@@ -2,7 +2,7 @@
 batch_size = 1049000
 batch_timeout = 1
 beta = true
-buffer = false
+buffer = true
 compressions  = ["gzip"]
 delivery_guarantee = "best_effort"
 healthcheck = true

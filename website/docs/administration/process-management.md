@@ -5,16 +5,12 @@ title: Process Management
 This document covers how to manage the Vector process using various process
 managers.
 
-import CodeHeader from '@site/src/components/CodeHeader';
-import Field from '@site/src/components/Field';
-import Fields from '@site/src/components/Fields';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Starting
 
 Vector can be started by calling the `vector` binary directly, no subcommand is
 necessary.
+
+import Tabs from '@theme/Tabs';
 
 <Tabs
   defaultValue="manual"
@@ -25,6 +21,9 @@ necessary.
     { label: 'Homebrew', value: 'homebrew', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="manual">
 
 ```bash
@@ -57,8 +56,11 @@ brew services start vector
 
 ### Flags
 
-<Fields>
+import Fields from '@site/src/components/Fields';
 
+import Field from '@site/src/components/Field';
+
+<Fields>
 <Field
   common={true}
   defaultValue={"/etc/vector/vector.toml"}

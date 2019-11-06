@@ -12,9 +12,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -58,8 +61,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -74,8 +78,10 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### address
 
@@ -95,8 +101,10 @@ The address to listen for connections on, or "systemd#N" to use the Nth socket p
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### host_key
 
@@ -116,8 +124,10 @@ The key name added to each event representing the current host. See [Context](#c
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"bytes"}>
+  unit={"bytes"}
+  >
 
 ### max_length
 
@@ -137,8 +147,10 @@ The maximum bytes size of incoming messages before they are discarded.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
-  unit={"seconds"}>
+  unit={"seconds"}
+  >
 
 ### shutdown_timeout_secs
 
@@ -149,6 +161,10 @@ The timeout before a connection is forcefully closed during shutdown.
 
 
 </Fields>
+
+## Fields
+
+This component does not automatically add any fields.
 
 ## Input/Output
 
@@ -185,7 +201,7 @@ the [`regex_parser` transform][docs.transforms.regex_parser].
 ### Context
 
 By default, the `tcp` source will add context
-keys to your events via the `host_key`
+keys to your events via the[`host_key`](#host_key)
 options.
 
 ### Environment Variables

@@ -12,9 +12,7 @@ The `regex_parser` transform accepts [`log`][docs.data-model#log] events and all
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 <Tabs
   defaultValue="common"
@@ -23,7 +21,12 @@ import TabItem from '@theme/TabItem';
     { label: 'Advanced', value: 'advanced', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
+
 <TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
 
@@ -78,8 +81,9 @@ import TabItem from '@theme/TabItem';
 
 ## Options
 
-import Field from '@site/src/components/Field';
 import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -94,12 +98,14 @@ import Fields from '@site/src/components/Fields';
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"bool"}
-  unit={null}>
+  unit={null}
+  >
 
 ### drop_field
 
-If the specified `field` should be dropped (removed) after parsing.
+If the specified[`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
@@ -115,8 +121,10 @@ If the specified `field` should be dropped (removed) after parsing.
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### field
 
@@ -136,8 +144,10 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
   path={null}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 ### regex
 
@@ -157,8 +167,10 @@ The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See
   path={null}
   relevantWhen={null}
   required={false}
+  templateable={false}
   type={"table"}
-  unit={null}>
+  unit={null}
+  >
 
 ### types
 
@@ -177,8 +189,10 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
   path={"types"}
   relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
-  unit={null}>
+  unit={null}
+  >
 
 #### *
 
@@ -262,13 +276,13 @@ section.
 
 ### Failed Parsing
 
-If the `field` value fails to parse against the provided `regex` then an error
+If the[`field`](#field) value fails to parse against the provided[`regex`](#regex) then an error
 will be [logged][docs.monitoring#logs] and the event will be kept or discarded
 depending on the `drop_failed` value.
 
 A failure includes any event that does not successfully parse against the
-provided `regex`. This includes bad values as well as events missing the
-specified `field`.
+provided[`regex`](#regex). This includes bad values as well as events missing the
+specified[`field`](#field).
 
 ### Performance
 
@@ -280,7 +294,7 @@ Learn more in the [Performance][docs.performance] sections.
 
 ### Regex Debugger
 
-To test the validity of the `regex` option, we recommend the [Golang Regex
+To test the validity of the[`regex`](#regex) option, we recommend the [Golang Regex
 Tester][urls.regex_tester] as it's Regex syntax closely 
 follows Rust's.
 
@@ -299,7 +313,7 @@ You can name Regex captures with the `<name>` syntax. For example:
 ```
 
 Will capture `timestamp`, `level`, and `message`. All values are extracted as
-`string` values and must be coerced with the `types` table.
+`string` values and must be coerced with the[`types`](#types) table.
 
 More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].

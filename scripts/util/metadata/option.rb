@@ -82,8 +82,8 @@ class Option
     end
   end
 
-  def <=>(other_option)
-    name <=> other_option.name
+  def <=>(other)
+    name <=> other.name
   end
 
   def advanced?
@@ -145,6 +145,10 @@ class Option
 
   def context?
     category.downcase == "context"
+  end
+
+  def eql?(other)
+    self.<=>(other) == 0
   end
 
   def get_relevant_sections(sections)
