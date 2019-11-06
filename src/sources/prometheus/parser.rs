@@ -135,6 +135,12 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         // first comes name and labels
         let (first, second) = input.split_at(pos);
         let parts = first.split('{').collect::<Vec<_>>();
+        if parts.len() < 2 {
+            return Err(ParserError::Malformed(
+                "expected at least 2 tokens in data line",
+            ));
+        };
+
         let name = parts[0];
         let tags = parse_tags(parts[1])?;
         // second is value and optional timestamp
@@ -156,6 +162,11 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
     } else {
         // example: http_requests_total 1027 1395066363000
         let parts = input.split(' ').collect::<Vec<_>>();
+        if parts.len() < 2 {
+            return Err(ParserError::Malformed(
+                "expected at least 2 tokens in data line",
+            ));
+        };
         let name = parts[0];
         let value = parse_value(parts[1])?;
         let timestamp = if let Some(ts) = parts.get(2) {
@@ -724,6 +735,26 @@ mod test {
                 }
             ]),
         );
+    }
+
+    #[test]
+    fn test_no_value() {
+        let exp = r##"
+            # TYPE latency counter
+            latency{env="production"}
+            "##;
+
+        assert!(parse(exp).is_err());
+    }
+
+    #[test]
+    fn test_no_name() {
+        let exp = r##"
+            # TYPE uptime counter
+            123.0
+            "##;
+
+        assert!(parse(exp).is_err());
     }
 
     #[test]
