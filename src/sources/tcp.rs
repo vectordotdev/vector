@@ -1,7 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
@@ -38,6 +38,10 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<TcpConfig>("tcp")
 }
 
 #[typetag::serde(name = "tcp")]

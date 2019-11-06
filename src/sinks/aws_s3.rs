@@ -7,7 +7,7 @@ use crate::{
         BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -75,6 +75,10 @@ pub enum Compression {
     #[derivative(Default)]
     Gzip,
     None,
+}
+
+inventory::submit! {
+    SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
 #[typetag::serde(name = "aws_s3")]

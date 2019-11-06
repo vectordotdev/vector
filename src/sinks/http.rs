@@ -7,7 +7,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -84,6 +84,10 @@ pub enum Encoding {
 pub struct BasicAuth {
     user: String,
     password: String,
+}
+
+inventory::submit! {
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
 #[typetag::serde(name = "http")]
