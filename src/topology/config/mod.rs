@@ -26,6 +26,8 @@ pub struct Config {
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub dns: Vec<String>,
 }
 
 fn default_data_dir() -> Option<PathBuf> {

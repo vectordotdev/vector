@@ -126,6 +126,7 @@ url = "1.7"
 base64 = "0.10.1"
 shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
 owning_ref = "0.4.0"
+trust-dns-resolver = "0.12.0"
 listenfd = "0.3.3"
 
 [build-dependencies]
@@ -145,6 +146,9 @@ pretty_assertions = "0.6.1"
 proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
+trust-dns-server = "0.17.0"
+trust-dns = "0.17.0"
+trust-dns-proto = "0.8.0"
 
 [features]
 default = ["rdkafka", "leveldb", "jemallocator"]

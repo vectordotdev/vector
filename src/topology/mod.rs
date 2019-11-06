@@ -167,6 +167,11 @@ impl RunningTopology {
             return false;
         }
 
+        if self.config.global.dns != new_config.global.dns {
+            error!("dns cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.dns);
+            return false;
+        }
+
         match validate(&new_config) {
             Some(mut new_pieces) => {
                 if !self.run_healthchecks(&new_config, &mut new_pieces, rt, require_healthy) {
