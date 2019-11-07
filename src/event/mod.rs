@@ -24,6 +24,7 @@ lazy_static! {
     pub static ref CONTAINER: Atom = Atom::from("container");
     pub static ref IMAGE: Atom = Atom::from("image");
     pub static ref CREATED_AT: Atom = Atom::from("created_at");
+    pub static ref NAME: Atom = Atom::from("name");
 }
 
 #[derive(PartialEq, Debug, Clone)]

@@ -3,7 +3,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Bytes, BytesMut};
-use chrono::{offset::TimeZone, DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use futures::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
-    rep::{Container, ContainerDetails},
+    rep::ContainerDetails,
     tty::{Chunk, StreamType},
     Docker,
 };
@@ -315,11 +315,9 @@ impl DockerSource {
                         continue;
                     }
 
-                    let id = ContainerId::new(container.id.clone());
-                    let metadata = ContainerMetadata::from_container(&container);
+                    let id = ContainerId::new(container.id);
 
-                    self.containers
-                        .insert(id.clone(), self.esb.start(id, metadata));
+                    self.containers.insert(id.clone(), self.esb.start(id));
                 }
 
                 // Sort for efficient lookup
@@ -398,7 +396,7 @@ impl Future for DockerSource {
                                             if !ignore_flag && include_name {
                                                 // Included
                                                 self.containers
-                                                    .insert(id.clone(), self.esb.start(id, None));
+                                                    .insert(id.clone(), self.esb.start(id));
                                             } else {
                                                 // Ignore
                                             }
@@ -458,41 +456,25 @@ impl EventStreamBuilder {
     }
 
     /// Constructs and runs event stream
-    fn start(
-        &self,
-        id: ContainerId,
-        metadata: impl Into<Option<ContainerMetadata>>,
-    ) -> ContainerState {
-        if let Some(metadata) = metadata.into() {
-            tokio::spawn(self.start_event_stream(ContainerLogInfo::new(
-                id,
-                metadata,
-                self.core.now_timestamp,
-            )));
-        } else {
-            let metadata_fetch = self
-                .core
-                .docker
-                .containers()
-                .get(id.as_str())
-                .inspect()
-                .map_err(|error| error!(message="Fetching container details failed",%error))
-                .and_then(|details| {
-                    ContainerMetadata::from_details(&details)
-                        .map_err(|error| error!(message="Metadata extraction failed",%error))
-                });
-
-            let this = self.clone();
-            let task = metadata_fetch.and_then(move |metadata| {
-                this.start_event_stream(ContainerLogInfo::new(
-                    id,
-                    metadata,
-                    this.core.now_timestamp,
-                ))
+    fn start(&self, id: ContainerId) -> ContainerState {
+        let metadata_fetch = self
+            .core
+            .docker
+            .containers()
+            .get(id.as_str())
+            .inspect()
+            .map_err(|error| error!(message="Fetching container details failed",%error))
+            .and_then(|details| {
+                ContainerMetadata::from_details(&details)
+                    .map_err(|error| error!(message="Metadata extraction failed",%error))
             });
 
-            tokio::spawn(task);
-        }
+        let this = self.clone();
+        let task = metadata_fetch.and_then(move |metadata| {
+            this.start_event_stream(ContainerLogInfo::new(id, metadata, this.core.now_timestamp))
+        });
+
+        tokio::spawn(task);
 
         ContainerState::new()
     }
@@ -746,14 +728,10 @@ impl ContainerLogInfo {
         log_event.insert_implicit(event::CONTAINER.clone(), self.id.0.clone().into());
 
         // Add Metadata
-        for (key, value) in self
-            .metadata
-            .labels
-            .iter()
-            .chain(self.metadata.names.iter())
-        {
+        for (key, value) in self.metadata.labels.iter() {
             log_event.insert_implicit(key.clone(), value.clone());
         }
+        log_event.insert_implicit(event::NAME.clone(), self.metadata.name.clone());
         log_event.insert_implicit(event::IMAGE.clone(), self.metadata.image.clone());
         log_event.insert_implicit(event::CREATED_AT.clone(), self.metadata.created_at.clone());
 
@@ -766,8 +744,8 @@ impl ContainerLogInfo {
 struct ContainerMetadata {
     /// label.key -> String
     labels: Vec<(Atom, ValueKind)>,
-    /// names -> Vec<String>
-    names: Vec<(Atom, ValueKind)>,
+    /// name -> String
+    name: ValueKind,
     /// image -> String
     image: ValueKind,
     /// created_at -> DateTime<Utc>
@@ -775,33 +753,6 @@ struct ContainerMetadata {
 }
 
 impl ContainerMetadata {
-    fn from_container(container: &Container) -> Self {
-        let labels = container
-            .labels
-            .iter()
-            .map(|(key, value)| (("label.".to_owned() + key).into(), value.as_str().into()))
-            .collect();
-
-        let names = container
-            .names
-            .iter()
-            .enumerate()
-            .map(|(i, name)| {
-                (
-                    format!("names[{}]", i).into(),
-                    remove_slash(name.as_str()).into(),
-                )
-            })
-            .collect();
-
-        ContainerMetadata {
-            labels,
-            names,
-            image: container.image.as_str().into(),
-            created_at: Utc.timestamp(container.created as i64, 0).into(),
-        }
-    }
-
     fn from_details(details: &ContainerDetails) -> Result<Self, chrono::format::ParseError> {
         let labels = details
             .config
@@ -814,14 +765,9 @@ impl ContainerMetadata {
             })
             .unwrap_or_default();
 
-        let names = vec![(
-            "names[0]".to_owned().into(),
-            remove_slash(details.name.as_str()).into(),
-        )];
-
         Ok(ContainerMetadata {
             labels,
-            names,
+            name: remove_slash(details.name.as_str()).into(),
             image: details.config.image.as_str().into(),
             created_at: DateTime::parse_from_rfc3339(details.created.as_str())?
                 .with_timezone(&Utc)
@@ -1074,10 +1020,7 @@ mod tests {
         assert!(log.get(&event::CREATED_AT).is_some());
         assert_eq!(log[&event::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
-        assert_eq!(
-            events[0].as_log()[&"names[0]".to_owned().into()],
-            name.into()
-        );
+        assert_eq!(events[0].as_log()[&event::NAME], name.into());
     }
 
     #[test]
@@ -1167,9 +1110,6 @@ mod tests {
         assert!(log.get(&event::CREATED_AT).is_some());
         assert_eq!(log[&event::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
-        assert_eq!(
-            events[0].as_log()[&"names[0]".to_owned().into()],
-            name.into()
-        );
+        assert_eq!(events[0].as_log()[&event::NAME], name.into());
     }
 }
