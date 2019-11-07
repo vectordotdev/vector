@@ -96,7 +96,7 @@ impl CloudWatchMetricsSvc {
             .timeout(Duration::from_secs(timeout))
             .service(cloudwatch_metrics);
 
-        let sink = BatchServiceSink::new(svc, acker).batched_with_max(
+        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
             MetricBuffer::new(),
             batch_size,
             Duration::from_secs(batch_timeout),
