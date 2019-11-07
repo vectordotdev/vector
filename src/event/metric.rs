@@ -22,7 +22,6 @@ pub enum Metric {
     Gauge {
         name: String,
         val: f64,
-        direction: Option<Direction>,
         timestamp: Option<DateTime<Utc>>,
         tags: Option<HashMap<String, String>>,
     },
@@ -33,6 +32,12 @@ pub enum Metric {
         tags: Option<HashMap<String, String>>,
     },
     AggregatedCounter {
+        name: String,
+        val: f64,
+        timestamp: Option<DateTime<Utc>>,
+        tags: Option<HashMap<String, String>>,
+    },
+    AggregatedGauge {
         name: String,
         val: f64,
         timestamp: Option<DateTime<Utc>>,
@@ -58,12 +63,6 @@ pub enum Metric {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum Direction {
-    Plus,
-    Minus,
-}
-
 impl Metric {
     pub fn tags(&self) -> &Option<HashMap<String, String>> {
         match self {
@@ -72,6 +71,7 @@ impl Metric {
             Metric::Histogram { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
             Metric::AggregatedCounter { tags, .. } => tags,
+            Metric::AggregatedGauge { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::AggregatedSummary { tags, .. } => tags,
         }
@@ -84,6 +84,7 @@ impl Metric {
             Metric::Histogram { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
             Metric::AggregatedCounter { tags, .. } => tags,
+            Metric::AggregatedGauge { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::AggregatedSummary { tags, .. } => tags,
         }
@@ -115,7 +116,6 @@ impl Metric {
                 Metric::Gauge {
                     ref mut name,
                     ref mut val,
-                    direction: None,
                     ref mut timestamp,
                     ref mut tags,
                 },
@@ -123,21 +123,11 @@ impl Metric {
                     name: new_name,
                     val: new_val,
                     timestamp: new_timestamp,
-                    direction: new_direction,
                     tags: new_tags,
                 },
             ) => {
                 if name == new_name {
-                    if new_direction.is_none() {
-                        *val = *new_val;
-                    } else {
-                        let delta = match new_direction {
-                            None => 0.0,
-                            Some(Direction::Plus) => *val,
-                            Some(Direction::Minus) => -*val,
-                        };
-                        *val += delta;
-                    };
+                    *val += *new_val;
                     *timestamp = *new_timestamp;
                     *tags = new_tags.clone();
                 }
@@ -199,7 +189,27 @@ impl Metric {
                 },
             ) => {
                 if name == new_name {
-                    *val += *new_val;
+                    *val = *new_val;
+                    *timestamp = *new_timestamp;
+                    *tags = new_tags.clone();
+                }
+            }
+            (
+                Metric::AggregatedGauge {
+                    ref mut name,
+                    ref mut val,
+                    ref mut timestamp,
+                    ref mut tags,
+                },
+                Metric::AggregatedGauge {
+                    name: new_name,
+                    val: new_val,
+                    timestamp: new_timestamp,
+                    tags: new_tags,
+                },
+            ) => {
+                if name == new_name {
+                    *val = *new_val;
                     *timestamp = *new_timestamp;
                     *tags = new_tags.clone();
                 }
@@ -319,15 +329,13 @@ mod test {
         let mut gauge1 = Metric::Gauge {
             name: "gauge".into(),
             val: 1.0,
-            direction: None,
             timestamp: None,
             tags: None,
         };
 
         let gauge2 = Metric::Gauge {
             name: "gauge".into(),
-            val: 2.0,
-            direction: None,
+            val: -2.0,
             timestamp: Some(ts()),
             tags: Some(tags()),
         };
@@ -337,8 +345,35 @@ mod test {
             gauge1,
             Metric::Gauge {
                 name: "gauge".into(),
-                val: 2.0,
-                direction: None,
+                val: -1.0,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            }
+        )
+    }
+
+    #[test]
+    fn merge_aggregated_gauges() {
+        let mut gauge1 = Metric::AggregatedGauge {
+            name: "gauge".into(),
+            val: 1.0,
+            timestamp: None,
+            tags: None,
+        };
+
+        let gauge2 = Metric::AggregatedGauge {
+            name: "gauge".into(),
+            val: -2.0,
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+        };
+
+        gauge1.merge(&gauge2);
+        assert_eq!(
+            gauge1,
+            Metric::AggregatedGauge {
+                name: "gauge".into(),
+                val: -2.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
             }
@@ -425,7 +460,7 @@ mod test {
             counter1,
             Metric::AggregatedCounter {
                 name: "counter".into(),
-                val: 3.0,
+                val: 2.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
             }

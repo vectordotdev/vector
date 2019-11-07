@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{metric::Direction, Metric},
+    event::Metric,
     topology::config::{DataType, SinkConfig},
     Event,
 };
@@ -378,21 +378,26 @@ impl Sink for PrometheusSink {
                 })
             }
             Metric::Gauge {
-                name,
-                val,
-                direction,
-                tags,
-                ..
+                name, val, tags, ..
             } => {
                 let tags = tags.unwrap_or_default();
                 let labels = tags_to_labels(&tags);
                 self.with_gauge(name, &labels, |gauge| {
                     if let Ok(g) = gauge.get_metric_with(&labels) {
-                        match direction {
-                            None => g.set(val),
-                            Some(Direction::Plus) => g.add(val),
-                            Some(Direction::Minus) => g.sub(val),
-                        }
+                        g.add(val);
+                    } else {
+                        error!("Error getting Prometheus gauge with labels: {:?}", &labels);
+                    }
+                })
+            }
+            Metric::AggregatedGauge {
+                name, val, tags, ..
+            } => {
+                let tags = tags.unwrap_or_default();
+                let labels = tags_to_labels(&tags);
+                self.with_gauge(name, &labels, |gauge| {
+                    if let Ok(g) = gauge.get_metric_with(&labels) {
+                        g.set(val);
                     } else {
                         error!("Error getting Prometheus gauge with labels: {:?}", &labels);
                     }

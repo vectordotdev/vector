@@ -71,10 +71,9 @@ mod tests {
 
     #[test]
     fn add_tags() {
-        let event = Event::Metric(Metric::Gauge {
+        let event = Event::Metric(Metric::AggregatedGauge {
             name: "bar".into(),
             val: 10.0,
-            direction: None,
             timestamp: None,
             tags: None,
         });

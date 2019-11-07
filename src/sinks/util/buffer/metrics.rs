@@ -16,7 +16,7 @@ impl Hash for MetricEntry {
             Metric::Counter { name, .. } | Metric::AggregatedCounter { name, .. } => {
                 name.hash(state);
             }
-            Metric::Gauge { name, .. } => {
+            Metric::Gauge { name, .. } | Metric::AggregatedGauge { name, .. } => {
                 name.hash(state);
             }
             Metric::Set { name, val, .. } => {
@@ -66,14 +66,12 @@ impl PartialEq for MetricEntry {
 
 #[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
-    state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
 }
 
 impl MetricBuffer {
     pub fn new() -> Self {
         Self {
-            state: HashSet::new(),
             metrics: HashSet::new(),
         }
     }
@@ -92,41 +90,14 @@ impl Batch for MetricBuffer {
         let new = MetricEntry(item.clone());
 
         match item {
-            // gauges are special because gauge values could come
-            // in deltas - relative increments or decrements
-            Metric::Gauge { ref name, .. } => {
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.merge(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    // if the gauge is not present in active batch,
-                    // then we look it up in permanent state, where we keep track
-                    // of gauge values throughout the entire application uptime
-                    let mut initial = if let Some(default) = self.state.get(&new) {
-                        default.0.clone()
-                    } else {
-                        // otherwise we start from absolute 0
-                        Metric::Gauge {
-                            name: name.clone(),
-                            val: 0.0,
-                            direction: None,
-                            timestamp: None,
-                            tags: None,
-                        }
-                    };
-                    initial.merge(&item);
-                    self.metrics.insert(MetricEntry(initial));
-                }
-            }
-            // set observations are simply deduplicated
-            Metric::Set { .. } => {
-                self.metrics.insert(new);
-            }
-            // Summaries cannot be aggregated
-            Metric::AggregatedSummary { .. } => {
+            // cannot be aggregated
+            Metric::Set { .. }
+            | Metric::AggregatedGauge { .. }
+            | Metric::AggregatedSummary { .. } => {
                 self.metrics.insert(new);
             }
             _ => {
+                // counters, gauges, aggregated counters, histograms
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.merge(&item);
                     self.metrics.insert(MetricEntry(existing));
@@ -142,15 +113,7 @@ impl Batch for MetricBuffer {
     }
 
     fn fresh(&self) -> Self {
-        let mut state = self.state.clone();
-        for entry in self.metrics.iter() {
-            if entry.0.is_gauge() {
-                state.insert(entry.clone());
-            }
-        }
-
         Self {
-            state,
             metrics: HashSet::new(),
         }
     }
@@ -168,10 +131,7 @@ impl Batch for MetricBuffer {
 mod test {
     use super::*;
     use crate::sinks::util::batch::BatchSink;
-    use crate::{
-        event::metric::{Direction, Metric},
-        Event,
-    };
+    use crate::{event::metric::Metric, Event};
     use futures::{future::Future, stream, Sink};
     use pretty_assertions::assert_eq;
     use std::collections::HashMap;
@@ -304,7 +264,6 @@ mod test {
             let event = Event::Metric(Metric::Gauge {
                 name: "gauge-0".into(),
                 val: i as f64,
-                direction: None,
                 timestamp: None,
                 tags: Some(tag("production")),
             });
@@ -315,7 +274,6 @@ mod test {
             let event = Event::Metric(Metric::Gauge {
                 name: format!("gauge-{}", i),
                 val: i as f64,
-                direction: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
             });
@@ -326,7 +284,6 @@ mod test {
             let event = Event::Metric(Metric::Gauge {
                 name: format!("gauge-{}", i),
                 val: i as f64,
-                direction: Some(Direction::Plus),
                 timestamp: None,
                 tags: Some(tag("staging")),
             });
@@ -350,28 +307,24 @@ mod test {
                 Metric::Gauge {
                     name: "gauge-0".into(),
                     val: 0.0,
-                    direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-0".into(),
-                    val: 3.0,
-                    direction: None,
+                    val: 6.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
                 Metric::Gauge {
                     name: "gauge-1".into(),
                     val: 1.0,
-                    direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-2".into(),
                     val: 2.0,
-                    direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
@@ -384,28 +337,24 @@ mod test {
                 Metric::Gauge {
                     name: "gauge-0".into(),
                     val: 0.0,
-                    direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-1".into(),
-                    val: 1.0 + 1.0,
-                    direction: None,
+                    val: 1.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-3".into(),
                     val: 3.0,
-                    direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-4".into(),
                     val: 4.0,
-                    direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
@@ -417,22 +366,19 @@ mod test {
             [
                 Metric::Gauge {
                     name: "gauge-2".into(),
-                    val: 2.0 + 2.0,
-                    direction: None,
+                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-3".into(),
-                    val: 3.0 + 3.0,
-                    direction: None,
+                    val: 3.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-4".into(),
-                    val: 4.0 + 4.0,
-                    direction: None,
+                    val: 4.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },

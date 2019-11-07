@@ -147,7 +147,14 @@ impl Transform for MockTransform {
             Event::Metric(Metric::Gauge {
                 name: _,
                 val,
-                direction: _,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *val += self.increase;
+            }
+            Event::Metric(Metric::AggregatedGauge {
+                name: _,
+                val,
                 timestamp: _,
                 tags: _,
             }) => {

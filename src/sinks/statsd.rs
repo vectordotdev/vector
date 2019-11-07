@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{metric::Direction, Event, Metric},
+    event::{Event, Metric},
     sinks::util::{BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig},
 };
@@ -133,19 +133,28 @@ fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        Metric::Gauge {
-            name,
-            val,
-            direction,
-            tags,
-            ..
+        Metric::AggregatedCounter {
+            name, val, tags, ..
         } => {
-            let val_with_direction = match direction {
-                None => format!("{}", val),
-                Some(Direction::Plus) => format!("+{}", val),
-                Some(Direction::Minus) => format!("-{}", val),
+            buf.push(format!("{}:{}", name, val));
+            buf.push("c".to_string());
+            if let Some(t) = tags {
+                buf.push(format!("#{}", encode_tags(t)));
             };
-            buf.push(format!("{}:{}", name, val_with_direction));
+        }
+        Metric::Gauge {
+            name, val, tags, ..
+        } => {
+            buf.push(format!("{}:{:+}", name, val));
+            buf.push("g".to_string());
+            if let Some(t) = tags {
+                buf.push(format!("#{}", encode_tags(t)));
+            };
+        }
+        Metric::AggregatedGauge {
+            name, val, tags, ..
+        } => {
+            buf.push(format!("{}:{}", name, val));
             buf.push("g".to_string());
             if let Some(t) = tags {
                 buf.push(format!("#{}", encode_tags(t)));
@@ -263,8 +272,7 @@ mod test {
     fn test_encode_gauge() {
         let metric1 = Metric::Gauge {
             name: "gauge".to_owned(),
-            val: 1.5,
-            direction: Some(Direction::Minus),
+            val: -1.5,
             timestamp: None,
             tags: Some(tags()),
         };

@@ -197,10 +197,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&gauge.tags, &event);
 
-            Ok(Metric::Gauge {
+            Ok(Metric::AggregatedGauge {
                 name,
                 val,
-                direction: None,
                 timestamp,
                 tags,
             })
@@ -431,10 +430,9 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Gauge {
+            Metric::AggregatedGauge {
                 name: "memory_rss_bytes".into(),
                 val: 123.0,
-                direction: None,
                 timestamp: Some(ts()),
                 tags: None,
             }

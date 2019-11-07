@@ -156,10 +156,9 @@ impl CloudWatchMetricsSvc {
                     dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
                 }),
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name,
                     val,
-                    direction: None,
                     timestamp,
                     tags,
                 } => Some(MetricDatum {
@@ -338,10 +337,9 @@ mod tests {
 
     #[test]
     fn encode_events_absolute_gauge() {
-        let events = vec![Metric::Gauge {
+        let events = vec![Metric::AggregatedGauge {
             name: "temperature".into(),
             val: 10.0,
-            direction: None,
             timestamp: None,
             tags: None,
         }];
@@ -437,10 +435,9 @@ mod integration_tests {
 
         let gauge_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::Gauge {
+            let event = Event::Metric(Metric::AggregatedGauge {
                 name: format!("gauge-{}", gauge_name),
                 val: i as f64,
-                direction: None,
                 timestamp: None,
                 tags: None,
             });

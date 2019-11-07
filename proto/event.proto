@@ -29,12 +29,13 @@ message Value {
 message Metric {
   oneof metric {
     Counter counter = 1;
-    Histogram histogram = 2;
-    Gauge gauge = 3;
+    Gauge gauge = 2;
+    Histogram histogram = 3;
     Set set = 4;
     AggregatedCounter aggregated_counter = 5;
-    AggregatedHistogram aggregated_histogram = 6;
-    AggregatedSummary aggregated_summary = 7;
+    AggregatedGauge aggregated_gauge = 6;
+    AggregatedHistogram aggregated_histogram = 7;
+    AggregatedSummary aggregated_summary = 8;
   }
 }
 
@@ -66,8 +67,8 @@ message AggregatedHistogram {
   repeated uint32 counts = 3;
   uint32 count = 4;
   double sum = 5;
-  google.protobuf.Timestamp timestamp = 7;
-  map<string, string> tags = 8;
+  google.protobuf.Timestamp timestamp = 6;
+  map<string, string> tags = 7;
 }
 
 message AggregatedSummary {
@@ -76,21 +77,22 @@ message AggregatedSummary {
   repeated double values = 3;
   uint32 count = 4;
   double sum = 5;
-  google.protobuf.Timestamp timestamp = 7;
-  map<string, string> tags = 8;
+  google.protobuf.Timestamp timestamp = 6;
+  map<string, string> tags = 7;
 }
 
 message Gauge {
   string name = 1;
   double val = 2;
-  enum Direction {
-    None = 0;
-    Plus = 1;
-    Minus = 2;
-  }
-  Direction direction = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  map<string, string> tags = 5;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
+}
+
+message AggregatedGauge {
+  string name = 1;
+  double val = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
 }
 
 message Set {

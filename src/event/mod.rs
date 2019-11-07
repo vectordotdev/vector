@@ -451,11 +451,9 @@ impl From<proto::EventWrapper> for Event {
                         })
                     }
                     MetricProto::Gauge(gauge) => {
-                        let direction = match gauge.direction() {
-                            proto::gauge::Direction::None => None,
-                            proto::gauge::Direction::Plus => Some(metric::Direction::Plus),
-                            proto::gauge::Direction::Minus => Some(metric::Direction::Minus),
-                        };
+                        let timestamp = gauge
+                            .timestamp
+                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
                         let tags = if !gauge.tags.is_empty() {
                             Some(gauge.tags)
@@ -463,14 +461,27 @@ impl From<proto::EventWrapper> for Event {
                             None
                         };
 
+                        Event::Metric(Metric::Gauge {
+                            name: gauge.name,
+                            val: gauge.val,
+                            timestamp,
+                            tags,
+                        })
+                    }
+                    MetricProto::AggregatedGauge(gauge) => {
                         let timestamp = gauge
                             .timestamp
                             .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                        Event::Metric(Metric::Gauge {
+                        let tags = if !gauge.tags.is_empty() {
+                            Some(gauge.tags)
+                        } else {
+                            None
+                        };
+
+                        Event::Metric(Metric::AggregatedGauge {
                             name: gauge.name,
                             val: gauge.val,
-                            direction,
                             timestamp,
                             tags,
                         })
@@ -672,7 +683,6 @@ impl From<Event> for proto::EventWrapper {
             Event::Metric(Metric::Gauge {
                 name,
                 val,
-                direction,
                 timestamp,
                 tags,
             }) => {
@@ -681,24 +691,40 @@ impl From<Event> for proto::EventWrapper {
                     nanos: ts.timestamp_subsec_nanos() as i32,
                 });
 
-                let direction = match direction {
-                    None => proto::gauge::Direction::None,
-                    Some(metric::Direction::Plus) => proto::gauge::Direction::Plus,
-                    Some(metric::Direction::Minus) => proto::gauge::Direction::Minus,
-                }
-                .into();
-
                 let tags = tags.unwrap_or_default();
 
                 let gauge = proto::Gauge {
                     name,
                     val,
-                    direction,
                     timestamp,
                     tags,
                 };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::Gauge(gauge)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::AggregatedGauge {
+                name,
+                val,
+                timestamp,
+                tags,
+            }) => {
+                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                });
+
+                let tags = tags.unwrap_or_default();
+
+                let gauge = proto::AggregatedGauge {
+                    name,
+                    val,
+                    timestamp,
+                    tags,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::AggregatedGauge(gauge)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }

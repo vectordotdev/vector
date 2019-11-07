@@ -1,4 +1,4 @@
-use crate::event::{metric::Direction, Metric};
+use crate::event::Metric;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -73,9 +73,8 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 tags,
             }
         }
-        "g" => Metric::Gauge {
-            name,
-            val: if parts[0]
+        "g" => {
+            let val = if parts[0]
                 .chars()
                 .next()
                 .map(|c| c.is_ascii_digit())
@@ -84,11 +83,23 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 parts[0].parse()?
             } else {
                 parts[0][1..].parse()?
-            },
-            direction: parse_direction(parts[0])?,
-            timestamp: None,
-            tags,
-        },
+            };
+
+            match parse_direction(parts[0])? {
+                None => Metric::AggregatedGauge {
+                    name,
+                    val,
+                    timestamp: None,
+                    tags,
+                },
+                Some(sign) => Metric::Gauge {
+                    name,
+                    val: val * sign,
+                    timestamp: None,
+                    tags,
+                },
+            }
+        }
         "s" => Metric::Set {
             name,
             val: parts[0].into(),
@@ -138,14 +149,14 @@ fn parse_tags(input: &str) -> Result<HashMap<String, String>, ParseError> {
     Ok(result)
 }
 
-fn parse_direction(input: &str) -> Result<Option<Direction>, ParseError> {
+fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
     match input
         .chars()
         .next()
         .ok_or_else(|| ParseError::Malformed("empty body component"))?
     {
-        '+' => Ok(Some(Direction::Plus)),
-        '-' => Ok(Some(Direction::Minus)),
+        '+' => Ok(Some(1.0)),
+        '-' => Ok(Some(-1.0)),
         c if c.is_ascii_digit() => Ok(None),
         _other => Err(ParseError::Malformed("invalid gauge value prefix")),
     }
@@ -206,7 +217,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
-    use crate::event::{metric::Direction, Metric};
+    use crate::event::Metric;
 
     #[test]
     fn basic_counter() {
@@ -307,10 +318,9 @@ mod test {
     fn simple_gauge() {
         assert_eq!(
             parse("gaugor:333|g"),
-            Ok(Metric::Gauge {
+            Ok(Metric::AggregatedGauge {
                 name: "gaugor".into(),
                 val: 333.0,
-                direction: None,
                 timestamp: None,
                 tags: None,
             }),
@@ -323,8 +333,7 @@ mod test {
             parse("gaugor:-4|g"),
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
-                val: 4.0,
-                direction: Some(Direction::Minus),
+                val: -4.0,
                 timestamp: None,
                 tags: None,
             }),
@@ -334,7 +343,6 @@ mod test {
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
                 val: 10.0,
-                direction: Some(Direction::Plus),
                 timestamp: None,
                 tags: None,
             }),

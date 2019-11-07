@@ -310,10 +310,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         } else {
                             None
                         };
-                        let gauge = Metric::Gauge {
+                        let gauge = Metric::AggregatedGauge {
                             name: metric.name,
                             val: metric.value,
-                            direction: None,
                             timestamp: metric.timestamp,
                             tags,
                         };
@@ -592,10 +591,9 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::Gauge {
+            Ok(vec![Metric::AggregatedGauge {
                 name: "latency".into(),
                 val: 123.0,
-                direction: None,
                 timestamp: None,
                 tags: None,
             }]),
@@ -610,10 +608,9 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::Gauge {
+            Ok(vec![Metric::AggregatedGauge {
                 name: "metric_without_timestamp_and_labels".into(),
                 val: 12.47,
-                direction: None,
                 timestamp: None,
                 tags: None,
             }]),
@@ -628,10 +625,9 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::Gauge {
+            Ok(vec![Metric::AggregatedGauge {
                 name: "msdos_file_access_time_seconds".into(),
                 val: 1458255915.0,
-                direction: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -653,10 +649,9 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::Gauge {
+            Ok(vec![Metric::AggregatedGauge {
                 name: "something_weird".into(),
                 val: std::f64::INFINITY,
-                direction: None,
                 timestamp: Some(Utc.ymd(1969, 11, 15).and_hms_nano(21, 52, 35, 0)),
                 tags: Some(
                     vec![("problem".into(), "division by zero".into())]
@@ -678,10 +673,9 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "latency".into(),
                     val: 1.0,
-                    direction: None,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(
                         vec![("env".into(), "production".into())]
@@ -689,10 +683,9 @@ mod test {
                             .collect()
                     ),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "latency".into(),
                     val: 2.0,
-                    direction: None,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(vec![("env".into(), "testing".into())].into_iter().collect()),
                 }
@@ -720,10 +713,9 @@ mod test {
                     timestamp: None,
                     tags: None,
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "temperature".into(),
                     val: -1.5,
-                    direction: None,
                     timestamp: None,
                     tags: None,
                 },
@@ -778,10 +770,9 @@ mod test {
                     timestamp: None,
                     tags: None,
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "temperature".into(),
                     val: -1.5,
-                    direction: None,
                     timestamp: None,
                     tags: None,
                 }
@@ -809,24 +800,21 @@ mod test {
                     timestamp: None,
                     tags: None,
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "last_downtime".into(),
                     val: 4.0,
-                    direction: None,
                     timestamp: None,
                     tags: None,
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "temperature".into(),
                     val: -1.5,
-                    direction: None,
                     timestamp: None,
                     tags: None,
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "temperature_7_days_average".into(),
                     val: 0.1,
-                    direction: None,
                     timestamp: None,
                     tags: None,
                 }

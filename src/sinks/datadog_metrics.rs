@@ -241,10 +241,9 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                 points: vec![DatadogPoint(encode_timestamp(timestamp), val)],
                 tags: tags.map(encode_tags),
             }),
-            Metric::Gauge {
+            Metric::AggregatedGauge {
                 name,
                 val,
-                direction: None,
                 timestamp,
                 tags,
             } => Some(DatadogMetric {
@@ -333,6 +332,12 @@ mod tests {
                 timestamp: Some(ts()),
                 tags: Some(tags()),
             },
+            Metric::AggregatedCounter {
+                name: "unsupported".into(),
+                val: 1.0,
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+            },
         ];
         let input = encode_events(events, interval, "ns");
         let json = serde_json::to_string(&input).unwrap();
@@ -345,13 +350,20 @@ mod tests {
 
     #[test]
     fn encode_gauge() {
-        let events = vec![Metric::Gauge {
-            name: "volume".into(),
-            val: -1.1,
-            direction: None,
-            timestamp: Some(ts()),
-            tags: None,
-        }];
+        let events = vec![
+            Metric::Gauge {
+                name: "unsupported".into(),
+                val: 0.1,
+                timestamp: Some(ts()),
+                tags: None,
+            },
+            Metric::AggregatedGauge {
+                name: "volume".into(),
+                val: -1.1,
+                timestamp: Some(ts()),
+                tags: None,
+            },
+        ];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();
 
