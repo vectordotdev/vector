@@ -39,13 +39,6 @@ where
         BatchSink::new_min(self, batch, settings.size, Some(settings.timeout))
     }
 
-    fn batched_with_max(self, batch: T, settings: &BatchSettings) -> BatchSink<T, Self>
-    where
-        T: Batch,
-    {
-        BatchSink::new_max(self, batch, settings.size, Some(settings.timeout))
-    }
-
     fn partitioned_batched_with_min<K>(
         self,
         batch: T,

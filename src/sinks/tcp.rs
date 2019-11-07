@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{
@@ -67,6 +67,10 @@ impl TcpSinkConfig {
             tls: None,
         }
     }
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<TcpSinkConfig>("tcp")
 }
 
 #[typetag::serde(name = "tcp")]

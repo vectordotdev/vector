@@ -25,6 +25,7 @@ type = "log_to_metric"
 type = "counter"
 increment_by_value = true
 field = "bytes_out"
+tags = {method = "{{method}}", status = "{{status}}"}
 
 # Output data
 [sinks.console_metrics]
