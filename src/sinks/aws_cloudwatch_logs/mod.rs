@@ -186,16 +186,15 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
             timeout,
             rate_limit_duration,
             rate_limit_num,
-            retry_attempts,
-            retry_backoff,
+            retry_attempts: _,
+            retry_backoff: _,
         } = self.request_settings;
 
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
             let svc = {
-                let policy =
-                    FixedRetryPolicy::new(retry_attempts, retry_backoff, CloudwatchRetryLogic);
+                let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
 
                 let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key).unwrap();
                 let timeout = Timeout::new(cloudwatch, timeout);

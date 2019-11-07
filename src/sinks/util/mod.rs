@@ -18,6 +18,7 @@ pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
 pub use buffer::metrics::MetricBuffer;
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+use retries::{FixedRetryPolicy, RetryLogic};
 
 pub trait SinkExt<T>
 where
@@ -368,4 +369,10 @@ pub struct TowerRequestSettings {
     pub rate_limit_num: u64,
     pub retry_attempts: usize,
     pub retry_backoff: Duration,
+}
+
+impl TowerRequestSettings {
+    pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
+        FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
+    }
 }

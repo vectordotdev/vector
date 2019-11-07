@@ -3,7 +3,6 @@ use crate::{
     event::{self, Event, ValueKind},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
         BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -100,12 +99,6 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
     let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
     let encoding = config.encoding.clone();
 
-    let policy = FixedRetryPolicy::new(
-        request.retry_attempts,
-        request.retry_backoff,
-        HttpRetryLogic,
-    );
-
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
@@ -135,7 +128,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
     let service = ServiceBuilder::new()
         .concurrency_limit(request.in_flight_limit)
         .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-        .retry(policy)
+        .retry(request.retry_policy(HttpRetryLogic))
         .timeout(request.timeout)
         .service(http_service);
 

@@ -3,9 +3,8 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
-        TowerRequestConfig,
+        retries::RetryLogic, BatchConfig, BatchServiceSink, Buffer, PartitionBuffer,
+        PartitionInnerBuffer, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -117,9 +116,6 @@ impl S3Sink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let policy =
-            FixedRetryPolicy::new(request.retry_attempts, request.retry_backoff, S3RetryLogic);
-
         let compression = match config.compression {
             Compression::Gzip => true,
             Compression::None => false,
@@ -146,7 +142,7 @@ impl S3Sink {
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.in_flight_limit)
             .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(policy)
+            .retry(request.retry_policy(S3RetryLogic))
             .timeout(request.timeout)
             .service(s3);
 

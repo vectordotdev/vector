@@ -3,7 +3,6 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
         BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -136,12 +135,6 @@ fn http(
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
-    let policy = FixedRetryPolicy::new(
-        request.retry_attempts,
-        request.retry_backoff,
-        HttpRetryLogic,
-    );
-
     let http_service =
         HttpService::builder()
             .tls_settings(tls_settings)
@@ -190,7 +183,7 @@ fn http(
     let service = ServiceBuilder::new()
         .concurrency_limit(request.in_flight_limit)
         .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-        .retry(policy)
+        .retry(request.retry_policy(HttpRetryLogic))
         .timeout(request.timeout)
         .service(http_service);
 

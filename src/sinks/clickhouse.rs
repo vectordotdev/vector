@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         http::{HttpRetryLogic, HttpService, Response},
-        retries::{FixedRetryPolicy, RetryLogic},
+        retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
         BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -95,14 +95,6 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
 
     let basic_auth = config.basic_auth.clone();
 
-    let policy = FixedRetryPolicy::new(
-        request.retry_attempts,
-        request.retry_backoff,
-        ClickhouseRetryLogic {
-            inner: HttpRetryLogic,
-        },
-    );
-
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
@@ -132,7 +124,9 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     let service = ServiceBuilder::new()
         .concurrency_limit(request.in_flight_limit)
         .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-        .retry(policy)
+        .retry(request.retry_policy(ClickhouseRetryLogic {
+            inner: HttpRetryLogic,
+        }))
         .timeout(request.timeout)
         .service(http_service);
 

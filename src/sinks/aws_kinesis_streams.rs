@@ -3,8 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, SinkExt, TowerRequestConfig,
+        retries::RetryLogic, BatchConfig, BatchServiceSink, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -95,18 +94,12 @@ impl KinesisService {
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
 
-        let policy = FixedRetryPolicy::new(
-            request.retry_attempts,
-            request.retry_backoff,
-            KinesisRetryLogic,
-        );
-
         let kinesis = KinesisService { client, config };
 
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.in_flight_limit)
             .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(policy)
+            .retry(request.retry_policy(KinesisRetryLogic))
             .timeout(request.timeout)
             .service(kinesis);
 

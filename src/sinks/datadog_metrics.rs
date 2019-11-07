@@ -3,7 +3,6 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        retries::FixedRetryPolicy,
         BatchConfig, BatchServiceSink, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -113,12 +112,6 @@ impl DatadogSvc {
         let batch = config.batch.unwrap_or(20, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let policy = FixedRetryPolicy::new(
-            request.retry_attempts,
-            request.retry_backoff,
-            HttpRetryLogic,
-        );
-
         let uri = format!("{}/api/v1/series?api_key={}", config.host, config.api_key)
             .parse::<Uri>()
             .context(super::UriParseError)?;
@@ -143,7 +136,7 @@ impl DatadogSvc {
         let service = ServiceBuilder::new()
             .concurrency_limit(request.in_flight_limit)
             .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(policy)
+            .retry(request.retry_policy(HttpRetryLogic))
             .timeout(request.timeout)
             .service(datadog_http_service);
 
