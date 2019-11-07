@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::{metric::Direction, Event, Metric},
     sinks::util::{BatchServiceSink, Buffer, SinkExt},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
@@ -54,6 +54,10 @@ pub struct StatsdSinkConfig {
 
 pub fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
 }
 
 #[typetag::serde(name = "statsd")]

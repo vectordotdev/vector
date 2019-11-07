@@ -40,13 +40,6 @@ where
         BatchSink::new_min(self, batch, min, Some(delay))
     }
 
-    fn batched_with_max(self, batch: T, max: usize, delay: Duration) -> BatchSink<T, Self>
-    where
-        T: Batch,
-    {
-        BatchSink::new_max(self, batch, max, Some(delay))
-    }
-
     fn partitioned_batched_with_min<K>(
         self,
         batch: T,

@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,10 @@ pub struct RemoveTagsConfig {
 
 pub struct RemoveTags {
     tags: Vec<Atom>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<RemoveTagsConfig>("remove_tags")
 }
 
 #[typetag::serde(name = "remove_tags")]

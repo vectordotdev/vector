@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
@@ -49,6 +49,10 @@ fn default_commit_interval_ms() -> u64 {
 
 fn default_auto_offset_reset() -> String {
     "largest".into() // default in librdkafka
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
 }
 
 #[typetag::serde(name = "kafka")]

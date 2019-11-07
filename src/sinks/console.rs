@@ -2,7 +2,7 @@ use super::util::SinkExt;
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,10 @@ pub struct ConsoleSinkConfig {
 pub enum Encoding {
     Text,
     Json,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
 }
 
 #[typetag::serde(name = "console")]

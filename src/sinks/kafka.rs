@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::tls::TlsOptions,
     sinks::util::MetadataFuture,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{
     future::{self, poll_fn, IntoFuture},
@@ -63,6 +63,10 @@ pub struct KafkaSink {
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashSet<usize>,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<KafkaSinkConfig>("kafka")
 }
 
 #[typetag::serde(name = "kafka")]

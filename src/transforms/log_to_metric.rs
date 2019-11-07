@@ -3,7 +3,7 @@ use crate::{
     event::metric::Metric,
     event::{self, ValueKind},
     template::Template,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
@@ -66,6 +66,10 @@ fn default_increment_by_value() -> bool {
 
 pub struct LogToMetric {
     config: LogToMetricConfig,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
 }
 
 #[typetag::serde(name = "log_to_metric")]

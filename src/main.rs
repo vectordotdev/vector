@@ -169,6 +169,7 @@ fn main() {
             format!("vector={}", level),
             format!("codec={}", level),
             format!("file_source={}", level),
+            format!("tower_limit=trace"),
         ]
         .join(",")
         .to_string()

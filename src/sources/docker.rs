@@ -1,6 +1,6 @@
 use crate::{
-    event::{self, Event, ValueKind},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    event::{self, Event,ValueKind},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset, Utc};
@@ -61,6 +61,10 @@ impl DockerConfig {
             true
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new::<DockerConfig>("docker")
 }
 
 #[typetag::serde(name = "docker")]

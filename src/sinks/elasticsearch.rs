@@ -9,7 +9,7 @@ use crate::{
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
@@ -70,6 +70,10 @@ pub struct ElasticSearchBasicAuthConfig {
 pub enum Provider {
     Default,
     Aws,
+}
+
+inventory::submit! {
+    SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
 #[typetag::serde(name = "elasticsearch")]

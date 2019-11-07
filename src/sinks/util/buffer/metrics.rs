@@ -173,7 +173,7 @@ mod test {
 
     #[test]
     fn metric_buffer_counters() {
-        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -279,7 +279,7 @@ mod test {
 
     #[test]
     fn metric_buffer_gauges() {
-        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 4, Some(Duration::from_secs(1)));
+        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 4, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -424,7 +424,7 @@ mod test {
 
     #[test]
     fn metric_buffer_sets() {
-        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -488,7 +488,7 @@ mod test {
 
     #[test]
     fn metric_buffer_histograms() {
-        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
         for _i in 2..6 {

@@ -6,7 +6,7 @@ use crate::{
         retries::FixedRetryPolicy,
         BatchServiceSink, MetricBuffer, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{Future, Poll};
@@ -85,6 +85,10 @@ pub enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogPoint(i64, f64);
 
+inventory::submit! {
+    SinkDescription::new::<DatadogConfig>("datadog")
+}
+
 #[typetag::serde(name = "datadog")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -148,7 +152,7 @@ impl DatadogSvc {
             .timeout(Duration::from_secs(timeout))
             .service(datadog_http_service);
 
-        let sink = BatchServiceSink::new(service, acker).batched_with_max(
+        let sink = BatchServiceSink::new(service, acker).batched_with_min(
             MetricBuffer::new(),
             batch_size,
             Duration::from_secs(batch_timeout),

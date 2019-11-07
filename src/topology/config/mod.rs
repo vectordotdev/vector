@@ -1,4 +1,5 @@
 use crate::{event::Event, sinks, sources, transforms};
+use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -6,6 +7,7 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
+pub mod component;
 mod validation;
 mod vars;
 
@@ -119,6 +121,10 @@ pub trait SourceConfig: core::fmt::Debug {
     fn source_type(&self) -> &'static str;
 }
 
+pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
+
+inventory::collect!(SourceDescription);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
     #[serde(default)]
@@ -142,6 +148,10 @@ pub trait SinkConfig: core::fmt::Debug {
     fn sink_type(&self) -> &'static str;
 }
 
+pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
+
+inventory::collect!(SinkDescription);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
     pub inputs: Vec<String>,
@@ -159,6 +169,10 @@ pub trait TransformConfig: core::fmt::Debug {
 
     fn transform_type(&self) -> &'static str;
 }
+
+pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
+
+inventory::collect!(TransformDescription);
 
 // Helper methods for programming construction during tests
 impl Config {

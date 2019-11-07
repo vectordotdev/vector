@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -15,6 +15,10 @@ pub struct JsonParserConfig {
     pub drop_invalid: bool,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
+}
+
+inventory::submit! {
+    TransformDescription::new::<JsonParserConfig>("json_parser")
 }
 
 #[typetag::serde(name = "json_parser")]

@@ -1,7 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -50,6 +50,10 @@ impl SyslogConfig {
             max_length: default_max_length(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<SyslogConfig>("syslog")
 }
 
 #[typetag::serde(name = "syslog")]
