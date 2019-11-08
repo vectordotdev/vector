@@ -997,7 +997,7 @@ mod tests {
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker, rt) {
                 container_remove(&id, docker, rt);
-                panic!("Container start failed with error: {:?}", error);
+                panic!("Container failed to start with error: {:?}", error);
             }
         }
         id
