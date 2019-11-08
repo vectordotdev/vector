@@ -200,12 +200,26 @@ class Templates
     end
   end
 
-  def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
+  def fields(fields, breakout_top_keys: false, filters: true, heading_depth: 1, level: 1, path: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
 
     render("#{partials_path}/_fields.md", binding).strip
+  end
+
+  def fields_hash(fields)
+    hash = {}
+
+    fields.each do |field|
+      if field.fields_list.any?
+        hash[field.name] = fields_hash(field.fields_list)
+      else
+        hash[field.name] = field.examples.first
+      end
+    end
+
+    hash
   end
 
   def full_config_spec
@@ -325,8 +339,8 @@ class Templates
     basename.start_with?("_")
   end
 
-  def install_command
-    "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
+  def install_command(prompts: true)
+    "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh#{prompts ? "" : " -s -- -y"}"
   end
 
   def installation_target_links(targets)
@@ -366,11 +380,13 @@ class Templates
   end
 
   def render(template_path, template_binding = nil)
+    old_template_path = @_template_path
     template_binding = binding if template_binding.nil?
     content = File.read("#{root_dir}/#{template_path}.erb")
     renderer = ERB.new(content, nil, '-')
     content =
       begin
+        @_template_path = "#{root_dir}/#{template_path}"
         renderer.result(template_binding)
       rescue Exception => e
         raise(
@@ -386,6 +402,8 @@ class Templates
           #{e.backtrace.join("\n").indent(2)}
           EOF
         )
+      ensure
+        @_template_path = old_template_path
       end
 
     # Disabled since Docusaurus does not allow HTML comments :(
@@ -419,6 +437,20 @@ class Templates
     strip <<~EOF
     Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.
     EOF
+  end
+
+  def subpages
+    dirname = File.basename(@_template_path).split(".").first
+    dir = @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+
+    Dir.glob("#{dir}/*.md").
+      to_a.
+      sort.
+      collect do |f|
+        path = File.basename(f).split(".").first
+        "<Jump to=\"#{path}\">#{path.gsub("-", " ").humanize}</Jump>"
+      end.
+      join("\n")
   end
 
   def tags(tags)

@@ -1,5 +1,5 @@
 ---
-title: Install via RPM
+title: Install Vector via RPM
 sidebar_label: RPM
 description: Install Vector through the RPM package manager
 ---

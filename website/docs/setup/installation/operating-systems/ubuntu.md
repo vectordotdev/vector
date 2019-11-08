@@ -1,5 +1,5 @@
 ---
-title: Install On Ubuntu
+title: Install Vector On Ubuntu
 sidebar_label: Ubuntu
 description: Install Vector on the Ubuntu operating system
 ---

@@ -3,6 +3,7 @@
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
+  color: var(--ifm-panel-color);
   font-weight: 500;
   padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
   transition: var(--ifm-transition-fast) ease;
@@ -10,8 +11,9 @@
 
 .component:hover {
   background: var(--ifm-panel-background-active);
-  border-color: var(--ifm-color-primary);
+  border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-panel-color-active);
   text-decoration: none;
 }
 
@@ -21,7 +23,6 @@
 }
 
 .component .component-name {
-  color: var(--ifm-color-emphasis-800);
   font-size: 1.1em;
 }
 

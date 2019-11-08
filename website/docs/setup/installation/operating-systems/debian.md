@@ -1,5 +1,5 @@
 ---
-title: Install On Debian
+title: Install Vector On Debian
 sidebar_label: Debian
 description: Install Vector on the Debian operating system
 ---

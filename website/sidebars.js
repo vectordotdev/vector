@@ -6,7 +6,15 @@ module.exports = {
       items: [
         'index',
         'about/concepts',
-        'about/data-model',
+        {
+          type: 'category',
+          label: 'Data Model',
+          items: [
+            "about/data-model",
+            "about/data-model/log",
+            "about/data-model/metric",
+          ]
+        },
         'about/guarantees',
       ],
     },
@@ -18,11 +26,12 @@ module.exports = {
           type: 'category',
           label: 'Installation',
           items: [
-            "setup/installation/script",
+            "setup/installation",
             {
               type: 'category',
               label: 'Platforms',
               items: [
+                "setup/installation/platforms",
                   "setup/installation/platforms/docker",
               ],
             },
@@ -30,6 +39,7 @@ module.exports = {
               type: 'category',
               label: 'Package Managers',
               items: [
+                "setup/installation/package-managers",
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
@@ -39,6 +49,7 @@ module.exports = {
               type: 'category',
               label: 'Operating Systems',
               items: [
+                "setup/installation/operating-systems",
                   "setup/installation/operating-systems/amazon-linux",
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
@@ -51,6 +62,7 @@ module.exports = {
               type: 'category',
               label: 'Manual',
               items: [
+                "setup/installation/manual",
                 "setup/installation/manual/from-archives",
                 "setup/installation/manual/from-source",              
               ],
@@ -62,7 +74,7 @@ module.exports = {
           type: 'category',
           label: 'Deployment',
           items: [
-            "setup/deployment/topologies",
+            "setup/deployment",
             {
               type: 'category',
               label: 'Roles',
@@ -71,6 +83,7 @@ module.exports = {
                 "setup/deployment/roles/service",
               ]
             },
+            "setup/deployment/topologies",
           ]
         },
       ],

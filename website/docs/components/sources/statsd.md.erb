@@ -10,10 +10,10 @@
 
 <%= options_sections(component.specific_options_list, heading_depth: 3) %>
 
-## Fields
+## Output
 
 <%- if component.fields_list.any? -%>
-The following fields are automatically added to each event as they are ingested.
+The following schema represents events as that are output from this source.
 
 <%= fields(component.fields_list, heading_depth: 3) %>
 <%- else -%>

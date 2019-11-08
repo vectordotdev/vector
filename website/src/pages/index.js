@@ -11,40 +11,94 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
-import styles from './styles.module.css';
+import styles from './index.module.css';
+import Diagram from '@site/src/components/Diagram';
+import repoUrl from '@site/src/exports/repoUrl';
 
 const features = [
   {
-    title: <>Easy to Use</>,
+    title: 'Blistering Fast',
     imageUrl: 'img/undraw_docusaurus_mountain.svg',
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Built in Rust, Vector is <a href="#performance">blistering fast and
+        memory efficient</a>. It's designed to handle the most demanding
+        environments.
       </>
     ),
   },
   {
-    title: <>Focus on What Matters</>,
+    title: 'Vendor Neutral',
     imageUrl: 'img/undraw_docusaurus_tree.svg',
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Vector does not favor any specific storage. It fosters a fair, open ecosystem with the user's best interest in mind.
       </>
     ),
   },
   {
-    title: <>Powered by React</>,
+    title: 'Agent or Service',
     imageUrl: 'img/undraw_docusaurus_react.svg',
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Vector aims to be the single, and only, tool needed to get data from A to B, deploying as an <Link to="/docs/setup/deployment/roles/agent">agent</Link> or <Link to="/docs/setup/deployment/roles/service">service</Link>.
+      </>
+    ),
+  },
+  {
+    title: 'Logs, Metrics, & Events',
+    imageUrl: 'img/undraw_docusaurus_react.svg',
+    description: (
+      <>
+        Vector unifies logs, metrics, and events at the source, making it collect and ship all observability data.
+      </>
+    ),
+  },
+  {
+    title: 'Programmable Transforms',
+    imageUrl: 'img/undraw_docusaurus_react.svg',
+    description: (
+      <>
+        An <Link to="/docs/components/transforms/lua">embedded LUA engine</Link> makes it easy to program powerful transforms. Handle complex use cases without limitations.
+      </>
+    ),
+  },
+  {
+    title: 'Clear Guarantees',
+    imageUrl: 'img/undraw_docusaurus_react.svg',
+    description: (
+      <>
+        Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
       </>
     ),
   },
 ];
+
+function Features({features}) {
+  let rows = [];
+
+  let i,j,temparray,chunk = 3;
+  for (i=0,j=features.length; i<j; i+=chunk) {
+    let featuresChunk = features.slice(i,i+chunk);
+    
+    rows.push(
+      <div key={`features${i}`} className="row">
+        {featuresChunk.map((props, idx) => (
+          <Feature key={idx} {...props} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section className={styles.features}>
+      <div className="container">
+        <h2>Features</h2>
+        {rows}
+      </div>
+    </section>
+  );
+}
 
 function Feature({imageUrl, title, description}) {
   const imgUrl = useBaseUrl(imageUrl);
@@ -66,37 +120,27 @@ function Home() {
   const {siteConfig = {}} = context;
   return (
     <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
-      <header className={classnames('hero hero--primary', styles.heroBanner)}>
-        <div className="container">
-          <h1 className="hero__title">{siteConfig.title}</h1>
-          <p className="hero__subtitle">{siteConfig.tagline}</p>
-          <div className={styles.buttons}>
-            <Link
-              classnames={classnames(
-                'button button--outline button--secondary button--lg',
-                styles.getStarted,
-              )}
-              to={useBaseUrl('docs/doc1')}>
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </header>
-      <main>
-        {features && features.length && (
-          <section className={styles.features}>
-            <div className="container">
-              <div className="row">
-                {features.map((props, idx) => (
-                  <Feature key={idx} {...props} />
-                ))}
-              </div>
+      title={`${siteConfig.title}: ${siteConfig.tagline}`}
+      description={siteConfig.description}>
+      <div className="fixed-width">
+        <header className={classnames('hero', styles.hero)}>
+          <div className="container">
+            <h1 className={styles.heroH1}>Vector Makes Observability Data Simple</h1>
+            <p className="hero__subtitle">
+              Vector is an <a href={repoUrl()}>open-source</a> utility for
+              collecting, transforming, and routing logs, metrics, and events.
+            </p>
+            <div className="hero__buttons">
+              <button className="button button--primary">Get Started</button>
+              <button className="button button--primary">Get Started</button>
             </div>
-          </section>
-        )}
-      </main>
+            <Diagram className={styles.heroDiagram} width="100%" />
+          </div>
+        </header>
+        <main>
+          {features && features.length && <Features features={features} />}
+        </main>
+      </div>
     </Layout>
   );
 }

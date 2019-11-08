@@ -6,7 +6,15 @@ module.exports = {
       items: [
         'index',
         'about/concepts',
-        'about/data-model',
+        {
+          type: 'category',
+          label: 'Data Model',
+          items: [
+            <%= metadata.links.fetch_id("docs.data-model").to_json %>,
+            <%= metadata.links.fetch_id("docs.data-model.log").to_json %>,
+            <%= metadata.links.fetch_id("docs.data-model.metric").to_json %>,
+          ]
+        },
         'about/guarantees',
       ],
     },
@@ -18,13 +26,14 @@ module.exports = {
           type: 'category',
           label: 'Installation',
           items: [
-            <%= metadata.links.fetch_id("docs.installation.script").to_json %>,
+            <%= metadata.links.fetch_id("docs.installation").to_json %>,
             {
               type: 'category',
               label: 'Platforms',
               items: [
+                <%= metadata.links.fetch_id("docs.installation.platforms").to_json %>,
                 <%- metadata.installation.platforms.each do |platform| -%>
-                  <%= metadata.links.fetch_id("docs.platforms.#{platform.id}").to_json %>,
+                  <%= metadata.links.fetch_id("docs.installation.platforms.#{platform.id}").to_json %>,
                 <%- end -%>
               ],
             },
@@ -32,8 +41,9 @@ module.exports = {
               type: 'category',
               label: 'Package Managers',
               items: [
+                <%= metadata.links.fetch_id("docs.installation.package-managers").to_json %>,
                 <%- metadata.installation.package_managers.each do |package_manager| -%>
-                  <%= metadata.links.fetch_id("docs.package_managers.#{package_manager.id}").to_json %>,
+                  <%= metadata.links.fetch_id("docs.installation.package_managers.#{package_manager.id}").to_json %>,
                 <%- end -%>
               ],
             },
@@ -41,8 +51,9 @@ module.exports = {
               type: 'category',
               label: 'Operating Systems',
               items: [
+                <%= metadata.links.fetch_id("docs.installation.operating-systems").to_json %>,
                 <%- metadata.installation.operating_systems.each do |operating_system| -%>
-                  <%= metadata.links.fetch_id("docs.operating_systems.#{operating_system.id}").to_json %>,
+                  <%= metadata.links.fetch_id("docs.installation.operating_systems.#{operating_system.id}").to_json %>,
                 <%- end -%>
               ],
             },
@@ -50,8 +61,9 @@ module.exports = {
               type: 'category',
               label: 'Manual',
               items: [
-                <%= metadata.links.fetch_id("docs.from-archives").to_json %>,
-                <%= metadata.links.fetch_id("docs.from-source").to_json %>,              
+                <%= metadata.links.fetch_id("docs.manual").to_json %>,
+                <%= metadata.links.fetch_id("docs.manual.from-archives").to_json %>,
+                <%= metadata.links.fetch_id("docs.manual.from-source").to_json %>,              
               ],
             },
           ],
@@ -61,15 +73,16 @@ module.exports = {
           type: 'category',
           label: 'Deployment',
           items: [
-            <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,
+            <%= metadata.links.fetch_id("docs.deployment").to_json %>,
             {
               type: 'category',
               label: 'Roles',
               items: [
-                <%= metadata.links.fetch_id("docs.roles.agent").to_json %>,
-                <%= metadata.links.fetch_id("docs.roles.service").to_json %>,
+                <%= metadata.links.fetch_id("docs.deployment.roles.agent").to_json %>,
+                <%= metadata.links.fetch_id("docs.deployment.roles.service").to_json %>,
               ]
             },
+            <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,
           ]
         },
       ],

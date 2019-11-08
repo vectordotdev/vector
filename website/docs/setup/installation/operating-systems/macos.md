@@ -1,5 +1,5 @@
 ---
-title: Install On MacOS
+title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS
 ---

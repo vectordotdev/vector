@@ -1,0 +1,78 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes hero1 {
+  0% {
+    background-size: 100% 100%;
+  }
+  100% {
+    background-size: 350% 350%;
+  }
+}
+
+@keyframes hero2 {
+  0% {
+    background-size: 350% 350%;
+  }
+  50% {
+    background-size: 275% 275%;
+  }
+  100% {
+    background-size: 350% 350%;
+  }
+}
+
+.hero {
+  animation: hero1 700ms cubic-bezier(0, 1.5, 0.32, 1.5), hero2 2.5s 1200ms linear infinite;
+  animation-delay: 500ms;
+  animation-fill-mode: forwards;
+  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.3), transparent 15%);
+  background-position: center center;
+  border-bottom: 0px none;
+  min-height: calc( 100vh - var(--ifm-navbar-height) );
+  text-align: center;
+}
+
+.heroDiagram {
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  max-height: 350px;
+  width: 100%;
+}
+
+.heroDiagramSteps {
+  font-size: 1.2em;
+}
+
+.features {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.features h3 {
+  text-align: center;
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.featureImage {
+  height: 200px;
+  width: 200px;
+}
+
+html[data-theme="dark"] .hero {
+  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.2), transparent 30%);
+}
+
+@media (max-width: 996px) {
+  .hero {
+    padding: 1rem 1rem;
+  }
+}

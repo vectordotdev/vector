@@ -1,11 +1,11 @@
 module.exports = {
-  title: 'My Site',
-  tagline: 'The tagline of my site',
-  url: 'https://your-docusaurus-test-site.com',
+  title: 'Vector',
+  tagline: 'A High-Performance, Logs, Metrics, & Events Router',
+  url: 'https://vector.dev',
   baseUrl: '/',
   favicon: 'img/favicon.ico',
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  organizationName: 'timberio',
+  projectName: 'vector',
   themeConfig: {
     navbar: {
       logo: {
@@ -25,43 +25,6 @@ module.exports = {
           position: 'right',
         },
       ],
-    },
-    footer: {
-      style: 'dark',
-      links: [
-        {
-          title: 'Docs',
-          items: [
-            {
-              label: 'Docs',
-              to: 'docs/doc1',
-            },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-          ],
-        },
-        {
-          title: 'Social',
-          items: [
-            {
-              label: 'Blog',
-              to: 'blog',
-            },
-          ],
-        },
-      ],
-      logo: {
-        alt: 'Facebook Open Source Logo',
-        src: 'https://docusaurus.io/img/oss_logo.png',
-      },
-      copyright: `Copyright © ${new Date().getFullYear()} Facebook, Inc. Built with Docusaurus.`,
     },
     prismTheme: require('prism-react-renderer/themes/github'),
     darkPrismTheme: require('prism-react-renderer/themes/dracula')

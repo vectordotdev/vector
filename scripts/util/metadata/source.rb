@@ -15,20 +15,9 @@ class Source < Component
     # Init
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
+    @fields = Field.build_struct(hash["fields"] || {})
     @output_types = hash.fetch("output_types")
     @through_description = hash.fetch("through_description")
-
-    # Fields
-
-    @fields = OpenStruct.new()
-
-    (hash["fields"] || {}).each do |field_name, field_hash|
-      field = Field.new(
-        field_hash.merge({"name" => field_name}
-      ))
-
-      @fields.send("#{field_name}=", field)
-    end
 
     # delivery_guarantee
 

@@ -192,16 +192,36 @@ The unix socket path. *This should be absolute path.*
 
 </Fields>
 
-## Fields
+## Output
 
-The following fields are automatically added to each event as they are ingested.
+The following fields are automatically added to each event as they are ingested:
+
+<CodeHeader fileName="example.json" />
+
+```javascript
+{
+  "appname": "app-name",
+  "facility": "1",
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "msgid": "ID47",
+  "procid": 8710,
+  "severity": "notice",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "version": 1
+}
+```
+
 
 <Fields filters={true}>
 
 
 <Field
+  enumValues={null}
+  examples={["app-name"]}
   name={"appname"}
   path={null}
+  required={false}
   type={"string"}
   >
 
@@ -210,27 +230,15 @@ The following fields are automatically added to each event as they are ingested.
 The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a appname is not found, then the key will not be added.
 
 
-
 </Field>
 
 
 <Field
-  name={"container"}
-  path={null}
-  type={"string"}
-  >
-
-### container
-
-The Docker container name that the log was collected from.
-
-
-</Field>
-
-
-<Field
+  enumValues={null}
+  examples={["1"]}
   name={"facility"}
   path={null}
+  required={false}
   type={"string"}
   >
 
@@ -239,27 +247,50 @@ The Docker container name that the log was collected from.
 The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a facility is not found, then the key will not be added.
 
 
-
 </Field>
 
 
 <Field
+  enumValues={null}
+  examples={["my.host.com"]}
   name={"host"}
   path={null}
+  required={true}
   type={"string"}
   >
 
 ### host
 
-The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream host IP address.
+The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where[`mode`](#mode) = `"unix"` the socket path will be used.
 
 
 </Field>
 
 
 <Field
+  enumValues={null}
+  examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
+  name={"message"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### message
+
+The raw message, unaltered.
+
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["ID47"]}
   name={"msgid"}
   path={null}
+  required={false}
   type={"string"}
   >
 
@@ -268,14 +299,16 @@ The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostn
 The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a msgid is not found, then the key will not be added.
 
 
-
 </Field>
 
 
 <Field
+  enumValues={null}
+  examples={[8710]}
   name={"procid"}
   path={null}
-  type={"string"}
+  required={false}
+  type={"int"}
   >
 
 ### procid
@@ -283,13 +316,15 @@ The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a msgid is
 The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a procid is not found, then the key will not be added.
 
 
-
 </Field>
 
 
 <Field
+  enumValues={null}
+  examples={["notice"]}
   name={"severity"}
   path={null}
+  required={false}
   type={"string"}
   >
 
@@ -298,27 +333,15 @@ The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a procid 
 The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a severity is not found, then the key will not be added.
 
 
-
 </Field>
 
 
 <Field
-  name={"stream"}
-  path={null}
-  type={"string"}
-  >
-
-### stream
-
-The [standard stream][urls.standard_streams] that the log was collected from.
-
-
-</Field>
-
-
-<Field
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  required={true}
   type={"timestamp"}
   >
 
@@ -331,9 +354,12 @@ The timestamp extracted from the incoming line. If a timestamp is not found, the
 
 
 <Field
+  enumValues={null}
+  examples={[1]}
   name={"version"}
   path={null}
-  type={"string"}
+  required={false}
+  type={"int"}
   >
 
 ### version
@@ -382,5 +408,4 @@ ingestion and parsing scheme.
 [docs.data-model#log]: ../../about/data-model#log
 [docs.sources.tcp]: ../../components/sources/tcp
 [docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

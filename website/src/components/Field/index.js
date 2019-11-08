@@ -16,7 +16,11 @@ function toTOML(value) {
 
 function exampleToTOML(name, example) {
   if (isObject(example)) {
-    return `${example.name} = ${toTOML(example.value)}`;
+    if ('name' in example && 'value' in example) {
+      return `${example.name} = ${toTOML(example.value)}`;
+    } else {
+      return `${Object.keys(example)[0]} = ${toTOML(Object.values(example)[0])}`
+    }
   } else if (name) {
     return `${name} = ${toTOML(example)}`;
   } else {
@@ -27,9 +31,17 @@ function exampleToTOML(name, example) {
 function Enum({values}) {
   let elements = [];
 
-  for (var key in values) {
-    elements.push(<code key={key} title={values[key]}>{toTOML(key)}</code>);
-    elements.push(" ");
+  if (!Array.isArray(values)) {
+    for (var key in values) {
+      elements.push(<code key={key} title={values[key]}>{toTOML(key)}</code>);
+      elements.push(" ");
+    }
+  } else {
+    for (var index in values) {
+      let value = values[index];
+      elements.push(<code key={value}>{toTOML(value)}</code>);
+      elements.push(" ");
+    }
   }
 
   return elements;
@@ -78,9 +90,11 @@ function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWh
   if (defaultValue || enumValues || (examples && examples.length > 0)) {
     return (
       <div className="info">
-        {defaultValue ?
-          <div>Default: <Example name={name} path={path} value={defaultValue} /></div> :
-          <div>No default</div>}
+        {defaultValue !== undefined ?
+          (defaultValue ?
+            <div>Default: <Example name={name} path={path} value={defaultValue} /></div> :
+            <div>No default</div>) :
+          null}
         {enumValues ?
           <div>Enum, must be one of: <Enum values={enumValues} /></div> :
           null}

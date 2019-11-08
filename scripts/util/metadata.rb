@@ -3,6 +3,7 @@ require "toml-rb"
 
 require_relative "metadata/batching_sink"
 require_relative "metadata/exposing_sink"
+require_relative "metadata/field"
 require_relative "metadata/links"
 require_relative "metadata/release"
 require_relative "metadata/source"
@@ -30,6 +31,8 @@ class Metadata
   attr_reader :companies,
     :installation,
     :links,
+    :log_fields,
+    :metric_fields,
     :options,
     :releases,
     :sinks,
@@ -39,6 +42,8 @@ class Metadata
   def initialize(hash, docs_root)
     @companies = hash.fetch("companies")
     @installation = OpenStruct.new()
+    @log_fields = Field.build_struct(hash["log_fields"] || {})
+    @metric_fields = Field.build_struct(hash["metric_fields"] || {})
     @options = OpenStruct.new()
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
@@ -157,6 +162,14 @@ class Metadata
 
   def latest_version
     @latest_version ||= latest_release.version
+  end
+
+  def log_fields_list
+    @log_fields_list ||= log_fields.to_h.values.sort
+  end
+
+  def metric_fields_list
+    @metric_fields_list ||= metric_fields.to_h.values.sort
   end
 
   def newer_releases(release)

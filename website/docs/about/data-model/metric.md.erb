@@ -1,0 +1,16 @@
+---
+title: Metric Event
+description: A deep dive into Vector's metric event
+---
+
+<%= embed_svg("data-model-metric") %>
+
+## Description
+
+A `metric` event represents a numeric value that must be classified into one of
+four types: `counter`, `histogram`, `gauge`, or `set`. Each are described in
+more detail below.
+
+## Schema
+
+<%= fields(metadata.metric_fields_list, breakout_top_keys: true, heading_depth: 3) %>

@@ -25,6 +25,7 @@ require 'net/http'
 # implement dynamic readers that can be found in the `#fetch_dynamic_url`
 # method.
 class Links
+  CATEGORIES = ["assets", "docs", "urls"]
   VECTOR_ROOT = "https://github.com/timberio/vector"
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"

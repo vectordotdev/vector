@@ -24,7 +24,7 @@ serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
 [service][docs.roles.service], making the process of getting data from A to B
 simple and unified.
 
-## Usage
+## Running
 
 ```bash
 docker run timberio/vector:latest-alpine
@@ -63,7 +63,7 @@ is the image we recommend due to it's small size and reliability.
 This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
-## Versions
+## Previous Versions
 
 Vector's Docker images include a special `latest` version that will be updated
 whenever Vector is [released][urls.vector_releases]. All other

@@ -3,7 +3,6 @@ import React from 'react';
 import './styles.css';
 
 function Component({delivery_guarantee, description, event_types, name, path, status, type}) {
-
   return (
     <a href={path} className="component">
       <div className="component-header">

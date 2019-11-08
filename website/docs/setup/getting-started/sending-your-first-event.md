@@ -1,8 +1,7 @@
 ---
+title: Sending Your First Event
 description: A "Hello World" getting started guide
 ---
-
-# Sending Your First Event
 
 This is a "Hello World" style guide that walks through sending your first
 [event][docs.data-model#event] through Vector. It's designed to be followed locally,

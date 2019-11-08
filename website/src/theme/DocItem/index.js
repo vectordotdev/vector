@@ -52,6 +52,8 @@ function DocItem(props) {
     title,
   } = metadata;
 
+  console.log(metadata)
+
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
 
   return (
@@ -73,7 +75,7 @@ function DocItem(props) {
         {permalink && <meta property="og:url" content={siteUrl + permalink} />}
       </Head>
       <div className="padding-vert--lg">
-        <div className="container">
+        <div className="container container--fluid">
           <div className="row">
             <div className="col">
               <div className={styles.docItemContainer}>
@@ -91,9 +93,11 @@ function DocItem(props) {
                     <DocContent />
                   </div>
                 </article>
-                <div className="margin-vert--lg">
-                  <DocPaginator metadata={metadata} />
-                </div>
+                {!metadata.hide_pagination && (
+                  <div className="margin-vert--lg">
+                    <DocPaginator metadata={metadata} />
+                  </div>
+                )}
               </div>
             </div>
             {DocContent.rightToc && (

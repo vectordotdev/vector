@@ -9,16 +9,18 @@ tradeoffs or your usecase.
 
 ## Delivery Gaurantees
 
-### At Least Once
+### At-Least-Once
 
-"At least once" delivery guarantees that an [event][docs.data-model#event] received by
-Vector will be delivered at least once to the configured destination(s). While
-rare, it is possible for an event to be delivered more than once (see the
-[Does Vector support exactly once delivery](#does-vector-support-exactly-once-delivery)
-FAQ below).
+The `at-least-once` delivery guarantee ensures that an
+[event][docs.data-model#event] received by Vector will be delivered at least
+once to the configured destination(s). While rare, it is possible for an event
+to be delivered more than once. See the [Does Vector support exactly once
+delivery](#does-vector-support-exactly-once-delivery) FAQ below).
 
-To achieve at least once delivery your source must be configured to use `disk`
-based buffers:
+#### Prerequisites
+
+In order to achieve at least once delivery your source must be configured to
+use `disk` based buffers:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
@@ -36,22 +38,33 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 Each [sink][docs.sinks] documents the buffer options.
 
+### Best-Effort
 
-### Best Effort
+A `best-effort` delivery guarantee means that Vector will make a best effort to
+deliver each event, but cannot guarantee delivery. While rare, this means it is
+possible for the occasional event to not be lost. See the ["Do I need at least
+once delivery?"](#do-i-need-at-least-once-delivery) FAQ.
 
-"Best effort" delivery has no guarantees and means that Vector will make a best
-effort to deliver each event. This means it is possible for the occasional
-event to not be lost.
-
-## Prod-Ready Guarantee
+## Reliability Guarantee
 
 ### Prod-Ready
 
-sfdsfsd
+The `prod-ready` status is a _subjective_ status defined by the Vector team
+intended to give you a general idea of it's reliability for production
+environments. A component is `prod-ready` if it means the following general
+criteria:
+
+1. A meaningful amount of users (generally >50) have been using the component in
+   a production environment for sustained periods without issue.
+2. The component has had sufficient time (generally >4 months) to be community
+   tested.
+3. There are no major [open bugs][urls.vector_bug_issues] for the component.
 
 ### Beta
 
-fdsfsd
+The `beta` status means that a component has not met the criteria outlined in
+the [Prod-Ready](#prod-ready) section and therefore should be used with caution
+in production environments.
 
 ## FAQs
 
@@ -79,6 +92,13 @@ example), but it remains unclear if Vector will ever be able to achieve this.
 We recommend [subscribing to our mailing list](https://vector.dev), which will
 keep you in the loop if this ever changes.
 
+### How can I find components that meet these guarantees?
 
+Head over to the [components section][docs.components] and use the guarantee
+filters.
+
+
+[docs.components]: ../components
 [docs.data-model#event]: ../about/data-model#event
 [docs.sinks]: ../components/sinks
+[urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

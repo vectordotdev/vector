@@ -11,8 +11,10 @@ module PostProcessors
       'CodeHeader' => "import CodeHeader from '@site/src/components/CodeHeader';",
       'Components' => "import Components from '@site/src/components/Components';",
       'Component' => "import Component from '@site/src/components/Component';",
+      'Diagram' => "import Diagram from '@site/src/components/Diagram';",
       'Fields' => "import Fields from '@site/src/components/Fields';",
       'Field' => "import Field from '@site/src/components/Field';",
+      'Jump' => "import Jump from '@site/src/components/Jump';",
       'Tabs' => "import Tabs from '@theme/Tabs';",
       'TabItem' => "import TabItem from '@theme/TabItem';"
     }

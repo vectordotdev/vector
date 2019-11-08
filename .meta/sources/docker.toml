@@ -6,17 +6,36 @@ output_types = ["log"]
 resources = []
 through_description = "the docker engine daemon"
 
-[sources.syslog.fields.container]
+[sources.docker.fields.container]
 type = "string"
+examples = ["evil_ptolemy"]
+optional = false
 description = """\
 The Docker container name that the log was collected from.\
 """
 
-[sources.syslog.fields.stream]
+[sources.docker.fields.message]
+type = "string"
+examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+optional = false
+description = """\
+The raw log message, unaltered.
+"""
+
+[sources.docker.fields.stream]
 type = "string"
 enum = ["stdout", "stderr"]
+optional = false
 description = """\
 The [standard stream][urls.standard_streams] that the log was collected from.\
+"""
+
+[sources.docker.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The timestamp extracted from the Docker log event.
 """
 
 [sources.docker.options.include_containers]

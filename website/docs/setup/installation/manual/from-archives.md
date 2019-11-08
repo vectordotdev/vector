@@ -1,5 +1,5 @@
 ---
-title: Install From Archives
+title: Install Vector From Archives
 sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---

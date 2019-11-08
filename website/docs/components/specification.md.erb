@@ -1,8 +1,8 @@
 ---
+title: Config Specification
+sidebar_label: Specification
 description: Full Vector config specification
 ---
-
-# Config Specification
 
 Below is a full config specification. Note, this file is included with
 Vector package installs, generally located at `/etc/vector/vector.spec.yml`:

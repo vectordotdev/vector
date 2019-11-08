@@ -112,7 +112,7 @@ The timeout before a connection is forcefully closed during shutdown.
 
 </Fields>
 
-## Fields
+## Output
 
 This component does not automatically add any fields.
 

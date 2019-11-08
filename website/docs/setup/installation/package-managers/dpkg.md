@@ -1,5 +1,5 @@
 ---
-title: Install via DPKG
+title: Install Vector via DPKG
 sidebar_label: DPKG
 description: Install Vector through the DKG package manager
 ---

@@ -1,6 +1,7 @@
 ---
 title: Components
 sidebar_label: hidden
+hide_pagination: true
 ---
 
 Vector components are the entities used to
@@ -15,9 +16,13 @@ Vector components are the entities used to
   event_types={<%= component.event_types.to_json %>}
   id={<%= component.id.to_json %>}
   name={<%= component.name.to_json %>}
-  path={<%= metadata.links.fetch("docs.#{component.type.pluralize}.#{component.name}").to_json %>}
+  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
   status={<%= component.status.to_json %>}
   type={<%= component.type.to_json %>} />
 <%- end -%>
 
 </Components>
+
+<Jump to="[[[urls.new_feature_request]]]" icon="plus-circle">
+  Request a new component
+</Jump>

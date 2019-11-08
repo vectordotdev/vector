@@ -1,5 +1,5 @@
 ---
-title: Install via Homebrew
+title: Install Vector via Homebrew
 sidebar_label: Homebrew
 description: Install Vector through the Homebrew package manager
 ---

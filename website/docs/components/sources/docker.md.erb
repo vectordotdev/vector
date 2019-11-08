@@ -10,10 +10,10 @@
 
 <%= options_sections(component.specific_options_list, heading_depth: 3) %>
 
-## Fields
+## Output
 
 <%- if component.fields_list.any? -%>
-The following fields are automatically added to each event as they are ingested.
+The following schema represents events as that are output from this source.
 
 <%= fields(component.fields_list, heading_depth: 3) %>
 <%- else -%>
@@ -30,8 +30,3 @@ Vector will automatically attempt to connect to the docker daemon for you. In mo
 situations if your current user is able to run `docker ps` then Vector will be able to
 connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
 use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].
-
-## Guides
-
-<%= component_guides(component) %>
-

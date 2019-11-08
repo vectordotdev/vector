@@ -1,5 +1,5 @@
 ---
-title: Install On CentOS
+title: Install Vector On CentOS
 sidebar_label: CentOS
 description: Install Vector on CentOS
 ---

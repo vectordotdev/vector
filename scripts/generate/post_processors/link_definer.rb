@@ -39,26 +39,22 @@ module PostProcessors
     end
 
     def define!
-      if !file_path.end_with?("SUMMARY.md") && !file_path.end_with?("conventions.md")
-        verify_no_direct_links!
+      verify_no_direct_links!
+
+      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/# ]*)\]\]\]/).flatten.uniq
+
+      link_ids.each do |link_id|
+        definition = get_path_or_url(link_id)
+        content.gsub!("[[[#{link_id}]]]", definition)
       end
 
-      link_names = content.scan(/\]\[([a-zA-Z0-9_\-\.\/# ]*)\]/).flatten.uniq
+      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/# ]*)\]/).flatten.uniq
 
       footer_links = []
 
-      link_names.each do |link_name|
-        definition = links.fetch(link_name)
-
-        if definition.start_with?("/")
-          if in_docs?
-            definition = docs_root + definition
-          else
-            definition = VECTOR_DOCS_HOST + definition.gsub(/\.md$/, "")
-          end
-        end
-
-        footer_links << "[#{link_name}]: #{definition}"
+      link_ids.each do |link_id|
+        definition = get_path_or_url(link_id)
+        footer_links << "[#{link_id}]: #{definition}"
       end
 
       <<~EOF
@@ -70,6 +66,20 @@ module PostProcessors
     end
 
     private
+      def get_path_or_url(link_id)
+        definition = links.fetch(link_id)
+
+        if definition.start_with?("/")
+          if in_docs?
+            definition = docs_root + definition
+          else
+            definition = VECTOR_DOCS_HOST + definition.gsub(/\.md$/, "")
+          end
+        end
+
+        definition
+      end
+
       def in_docs?
         @file_path.start_with?(DOCS_ROOT)
       end

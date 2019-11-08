@@ -7,56 +7,81 @@ through_description = "the Syslog 5424 protocol"
 
 [sources.syslog.fields.appname]
 type = "string"
+examples = ["app-name"]
+optional = true
 description = """\
 The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-appname is not found, then the key will not be added.
+appname is not found, then the key will not be added.\
 """
 
 [sources.syslog.fields.host]
 type = "string"
+examples = ["my.host.com"]
 key_name_option = "host_key"
+optional = false
 description = """\
 The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-hostname is not found, then Vector will use the upstream host IP address.\
+hostname is not found, then Vector will use the upstream hostname. In the \
+case where `mode` = `"unix"` the socket path will be used.\
 """
 
 [sources.syslog.fields.facility]
 type = "string"
+examples = ["1"]
+optional = true
 description = """\
 The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-facility is not found, then the key will not be added.
+facility is not found, then the key will not be added.\
+"""
+
+[sources.syslog.fields.message]
+type = "string"
+examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
+optional = false
+description = """\
+The raw message, unaltered.
 """
 
 [sources.syslog.fields.msgid]
 type = "string"
+examples = ["ID47"]
+optional = true
 description = """\
 The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-msgid is not found, then the key will not be added.
+msgid is not found, then the key will not be added.\
 """
 
 [sources.syslog.fields.procid]
-type = "string"
+type = "int"
+examples = [8710]
+optional = true
 description = """\
 The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-procid is not found, then the key will not be added.
+procid is not found, then the key will not be added.\
 """
 
 [sources.syslog.fields.severity]
 type = "string"
+examples = ["notice"]
+optional = true
 description = """\
 The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-severity is not found, then the key will not be added.
+severity is not found, then the key will not be added.\
 """
 
 [sources.syslog.fields.timestamp]
 type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
 description = """\
 The timestamp extracted from the incoming line. If a timestamp is not found, \
 then Vector will use the current time.\
 """
 
 [sources.syslog.fields.version]
-type = "string"
+type = "int"
+examples = [1]
+optional = true
 description = """\
 The version extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 version is not found, then the key will not be added.

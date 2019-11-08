@@ -56,7 +56,7 @@ UDP socket address to bind to.
 
 </Fields>
 
-## Fields
+## Output
 
 This component does not automatically add any fields.
 

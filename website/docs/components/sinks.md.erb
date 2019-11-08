@@ -1,6 +1,7 @@
 ---
 title: Sinks
 sidebar_label: hidden
+hide_pagination: true
 ---
 
 Sinks are last in the [pipeline][docs.configuration#composition], responsible
@@ -15,12 +16,13 @@ for sending [events][docs.data-model#event] downstream.
   event_types={<%= component.event_types.to_json %>}
   id={<%= component.id.to_json %>}
   name={<%= component.name.to_json %>}
-  path={<%= metadata.links.fetch("docs.#{component.type.pluralize}.#{component.name}").to_json %>}
+  path="[[[docs.<%= component.type.pluralize %>.<%= component.name %>]]]"
   status={<%= component.status.to_json %>}
   type={<%= component.type.to_json %>} />
 <%- end -%>
 
 </Components>
 
-
-[+ request a new sink][urls.new_sink]
+<Jump to="[[[urls.new_sink]]]" icon="plus-circle">
+  Request a new sink
+</Jump>

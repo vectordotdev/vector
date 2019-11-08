@@ -111,9 +111,96 @@ A list of container ids to match against when filtering running containers. This
 
 </Fields>
 
-## Fields
+## Output
 
-This component does not automatically add any fields.
+The following schema represents events as that are output from this source.
+
+<CodeHeader fileName="example.json" />
+
+```javascript
+{
+  "container": "evil_ptolemy",
+  "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
+  "stream": "stdout",
+  "timestamp": "2019-11-01T21:15:47+00:00"
+}
+```
+
+
+<Fields filters={true}>
+
+
+<Field
+  enumValues={null}
+  examples={["evil_ptolemy"]}
+  name={"container"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### container
+
+The Docker container name that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  name={"message"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### message
+
+The raw log message, unaltered.
+
+
+
+</Field>
+
+
+<Field
+  enumValues={["stdout","stderr"]}
+  examples={["stdout","stderr"]}
+  name={"stream"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### stream
+
+The [standard stream][urls.standard_streams] that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  name={"timestamp"}
+  path={null}
+  required={true}
+  type={"timestamp"}
+  >
+
+### timestamp
+
+The timestamp extracted from the Docker log event.
+
+
+
+</Field>
+
+
+</Fields>
 
 ## How It Works
 
@@ -123,7 +210,6 @@ Vector will automatically attempt to connect to the docker daemon for you. In mo
 situations if your current user is able to run `docker ps` then Vector will be able to
 connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
 use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -133,10 +219,9 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-## Guides
-
 
 [docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
 [docs.data-model#log]: ../../about/data-model#log
 [urls.docker_daemon]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
 [urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
+[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

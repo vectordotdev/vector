@@ -1,8 +1,7 @@
 ---
+title: Troubleshooting Guide
 description: A guide on debugging and troubleshooting Vector
 ---
-
-# Troubleshooting Guide
 
 This guide covers troubleshooting Vector. The sections are intended to be
 followed in order.

@@ -1,13 +1,14 @@
 ---
-title: Install On Docker
+title: Install Vector On Docker
 sidebar_label: Docker
 description: Using Vector on Docker
 ---
 
 Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
-available on [Docker Hub][urls.docker_hub_vector].
+available on [Docker Hub][urls.docker_hub_vector] which come pre-installed
+with Vector and any recommended system dependencies.
 
-## Usage
+## Running
 
 ```bash
 docker run timberio/vector:latest-alpine
@@ -46,7 +47,7 @@ is the image we recommend due to it's small size and reliability.
 This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
-## Versions
+## Previous Versions
 
 Vector's Docker images include a special `latest` version that will be updated
 whenever Vector is [released][urls.vector_releases]. All other

@@ -4,12 +4,20 @@ import './styles.css';
 
 function Fields({children, filters}) {
   const [onlyCommon, setOnlyCommon] = useState(false);
+  const [onlyRequired, setOnlyRequired] = useState(false);
   const [searchTerm, setSearchTerm] = useState(null);
 
-  let filteredChildren = children;
+  let childrenArray = Array.isArray(children) ? children : [children];
+  let commonRelevant = childrenArray.some(child => child.props.common);
+  let requiredRelevant = childrenArray.some(child => child.props.required);
+  let filteredChildren = childrenArray;
 
   if (onlyCommon) {
     filteredChildren = filteredChildren.filter(child => child.props.common);
+  }
+
+  if (onlyRequired) {
+    filteredChildren = filteredChildren.filter(child => child.props.required);
   }
 
   if (searchTerm) {
@@ -22,6 +30,7 @@ function Fields({children, filters}) {
     <div className="fields">
       {filters !== false ?
         (<div className="filters">
+          <span className="result-count">{filteredChildren.length} items</span>
           <div className=" search">
             <input
               type="text"
@@ -29,14 +38,22 @@ function Fields({children, filters}) {
               placeholder="🔍 Search..." />
           </div>
           <div className="checkboxes">
-            <span className="result-count">{filteredChildren.length} items</span>
-            <label title="Only show popular/common results">
+            {commonRelevant && (
+              <label title="Only show popular/common results">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyCommon(event.currentTarget.checked)}
                 checked={onlyCommon} />
               common only
-            </label>
+            </label>)}
+            {requiredRelevant && (
+              <label title="Only show required results">
+              <input
+                type="checkbox"
+                onChange={(event) => setOnlyRequired(event.currentTarget.checked)}
+                checked={onlyRequired} />
+              required only
+            </label>)}
           </div>
         </div>) :
         null}

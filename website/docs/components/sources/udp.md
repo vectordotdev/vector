@@ -138,9 +138,79 @@ The maximum bytes size of incoming messages before they are discarded.
 
 </Fields>
 
-## Fields
+## Output
 
-This component does not automatically add any fields.
+The following schema represents events as that are output from this source.
+
+<CodeHeader fileName="example.json" />
+
+```javascript
+{
+  "host": "my.host.com",
+  "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
+  "timestamp": "2019-11-01T21:15:47+00:00"
+}
+```
+
+
+<Fields filters={true}>
+
+
+<Field
+  enumValues={null}
+  examples={["my.host.com"]}
+  name={"host"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### host
+
+The upstream hostname.
+
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  name={"message"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### message
+
+The raw message, unaltered.
+
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  name={"timestamp"}
+  path={null}
+  required={true}
+  type={"timestamp"}
+  >
+
+### timestamp
+
+The exact time the event was ingested.
+
+
+
+</Field>
+
+
+</Fields>
 
 ## Input/Output
 

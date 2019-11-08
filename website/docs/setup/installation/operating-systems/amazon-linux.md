@@ -1,5 +1,5 @@
 ---
-title: Install On Amazon Linux
+title: Install Vector On Amazon Linux
 sidebar_label: Amazon Linux
 description: Install Vector on Amazon Linux
 ---
