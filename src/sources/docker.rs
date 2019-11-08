@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event,ValueKind},
+    event::{self, Event, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
