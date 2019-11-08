@@ -84,12 +84,8 @@ impl Transform for Geoip {
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             let mut lookup_results = IndexMap::new();
-            let ip_parsed = FromStr::from_str(ipaddress);
-            if ip_parsed.is_ok() {
-                let ip: IpAddr = ip_parsed.unwrap();
-                let v = self.dbreader.lookup(ip);
-                if v.is_ok() {
-                    let data: maxminddb::geoip2::City = v.unwrap();
+            if let Ok(ip) = FromStr::from_str(ipaddress) {
+                if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
                     let city = data.city;
                     if let Some(city) = city {
                         let city_names = city.names;
