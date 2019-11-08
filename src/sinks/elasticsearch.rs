@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::Event,
-    region::RegionOrEndpoint,
+    region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -39,8 +39,11 @@ pub struct ElasticSearchConfig {
     pub provider: Option<Provider>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
+    // TODO: This should be an Option, but when combined with flatten we never seem to get back
+    // a None. For now, we get optionality by handling the error during parsing when nothing is
+    // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
-    pub region: Option<RegionOrEndpoint>,
+    pub region: RegionOrEndpoint,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -128,9 +131,10 @@ impl ElasticSearchCommon {
             format!("Basic {}", base64::encode(token.as_bytes()))
         });
 
-        let region: Option<Region> = match config.region {
-            Some(ref region) => Some(region.try_into()?),
-            None => None,
+        let region: Option<Region> = match (&config.region).try_into() {
+            Ok(region) => Some(region),
+            Err(region::ParseError::MissingRegionAndEndpoint) => None,
+            Err(error) => return Err(error.into()),
         };
 
         let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
@@ -432,6 +436,20 @@ mod tests {
 
         assert_eq!(json!({}), action);
     }
+
+    #[test]
+    fn region_is_not_required() {
+        let input = r#"
+            host = "https://example.com"
+            doc_type = "_doc"
+            index = "my-jobs"
+            compression = "none"
+        "#;
+
+        let config: ElasticSearchConfig = toml::from_str(input).unwrap();
+        let common = ElasticSearchCommon::parse_config(&config).unwrap();
+        assert_eq!(None, common.region);
+    }
 }
 
 #[cfg(test)]
@@ -539,7 +557,7 @@ mod integration_tests {
         run_insert_tests(ElasticSearchConfig {
             host: url.into(),
             provider: Some(Provider::Aws),
-            region: Some(RegionOrEndpoint::with_endpoint(url.into())),
+            region: RegionOrEndpoint::with_endpoint(url.into()),
             ..config()
         });
     }
