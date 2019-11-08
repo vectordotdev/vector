@@ -438,12 +438,9 @@ mod tests {
     }
 
     #[test]
-    fn region_is_not_required() {
+    fn region_is_not_required_for_default() {
         let input = r#"
             host = "https://example.com"
-            doc_type = "_doc"
-            index = "my-jobs"
-            compression = "none"
         "#;
 
         let config: ElasticSearchConfig = toml::from_str(input).unwrap();
