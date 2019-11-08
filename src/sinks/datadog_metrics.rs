@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         retries::FixedRetryPolicy,
-        BatchServiceSink, MetricBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -44,8 +44,8 @@ pub struct DatadogConfig {
     #[serde(default = "default_host")]
     pub host: String,
     pub api_key: String,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -108,8 +108,7 @@ impl SinkConfig for DatadogConfig {
 
 impl DatadogSvc {
     pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
-        let batch_size = config.batch_size.unwrap_or(20);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let batch = config.batch.unwrap_or(20, 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -152,11 +151,8 @@ impl DatadogSvc {
             .timeout(Duration::from_secs(timeout))
             .service(datadog_http_service);
 
-        let sink = BatchServiceSink::new(service, acker).batched_with_min(
-            MetricBuffer::new(),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        );
+        let sink =
+            BatchServiceSink::new(service, acker).batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }

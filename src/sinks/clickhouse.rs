@@ -5,7 +5,7 @@ use crate::{
         http::{HttpRetryLogic, HttpService, Response},
         retries::{FixedRetryPolicy, RetryLogic},
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -27,10 +27,10 @@ pub struct ClickhouseConfig {
     pub host: String,
     pub table: String,
     pub database: Option<String>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub basic_auth: Option<ClickHouseBasicAuthConfig>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -89,8 +89,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -143,11 +142,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with(move |event: Event| {
             let mut body = serde_json::to_vec(&event.as_log().all_fields())
                 .expect("Events should be valid json!");
@@ -281,7 +276,10 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch_size: Some(1),
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
             request_retry_attempts: Some(1),
             ..Default::default()
         };
@@ -317,7 +315,10 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch_size: Some(1),
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
             ..Default::default()
         };
 

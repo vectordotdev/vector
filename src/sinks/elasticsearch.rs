@@ -6,7 +6,7 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -35,10 +35,10 @@ pub struct ElasticSearchConfig {
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
     #[serde(flatten)]
     pub region: Option<RegionOrEndpoint>,
 
@@ -185,8 +185,7 @@ fn es(
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -286,11 +285,7 @@ fn es(
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
     Box::new(sink)
@@ -467,8 +462,7 @@ mod integration_tests {
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            ..Default::default()
+            ..config()
         };
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
@@ -521,8 +515,7 @@ mod integration_tests {
             host: "http://localhost:9200".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            ..Default::default()
+            ..config()
         });
     }
 
@@ -532,12 +525,11 @@ mod integration_tests {
             host: "https://localhost:9201".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
             tls: Some(TlsOptions {
                 ca_path: Some("tests/data/Vector_CA.crt".into()),
                 ..Default::default()
             }),
-            ..Default::default()
+            ..config()
         });
     }
 
@@ -546,10 +538,9 @@ mod integration_tests {
         let url = "http://localhost:4571";
         run_insert_tests(ElasticSearchConfig {
             host: url.into(),
-            batch_size: Some(1),
             provider: Some(Provider::Aws),
             region: Some(RegionOrEndpoint::with_endpoint(url.into())),
-            ..Default::default()
+            ..config()
         });
     }
 
@@ -619,5 +610,15 @@ mod integration_tests {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
             })
+    }
+
+    fn config() -> ElasticSearchConfig {
+        ElasticSearchConfig {
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
+            ..Default::default()
+        }
     }
 }

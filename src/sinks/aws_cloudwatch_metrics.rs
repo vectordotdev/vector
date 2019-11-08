@@ -4,7 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, MetricBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -31,8 +31,8 @@ pub struct CloudWatchMetricsSinkConfig {
     pub namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -71,8 +71,7 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<super::RouterSink> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
-        let batch_size = config.batch_size.unwrap_or(20);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let batch = config.batch.unwrap_or(20, 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -96,11 +95,7 @@ impl CloudWatchMetricsSvc {
             .timeout(Duration::from_secs(timeout))
             .service(cloudwatch_metrics);
 
-        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
-            MetricBuffer::new(),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        );
+        let sink = BatchServiceSink::new(svc, acker).batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }
