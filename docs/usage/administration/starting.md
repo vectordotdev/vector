@@ -44,6 +44,22 @@ brew services start vector
 | `-v, --verbose` | Drops the log level to `debug`. |
 | `-vv` | Drops the log level to `trace`, the lowest level possible. |
 
+## Discovery
+
+In order to help you explore its features Vector provides a subcommand `list`
+that lists all available sources, transforms and sinks:
+
+{% tabs %}
+{% tab title="List" %}
+```bash
+vector list
+```
+{% endtab %}
+{% endtabs %}
+
+By default this prints a human readable representation of all components. You
+can view options for customizing the output of `list` with `vector list --help`.
+
 ## Daemonizing
 
 Vector does not _directly_ offer a way to daemonize the Vector process. We
