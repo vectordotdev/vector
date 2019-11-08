@@ -791,7 +791,7 @@ mod tests {
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
 
-    static BUXYBOX_IMAGE_TAG: &'static str = "1.31.1";
+    static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
     fn pull(image: &str, docker: &Docker, rt: &mut runtime::Runtime) {
         let list_option = shiplift::ImageListOptions::builder()
