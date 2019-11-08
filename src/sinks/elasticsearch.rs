@@ -557,7 +557,7 @@ mod integration_tests {
         run_insert_tests(ElasticSearchConfig {
             host: url.into(),
             provider: Some(Provider::Aws),
-            region: Some(RegionOrEndpoint::with_endpoint(url.into())),
+            region: RegionOrEndpoint::with_endpoint(url.into()),
             ..config()
         });
     }
