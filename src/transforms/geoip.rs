@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
 use indexmap::IndexMap;
-use std::net::IpAddr;
 use std::str::FromStr;
 use tracing::field;
 
