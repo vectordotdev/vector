@@ -131,7 +131,7 @@ impl ElasticSearchCommon {
             format!("Basic {}", base64::encode(token.as_bytes()))
         });
 
-        let region: Option<Region> = match config.region.clone().try_into() {
+        let region: Option<Region> = match (&config.region).try_into() {
             Ok(region) => Some(region),
             Err(region::ParseError::MissingRegionAndEndpoint) => None,
             Err(error) => return Err(error.into()),
