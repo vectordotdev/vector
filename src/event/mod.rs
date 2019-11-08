@@ -408,6 +408,43 @@ impl From<proto::EventWrapper> for Event {
                             tags,
                         })
                     }
+                    MetricProto::AggregatedSet(set) => {
+                        let timestamp = set
+                            .timestamp
+                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+
+                        let tags = if !set.tags.is_empty() {
+                            Some(set.tags)
+                        } else {
+                            None
+                        };
+
+                        Event::Metric(Metric::AggregatedSet {
+                            name: set.name,
+                            values: set.values.into_iter().collect(),
+                            timestamp,
+                            tags,
+                        })
+                    }
+                    MetricProto::AggregatedDistribution(dist) => {
+                        let timestamp = dist
+                            .timestamp
+                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+
+                        let tags = if !dist.tags.is_empty() {
+                            Some(dist.tags)
+                        } else {
+                            None
+                        };
+
+                        Event::Metric(Metric::AggregatedDistribution {
+                            name: dist.name,
+                            values: dist.values,
+                            sample_rates: dist.sample_rates,
+                            timestamp,
+                            tags,
+                        })
+                    }
                     MetricProto::AggregatedHistogram(hist) => {
                         let timestamp = hist
                             .timestamp
@@ -617,6 +654,56 @@ impl From<Event> for proto::EventWrapper {
                 };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::Histogram(hist)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::AggregatedSet {
+                name,
+                values,
+                timestamp,
+                tags,
+            }) => {
+                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                });
+
+                let tags = tags.unwrap_or_default();
+
+                let set = proto::AggregatedSet {
+                    name,
+                    values: values.into_iter().collect(),
+                    timestamp,
+                    tags,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::AggregatedSet(set)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::AggregatedDistribution {
+                name,
+                values,
+                sample_rates,
+                timestamp,
+                tags,
+            }) => {
+                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                    seconds: ts.timestamp(),
+                    nanos: ts.timestamp_subsec_nanos() as i32,
+                });
+
+                let tags = tags.unwrap_or_default();
+
+                let dist = proto::AggregatedDistribution {
+                    name,
+                    values,
+                    sample_rates,
+                    timestamp,
+                    tags,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::AggregatedDistribution(dist)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }

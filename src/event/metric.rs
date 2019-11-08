@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Serialize, is_enum_variant)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -43,6 +43,19 @@ pub enum Metric {
         timestamp: Option<DateTime<Utc>>,
         tags: Option<HashMap<String, String>>,
     },
+    AggregatedSet {
+        name: String,
+        values: HashSet<String>,
+        timestamp: Option<DateTime<Utc>>,
+        tags: Option<HashMap<String, String>>,
+    },
+    AggregatedDistribution {
+        name: String,
+        values: Vec<f64>,
+        sample_rates: Vec<u32>,
+        timestamp: Option<DateTime<Utc>>,
+        tags: Option<HashMap<String, String>>,
+    },
     AggregatedHistogram {
         name: String,
         buckets: Vec<f64>,
@@ -72,6 +85,8 @@ impl Metric {
             Metric::Set { tags, .. } => tags,
             Metric::AggregatedCounter { tags, .. } => tags,
             Metric::AggregatedGauge { tags, .. } => tags,
+            Metric::AggregatedSet { tags, .. } => tags,
+            Metric::AggregatedDistribution { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::AggregatedSummary { tags, .. } => tags,
         }
@@ -85,164 +100,108 @@ impl Metric {
             Metric::Set { tags, .. } => tags,
             Metric::AggregatedCounter { tags, .. } => tags,
             Metric::AggregatedGauge { tags, .. } => tags,
+            Metric::AggregatedSet { tags, .. } => tags,
+            Metric::AggregatedDistribution { tags, .. } => tags,
             Metric::AggregatedHistogram { tags, .. } => tags,
             Metric::AggregatedSummary { tags, .. } => tags,
         }
     }
 
-    pub fn merge(&mut self, other: &Self) {
+    pub fn is_aggregated(&self) -> bool {
+        match self {
+            Metric::Counter { .. } => false,
+            Metric::Gauge { .. } => false,
+            Metric::Histogram { .. } => false,
+            Metric::Set { .. } => false,
+            Metric::AggregatedCounter { .. } => true,
+            Metric::AggregatedGauge { .. } => true,
+            Metric::AggregatedSet { .. } => true,
+            Metric::AggregatedDistribution { .. } => true,
+            Metric::AggregatedHistogram { .. } => true,
+            Metric::AggregatedSummary { .. } => true,
+        }
+    }
+
+    pub fn into_aggregated(self) -> Metric {
+        match self {
+            Metric::Counter {
+                name,
+                val,
+                timestamp,
+                tags,
+            } => Metric::AggregatedCounter {
+                name,
+                val,
+                timestamp,
+                tags,
+            },
+            Metric::Gauge {
+                name,
+                val,
+                timestamp,
+                tags,
+            } => Metric::AggregatedGauge {
+                name,
+                val,
+                timestamp,
+                tags,
+            },
+            Metric::Histogram {
+                name,
+                val,
+                sample_rate,
+                timestamp,
+                tags,
+            } => Metric::AggregatedDistribution {
+                name,
+                values: vec![val],
+                sample_rates: vec![sample_rate],
+                timestamp,
+                tags,
+            },
+            Metric::Set {
+                name,
+                val,
+                timestamp,
+                tags,
+            } => Metric::AggregatedSet {
+                name,
+                values: vec![val].into_iter().collect(),
+                timestamp,
+                tags,
+            },
+            m @ Metric::AggregatedCounter { .. } => m,
+            m @ Metric::AggregatedGauge { .. } => m,
+            m @ Metric::AggregatedSet { .. } => m,
+            m @ Metric::AggregatedDistribution { .. } => m,
+            m @ Metric::AggregatedHistogram { .. } => m,
+            m @ Metric::AggregatedSummary { .. } => m,
+        }
+    }
+
+    pub fn add(&mut self, other: &Self) {
         match (self, other) {
-            (
-                Metric::Counter {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::Counter {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name {
-                    *val += *new_val;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
+            (Metric::AggregatedCounter { ref mut val, .. }, Metric::Counter { val: inc, .. }) => {
+                *val += *inc;
+            }
+            (Metric::AggregatedGauge { ref mut val, .. }, Metric::Gauge { val: inc, .. }) => {
+                *val += *inc;
+            }
+            (Metric::AggregatedSet { ref mut values, .. }, Metric::Set { val, .. }) => {
+                values.insert(val.to_owned());
             }
             (
-                Metric::Gauge {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::Gauge {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name {
-                    *val += *new_val;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
-            }
-            (
-                Metric::Set {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::Set {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name {
-                    *val = new_val.clone();
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
-            }
-            (
-                Metric::Histogram {
-                    ref mut name,
-                    ref mut val,
-                    ref mut sample_rate,
-                    ref mut timestamp,
-                    ref mut tags,
+                Metric::AggregatedDistribution {
+                    ref mut values,
+                    ref mut sample_rates,
+                    ..
                 },
                 Metric::Histogram {
-                    name: new_name,
-                    val: new_val,
-                    sample_rate: new_sample_rate,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
+                    val, sample_rate, ..
                 },
             ) => {
-                if name == new_name && val == new_val {
-                    *sample_rate += *new_sample_rate;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                };
-            }
-            (
-                Metric::AggregatedCounter {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::AggregatedCounter {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name {
-                    *val = *new_val;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
-            }
-            (
-                Metric::AggregatedGauge {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::AggregatedGauge {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name {
-                    *val = *new_val;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
-            }
-            (
-                Metric::AggregatedHistogram {
-                    ref mut name,
-                    ref mut buckets,
-                    ref mut counts,
-                    ref mut count,
-                    ref mut sum,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::AggregatedHistogram {
-                    name: new_name,
-                    buckets: new_buckets,
-                    counts: new_counts,
-                    count: new_count,
-                    sum: new_sum,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name && buckets == new_buckets {
-                    for i in 0..counts.len() {
-                        counts[i] += new_counts[i];
-                    }
-                    *sum += new_sum;
-                    *count += new_count;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
+                values.push(*val);
+                sample_rates.push(*sample_rate);
             }
             _ => {}
         }
@@ -270,54 +229,26 @@ mod test {
 
     #[test]
     fn merge_counters() {
-        let mut counter1 = Metric::Counter {
+        let mut counter = Metric::AggregatedCounter {
             name: "counter".into(),
             val: 1.0,
             timestamp: None,
             tags: None,
         };
 
-        let counter2 = Metric::Counter {
+        let delta = Metric::Counter {
             name: "counter".into(),
             val: 2.0,
             timestamp: Some(ts()),
             tags: Some(tags()),
         };
 
-        counter1.merge(&counter2);
+        counter.add(&delta);
         assert_eq!(
-            counter1,
-            Metric::Counter {
+            counter,
+            Metric::AggregatedCounter {
                 name: "counter".into(),
                 val: 3.0,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-            }
-        )
-    }
-
-    #[test]
-    fn merge_incompatible_counters() {
-        let mut counter1 = Metric::Counter {
-            name: "first".into(),
-            val: 1.0,
-            timestamp: None,
-            tags: None,
-        };
-
-        let counter2 = Metric::Counter {
-            name: "second".into(),
-            val: 2.0,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-        };
-
-        counter1.merge(&counter2);
-        assert_eq!(
-            counter1,
-            Metric::Counter {
-                name: "first".into(),
-                val: 1.0,
                 timestamp: None,
                 tags: None,
             }
@@ -326,99 +257,71 @@ mod test {
 
     #[test]
     fn merge_gauges() {
-        let mut gauge1 = Metric::Gauge {
+        let mut gauge = Metric::AggregatedGauge {
             name: "gauge".into(),
             val: 1.0,
             timestamp: None,
             tags: None,
         };
 
-        let gauge2 = Metric::Gauge {
+        let delta = Metric::Gauge {
             name: "gauge".into(),
             val: -2.0,
             timestamp: Some(ts()),
             tags: Some(tags()),
         };
 
-        gauge1.merge(&gauge2);
+        gauge.add(&delta);
         assert_eq!(
-            gauge1,
-            Metric::Gauge {
-                name: "gauge".into(),
-                val: -1.0,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-            }
-        )
-    }
-
-    #[test]
-    fn merge_aggregated_gauges() {
-        let mut gauge1 = Metric::AggregatedGauge {
-            name: "gauge".into(),
-            val: 1.0,
-            timestamp: None,
-            tags: None,
-        };
-
-        let gauge2 = Metric::AggregatedGauge {
-            name: "gauge".into(),
-            val: -2.0,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-        };
-
-        gauge1.merge(&gauge2);
-        assert_eq!(
-            gauge1,
+            gauge,
             Metric::AggregatedGauge {
                 name: "gauge".into(),
-                val: -2.0,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
+                val: -1.0,
+                timestamp: None,
+                tags: None,
             }
         )
     }
 
     #[test]
     fn merge_sets() {
-        let mut set1 = Metric::Set {
+        let mut set = Metric::AggregatedSet {
             name: "set".into(),
-            val: "old".into(),
+            values: vec!["old".into()].into_iter().collect(),
             timestamp: None,
             tags: None,
         };
 
-        let set2 = Metric::Set {
+        let delta = Metric::Set {
             name: "set".into(),
             val: "new".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
         };
 
-        set1.merge(&set2);
+        set.add(&delta);
         assert_eq!(
-            set1,
-            Metric::Set {
+            set,
+            Metric::AggregatedSet {
                 name: "set".into(),
-                val: "new".into(),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
+                values: vec!["old".into(), "new".into()].into_iter().collect(),
+                timestamp: None,
+                tags: None,
             }
         )
     }
 
     #[test]
     fn merge_histograms() {
-        let mut hist1 = Metric::Histogram {
+        let mut dist = Metric::AggregatedDistribution {
             name: "hist".into(),
-            val: 1.0,
-            sample_rate: 10,
+            values: vec![1.0],
+            sample_rates: vec![10],
             timestamp: None,
             tags: None,
         };
 
-        let hist2 = Metric::Histogram {
+        let delta = Metric::Histogram {
             name: "hist".into(),
             val: 1.0,
             sample_rate: 20,
@@ -426,80 +329,15 @@ mod test {
             tags: Some(tags()),
         };
 
-        hist1.merge(&hist2);
+        dist.add(&delta);
         assert_eq!(
-            hist1,
-            Metric::Histogram {
+            dist,
+            Metric::AggregatedDistribution {
                 name: "hist".into(),
-                val: 1.0,
-                sample_rate: 30,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-            }
-        )
-    }
-
-    #[test]
-    fn merge_aggregated_counter() {
-        let mut counter1 = Metric::AggregatedCounter {
-            name: "counter".into(),
-            val: 1.0,
-            timestamp: None,
-            tags: None,
-        };
-
-        let counter2 = Metric::AggregatedCounter {
-            name: "counter".into(),
-            val: 2.0,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-        };
-
-        counter1.merge(&counter2);
-        assert_eq!(
-            counter1,
-            Metric::AggregatedCounter {
-                name: "counter".into(),
-                val: 2.0,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-            }
-        )
-    }
-
-    #[test]
-    fn merge_aggregated_histograms() {
-        let mut hist1 = Metric::AggregatedHistogram {
-            name: "hist".into(),
-            buckets: vec![1.0, 2.0, 4.0],
-            counts: vec![1, 5, 15],
-            count: 21,
-            sum: 10.0,
-            timestamp: None,
-            tags: None,
-        };
-
-        let hist2 = Metric::AggregatedHistogram {
-            name: "hist".into(),
-            buckets: vec![1.0, 2.0, 4.0],
-            counts: vec![2, 10, 30],
-            count: 42,
-            sum: 20.0,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-        };
-
-        hist1.merge(&hist2);
-        assert_eq!(
-            hist1,
-            Metric::AggregatedHistogram {
-                name: "hist".into(),
-                buckets: vec![1.0, 2.0, 4.0],
-                counts: vec![3, 15, 45],
-                count: 63,
-                sum: 30.0,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
+                values: vec![1.0, 1.0],
+                sample_rates: vec![10, 20],
+                timestamp: None,
+                tags: None,
             }
         )
     }

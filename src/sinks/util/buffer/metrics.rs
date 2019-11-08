@@ -27,6 +27,9 @@ impl Hash for MetricEntry {
                 name.hash(state);
                 val.to_bits().hash(state);
             }
+            Metric::AggregatedDistribution { name, .. } | Metric::AggregatedSet { name, .. } => {
+                name.hash(state);
+            }
             Metric::AggregatedHistogram { name, buckets, .. } => {
                 name.hash(state);
                 for bucket in buckets {
@@ -66,12 +69,14 @@ impl PartialEq for MetricEntry {
 
 #[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
+    state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
 }
 
 impl MetricBuffer {
     pub fn new() -> Self {
         Self {
+            state: HashSet::new(),
             metrics: HashSet::new(),
         }
     }
@@ -87,19 +92,16 @@ impl Batch for MetricBuffer {
 
     fn push(&mut self, item: Self::Input) {
         let item = item.into_metric();
-        let new = MetricEntry(item.clone());
 
-        match item {
-            // cannot be aggregated
-            Metric::Set { .. }
-            | Metric::AggregatedGauge { .. }
-            | Metric::AggregatedSummary { .. } => {
+        match &item {
+            metric if metric.is_aggregated() => {
+                let new = MetricEntry(item);
                 self.metrics.insert(new);
             }
             _ => {
-                // counters, gauges, aggregated counters, histograms
+                let new = MetricEntry(item.clone().into_aggregated());
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.merge(&item);
+                    existing.add(&item);
                     self.metrics.insert(MetricEntry(existing));
                 } else {
                     self.metrics.insert(new);
@@ -113,7 +115,15 @@ impl Batch for MetricBuffer {
     }
 
     fn fresh(&self) -> Self {
+        let mut state = self.state.clone();
+        for entry in self.metrics.iter() {
+            if entry.0.is_aggregated_gauge() {
+                state.insert(entry.clone());
+            }
+        }
+
         Self {
+            state,
             metrics: HashSet::new(),
         }
     }
@@ -197,37 +207,37 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-0".into(),
                     val: 0.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-0".into(),
                     val: 6.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-1".into(),
                     val: 1.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-1".into(),
                     val: 1.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-2".into(),
                     val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-3".into(),
                     val: 3.0,
                     timestamp: None,
@@ -239,13 +249,13 @@ mod test {
         assert_eq!(
             sorted(&buffer[1].clone().finish()),
             [
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-2".into(),
                     val: 2.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Counter {
+                Metric::AggregatedCounter {
                     name: "counter-3".into(),
                     val: 3.0,
                     timestamp: None,
@@ -304,25 +314,25 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-0".into(),
                     val: 0.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-0".into(),
                     val: 6.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-1".into(),
                     val: 1.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-2".into(),
                     val: 2.0,
                     timestamp: None,
@@ -334,25 +344,25 @@ mod test {
         assert_eq!(
             sorted(&buffer[1].clone().finish()),
             [
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-0".into(),
                     val: 0.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-1".into(),
                     val: 1.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-3".into(),
                     val: 3.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-4".into(),
                     val: 4.0,
                     timestamp: None,
@@ -364,19 +374,19 @@ mod test {
         assert_eq!(
             sorted(&buffer[2].clone().finish()),
             [
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-2".into(),
                     val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-3".into(),
                     val: 3.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::Gauge {
+                Metric::AggregatedGauge {
                     name: "gauge-4".into(),
                     val: 4.0,
                     timestamp: None,
@@ -421,32 +431,14 @@ mod test {
 
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
-            [
-                Metric::Set {
-                    name: "set-0".into(),
-                    val: "0".into(),
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-                Metric::Set {
-                    name: "set-0".into(),
-                    val: "1".into(),
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-                Metric::Set {
-                    name: "set-0".into(),
-                    val: "2".into(),
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-                Metric::Set {
-                    name: "set-0".into(),
-                    val: "3".into(),
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-            ]
+            [Metric::AggregatedSet {
+                name: "set-0".into(),
+                values: vec!["0".into(), "1".into(), "2".into(), "3".into()]
+                    .into_iter()
+                    .collect(),
+                timestamp: None,
+                tags: Some(tag("production")),
+            },]
         );
     }
 
@@ -488,31 +480,31 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::Histogram {
+                Metric::AggregatedDistribution {
                     name: "hist-2".into(),
-                    val: 2.0,
-                    sample_rate: 50,
+                    values: vec![2.0, 2.0, 2.0, 2.0, 2.0],
+                    sample_rates: vec![10, 10, 10, 10, 10],
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Histogram {
+                Metric::AggregatedDistribution {
                     name: "hist-3".into(),
-                    val: 3.0,
-                    sample_rate: 10,
+                    values: vec![3.0],
+                    sample_rates: vec![10],
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Histogram {
+                Metric::AggregatedDistribution {
                     name: "hist-4".into(),
-                    val: 4.0,
-                    sample_rate: 10,
+                    values: vec![4.0],
+                    sample_rates: vec![10],
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::Histogram {
+                Metric::AggregatedDistribution {
                     name: "hist-5".into(),
-                    val: 5.0,
-                    sample_rate: 10,
+                    values: vec![5.0],
+                    sample_rates: vec![10],
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
@@ -565,9 +557,9 @@ mod test {
                 Metric::AggregatedHistogram {
                     name: "buckets-2".into(),
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![5, 10, 20],
-                    count: 6 * 5,
-                    sum: 40.0,
+                    counts: vec![1, 2, 4],
+                    count: 6,
+                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },

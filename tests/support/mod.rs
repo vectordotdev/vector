@@ -120,6 +120,16 @@ impl Transform for MockTransform {
             }) => {
                 *val += self.increase;
             }
+            Event::Metric(Metric::AggregatedDistribution {
+                name: _,
+                values,
+                sample_rates,
+                timestamp: _,
+                tags: _,
+            }) => {
+                values.push(self.increase);
+                sample_rates.push(1);
+            }
             Event::Metric(Metric::AggregatedHistogram {
                 name: _,
                 buckets: _,
@@ -167,6 +177,14 @@ impl Transform for MockTransform {
                 tags: _,
             }) => {
                 val.push_str(&self.suffix);
+            }
+            Event::Metric(Metric::AggregatedSet {
+                name: _,
+                values,
+                timestamp: _,
+                tags: _,
+            }) => {
+                values.insert(self.suffix.clone());
             }
         };
         Some(event)

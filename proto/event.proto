@@ -34,8 +34,10 @@ message Metric {
     Set set = 4;
     AggregatedCounter aggregated_counter = 5;
     AggregatedGauge aggregated_gauge = 6;
-    AggregatedHistogram aggregated_histogram = 7;
-    AggregatedSummary aggregated_summary = 8;
+    AggregatedSet aggregated_set = 7;
+    AggregatedDistribution aggregated_distribution = 8;
+    AggregatedHistogram aggregated_histogram = 9;
+    AggregatedSummary aggregated_summary = 10;
   }
 }
 
@@ -59,6 +61,21 @@ message Histogram {
   uint32 sample_rate = 3;
   google.protobuf.Timestamp timestamp = 4;
   map<string, string> tags = 5;
+}
+
+message AggregatedSet {
+  string name = 1;
+  repeated string values = 2;
+  google.protobuf.Timestamp timestamp = 6;
+  map<string, string> tags = 7;
+}
+
+message AggregatedDistribution {
+  string name = 1;
+  repeated double values = 2;
+  repeated uint32 sample_rates = 3;
+  google.protobuf.Timestamp timestamp = 6;
+  map<string, string> tags = 7;
 }
 
 message AggregatedHistogram {
