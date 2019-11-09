@@ -61,7 +61,7 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
 
 `optional` `no default` `type: string` `example: "target"`
 
-If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name.
+If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error.
 
 ## Input/Output
 

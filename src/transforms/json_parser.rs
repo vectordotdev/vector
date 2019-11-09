@@ -6,6 +6,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -45,7 +46,7 @@ pub struct JsonParser {
     field: Atom,
     drop_invalid: bool,
     drop_field: bool,
-    prefix: Option<String>,
+    target_field: Option<String>,
 }
 
 impl From<JsonParserConfig> for JsonParser {
@@ -55,13 +56,12 @@ impl From<JsonParserConfig> for JsonParser {
         } else {
             &event::MESSAGE
         };
-        let prefix = config.target_field.as_ref().map(|t| format!("{}.", t));
 
         JsonParser {
             field: field.clone(),
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
-            prefix,
+            target_field: config.target_field.clone(),
         }
     }
 }
@@ -92,10 +92,23 @@ impl Transform for JsonParser {
             });
 
         if let Some(object) = parsed {
-            for (name, value) in object {
-                match self.prefix {
-                    None => insert(&mut event, name, value),
-                    Some(ref p) => insert(&mut event, format!("{}{}", p, name), value),
+            match self.target_field {
+                Some(ref target_field) => {
+                    if event.as_log().contains(&target_field.as_str().into()) {
+                        error!(
+                            message = "target field already exsists",
+                            target_field = field::display(target_field)
+                        );
+                    } else {
+                        for (name, value) in object {
+                            insert(&mut event, format!("{}.{}", target_field, name), value);
+                        }
+                    }
+                }
+                None => {
+                    for (name, value) in object {
+                        insert(&mut event, name, value);
+                    }
                 }
             }
         } else if self.drop_invalid {
@@ -406,7 +419,7 @@ mod test {
     }
 
     #[test]
-    fn target_field() {
+    fn target_field_works() {
         let mut parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             target_field: Some("that".into()),
@@ -419,5 +432,23 @@ mod test {
 
         assert_eq!(event[&Atom::from("that.greeting")], "hello".into());
         assert_eq!(event[&Atom::from("that.name")], "bob".into());
+    }
+
+    #[test]
+    fn target_field_preserves_existing() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
+            target_field: Some("message".into()),
+            ..Default::default()
+        });
+
+        let message = r#"{"greeting": "hello", "name": "bob"}"#;
+        let event = Event::from(message);
+        let event = parser.transform(event).unwrap();
+        let event = event.as_log();
+
+        assert_eq!(event[&"message".into()], message.into());
+        assert_eq!(event.get(&"message.greeting".into()), None);
+        assert_eq!(event.get(&"message.name".into()), None);
     }
 }
