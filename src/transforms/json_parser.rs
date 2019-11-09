@@ -15,6 +15,7 @@ pub struct JsonParserConfig {
     pub drop_invalid: bool,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
+    pub target_field: Option<String>,
 }
 
 inventory::submit! {
@@ -44,6 +45,7 @@ pub struct JsonParser {
     field: Atom,
     drop_invalid: bool,
     drop_field: bool,
+    prefix: Option<String>,
 }
 
 impl From<JsonParserConfig> for JsonParser {
@@ -53,11 +55,13 @@ impl From<JsonParserConfig> for JsonParser {
         } else {
             &event::MESSAGE
         };
+        let prefix = config.target_field.as_ref().map(|t| format!("{}.", t));
 
         JsonParser {
             field: field.clone(),
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
+            prefix,
         }
     }
 }
@@ -89,7 +93,10 @@ impl Transform for JsonParser {
 
         if let Some(object) = parsed {
             for (name, value) in object {
-                insert(&mut event, name, value);
+                match self.prefix {
+                    None => insert(&mut event, name, value),
+                    Some(ref p) => insert(&mut event, format!("{}{}", p, name), value),
+                }
             }
         } else if self.drop_invalid {
             return None;
@@ -396,5 +403,21 @@ mod test {
             event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
             1234.into()
         );
+    }
+
+    #[test]
+    fn target_field() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
+            target_field: Some("that".into()),
+            ..Default::default()
+        });
+
+        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let event = parser.transform(event).unwrap();
+        let event = event.as_log();
+
+        assert_eq!(event[&Atom::from("that.greeting")], "hello".into());
+        assert_eq!(event[&Atom::from("that.name")], "bob".into());
     }
 }

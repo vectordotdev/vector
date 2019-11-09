@@ -22,3 +22,12 @@ null = false
 description = """\
 The log field to decode as JSON. Must be a `string` value type.\
 """
+
+[transforms.json_parser.options.target_field]
+type = "string"
+null = true
+examples = ["target"]
+description = """\
+If this setting is present, the parsed JSON will be inserted into the \
+log as a sub-object with this name.\
+"""

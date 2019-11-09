@@ -838,6 +838,14 @@ data_dir = "/var/lib/vector"
   # * type: string
   field = "message"
 
+  # If this setting is present, the parsed JSON will be inserted into the log as
+  # a sub-object with this name.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  target_field = "target"
+
 # Accepts `log` events and allows you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #

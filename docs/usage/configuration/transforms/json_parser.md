@@ -38,6 +38,7 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
   
   # OPTIONAL
   field = "message" # default
+  target_field = "target" # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -55,6 +56,12 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
 `optional` `default: "message"` `type: string`
 
 The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+
+### target_field
+
+`optional` `no default` `type: string` `example: "target"`
+
+If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name.
 
 ## Input/Output
 
