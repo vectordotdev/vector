@@ -24,6 +24,12 @@ mv vector-$TARGET/bin/vector $project_root/target/$TARGET/release
 popd
 rm -rf $td
 
+# Create short plain-text extended description for the package
+cmark-gfm $project_root/README.md --to commonmark | # expand link aliases
+  sed '/^## /Q' | # select text before first header
+  cmark-gfm --to plaintext | # convert to plain text
+  fmt -uw 80 > $project_root/target/debian-extended-description.txt
+
 # Build the deb
 #
 #   --target
