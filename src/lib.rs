@@ -12,6 +12,7 @@ extern crate derivative;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
+pub mod conditions;
 pub mod event;
 pub mod generate;
 pub mod list;
@@ -26,6 +27,7 @@ pub mod topology;
 pub mod trace;
 pub mod transforms;
 pub mod types;
+pub mod unit_test;
 
 pub use event::Event;
 

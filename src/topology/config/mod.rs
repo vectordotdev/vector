@@ -1,4 +1,8 @@
-use crate::{event::Event, sinks, sources, transforms};
+use crate::{
+    conditions,
+    event::{Event, Metric},
+    sinks, sources, transforms,
+};
 use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
@@ -22,6 +26,8 @@ pub struct Config {
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
+    #[serde(default)]
+    pub tests: Vec<TestDefinition>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
@@ -174,6 +180,52 @@ pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestDefinition {
+    pub name: String,
+    pub input: TestInput,
+    pub outputs: Vec<TestOutput>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(untagged)]
+pub enum TestInputValue {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestInput {
+    pub insert_at: String,
+    #[serde(default = "default_test_input_type", rename = "type")]
+    pub type_str: String,
+    pub value: Option<String>,
+    pub log_fields: Option<IndexMap<String, TestInputValue>>,
+    pub metric: Option<Metric>,
+}
+
+fn default_test_input_type() -> String {
+    "raw".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestOutput {
+    pub extract_from: String,
+    pub conditions: IndexMap<String, TestCondition>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TestCondition {
+    String(String),
+    Embedded(Box<dyn conditions::ConditionConfig>),
+}
+
 // Helper methods for programming construction during tests
 impl Config {
     pub fn empty() -> Self {
@@ -182,6 +234,7 @@ impl Config {
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
+            tests: Vec::new(),
         }
     }
 
