@@ -15,6 +15,7 @@ The `tokenizer` transform accepts [`log`][docs.data-model#log] events and allows
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

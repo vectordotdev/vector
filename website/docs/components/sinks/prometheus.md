@@ -15,6 +15,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

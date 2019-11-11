@@ -63,6 +63,7 @@ This component outputs [`metric` events][docs.data-model.metric].
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="counter"
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer/Histogram","value":"timer-histogram"}]}>
 

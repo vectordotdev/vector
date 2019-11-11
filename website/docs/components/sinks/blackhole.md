@@ -15,6 +15,7 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model#log] and [`me
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

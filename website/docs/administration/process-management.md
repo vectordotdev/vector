@@ -13,6 +13,7 @@ necessary.
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="manual"
   values={[
     { label: 'Manual', value: 'manual', },

@@ -15,6 +15,7 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

@@ -11,6 +11,7 @@ simple to install:
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="humans"
   values={[
     { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },

@@ -15,6 +15,7 @@ The `regex_parser` transform accepts [`log`][docs.data-model#log] events and all
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

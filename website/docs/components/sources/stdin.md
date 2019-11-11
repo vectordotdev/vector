@@ -15,6 +15,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

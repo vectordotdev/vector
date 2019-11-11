@@ -15,6 +15,7 @@ The `log_to_metric` transform accepts [`log`][docs.data-model#log] events and al
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

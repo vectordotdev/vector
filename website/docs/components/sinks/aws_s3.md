@@ -15,6 +15,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] e
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

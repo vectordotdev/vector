@@ -15,6 +15,7 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model#log] events to a f
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

@@ -15,6 +15,7 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model#log] events to a
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

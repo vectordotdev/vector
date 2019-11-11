@@ -15,6 +15,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model#log] events to [A
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

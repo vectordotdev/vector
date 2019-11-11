@@ -3,6 +3,7 @@ This component outputs [`<%= type %>` events][docs.data-model.<%= type %>].
 <%- if examples.size > 1 -%>
 
 <Tabs
+  block={true}
   defaultValue="<%= examples.first.label.parameterize %>"
   values={<%= examples.collect { |e| {label: e.label, value: e.label.parameterize} }.to_json %>}>
 <%- end -%>

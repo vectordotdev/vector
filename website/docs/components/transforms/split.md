@@ -15,6 +15,7 @@ The `split` transform accepts [`log`][docs.data-model#log] events and allows you
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

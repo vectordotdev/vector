@@ -771,10 +771,6 @@ html[data-theme='dark'] .navbar__sidebar__backdrop {
   background: var(--ifm-color-emphasis-100);
 }
 
-html[data-theme='dark'] img.navbar__logo {
-  content: url("http://imgur.com/SZ8Cm.jpg") !important;
-}
-
 html[data-theme='dark']  div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) .badge {
   background: rgba(var(--ifm-color-primary-rgb), 0.2);
   background-clip: padding-box;

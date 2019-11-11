@@ -15,6 +15,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

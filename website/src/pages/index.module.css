@@ -6,26 +6,29 @@
   0% {
     background-size: 100% 100%;
   }
+  90% {
+    background-size: 250% 250%;
+  }
   100% {
-    background-size: 350% 350%;
+    background-size: 200% 200%;
   }
 }
 
 @keyframes heroPulsating {
   0% {
-    background-size: 150% 150%;
+    background-size: 200% 200%;
   }
   50% {
-    background-size: 100% 100%;
+    background-size: 150% 150%;
   }
   100% {
-    background-size: 150% 150%;
+    background-size: 200% 200%;
   }
 }
 
 .indexHeroBanner {
-  animation: heroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), heroPulsating 2.5s 1200ms linear infinite;
-  animation-delay: 500ms;
+  animation: heroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), heroPulsating 2.5s linear infinite;
+  animation-delay: 650ms, 1350ms;
   animation-fill-mode: forwards;
   background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.3), transparent 15%);
   background-position: center center;
@@ -44,14 +47,14 @@ html[data-theme="dark"] .hero {
 }
 
 @media (max-width: 480px) {
-  html[data-theme="dark"] .hero,
-  .hero {
+  html[data-theme="dark"] .indexHeroBanner,
+  .indexHeroBanner {
     animation: none;
     background-image: none;
     min-height: auto;
   }
 
-  .heroDiagram {
+  .indexHeroDiagram {
     display: none;
   }
 }

@@ -15,6 +15,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

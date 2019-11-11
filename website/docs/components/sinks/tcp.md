@@ -15,6 +15,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model#log] events to a TC
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

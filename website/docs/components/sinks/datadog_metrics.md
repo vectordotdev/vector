@@ -15,6 +15,7 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

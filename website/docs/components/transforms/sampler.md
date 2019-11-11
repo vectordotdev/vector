@@ -15,6 +15,7 @@ The `sampler` transform accepts [`log`][docs.data-model#log] events and allows y
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

@@ -15,6 +15,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

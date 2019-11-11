@@ -15,6 +15,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] eve
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

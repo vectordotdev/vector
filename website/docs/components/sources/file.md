@@ -15,6 +15,7 @@ The[`file`](#file) source ingests data through one or more local files and outpu
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

@@ -15,6 +15,7 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model#log] and [`metr
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

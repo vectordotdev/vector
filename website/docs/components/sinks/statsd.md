@@ -15,6 +15,7 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model#metric] event
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

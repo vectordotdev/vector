@@ -15,6 +15,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="common"
   values={[
     { label: 'Common', value: 'common', },

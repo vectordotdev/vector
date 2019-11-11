@@ -1,5 +1,6 @@
 <%- if breakout_top_keys -%>
 <Tabs
+  block={true}
   defaultValue="<%= fields.first.name %>"
   values={<%= fields.collect { |f| {label: f.name, value: f.name } }.to_json %>}>
 
