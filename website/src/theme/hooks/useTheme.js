@@ -10,7 +10,7 @@ const useTheme = () => {
   let utcDate = new Date();
   let offset = (new Date().getTimezoneOffset() / 60) * -1;
   let date = new Date(utcDate.getTime() + offset);
-  let defaultTheme = localStorage.getItem('theme') != null ?
+  let defaultTheme = typeof window !== 'undefined' && localStorage.getItem('theme') != null ?
     localStorage.getItem('theme') :
     (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
 
