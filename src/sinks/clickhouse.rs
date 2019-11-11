@@ -5,7 +5,7 @@ use crate::{
         http::{HttpRetryLogic, HttpService, Response},
         retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -120,14 +120,14 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
                 request
             });
 
-    let service = request.service(
-        ClickhouseRetryLogic {
-            inner: HttpRetryLogic,
-        },
-        http_service,
-    );
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(
+            ClickhouseRetryLogic {
+                inner: HttpRetryLogic,
+            },
+            http_service,
+            acker,
+        )
         .batched_with_min(Buffer::new(gzip), &batch)
         .with(move |event: Event| {
             let mut body = serde_json::to_vec(&event.as_log().all_fields())

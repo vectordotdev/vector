@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -179,10 +179,9 @@ fn http(
                 request
             });
 
-    let service = request.service(HttpRetryLogic, http_service);
-
     let encoding = config.encoding.clone();
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 

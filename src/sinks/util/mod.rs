@@ -381,28 +381,32 @@ impl TowerRequestSettings {
         FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
     }
 
-    pub fn service<L, R, S>(
+    pub fn batch_sink<B, L, S, T>(
         &self,
         retry_logic: L,
         service: S,
-    ) -> ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>
-    // Would like to return `impl Service<R>` here, but that doesn't
-    // work with later calls to `BatchServiceSink::batched_with_min`
-    // (via `trait SinkExt` above), as it is missing a bound on the
+        acker: Acker,
+    ) -> BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>
+    // Would like to return `impl Sink + SinkExt<T>` here, but that
+    // doesn't work with later calls to `batched_with_min` etc (via
+    // `trait SinkExt` above), as it is missing a bound on the
     // associated types that cannot be expressed in stable Rust.
     where
         L: RetryLogic<Error = S::Error, Response = S::Response>,
-        S: Clone + Service<R>,
+        S: Clone + Service<T>,
         S::Error: 'static + std::error::Error + Send + Sync,
         S::Response: std::fmt::Debug,
-        R: Clone,
+        T: Clone,
+        B: Batch<Output = T>,
     {
         let policy = self.retry_policy(retry_logic);
-        ServiceBuilder::new()
+        let service = ServiceBuilder::new()
             .concurrency_limit(self.in_flight_limit)
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
             .timeout(self.timeout)
-            .service(service)
+            .service(service);
+
+        BatchServiceSink::new(service, acker)
     }
 }

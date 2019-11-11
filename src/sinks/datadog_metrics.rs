@@ -3,7 +3,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt, TowerRequestConfig,
+        BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -133,10 +133,9 @@ impl DatadogSvc {
             inner: http_service,
         };
 
-        let service = request.service(HttpRetryLogic, datadog_http_service);
-
-        let sink =
-            BatchServiceSink::new(service, acker).batched_with_min(MetricBuffer::new(), &batch);
+        let sink = request
+            .batch_sink(HttpRetryLogic, datadog_http_service, acker)
+            .batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }

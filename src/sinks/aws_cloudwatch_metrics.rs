@@ -2,10 +2,7 @@ use crate::{
     buffers::Acker,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
-    sinks::util::{
-        retries::RetryLogic, BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
-        TowerRequestConfig,
-    },
+    sinks::util::{retries::RetryLogic, BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -79,9 +76,9 @@ impl CloudWatchMetricsSvc {
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
-        let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
-
-        let sink = BatchServiceSink::new(svc, acker).batched_with_min(MetricBuffer::new(), &batch);
+        let sink = request
+            .batch_sink(CloudWatchMetricsRetryLogic, cloudwatch_metrics, acker)
+            .batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }

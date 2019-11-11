@@ -2,9 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{
-        retries::RetryLogic, BatchConfig, BatchServiceSink, SinkExt, TowerRequestConfig,
-    },
+    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
@@ -96,9 +94,8 @@ impl KinesisService {
 
         let kinesis = KinesisService { client, config };
 
-        let svc = request.service(KinesisRetryLogic, kinesis);
-
-        let sink = BatchServiceSink::new(svc, acker)
+        let sink = request
+            .batch_sink(KinesisRetryLogic, kinesis, acker)
             .batched_with_min(Vec::new(), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 

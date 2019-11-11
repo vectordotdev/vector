@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -286,9 +286,8 @@ fn es(
             }
         });
 
-    let service = request.service(HttpRetryLogic, http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 

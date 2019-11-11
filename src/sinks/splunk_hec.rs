@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -124,9 +124,8 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
                 builder.body(body).unwrap()
             });
 
-    let service = request.service(HttpRetryLogic, http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
