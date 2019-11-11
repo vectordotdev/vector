@@ -94,7 +94,7 @@ prometheus = "0.4.2"
 hyper = "0.12.35"
 hyper-tls = "0.3.2"
 native-tls = "0.2.3"
-openssl = "0.10.25"
+openssl = { version = "0.10.25", features = ["vendored"] }
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
@@ -109,7 +109,7 @@ derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8.4", optional = true }
 db-key = "0.0.5"
 headers = "0.2.1"
-rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", features = ["ssl"], optional = true }
+rdkafka = { git = "https://github.com/timberio/rust-rdkafka", features = ["ssl", "ssl_vendored"], optional = true }
 hostname = "0.1.5"
 seahash = "3.0.6"
 jemallocator = { version = "0.3.0", optional = true }
