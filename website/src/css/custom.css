@@ -40,6 +40,7 @@
   --ifm-color-emphasis-40: var(--ifm-color-gray-40);
   --ifm-color-emphasis-50: var(--ifm-color-gray-50);
   --ifm-color-emphasis-75: var(--ifm-color-gray-75);
+  --ifm-color-pink: #f44af5;
   --ifm-color-primary: #28D9F2;
   --ifm-color-primary-rgb: 40,217,242;
   --ifm-color-primary-dark: #0FBCE1;
@@ -223,6 +224,7 @@ header.hero h1 {
 
 .hero {
   padding: 5vw 0;
+  text-align: center
 }
 
 .hero .hero__subtitle {
@@ -552,8 +554,22 @@ section {
   padding: calc( 1.5 * var(--ifm-leading) ) 0;
 }
 
+section .sub-title {
+  color: var(--ifm-color-emphasis-400);
+  margin-top: calc( var(--ifm-heading-margin-bottom) * -1 );
+  margin-bottom: var(--ifm-heading-margin-bottom);
+}
+
 .alternate-bg section:nth-child(even) {
   background: var(--ifm-panel-background);
+}
+
+table {
+  display: table;
+}
+
+.table-responsive {
+  overflow-x: auto;
 }
 
 div[class^='tableOfContents_'] {

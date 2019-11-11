@@ -10,8 +10,10 @@ class Object
       new_h
     elsif is_a?(Array)
       map(&:deep_to_h)
-    else
+    elsif respond_to?(:to_h)
       to_h
+    else
+      self
     end
   end
 

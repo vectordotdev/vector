@@ -204,6 +204,7 @@ class Metadata
 
   def to_h
     {
+      installation: installation.deep_to_h,
       sources: sources.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h

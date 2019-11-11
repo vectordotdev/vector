@@ -7,7 +7,7 @@ module.exports = {
   organizationName: 'timberio',
   projectName: 'vector',
   customFields: {
-    components: require('./components'),
+    metadata: require('./metadata'),
   },
   themeConfig: {
     navbar: {
@@ -17,11 +17,9 @@ module.exports = {
         darkSrc: 'img/logo-dark.svg'
       },
       links: [
-        {to: 'use_cases', label: 'Use Cases', position: 'right'},
-        {to: 'docs/components', label: 'Integrations', position: 'right'},
         {to: 'docs', label: 'Docs', position: 'right'},
         {to: 'blog', label: 'Blog', position: 'right'},
-        {to: 'community', label: 'Community', position: 'right'},
+        {to: 'download', label: 'Download', position: 'right'},
         {
           href: 'https://github.com/timberio/vector',
           label: "GitHub",

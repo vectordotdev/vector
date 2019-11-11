@@ -10,13 +10,14 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.33",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.33",
+    "@docusaurus/core": "^2.0.0-alpha.34",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.34",
     "classnames": "^2.2.6",
-    "docusaurus": "^2.0.0-alpha.33",
+    "docusaurus": "^2.0.0-alpha.34",
     "prismjs": "^1.17.1",
     "react": "^16.8.4",
-    "react-dom": "^16.8.4"
+    "react-dom": "^16.8.4",
+    "react-inlinesvg": "^1.1.7"
   },
   "browserslist": {
     "production": [

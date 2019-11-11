@@ -1,0 +1,67 @@
+@keyframes heroPulsating {
+  0% {
+    background-size: 100% 100%;
+  }
+  50% {
+    background-size: 150% 150%;
+  }
+  100% {
+    background-size: 100% 100%;
+  }
+}
+
+.downloadHeroBanner {
+  animation: heroPulsating 2.5s 1200ms linear infinite;
+  background-image: radial-gradient(ellipse at center calc( 50% + 80px ), rgba(var(--ifm-color-primary-rgb), 0.15), transparent 20%);
+  background-position: center center;
+  border-bottom: 0px none;
+  margin-top: 0;
+  min-height: auto;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.downloadHeroBanner svg {
+  width: 100%;
+}
+
+@media (max-width: 996px) {
+  .downloadHeroBanner svg {
+    display: none;
+  }
+
+  .downloadHeroBanner {
+    background: none;
+    padding-top: 5vw;
+  }
+}
+
+.downloadTableContainer {
+  max-width: 600px;
+}
+
+.downloadTable {
+}
+
+.downloadTable tr,
+.downloadTable th,
+.downloadTable td {
+  border: 0px none;
+  vertical-align: top;
+}
+
+.downloadTable th,
+.downloadTable td {
+  padding: calc( var(--ifm-spacing-vertical) / 2 );
+}
+
+.downloadTable tr td:first-child {
+  text-align: right;
+  width: 33%;
+}
+
+
+.downloadGetStartedContainer {
+  max-width: 600px;
+  text-align: center;
+}

@@ -10,8 +10,8 @@ system][docs.operating_systems].
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="from-archives">From archives</Jump>
-<Jump to="from-source">From source</Jump>
+<Jump to="/docs/setup/installation/manual/from-archives">From archives</Jump>
+<Jump to="/docs/setup/installation/manual/from-source">From source</Jump>
 
 
 [docs.operating_systems]: /docs/setup/installation/operating-systems

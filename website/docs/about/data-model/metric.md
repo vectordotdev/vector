@@ -189,9 +189,8 @@ description: A deep dive into Vector's metric event
 
 ## Description
 
-A `metric` event represents a numeric value that must be classified into one of
-four types:[`counter`](#counter),[`histogram`](#histogram),[`gauge`](#gauge), or[`set`](#set). Each are described in
-more detail below.
+A `metric` event represents a numeric value. The types are heavily inspired by
+the Statsd and Prometheus models.
 
 ## Schema
 

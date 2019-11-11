@@ -23,7 +23,7 @@
   }
 }
 
-.hero {
+.indexHeroBanner {
   animation: heroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), heroPulsating 2.5s 1200ms linear infinite;
   animation-delay: 500ms;
   animation-fill-mode: forwards;
@@ -31,10 +31,9 @@
   background-position: center center;
   border-bottom: 0px none;
   min-height: calc( 100vh - var(--ifm-navbar-height) );
-  text-align: center;
 }
 
-.heroDiagram {
+.indexHeroDiagram {
   margin: calc( var(--ifm-spacing-vertical) * 4 ) 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
   max-height: 325px;
   width: 100%;
@@ -90,6 +89,63 @@ html[data-theme="dark"] .hero {
   padding: 0 var(--ifm-spacing-horizontal);
   position: relative;
   top: -1em;
+}
+
+/*
+ * Performance Section
+ */
+
+.performance {
+
+}
+
+/*
+ * Correctness Section
+ */
+
+.correctness {
+  
+}
+
+.correctnessResults {
+  width: 100%;
+}
+
+.correctnessResults th,
+.correctnessResults td,
+.correctnessResults tr {
+  border: 0px none;
+}
+
+.correctnessResults th {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.correctnessResults tr td {
+  border-left: 10px solid var(--ifm-background-color);
+  color: var(--ifm-background-color);
+  min-width: 110px;
+  text-align: center;
+}
+
+.correctnessResults tr td:first-child {
+  font-weight: bold;
+  padding-left: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.correctnessResultsFailed {
+  background: var(--ifm-color-pink);
+}
+
+.correctnessResultsPassed {
+  background: var(--ifm-color-primary);
+}
+
+.correctnessResultsWarning {
+  background: var(--ifm-color-warning);
 }
 
 /*

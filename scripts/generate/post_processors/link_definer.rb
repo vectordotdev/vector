@@ -8,8 +8,7 @@ module PostProcessors
   #
   # See the `Links` class for more info on how links are resoolved.
   class LinkDefiner
-    DOCS_PATH = "/docs"
-    DOCS_HOST = "https://vector.dev#{DOCS_PATH}"
+    DOCS_HOST = "https://vector.dev#{DOCS_BASE_PATH}"
     
     class << self
       def define!(*args)
@@ -64,7 +63,7 @@ module PostProcessors
 
         if definition.start_with?("/")
           if in_docs?
-            definition = "#{DOCS_PATH}#{definition}"
+            definition = "#{DOCS_BASE_PATH}#{definition}"
           else
             definition = DOCS_HOST + definition.gsub(/\.md$/, "")
           end

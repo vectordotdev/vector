@@ -1,0 +1,33 @@
+<Fields filters={<%= filters.to_json %>}>
+
+<%- options.each do |option| -%>
+<%- full_path = [path, option.name].compact.join(".") -%>
+
+<Field
+  common={<%= option.common? %>}
+  defaultValue={<%= option.default.to_json %>}
+  enumValues={<%= option.enum.to_json %>}
+  examples={<%= option.examples.to_json %>}
+  name={<%= option.name.to_json %>}
+  nullable={<%= option.null %>}
+  path={<%= path.to_json %>}
+  relevantWhen={<%= option.relevant_when.to_json %>}
+  required={<%= option.required? %>}
+  templateable={<%= option.templateable? %>}
+  type={<%= option.type.to_json %>}
+  unit={<%= option.unit.to_json %>}
+  >
+
+<%= "#" * heading_depth %> <%= option.name %>
+
+<%= option.description %>[[references:<%= option.name %>]]
+
+<%- if option.options.any? -%>
+<%= options(option.options, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
+<%- end -%>
+
+</Field>
+
+<%- end -%>
+
+</Fields>

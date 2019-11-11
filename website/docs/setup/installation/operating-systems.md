@@ -6,12 +6,12 @@ hide_pagination: true
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="amazon-linux">Amazon linux</Jump>
-<Jump to="centos">Centos</Jump>
-<Jump to="debian">Debian</Jump>
-<Jump to="macos">Macos</Jump>
-<Jump to="rhel">Rhel</Jump>
-<Jump to="ubuntu">Ubuntu</Jump>
+<Jump to="/docs/setup/installation/operating-systems/amazon-linux">Amazon linux</Jump>
+<Jump to="/docs/setup/installation/operating-systems/centos">Centos</Jump>
+<Jump to="/docs/setup/installation/operating-systems/debian">Debian</Jump>
+<Jump to="/docs/setup/installation/operating-systems/macos">Macos</Jump>
+<Jump to="/docs/setup/installation/operating-systems/rhel">Rhel</Jump>
+<Jump to="/docs/setup/installation/operating-systems/ubuntu">Ubuntu</Jump>
 
 
 

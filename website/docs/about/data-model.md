@@ -175,8 +175,8 @@ must be classified as a [`log`](#log) or [`metric`](#metric) event:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="log">Log</Jump>
-<Jump to="metric">Metric</Jump>
+<Jump to="/docs/about/data-model/log">Log</Jump>
+<Jump to="/docs/about/data-model/metric">Metric</Jump>
 
 ## FAQ
 

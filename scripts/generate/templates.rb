@@ -449,8 +449,10 @@ class Templates
       to_a.
       sort.
       collect do |f|
-        path = File.basename(f).split(".").first
-        "<Jump to=\"#{path}\">#{path.gsub("-", " ").humanize}</Jump>"
+        path = DOCS_BASE_PATH + f.gsub(DOCS_ROOT, '').split(".").first
+        name = File.basename(f).split(".").first.gsub("-", " ").humanize
+
+        "<Jump to=\"#{path}\">#{name}</Jump>"
       end.
       join("\n")
   end

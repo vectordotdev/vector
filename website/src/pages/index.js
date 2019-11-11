@@ -121,10 +121,133 @@ function Feature({icon, title, description}) {
   );
 }
 
+function Performance() {
+  return (
+    <section className={styles.performance}>
+      <div className="container">
+        <h2>Performance</h2>
+
+
+      </div>
+    </section>
+  );
+}
+
+function Correctness() {
+  return (
+    <section className={styles.correctness}>
+      <div className="container">
+        <h2>Correctness</h2>
+        <div className="sub-title">Obsessed with the details</div>
+        <div className="table-responsive">
+          <table className={styles.correctnessResults}>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Vector</th>
+                <th>Filebeat</th>
+                <th>FluentBit</th>
+                <th>FluentD</th>
+                <th>Logstash</th>
+                <th>SplunkHF</th>
+                <th>SplunkUF</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness">Disk buffer persistence</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsWarning}><i className="feather icon-alert-triangle"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness">File rotate (create)</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness">File rotate (copytruncate)</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness">File truncation</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness">Process (SIGHUP)</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsWarning}><i className="feather icon-alert-triangle"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_stream_correctness">TCP Streaming</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness">JSON (wrapped)</a></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Configuration() {
+  return (
+    <section className={styles.correctness}>
+      <div className="container">
+        <h2>Configuration</h2>
+
+        
+      </div>
+    </section>
+  );
+}
+
 function Integrations() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
-  const {components: {sources, transforms, sinks}} = siteConfig.customFields;
+  const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
 
   const classes = {
     'aws_s3_sink': 'large',
@@ -171,6 +294,49 @@ function Integrations() {
   )
 }
 
+function Installation() {
+  return (
+    <section className={styles.installation}>
+      <div className="container">
+        <h2>Installs Everywhere</h2>
+        <Tabs
+          block={true}
+          defaultValue="humans"
+          values={[
+            { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
+            { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
+          ]
+        }>
+          <TabItem value="humans">
+            <CodeBlock className="language-bash">
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
+            </CodeBlock>
+          </TabItem>
+          <TabItem value="machines">
+            <CodeBlock className="language-bash">
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y
+            </CodeBlock>
+          </TabItem>
+        </Tabs>
+
+        <h3 className={styles.platformTitle}>Or choose your platform:</h3>
+
+        <div className="row">
+          <div className="col">
+            <Jump to="/docs">Kubernetes</Jump>
+          </div>
+          <div className="col">
+            <Jump to="/docs">Docker</Jump>
+          </div>
+          <div className="col">
+            <Jump to="/docs">Ubuntu</Jump>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Home() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
@@ -190,9 +356,9 @@ function Home() {
     <Layout
       title={`${siteConfig.title}: ${siteConfig.tagline}`}
       description={siteConfig.description}>
-      <header className={classnames('hero', styles.hero)}>
+      <header className={classnames('hero', styles.indexHeroBanner)}>
         <div className="container">
-          <h1 className={styles.heroH1}>Vector Makes Observability Data Simple</h1>
+          <h1>Vector Makes Observability Data Simple</h1>
           <p className="hero__subtitle">
             Vector is an <a href={repoUrl()}>open-source</a> utility for
             collecting, transforming, and routing logs, metrics, and events.
@@ -201,64 +367,16 @@ function Home() {
             <button className="button button--primary">Get Started</button>
             <button className="button button--primary">Download v0.5.0</button>
           </div>
-          <Diagram className={styles.heroDiagram} width="100%" />
+          <Diagram className={styles.indexHeroDiagram} width="100%" />
         </div>
       </header>
       <main>
         {features && features.length && <Features features={features} />}
-        <section>
-          <div className="container">
-            <h2>Performance</h2>
-          </div>
-        </section>
-        <section>
-          <div className="container">
-            <h2>Correctness</h2>
-          </div>
-        </section>
-        <section>
-          <div className="container">
-            <h2>Simple To Configure</h2>
-          </div>
-        </section>
+        <Performance />
+        <Correctness />
+        <Configuration />
         <Integrations />
-        <section className={styles.installation}>
-          <div className="container">
-            <h2>Installs Everywhere</h2>
-            <Tabs
-              defaultValue="humans"
-              values={[
-                { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
-                { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
-              ]
-            }>
-              <TabItem value="humans">
-                <CodeBlock className="language-bash">
-                  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
-                </CodeBlock>
-              </TabItem>
-              <TabItem value="machines">
-                <CodeBlock className="language-bash">
-                  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y
-                </CodeBlock>
-              </TabItem>
-            </Tabs>
-
-            <h3 className={styles.platformTitle}>Or choose your platform:</h3>
-
-            <div className="row">
-              <div className="col">
-                <Jump to="/docs">Kubernetes</Jump>
-              </div>
-              <div className="col">
-                <Jump to="/docs">Docker</Jump>
-              </div>
-              <div className="col">
-                <Jump to="/docs">Ubuntu</Jump>
-              </div>
-            </div>
-          </div>
-        </section>
+        <Installation />
         <section>
           <div className="container">
             <h2>Roadmap</h2>

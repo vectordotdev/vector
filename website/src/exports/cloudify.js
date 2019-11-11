@@ -80,9 +80,7 @@ export default function cloudify() {
   }
   var RADIUS_ANIMATION_SPEED = 0.15;
   var TEXT_ANIMATION_SPEED = 0.10;
-  var BLUE = "#adb946"
   var GRAY = "#bdbecf"
-  var PINK = "#DB738A"  
   var GRAY_TXT = "#8183A4"
   var Node = function(_home, _label) {
     this.home = _home; // Home position
@@ -137,23 +135,19 @@ export default function cloudify() {
       if (targetStyle == 'large') {
         this.targetRadius = RADIUS_LARGE;
         this.targetTextOpacity = 1;
-        this.svgText.fill(BLUE);
-        this.svgCircle.stroke(BLUE);
+        this.svgGroup.addClass('large');
       } else if (targetStyle == 'large-hover') {
         this.targetRadius = RADIUS_LARGE;
         this.targetTextOpacity = 1;
-        this.svgText.fill(BLUE);
-        this.svgCircle.stroke(BLUE);
+        this.svgGroup.addClass('large');
       } else if (targetStyle == 'medium') {
         this.targetRadius = RADIUS_MEDIUM;
         this.targetTextOpacity = 1;
-        this.svgText.fill(BLUE);
-        this.svgCircle.stroke(BLUE);
+        this.svgGroup.removeClass('large');
       } else if (targetStyle == 'small') {
         this.targetRadius = RADIUS_SMALL;
         this.targetTextOpacity = 0;
-        this.svgText.fill(GRAY_TXT);
-        this.svgCircle.stroke(GRAY);
+        this.svgGroup.removeClass('large');
       }
 
       this.currentStyle = targetStyle;
@@ -294,7 +288,7 @@ export default function cloudify() {
       applyHomeForces();
       applyEdgeForces();
       redraw();
-    }, 1000 / 60)
+    }, 1000 / 40)
   }
 
   setTimeout(function() {
