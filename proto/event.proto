@@ -29,8 +29,8 @@ message Value {
 message Metric {
   oneof metric {
     Counter counter = 1;
-    Gauge gauge = 2;
-    Histogram histogram = 3;
+    Histogram histogram = 2;
+    Gauge gauge = 3;
     Set set = 4;
     AggregatedCounter aggregated_counter = 5;
     AggregatedGauge aggregated_gauge = 6;

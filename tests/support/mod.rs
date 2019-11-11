@@ -95,95 +95,41 @@ impl Transform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
             }
-            Event::Metric(Metric::Counter {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::Counter { val, .. }) => {
                 *val += self.increase;
             }
-            Event::Metric(Metric::AggregatedCounter {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::AggregatedCounter { val, .. }) => {
                 *val += self.increase;
             }
-            Event::Metric(Metric::Histogram {
-                name: _,
-                val,
-                sample_rate: _,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::Histogram { val, .. }) => {
                 *val += self.increase;
             }
             Event::Metric(Metric::AggregatedDistribution {
-                name: _,
                 values,
                 sample_rates,
-                timestamp: _,
-                tags: _,
+                ..
             }) => {
                 values.push(self.increase);
                 sample_rates.push(1);
             }
-            Event::Metric(Metric::AggregatedHistogram {
-                name: _,
-                buckets: _,
-                counts: _,
-                count,
-                sum,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::AggregatedHistogram { count, sum, .. }) => {
                 *count += 1;
                 *sum += self.increase;
             }
-            Event::Metric(Metric::AggregatedSummary {
-                name: _,
-                quantiles: _,
-                values: _,
-                count,
-                sum,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::AggregatedSummary { count, sum, .. }) => {
                 *count += 1;
                 *sum += self.increase;
             }
-            Event::Metric(Metric::Gauge {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::Gauge { val, .. }) => {
                 *val += self.increase;
             }
-            Event::Metric(Metric::AggregatedGauge {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::AggregatedGauge { val, .. }) => {
                 *val += self.increase;
             }
-            Event::Metric(Metric::Set {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::Set { val, .. }) => {
                 val.push_str(&self.suffix);
             }
-            Event::Metric(Metric::AggregatedSet {
-                name: _,
-                values,
-                timestamp: _,
-                tags: _,
-            }) => {
+            Event::Metric(Metric::AggregatedSet { values, .. }) => {
                 values.insert(self.suffix.clone());
             }
         };
