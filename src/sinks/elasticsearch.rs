@@ -1,15 +1,15 @@
 use crate::{
     buffers::Acker,
     event::Event,
-    region::RegionOrEndpoint,
+    region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
@@ -35,12 +35,15 @@ pub struct ElasticSearchConfig {
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
+    // TODO: This should be an Option, but when combined with flatten we never seem to get back
+    // a None. For now, we get optionality by handling the error during parsing when nothing is
+    // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
-    pub region: Option<RegionOrEndpoint>,
+    pub region: RegionOrEndpoint,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -70,6 +73,10 @@ pub struct ElasticSearchBasicAuthConfig {
 pub enum Provider {
     Default,
     Aws,
+}
+
+inventory::submit! {
+    SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -124,9 +131,10 @@ impl ElasticSearchCommon {
             format!("Basic {}", base64::encode(token.as_bytes()))
         });
 
-        let region: Option<Region> = match config.region {
-            Some(ref region) => Some(region.try_into()?),
-            None => None,
+        let region: Option<Region> = match (&config.region).try_into() {
+            Ok(region) => Some(region),
+            Err(region::ParseError::MissingRegionAndEndpoint) => None,
+            Err(error) => return Err(error.into()),
         };
 
         let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
@@ -181,8 +189,7 @@ fn es(
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -282,11 +289,7 @@ fn es(
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
     Box::new(sink)
@@ -433,6 +436,20 @@ mod tests {
 
         assert_eq!(json!({}), action);
     }
+
+    #[test]
+    fn region_is_not_required() {
+        let input = r#"
+            host = "https://example.com"
+            doc_type = "_doc"
+            index = "my-jobs"
+            compression = "none"
+        "#;
+
+        let config: ElasticSearchConfig = toml::from_str(input).unwrap();
+        let common = ElasticSearchCommon::parse_config(&config).unwrap();
+        assert_eq!(None, common.region);
+    }
 }
 
 #[cfg(test)]
@@ -448,7 +465,6 @@ mod integration_tests {
         topology::config::SinkConfig,
         Event,
     };
-    use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
@@ -459,13 +475,12 @@ mod integration_tests {
     fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200/".into(),
+            host: "http://localhost:9200".into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            ..Default::default()
+            ..config()
         };
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
@@ -484,20 +499,23 @@ mod integration_tests {
         // make sure writes all all visible
         block_on(flush(&config)).unwrap();
 
-        let client = SyncClientBuilder::new().build().unwrap();
-
-        let response = client
-            .search::<Value>()
-            .index(index)
-            .body(json!({
+        let response = reqwest::Client::new()
+            .get(&format!("{}/{}/_search", config.host, index))
+            .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
+
+        println!("response {:?}", response);
+
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+        let doc = hit.document().unwrap();
+        assert_eq!(Some("42"), doc["my_id"].as_str());
 
         let value = hit.into_document().unwrap();
         let expected = json!({
@@ -515,8 +533,7 @@ mod integration_tests {
             host: "http://localhost:9200".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            ..Default::default()
+            ..config()
         });
     }
 
@@ -526,12 +543,11 @@ mod integration_tests {
             host: "https://localhost:9201".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
             tls: Some(TlsOptions {
                 ca_path: Some("tests/data/Vector_CA.crt".into()),
                 ..Default::default()
             }),
-            ..Default::default()
+            ..config()
         });
     }
 
@@ -540,10 +556,9 @@ mod integration_tests {
         let url = "http://localhost:4571";
         run_insert_tests(ElasticSearchConfig {
             host: url.into(),
-            batch_size: Some(1),
             provider: Some(Provider::Aws),
-            region: Some(RegionOrEndpoint::with_endpoint(url.into())),
-            ..Default::default()
+            region: RegionOrEndpoint::with_endpoint(url.into()),
+            ..config()
         });
     }
 
@@ -558,7 +573,7 @@ mod integration_tests {
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        block_on(pump).expect("Sending events failed");
+        let _ = block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
         block_on(flush(&config)).expect("Flushing writes failed");
@@ -570,24 +585,20 @@ mod integration_tests {
             .unwrap();
         let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-        let http_client = reqwest::Client::builder()
+        let client = reqwest::Client::builder()
             .add_root_certificate(test_ca)
             .build()
             .expect("Could not build HTTP client");
-        let client = SyncClientBuilder::new()
-            .http_client(http_client)
-            .static_node(config.host)
-            .build()
-            .expect("Building test client failed");
 
         let response = client
-            .search::<Value>()
-            .index(index)
-            .body(json!({
+            .get(&format!("{}/{}/_search", config.host, index))
+            .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
-            .expect("Issuing test query failed");
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
         let input = input
@@ -617,5 +628,15 @@ mod integration_tests {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
             })
+    }
+
+    fn config() -> ElasticSearchConfig {
+        ElasticSearchConfig {
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
+            ..Default::default()
+        }
     }
 }

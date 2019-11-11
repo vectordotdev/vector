@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,10 @@ pub struct BlackholeSink {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BlackholeConfig {
     pub print_amount: usize,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<BlackholeConfig>("blackhole")
 }
 
 #[typetag::serde(name = "blackhole")]
@@ -98,6 +102,6 @@ mod tests {
 
         let (_input_lines, events) = random_events_with_stream(100, 10);
 
-        sink.send_all(events).wait().unwrap();
+        let _ = sink.send_all(events).wait().unwrap();
     }
 }

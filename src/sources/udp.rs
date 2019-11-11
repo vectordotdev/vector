@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
@@ -25,6 +25,10 @@ impl UdpConfig {
             host_key: None,
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<UdpConfig>("udp")
 }
 
 #[typetag::serde(name = "udp")]

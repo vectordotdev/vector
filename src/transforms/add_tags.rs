@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,10 @@ pub struct AddTagsConfig {
 
 pub struct AddTags {
     tags: IndexMap<Atom, String>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<AddTagsConfig>("add_tags")
 }
 
 #[typetag::serde(name = "add_tags")]

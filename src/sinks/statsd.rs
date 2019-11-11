@@ -1,15 +1,14 @@
 use crate::{
     buffers::Acker,
     event::{metric::Direction, Event, Metric},
-    sinks::util::{BatchServiceSink, Buffer, SinkExt},
-    topology::config::{DataType, SinkConfig},
+    sinks::util::{BatchConfig, BatchServiceSink, Buffer, SinkExt},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::time::Duration;
 use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
@@ -48,12 +47,16 @@ pub struct StatsdSinkConfig {
     pub namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 }
 
 pub fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
 }
 
 #[typetag::serde(name = "statsd")]
@@ -80,8 +83,7 @@ impl StatsdSvc {
         // However we need to leave some space for +1 extra trailing event in the buffer.
         // Also one might keep an eye on server side limitations, like
         // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch_size = config.batch_size.unwrap_or(1300);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let batch = config.batch.unwrap_or(1300, 1);
         let namespace = config.namespace.clone();
 
         let client = Client::new(config.address)?;
@@ -90,11 +92,7 @@ impl StatsdSvc {
         let svc = ServiceBuilder::new().service(service);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(
-                Buffer::new(false),
-                batch_size,
-                Duration::from_secs(batch_timeout),
-            )
+            .batched_with_min(Buffer::new(false), &batch)
             .with(move |event| encode_event(event, &namespace));
 
         Ok(Box::new(sink))
@@ -307,8 +305,10 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch_size: Some(512),
-            batch_timeout: Some(1),
+            batch: BatchConfig {
+                batch_size: Some(512),
+                batch_timeout: Some(1),
+            },
         };
 
         let mut rt = runtime();

@@ -12,7 +12,7 @@ use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{metrics, runtime, topology, trace};
+use vector::{list, metrics, runtime, topology, trace};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -79,6 +79,9 @@ struct RootOpts {
 enum SubCommand {
     /// Validate the target config, then exit.
     Validate(Validate),
+
+    /// List available components, then exit.
+    List(list::Opts),
 }
 
 #[derive(StructOpt, Debug)]
@@ -126,9 +129,29 @@ impl std::str::FromStr for Color {
     }
 }
 
+fn get_version() -> String {
+    #[cfg(feature = "nightly")]
+    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+    #[cfg(not(feature = "nightly"))]
+    let pkg_version = built_info::PKG_VERSION;
+
+    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
+    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
+        .unwrap()
+        .format("%Y-%m-%d");
+    let built_string = if let Some(commit_hash) = commit_hash {
+        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
+    } else {
+        built_info::TARGET.into()
+    };
+    format!("{} ({})", pkg_version, built_string)
+}
+
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let root_opts = Opts::from_args();
+    let version = get_version();
+    let app = Opts::clap().version(&version[..]);
+    let root_opts = Opts::from_clap(&app.get_matches());
     let opts = root_opts.root;
     let sub_command = root_opts.sub_command;
 
@@ -149,6 +172,7 @@ fn main() {
             format!("vector={}", level),
             format!("codec={}", level),
             format!("file_source={}", level),
+            format!("tower_limit=trace"),
         ]
         .join(",")
         .to_string()
@@ -171,6 +195,7 @@ fn main() {
     sub_command.map(|s| {
         std::process::exit(match s {
             SubCommand::Validate(v) => validate(&v, &opts),
+            SubCommand::List(l) => list::cmd(&l),
         })
     });
 

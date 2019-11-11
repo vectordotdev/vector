@@ -1,6 +1,27 @@
 use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct BatchConfig {
+    pub batch_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
+}
+
+impl BatchConfig {
+    pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
+        BatchSettings {
+            size: self.batch_size.unwrap_or(size as usize),
+            timeout: Duration::from_secs(self.batch_timeout.unwrap_or(timeout)),
+        }
+    }
+}
+
+pub struct BatchSettings {
+    pub size: usize,
+    pub timeout: Duration,
+}
 
 pub trait Batch {
     type Input;
@@ -63,10 +84,6 @@ where
 
     pub fn new_min(inner: S, batch: B, min_size: usize, max_linger: Option<Duration>) -> Self {
         Self::build(inner, batch, min_size, min_size, max_linger)
-    }
-
-    pub fn new_max(inner: S, batch: B, max_size: usize, max_linger: Option<Duration>) -> Self {
-        Self::build(inner, batch, 0, max_size, max_linger)
     }
 
     fn build(

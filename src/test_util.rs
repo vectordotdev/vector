@@ -67,6 +67,18 @@ pub fn send_lines(
         })
 }
 
+pub fn temp_file() -> std::path::PathBuf {
+    let path = std::env::temp_dir();
+    let file_name = random_string(16);
+    path.join(file_name + ".log")
+}
+
+pub fn temp_dir() -> std::path::PathBuf {
+    let path = std::env::temp_dir();
+    let dir_name = random_string(16);
+    path.join(dir_name)
+}
+
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,

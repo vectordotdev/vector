@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
 use grok::Pattern;
@@ -26,6 +26,10 @@ pub struct GrokParserConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub types: HashMap<Atom, String>,
+}
+
+inventory::submit! {
+    TransformDescription::new::<GrokParserConfig>("grok_parser")
 }
 
 #[typetag::serde(name = "grok_parser")]

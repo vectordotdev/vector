@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.4.0-dev"
+version = "0.6.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
@@ -127,6 +127,7 @@ base64 = "0.10.1"
 shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
 owning_ref = "0.4.0"
 listenfd = "0.3.3"
+inventory = "0.1"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -139,7 +140,7 @@ reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
-elastic = { git = "https://github.com/elastic-rs/elastic" }
+elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
 proptest = "0.9"
@@ -168,6 +169,7 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
+nightly = []
 
 [[bench]]
 name = "bench"

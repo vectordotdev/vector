@@ -23,6 +23,11 @@ if [ -z "$FEATURES" ]; then
     FEATURES="default"
 fi
 
+CHANNEL="$(scripts/util/release-channel.sh)"
+if [ "$CHANNEL" == "nightly" ]; then
+  FEATURES="$FEATURES nightly"
+fi
+
 set -eu
 
 echo "Building Vector archive"

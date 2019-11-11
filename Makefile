@@ -39,6 +39,10 @@ check-generate: ## Checks for pending `make generate` changes
 check-examples: ## Validates the config examples
 	@find ./config/examples -name "*.toml" | xargs -I{} sh -c "cargo run -q -- validate --topology --deny-warnings -c {} || exit 255"
 
+check-version: ## Checks that the version in Cargo.toml is up-to-date
+	@bundle install --gemfile=scripts/Gemfile --quiet
+	@scripts/check-version.rb
+
 CHECK_URLS=false
 export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
@@ -62,6 +66,9 @@ signoff: ## Signsoff all previous commits since branch creation
 test: ## Spins up Docker resources and runs _every_ test
 	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4
+
+clean: ## Remove build artifacts
+	@cargo clean
 
 ##@ Releasing
 
