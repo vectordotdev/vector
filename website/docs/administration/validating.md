@@ -39,8 +39,8 @@ For clarify, Vector validates the following:
 7. All [sink][docs.sinks] health check if the `--require-healthy` option is supplied.
 
 
-[docs.configuration#composition]: ../setup/configuration#composition
-[docs.configuration#value-types]: ../setup/configuration#value-types
-[docs.sinks]: ../components/sinks
-[docs.sources]: ../components/sources
-[docs.transforms]: ../components/transforms
+[docs.configuration#composition]: /docs/setup/configuration#composition
+[docs.configuration#value-types]: /docs/setup/configuration#value-types
+[docs.sinks]: /docs/components/sinks
+[docs.sources]: /docs/components/sources
+[docs.transforms]: /docs/components/transforms

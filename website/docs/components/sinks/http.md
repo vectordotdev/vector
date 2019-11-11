@@ -964,9 +964,9 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry_backoff_secs`](#retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#event]: ../../about/data-model#event
-[docs.data-model#log]: ../../about/data-model#log
-[docs.guarantees]: ../../about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.guarantees]: /docs/about/guarantees
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http

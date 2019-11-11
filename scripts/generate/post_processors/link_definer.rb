@@ -8,7 +8,8 @@ module PostProcessors
   #
   # See the `Links` class for more info on how links are resoolved.
   class LinkDefiner
-    VECTOR_DOCS_HOST = "https://docs.vector.dev"
+    DOCS_PATH = "/docs"
+    DOCS_HOST = "https://vector.dev#{DOCS_PATH}"
     
     class << self
       def define!(*args)
@@ -21,21 +22,13 @@ module PostProcessors
       end
     end
 
-    attr_reader :content, :docs_root, :links, :file_path, :opts
+    attr_reader :content, :links, :file_path, :opts
 
     def initialize(content, file_path, links, opts = {})
       @content = self.class.remove_link_footers(content)
       @links = links
       @file_path = file_path
       @opts = opts
-
-      if in_docs?
-        @docs_root = @file_path.gsub(DOCS_ROOT + "/", "").split("/")[1..-1].collect { |_| ".." }.join("/")
-
-        if @docs_root == ""
-          @docs_root = "."
-        end
-      end
     end
 
     def define!
@@ -71,9 +64,9 @@ module PostProcessors
 
         if definition.start_with?("/")
           if in_docs?
-            definition = docs_root + definition
+            definition = "#{DOCS_PATH}#{definition}"
           else
-            definition = VECTOR_DOCS_HOST + definition.gsub(/\.md$/, "")
+            definition = DOCS_HOST + definition.gsub(/\.md$/, "")
           end
         end
 

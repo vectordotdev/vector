@@ -2,9 +2,7 @@
 title: "What is Vector?"
 ---
 
-import Diagram from '@site/src/components/Diagram';
-
-<Diagram />
+<%= embed_svg("components") %>
 
 Vector is a [high-performance][docs.performance], [open-source][urls.vector_repo]
 observability data router. It makes [collecting][docs.sources],
@@ -21,15 +19,16 @@ serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
 from A to B.
 
 
-[docs.administration]: ./administration
-[docs.correctness]: ./about/correctness
+[assets.components]: ./assets/components.svg
+[docs.administration]: ./usage/administration
+[docs.correctness]: ./correctness.md
 [docs.deployment]: ./setup/deployment
-[docs.performance]: ./about/performance
-[docs.roles.agent]: ./setup/deployment/roles/agent
-[docs.roles.service]: ./setup/deployment/roles/service
-[docs.sinks]: ./components/sinks
-[docs.sources]: ./components/sources
-[docs.transforms]: ./components/transforms
-[docs.use_cases]: ./use_cases
+[docs.performance]: ./performance.md
+[docs.roles.agent]: ./setup/deployment/roles/agent.md
+[docs.roles.service]: ./setup/deployment/roles/service.md
+[docs.sinks]: ./usage/configuration/sinks
+[docs.sources]: ./usage/configuration/sources
+[docs.transforms]: ./usage/configuration/transforms
+[docs.use_cases]: ./use-cases
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_repo]: https://github.com/timberio/vector

@@ -4,7 +4,7 @@ module.exports = {
       type: 'category',
       label: 'About',
       items: [
-        'index',
+        'what_is_vector',
         'about/concepts',
         {
           type: 'category',
@@ -78,6 +78,7 @@ module.exports = {
               type: 'category',
               label: 'Roles',
               items: [
+                <%= metadata.links.fetch_id("docs.deployment.roles").to_json %>,
                 <%= metadata.links.fetch_id("docs.deployment.roles.agent").to_json %>,
                 <%= metadata.links.fetch_id("docs.deployment.roles.service").to_json %>,
               ]

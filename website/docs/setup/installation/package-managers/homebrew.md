@@ -23,7 +23,7 @@ brew services start vector
 
 That's it! Proceed to [configure](#configuring) Vector for your use case.
 
-##P Previous Versions
+## Previous Versions
 
 Historical Vector versions can be found in the [releases][urls.vector_releases].
 Once you've found the version you'd like to install you can specify it with:
@@ -64,7 +64,7 @@ brew update && brew upgrade vector
 ```
 
 
-[docs.configuration]: ../../../setup/configuration
+[docs.configuration]: /docs/setup/configuration
 [urls.homebrew]: https://brew.sh/
 [urls.homebrew_services]: https://github.com/Homebrew/homebrew-services
 [urls.vector_releases]: https://github.com/timberio/vector/releases

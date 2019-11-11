@@ -13,6 +13,6 @@ typically want to limit resources. This is covered in detail in the
 [Agent role system configuration][docs.roles.agent#system-configuration] section.
 
 
-[docs.roles.agent#system-configuration]: ../setup/deployment/roles/agent#system-configuration
-[docs.roles.agent]: ../setup/deployment/roles/agent
+[docs.roles.agent#system-configuration]: /docs/setup/deployment/roles/agent#system-configuration
+[docs.roles.agent]: /docs/setup/deployment/roles/agent
 [urls.rust]: https://www.rust-lang.org/

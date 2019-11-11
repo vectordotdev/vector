@@ -7,6 +7,8 @@ hide_pagination: true
 Vector components are the entities used to
 [compose pipelines][docs.configuration#composition].
 
+---
+
 import Components from '@site/src/components/Components';
 
 import Component from '@site/src/components/Component';
@@ -19,7 +21,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"docker_source"}
   name={"docker"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/docker"
   status={"beta"}
   type={"source"} />
 <Component
@@ -28,7 +30,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"file_source"}
   name={"file"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/file"
   status={"prod-ready"}
   type={"source"} />
 <Component
@@ -37,7 +39,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"journald_source"}
   name={"journald"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/journald"
   status={"beta"}
   type={"source"} />
 <Component
@@ -46,7 +48,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"kafka_source"}
   name={"kafka"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/kafka"
   status={"beta"}
   type={"source"} />
 <Component
@@ -55,7 +57,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"statsd_source"}
   name={"statsd"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/statsd"
   status={"beta"}
   type={"source"} />
 <Component
@@ -64,7 +66,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"stdin_source"}
   name={"stdin"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/stdin"
   status={"prod-ready"}
   type={"source"} />
 <Component
@@ -73,7 +75,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"syslog_source"}
   name={"syslog"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/syslog"
   status={"prod-ready"}
   type={"source"} />
 <Component
@@ -82,7 +84,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"tcp_source"}
   name={"tcp"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/tcp"
   status={"prod-ready"}
   type={"source"} />
 <Component
@@ -91,7 +93,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"udp_source"}
   name={"udp"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/udp"
   status={"prod-ready"}
   type={"source"} />
 <Component
@@ -100,7 +102,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"vector_source"}
   name={"vector"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sources/vector"
   status={"beta"}
   type={"source"} />
 <Component
@@ -109,7 +111,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"add_fields_transform"}
   name={"add_fields"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/add_fields"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -118,7 +120,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"add_tags_transform"}
   name={"add_tags"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/add_tags"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -127,7 +129,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"coercer_transform"}
   name={"coercer"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/coercer"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -136,7 +138,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"field_filter_transform"}
   name={"field_filter"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/field_filter"
   status={"beta"}
   type={"transform"} />
 <Component
@@ -145,7 +147,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"grok_parser_transform"}
   name={"grok_parser"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/grok_parser"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -154,7 +156,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"json_parser_transform"}
   name={"json_parser"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/json_parser"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -163,7 +165,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"log_to_metric_transform"}
   name={"log_to_metric"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/log_to_metric"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -172,7 +174,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"lua_transform"}
   name={"lua"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/lua"
   status={"beta"}
   type={"transform"} />
 <Component
@@ -181,7 +183,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"regex_parser_transform"}
   name={"regex_parser"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/regex_parser"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -190,7 +192,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"remove_fields_transform"}
   name={"remove_fields"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/remove_fields"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -199,7 +201,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"remove_tags_transform"}
   name={"remove_tags"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/remove_tags"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -208,7 +210,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"sampler_transform"}
   name={"sampler"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/sampler"
   status={"beta"}
   type={"transform"} />
 <Component
@@ -217,7 +219,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"split_transform"}
   name={"split"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/split"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -226,7 +228,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"tokenizer_transform"}
   name={"tokenizer"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/transforms/tokenizer"
   status={"prod-ready"}
   type={"transform"} />
 <Component
@@ -235,7 +237,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"aws_cloudwatch_logs_sink"}
   name={"aws_cloudwatch_logs"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/aws_cloudwatch_logs"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -244,7 +246,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"aws_cloudwatch_metrics_sink"}
   name={"aws_cloudwatch_metrics"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/aws_cloudwatch_metrics"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -253,7 +255,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"aws_kinesis_streams_sink"}
   name={"aws_kinesis_streams"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/aws_kinesis_streams"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -262,7 +264,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"aws_s3_sink"}
   name={"aws_s3"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/aws_s3"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -271,7 +273,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"blackhole_sink"}
   name={"blackhole"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/blackhole"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -280,7 +282,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"clickhouse_sink"}
   name={"clickhouse"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/clickhouse"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -289,7 +291,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"console_sink"}
   name={"console"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/console"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -298,7 +300,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"datadog_metrics_sink"}
   name={"datadog_metrics"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/datadog_metrics"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -307,7 +309,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"elasticsearch_sink"}
   name={"elasticsearch"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/elasticsearch"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -316,7 +318,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"file_sink"}
   name={"file"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/file"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -325,7 +327,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"http_sink"}
   name={"http"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/http"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -334,7 +336,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"kafka_sink"}
   name={"kafka"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/kafka"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -343,7 +345,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"prometheus_sink"}
   name={"prometheus"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/prometheus"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -352,7 +354,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"splunk_hec_sink"}
   name={"splunk_hec"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/splunk_hec"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -361,7 +363,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"statsd_sink"}
   name={"statsd"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/statsd"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -370,7 +372,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"tcp_sink"}
   name={"tcp"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/tcp"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -379,7 +381,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"vector_sink"}
   name={"vector"}
-  path="[[docs.#{component.type.pluralize}.#{component.name}]]"
+  path="/docs/components/sinks/vector"
   status={"prod-ready"}
   type={"sink"} />
 
@@ -392,4 +394,4 @@ import Jump from '@site/src/components/Jump';
 </Jump>
 
 
-[docs.configuration#composition]: ./setup/configuration#composition
+[docs.configuration#composition]: /docs/setup/configuration#composition

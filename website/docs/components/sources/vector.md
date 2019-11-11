@@ -114,7 +114,9 @@ The timeout before a connection is forcefully closed during shutdown.
 
 ## Output
 
-This component does not automatically add any fields.
+The `vector` source is a pass-through source and is intended to accept data
+from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
+augmented.
 
 ## How It Works
 
@@ -140,7 +142,8 @@ Currently, Vector does not perform any application level message acknowledgement
 Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.data-model#metric]: ../../about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.sinks.vector]: /docs/components/sinks/vector
 [urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto

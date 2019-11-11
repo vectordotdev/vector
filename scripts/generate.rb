@@ -70,11 +70,13 @@ def link_valid?(value)
 end
 
 def post_process(content, doc, links)
-  content = PostProcessors::ComponentImporter.import!(content)
-  content = PostProcessors::SectionSorter.sort!(content)
-  content = PostProcessors::SectionReferencer.reference!(content)
-  content = PostProcessors::LinkDefiner.define!(content, doc, links)
-  content = PostProcessors::OptionLinker.link!(content)
+  if doc.end_with?(".md")
+    content = PostProcessors::ComponentImporter.import!(content)
+    content = PostProcessors::SectionSorter.sort!(content)
+    content = PostProcessors::SectionReferencer.reference!(content)
+    content = PostProcessors::LinkDefiner.define!(content, doc, links)
+    content = PostProcessors::OptionLinker.link!(content)
+  end
   content
 end
 
@@ -130,7 +132,10 @@ metadata.components.each do |component|
   end
 end
 
-erb_paths = Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).to_a
+erb_paths =
+  Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
+  to_a.
+  filter { |path| !File.basename(path).start_with?("_") }
 
 #
 # Create missing .md files

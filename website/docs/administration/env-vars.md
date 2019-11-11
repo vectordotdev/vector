@@ -16,7 +16,7 @@ More options can be set with [flags][docs.process-management#flags] when
 [starting][docs.process-management#starting] Vector.
 
 
-[docs.monitoring#logs]: ../administration/monitoring#logs
-[docs.process-management#flags]: ../administration/process-management#flags
-[docs.process-management#starting]: ../administration/process-management#starting
-[docs.sinks]: ../components/sinks
+[docs.monitoring#logs]: /docs/administration/monitoring#logs
+[docs.process-management#flags]: /docs/administration/process-management#flags
+[docs.process-management#starting]: /docs/administration/process-management#starting
+[docs.sinks]: /docs/components/sinks

@@ -233,13 +233,13 @@ This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.configuration#value-types]: ../../setup/configuration#value-types
-[docs.configuration#value_types]: ../../setup/configuration#value_types
-[docs.data-model#log#special-characters]: ../../about/data-model#log#special-characters
-[docs.data-model#log]: ../../about/data-model#log
-[docs.data-model]: ../../about/data-model
-[docs.transforms.lua]: ../../components/transforms/lua
-[docs.transforms.remove_fields]: ../../components/transforms/remove_fields
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.configuration#value-types]: /docs/setup/configuration#value-types
+[docs.configuration#value_types]: /docs/setup/configuration#value_types
+[docs.data-model#log#special-characters]: /docs/about/data-model#log#special-characters
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model]: /docs/about/data-model
+[docs.transforms.lua]: /docs/components/transforms/lua
+[docs.transforms.remove_fields]: /docs/components/transforms/remove_fields
 [urls.toml_array]: https://github.com/toml-lang/toml#array
 [urls.toml_table]: https://github.com/toml-lang/toml#table

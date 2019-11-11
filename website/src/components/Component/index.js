@@ -1,10 +1,12 @@
 import React from 'react';
 
+import Link from '@docusaurus/Link';
+
 import './styles.css';
 
 function Component({delivery_guarantee, description, event_types, name, path, status, type}) {
   return (
-    <a href={path} className="component">
+    <Link to={path} className="component">
       <div className="component-header">
         {description && <i className="feather icon-info" title={description}></i>}
         <div className="component-name">{name} {type}</div>
@@ -23,7 +25,7 @@ function Component({delivery_guarantee, description, event_types, name, path, st
           <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i> best-effort</span> :
           <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i> at-least-once</span>}
       </div>
-    </a>
+    </Link>
   );
 }
 

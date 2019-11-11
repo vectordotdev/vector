@@ -606,12 +606,12 @@ for the next scrape, while other metrics sinks will proceed to forward the
 individual metrics for reduction in the metrics storage itself.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#counters]: ../../about/data-model#counters
-[docs.data-model#gauges]: ../../about/data-model#gauges
-[docs.data-model#histograms]: ../../about/data-model#histograms
-[docs.data-model#log]: ../../about/data-model#log
-[docs.data-model#metric]: ../../about/data-model#metric
-[docs.data-model#sets]: ../../about/data-model#sets
-[docs.data-model#tags]: ../../about/data-model#tags
-[docs.sinks.prometheus]: ../../components/sinks/prometheus
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#counters]: /docs/about/data-model#counters
+[docs.data-model#gauges]: /docs/about/data-model#gauges
+[docs.data-model#histograms]: /docs/about/data-model#histograms
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.data-model#sets]: /docs/about/data-model#sets
+[docs.data-model#tags]: /docs/about/data-model#tags
+[docs.sinks.prometheus]: /docs/components/sinks/prometheus

@@ -72,7 +72,7 @@ docker run timberio/vector:X.X.X-alpine
 ```
 
 
-[docs.configuration]: ../../../setup/configuration
+[docs.configuration]: /docs/setup/configuration
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian

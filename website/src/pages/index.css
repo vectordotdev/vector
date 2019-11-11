@@ -1,0 +1,17 @@
+g.item circle {
+  fill: var(--ifm-background-color);
+  stroke: var(--ifm-heading-color);
+}
+
+g.item text {
+  fill: var(--ifm-color-content);
+}
+
+g.item:hover circle {
+  fill: var(--ifm-panel-background-active);
+  stroke: var(--ifm-panel-border-color-active);
+}
+
+g.item:hover text {
+  fill: var(--ifm-color-primary);
+}

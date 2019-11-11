@@ -192,11 +192,10 @@ The unix socket path. *This should be absolute path.*
 
 </Fields>
 
-## Output
+## Output (log)
 
-The following fields are automatically added to each event as they are ingested:
-
-<CodeHeader fileName="example.json" />
+This component outputs [`log` events][docs.data-model.log].
+For example:
 
 ```javascript
 {
@@ -211,7 +210,7 @@ The following fields are automatically added to each event as they are ingested:
   "version": 1
 }
 ```
-
+More detail on the output schema is below.
 
 <Fields filters={true}>
 
@@ -404,8 +403,9 @@ recommend using the [`tcp` source][docs.sources.tcp] combined with the
 ingestion and parsing scheme.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.sources.tcp]: ../../components/sources/tcp
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
+[docs.sources.tcp]: /docs/components/sources/tcp
+[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

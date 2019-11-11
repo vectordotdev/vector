@@ -120,6 +120,16 @@ class Component
     options_list.select(&:templateable?)
   end
 
+  def to_h
+    {
+      beta: beta?,
+      id: id,
+      name: name,
+      options: options.deep_to_h,
+      type: type
+    }
+  end
+
   def transform?
     type == "transform"
   end

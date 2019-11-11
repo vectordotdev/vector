@@ -145,8 +145,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
@@ -156,8 +156,6 @@ enabling dynamic values derived from the event's data. This syntax accepts
   <%- end -%>
   # ...
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].

@@ -15,8 +15,8 @@ vector --config /etc/vector/vector.toml
 
 ## Example
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 # Set global options
 data_dir = "/var/lib/vector"
@@ -58,30 +58,10 @@ data_dir = "/var/lib/vector"
   gzip         = true                          # compress final objects
   encoding     = "ndjson"                      # new line delimited JSON
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 ## Global Options
 
-<%= options_sections(metadata.options.to_h.values.sort, heading_depth: 3) %>
-
-## Sources
-
-<%= components_table(metadata.sources.to_h.values.sort) %>
-
-[+ request a new source][urls.new_source]
-
-## Transforms
-
-<%= components_table(metadata.transforms.to_h.values.sort) %>
-
-[+ request a new transform][urls.new_transform]
-
-## Sinks
-
-<%= components_table(metadata.sinks.to_h.values.sort) %>
-
-[+ request a new sink][urls.new_sink]
+<%= options(metadata.options.to_h.values.sort, heading_depth: 3) %>
 
 ## How It Works [[sort]]
 

@@ -6,6 +6,9 @@ module.exports = {
   favicon: 'img/favicon.ico',
   organizationName: 'timberio',
   projectName: 'vector',
+  customFields: {
+    components: require('./components'),
+  },
   themeConfig: {
     navbar: {
       logo: {
@@ -16,7 +19,7 @@ module.exports = {
       links: [
         {to: 'use_cases', label: 'Use Cases', position: 'right'},
         {to: 'docs/components', label: 'Integrations', position: 'right'},
-        {href: '/docs', label: 'Docs', position: 'right'},
+        {to: 'docs', label: 'Docs', position: 'right'},
         {to: 'blog', label: 'Blog', position: 'right'},
         {to: 'community', label: 'Community', position: 'right'},
         {
@@ -26,8 +29,10 @@ module.exports = {
         },
       ],
     },
-    prismTheme: require('prism-react-renderer/themes/github'),
-    darkPrismTheme: require('prism-react-renderer/themes/dracula')
+    prism: {
+      theme: require('prism-react-renderer/themes/github'),
+      darkTheme: require('prism-react-renderer/themes/dracula'),
+    },
   },
   presets: [
     [
@@ -43,9 +48,12 @@ module.exports = {
       },
     ],
   ],
-  scripts: [],
+  scripts: [
+    'https://cdnjs.cloudflare.com/ajax/libs/svg.js/2.7.1/svg.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js',
+  ],
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
-    'https://at-ui.github.io/feather-font/css/iconfont.css'
+    'https://at-ui.github.io/feather-font/css/iconfont.css',
   ],
 };

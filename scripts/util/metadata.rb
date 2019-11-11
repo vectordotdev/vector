@@ -202,6 +202,14 @@ class Metadata
     @sources_list ||= sources.to_h.values.sort
   end
 
+  def to_h
+    {
+      sources: sources.deep_to_h,
+      transforms: transforms.deep_to_h,
+      sinks: sinks.deep_to_h
+    }
+  end
+
   def transforms_list
     @transforms_list ||= transforms.to_h.values.sort
   end

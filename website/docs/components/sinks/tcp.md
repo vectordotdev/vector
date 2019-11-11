@@ -505,6 +505,6 @@ The `tcp` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#event]: ../../about/data-model#event
-[docs.data-model#log]: ../../about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.data-model#log]: /docs/about/data-model#log

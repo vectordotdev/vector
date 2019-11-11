@@ -6,40 +6,6 @@ output_types = ["log"]
 resources = []
 through_description = "one or more local files"
 
-[sources.file.fields.file]
-type = "string"
-examples = ["/var/log/nginx.log"]
-key_name_option = "file_key"
-optional = false
-description = """\
-The _full_ path of the file tha the log originated from.\
-"""
-
-[sources.file.fields.host]
-type = "string"
-examples = ["my.host.com"]
-key_name_option = "host_key"
-optional = false
-description = """\
-The current hostname, equivalent to the `gethostname` command.\
-"""
-
-[sources.file.fields.message]
-type = "string"
-examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
-description = """\
-The raw log message, unaltered.
-"""
-
-[sources.file.fields.timestamp]
-type = "timestamp"
-examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
-description = """\
-The exact time the event was ingested.
-"""
-
 [sources.file.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
@@ -214,4 +180,38 @@ null = true
 description = """\
 Instead of balancing read capacity fairly across all watched files, prioritize \
 draining the oldest files before moving on to read data from younger files.\
+"""
+
+[sources.file.output.log.fields.file]
+type = "string"
+examples = ["/var/log/nginx.log"]
+key_name_option = "file_key"
+optional = false
+description = """\
+The _full_ path of the file tha the log originated from.\
+"""
+
+[sources.file.output.log.fields.host]
+type = "string"
+examples = ["my.host.com"]
+key_name_option = "host_key"
+optional = false
+description = """\
+The current hostname, equivalent to the `gethostname` command.\
+"""
+
+[sources.file.output.log.fields.message]
+type = "string"
+examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+optional = false
+description = """\
+The raw log message, unaltered.
+"""
+
+[sources.file.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The exact time the event was ingested.
 """

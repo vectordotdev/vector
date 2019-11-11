@@ -18,8 +18,6 @@ method. Each installation guide provides it's own "Updating" section:
 
 ## Working Upstream
 
-![Where To Start Example][assets.updating-upstream]
-
 Depending on your [topology][docs.topologies], you'll want update your Vector
 instances in a specific order. You should _always_ start downstream and work
 your way upstream. This allows for incremental updating across your topology,
@@ -37,11 +35,10 @@ data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
 
 
-[assets.updating-upstream]: ../assets/updating-upstream.svg
-[docs.dpkg#updating]: ../setup/installation/package-managers/dpkg#updating
-[docs.from_archives#updating]: ../setup/installation/manual/from-archives#updating
-[docs.homebrew#updating]: ../setup/installation/package-managers/homebrew#updating
-[docs.installation]: ../setup/installation
-[docs.platforms.docker#updating]: ../setup/installation/platforms/docker#updating
-[docs.rpm#updating]: ../setup/installation/package-managers/rpm#updating
-[docs.topologies]: ../setup/deployment/topologies
+[docs.dpkg#updating]: /docs/setup/installation/package-managers/dpkg#updating
+[docs.from_archives#updating]: /docs/setup/installation/manual/from-archives#updating
+[docs.homebrew#updating]: /docs/setup/installation/package-managers/homebrew#updating
+[docs.installation]: /docs/setup/installation
+[docs.platforms.docker#updating]: /docs/setup/installation/platforms/docker#updating
+[docs.rpm#updating]: /docs/setup/installation/package-managers/rpm#updating
+[docs.topologies]: /docs/setup/deployment/topologies

@@ -341,10 +341,10 @@ More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.monitoring#logs]: ../../administration/monitoring#logs
-[docs.performance]: ../../about/performance
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.monitoring#logs]: /docs/administration/monitoring#logs
+[docs.performance]: /docs/about/performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
 [urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance

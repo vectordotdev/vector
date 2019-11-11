@@ -151,6 +151,6 @@ The `blackhole` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.data-model#metric]: ../../about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model#metric]: /docs/about/data-model#metric

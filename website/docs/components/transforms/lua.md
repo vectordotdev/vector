@@ -187,10 +187,10 @@ paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log#default-schema]: ../../about/data-model#log#default-schema
-[docs.data-model#log]: ../../about/data-model#log
-[docs.data_model]: ../../about/data-model
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log#default-schema]: /docs/about/data-model#log#default-schema
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data_model]: /docs/about/data-model
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/
 [urls.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require

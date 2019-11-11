@@ -894,10 +894,10 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry_backoff_secs`](#retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#event]: ../../about/data-model#event
-[docs.data-model#log]: ../../about/data-model#log
-[docs.guarantees]: ../../about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.guarantees]: /docs/about/guarantees
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [urls.gzip]: https://www.gzip.org/

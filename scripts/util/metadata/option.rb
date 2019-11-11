@@ -198,6 +198,25 @@ class Option
     templateable == true
   end
 
+  def to_h
+    {
+      name: name,
+      category: category,
+      default: default,
+      description: description,
+      display: display,
+      enum: enum,
+      examples: examples,
+      null: null,
+      options: options,
+      partition_key: partition_key,
+      relevant_when: relevant_when,
+      templateable: templateable,
+      type: type,
+      unit: unit
+    }
+  end
+
   def wildcard?
     name == "*"
   end

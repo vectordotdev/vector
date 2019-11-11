@@ -145,19 +145,19 @@ reducing cost, etc.
 "Vector" is the name of this project.
 
 
-[docs.configuration]: ../setup/configuration
-[docs.data-model#log]: ../about/data-model#log
-[docs.data-model#metric]: ../about/data-model#metric
-[docs.data_model]: ../about/data-model
-[docs.guides]: ../guides
-[docs.performance]: ../about/performance
-[docs.platforms.docker]: ../setup/installation/platforms/docker
-[docs.platforms]: ../setup/installation/platforms
-[docs.roles]: ../setup/deployment/roles
-[docs.sinks]: ../components/sinks
-[docs.sources]: ../components/sources
-[docs.topologies]: ../setup/deployment/topologies
-[docs.transforms]: ../components/transforms
+[docs.configuration]: /docs/setup/configuration
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.data_model]: /docs/about/data-model
+[docs.guides]: /docs/guides
+[docs.performance]: /docs/about/performance
+[docs.platforms.docker]: /docs/setup/installation/platforms/docker
+[docs.platforms]: /docs/setup/installation/platforms
+[docs.roles]: /docs/setup/deployment/roles
+[docs.sinks]: /docs/components/sinks
+[docs.sources]: /docs/components/sources
+[docs.topologies]: /docs/setup/deployment/topologies
+[docs.transforms]: /docs/components/transforms
 [urls.rust]: https://www.rust-lang.org/
 [urls.toml]: https://github.com/toml-lang/toml
 [urls.toml_table]: https://github.com/toml-lang/toml#table

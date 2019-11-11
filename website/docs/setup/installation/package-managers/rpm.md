@@ -64,7 +64,7 @@ sudo rpm -e vector
 Follow the [install](#install) steps again.
 
 
-[docs.configuration]: ../../../setup/configuration
+[docs.configuration]: /docs/setup/configuration
 [urls.rpm]: https://rpm.org/
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_downloads.latest/vector-x86_64.rpm]: https://packages.timber.io/vector/latest/vector-x86_64.rpm

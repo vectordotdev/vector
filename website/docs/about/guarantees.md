@@ -98,7 +98,7 @@ Head over to the [components section][docs.components] and use the guarantee
 filters.
 
 
-[docs.components]: ../components
-[docs.data-model#event]: ../about/data-model#event
-[docs.sinks]: ../components/sinks
+[docs.components]: /docs/components
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.sinks]: /docs/components/sinks
 [urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

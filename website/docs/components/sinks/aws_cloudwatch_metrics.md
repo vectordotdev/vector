@@ -242,9 +242,9 @@ The `aws_cloudwatch_metrics` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#metric]: ../../about/data-model#metric
-[docs.monitoring#logs]: ../../administration/monitoring#logs
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.monitoring#logs]: /docs/administration/monitoring#logs
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

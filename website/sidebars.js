@@ -4,7 +4,7 @@ module.exports = {
       type: 'category',
       label: 'About',
       items: [
-        'index',
+        'what_is_vector',
         'about/concepts',
         {
           type: 'category',
@@ -79,6 +79,7 @@ module.exports = {
               type: 'category',
               label: 'Roles',
               items: [
+                "setup/deployment/roles",
                 "setup/deployment/roles/agent",
                 "setup/deployment/roles/service",
               ]
@@ -222,6 +223,3 @@ module.exports = {
     },
   ]
 };
-
-
-

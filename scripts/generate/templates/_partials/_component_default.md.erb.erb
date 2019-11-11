@@ -8,20 +8,26 @@
 
 ## Options
 
-<%= options_sections(component.specific_options_list, heading_depth: 3) %>
+<%= options(component.specific_options_list, heading_depth: 3) %>
 
-<%- if component.respond_to?(:fields) -%>
-## Fields
+<%- if component.respond_to?(:log_fields_list) && component.log_fields_list.any? -%>
+## Log Fields
 
-<%%- if component.fields_list.any? -%>
-The following fields are automatically added to each event as they are ingested.
+The following schema represents [`log` events][docs.data-model.log] as they are
+output from this source.
 
-<%%= fields(component.fields_list, heading_depth: 3) %>
-<%%- end -%>
-This component does not automatically add any fields.
-<%%- end -%>
+<%= fields(component.log_fields_list, heading_depth: 3) %>
+
 <%- end -%>
+<%- if component.respond_to?(:metric_fields_list) && component.metric_fields_list.any? -%>
+## Metric Fields
 
+The following schema represents [`metric` events][docs.data-model.metric] as
+they are output from this source.
+
+<%= fields(component.metric_fields_list, heading_depth: 3) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%%= component_sections(component) %>

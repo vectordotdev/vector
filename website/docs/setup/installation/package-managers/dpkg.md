@@ -64,7 +64,7 @@ sudo dpkg -r vector
 Follow the [install](#install) steps again.
 
 
-[docs.configuration]: ../../../setup/configuration
+[docs.configuration]: /docs/setup/configuration
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_downloads.latest/vector-amd64.deb]: https://packages.timber.io/vector/latest/vector-amd64.deb

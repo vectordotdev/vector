@@ -6,7 +6,6 @@ require "action_view/helpers/number_helper"
 require_relative "templates/config_example"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
-require_relative "templates/options_table"
 
 # Renders teampltes in the templates sub-dir
 #
@@ -22,8 +21,8 @@ require_relative "templates/options_table"
 #
 # There are times whewre it makes sense to represent logic in a sub-object.
 # This is usually true for complicated partials. For example, the
-# `options_table` partial also instantiates an `Templates::OptionsTable` object
-# that is made available to the `options_table` partial. This reduces the
+# `config_schema` partial also instantiates an `Templates::ConfigSchema` object
+# that is made available to the `config_schema` partial. This reduces the
 # noise and complexity for the global `Templates` object.
 #
 # ==== Keep It Simple
@@ -110,6 +109,12 @@ class Templates
     render("#{partials_path}/_component_header.md", binding).strip
   end
 
+  def component_output(type, output, breakout_top_keys: false, heading_depth: 1)
+    examples = output.examples
+    fields = output.fields.to_h.values.sort
+    render("#{partials_path}/_component_output.md", binding).strip
+  end
+
   def component_sections(component)
     render("#{partials_path}/_component_sections.md", binding).strip
   end
@@ -176,6 +181,7 @@ class Templates
       gsub(/ *xmlns:xlink=".*"/, '').
       gsub(/ *<!--.*-->\n/, '').
       gsub(/ *<use .*>\n/, '').
+      gsub(/stroke-dasharray/, 'strokeDasharray').
       strip
   end
 
@@ -200,12 +206,20 @@ class Templates
     end
   end
 
-  def fields(fields, breakout_top_keys: false, filters: true, heading_depth: 1, level: 1, path: nil)
+  def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
 
     render("#{partials_path}/_fields.md", binding).strip
+  end
+
+  def fields_example(fields, breakout_top_keys: false)
+    if !fields.is_a?(Array)
+      raise ArgumentError.new("Fields must be an Array")
+    end
+
+    render("#{partials_path}/_fields_example.md", binding).strip
   end
 
   def fields_hash(fields)
@@ -314,24 +328,12 @@ class Templates
     options.collect { |option| "`#{option.name}`" }
   end
 
-  def options_sections(options, filters: true, heading_depth: 1, level: 1, path: nil)
+  def options(options, filters: true, heading_depth: 1, level: 1, path: nil)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    render("#{partials_path}/_options_sections.md", binding).strip
-  end
-
-  def options_table(options, opts = {})
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-    opts[:header] = true unless opts.key?(:header)
-    opts[:titles] = true unless opts.key?(:titles)
-
-    table = OptionsTable.new(options)
-    render("#{partials_path}/_options_table.md", binding).strip
+    render("#{partials_path}/_options.md", binding).strip
   end
 
   def partial?(template_path)

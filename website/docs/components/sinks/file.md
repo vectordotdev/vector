@@ -193,8 +193,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [sinks.my_file_sink_id]
   # ...
@@ -202,14 +202,12 @@ enabling dynamic values derived from the event's data. This syntax accepts
   path = "application-{{ application_id }}-%Y-%m-%d.log"
   # ...
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.configuration#template-syntax]: ../../setup/configuration#template-syntax
-[docs.data-model#log]: ../../about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.configuration#template-syntax]: /docs/setup/configuration#template-syntax
+[docs.data-model#log]: /docs/about/data-model#log
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

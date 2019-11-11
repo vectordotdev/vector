@@ -128,11 +128,11 @@ cp -av etc/systemd/vector /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration#data-directory]: ../../../setup/configuration#data-directory
-[docs.configuration]: ../../../setup/configuration
-[docs.from_source]: ../../../setup/installation/manual/from-source
-[docs.operating_systems]: ../../../setup/installation/operating-systems
-[docs.platforms]: ../../../setup/installation/platforms
+[docs.configuration#data-directory]: /docs/setup/configuration#data-directory
+[docs.configuration]: /docs/setup/configuration
+[docs.from_source]: /docs/setup/installation/manual/from-source
+[docs.operating_systems]: /docs/setup/installation/operating-systems
+[docs.platforms]: /docs/setup/installation/platforms
 [urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations
 [urls.vector_downloads.latest]: https://packages.timber.io/vector/latest
 [urls.vector_downloads.nightly/latest]: https://packages.timber.io/vector/nightly/latest

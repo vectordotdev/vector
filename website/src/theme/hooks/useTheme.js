@@ -7,18 +7,22 @@
 import * as React from 'react';
 
 const useTheme = () => {
-  const [theme, setTheme] = React.useState(
-    typeof document !== 'undefined'
-      ? document.querySelector('html').getAttribute('data-theme')
-      : '',
-  );
-  React.useEffect(() => {
-    try {
-      setTheme(localStorage.getItem('theme'));
-    } catch (err) {
-      console.error(err);
-    }
-  }, [setTheme]);
+  let utcDate = new Date();
+  let offset = (new Date().getTimezoneOffset() / 60) * -1;
+  let date = new Date(utcDate.getTime() + offset);
+  let defaultTheme = localStorage.getItem('theme') != null ?
+    localStorage.getItem('theme') :
+    (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
+
+  const [theme, setTheme] = React.useState(defaultTheme);
+
+  // React.useEffect(() => {
+  //   try {
+  //     setTheme(localStorage.getItem('theme'));
+  //   } catch (err) {
+  //     console.error(err);
+  //   }
+  // }, [setTheme]);
 
   const setThemeSyncWithLocalStorage = React.useCallback(
     nextTheme => {

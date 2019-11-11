@@ -13,6 +13,7 @@
  */
 :root {
   --ifm-background-color: white;
+  --ifm-background-surface-color: var(--ifm-panel-background);
   --ifm-badge-border-radius: 0.25em;
   --ifm-blockquote-color: var(--ifm-color-primary-lighter);
   --ifm-code-background: var(--ifm-color-emphasis-50);
@@ -70,9 +71,11 @@
   --ifm-panel-background: var(--ifm-background-color);
   --ifm-panel-background-active: var(--ifm-background-color);
   --ifm-panel-border-color: var(--ifm-hr-border-color);
+  --ifm-panel-border-color-active: var(--ifm-color-primary);
   --ifm-panel-box-shadow: var(--ifm-global-shadow-md);
   --ifm-panel-box-shadow-active: var(--ifm-panel-box-shadow);
   --ifm-panel-color: var(--ifm-color-emphasis-800);
+  --ifm-panel-color-active: var(--ifm-color-primary);
   --ifm-pre-line-height: var(--ifm-line-height-base);
   --ifm-sidebar-background: var(--ifm-color-emphasis-50);
   --ifm-sidebar-border-color: var(--ifm-hr-border-color);
@@ -160,35 +163,7 @@ blockquote {
   font-size: 2rem;
 }
 
-.cotnainer svg [fill="#000000"],
-.markdown svg [fill="#000000"] {
-  fill: var(--ifm-heading-color);
-}
 
-.container svg [stroke="#000000"],
-.markdown svg [stroke="#000000"] {
-  stroke: var(--ifm-heading-color);
-}
-
-.container svg [stop-color="#000000"],
-.markdown svg [stop-color="#000000"] {
-  stop-color: var(--ifm-heading-color);
-}
-
-.container svg [fill="#FFFFFF"],
-.markdown svg [fill="#FFFFFF"] {
-  fill: var(--ifm-background-color);
-}
-
-.container svg [stroke="#FFFFFF"],
-.markdown svg [stroke="#FFFFFF"] {
-  stroke: var(--ifm-background-color);
-}
-
-.container svg [fill="#10E7FF"],
-.markdown svg [fill="#10E7FF"] {
-  fill: var(--ifm-color-primary);
-}
 
 .empty {
   color: var(--ifm-color-emphasis-400);
@@ -246,6 +221,10 @@ header.hero h1 {
   margin-bottom: 0.3rem !important;
 }
 
+.hero {
+  padding: 5vw 0;
+}
+
 .hero .hero__subtitle {
   font-size: 1.1rem;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
@@ -263,16 +242,33 @@ header.hero h1 {
 .hero .hero__buttons {
   --ifm-button-padding-vertical: 0.5rem;
   --ifm-button-padding-horizontal: 4rem;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
 .hero .hero__buttons .button {
   border-radius: 2rem;
   margin-right: 1rem;
+  min-width: 240px;
 }
 
 .hero .hero__buttons .button:last-child {
   margin-right: 0;
+}
+
+@media (max-width: 996px) {
+  .hero .hero__buttons .button {
+    --ifm-button-padding-horizontal: 2rem;
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero .hero__buttons .button {
+    display: block;
+    border-radius: 2rem;
+    margin: 0 0 1rem 0;
+    min-width: auto;
+    width: 100%;
+  }
 }
 
 input[type="text"] {
@@ -525,6 +521,11 @@ input[type="text"]:focus {
   vertical-align: middle;
 }
 
+.menu.menu--responsive .menu__button {
+  bottom: auto;
+  top: 0.75rem;
+}
+
 .navbar .navbar__items--right {
   flex-grow: 2;
 }
@@ -544,6 +545,15 @@ input[type="text"]:focus {
 
 .pagination-nav .pagination-nav__link:hover * {
   color: var(--ifm-panel-color-active);
+}
+
+section {
+  border-top: 1px solid var(--ifm-hr-border-color);
+  padding: calc( 1.5 * var(--ifm-leading) ) 0;
+}
+
+.alternate-bg section:nth-child(even) {
+  background: var(--ifm-panel-background);
 }
 
 div[class^='tableOfContents_'] {
@@ -591,23 +601,21 @@ div[class^='tableOfContents_'] ul.contents > li ul {
 
 ul.tabs {
   background-color: var(--ifm-color-emphasis-50);
-  display: flex;
-  font-size: 0.9rem;
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  font-size: 0.9em;
   font-weight: bold;
-  justify-content: space-between;
 }
 
 ul.tabs li.tab-item {
   border-top: 2px solid transparent;
   border-right: 1px solid transparent;
-  border-bottom: 1px solid var(--ifm-hr-border-color);
   border-left: 1px solid transparent;
   border-radius: 0;
   color: var(--ifm-color-emphasis-400);
   margin: 0;
-  padding: 0.4rem 1.5rem;
+  margin-bottom: -1px;
+  padding: 0.4em 1.5em;
   text-align: center;
-  width: 100%;
 }
 
 ul.tabs li.tab-item:hover {
@@ -722,9 +730,8 @@ html[data-theme="dark"] {
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-panel-background: var(--ifm-color-emphasis-50);
   --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
-  --ifm-panel-border-color-active: var(--ifm-color-primary);
+  --ifm-panel-box-shadow: none;
   --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.5 );
-  --ifm-panel-color-active: var(--ifm-color-primary);
 }
 
 html[data-theme='dark'] .navbar {
@@ -836,11 +843,11 @@ html[data-theme='dark'] input[type="checkbox"] {
   border: 1px solid var(--ifm-color-emphasis-200);
   border-radius: 4px;
   cursor: pointer;
-  height: 1.25rem;
+  height: 1rem;
   margin-bottom: 0.5rem;
-  width: 1.25rem;
+  width: 1rem;
   outline: none;
-  transition-duration: 0.3s;
+  transition-duration: var(--ifm-transition-fast);
   vertical-align: middle;
 }
 

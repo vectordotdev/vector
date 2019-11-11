@@ -1,6 +1,6 @@
 .components .filters {
   color: var(--ifm-color-emphasis-300);
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
 .components .filters .checkboxes {
@@ -24,7 +24,16 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   grid-gap: 1rem;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
+.component-cards h3 {
+  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+.component-cards h3:first-child {
+  margin-top: 0;
 }
 
 .component-cards .component {

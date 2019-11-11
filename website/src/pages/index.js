@@ -5,20 +5,29 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import React from 'react';
-import classnames from 'classnames';
+import React, { useState, useEffect } from 'react';
+
+import CodeBlock from '@theme/CodeBlock';
+import Diagram from '@site/src/components/Diagram';
+import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import TabItem from '@theme/TabItem';
+import Tabs from '@theme/Tabs';
+
+import classnames from 'classnames';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
-import styles from './index.module.css';
-import Diagram from '@site/src/components/Diagram';
 import repoUrl from '@site/src/exports/repoUrl';
+import cloudify from '@site/src/exports/cloudify';
+
+import styles from './index.module.css';
+import './index.css';
 
 const features = [
   {
     title: 'Blistering Fast',
-    imageUrl: 'img/undraw_docusaurus_mountain.svg',
+    icon: 'zap',
     description: (
       <>
         Built in Rust, Vector is <a href="#performance">blistering fast and
@@ -29,7 +38,7 @@ const features = [
   },
   {
     title: 'Vendor Neutral',
-    imageUrl: 'img/undraw_docusaurus_tree.svg',
+    icon: 'unlock',
     description: (
       <>
         Vector does not favor any specific storage. It fosters a fair, open ecosystem with the user's best interest in mind.
@@ -38,25 +47,25 @@ const features = [
   },
   {
     title: 'Agent or Service',
-    imageUrl: 'img/undraw_docusaurus_react.svg',
+    icon: 'codepen',
     description: (
       <>
-        Vector aims to be the single, and only, tool needed to get data from A to B, deploying as an <Link to="/docs/setup/deployment/roles/agent">agent</Link> or <Link to="/docs/setup/deployment/roles/service">service</Link>.
+        Vector aims to be the single, and only, tool needed to get data from A to B, <Link to="/docs/setup/deployment">deploying</Link> as an <Link to="/docs/setup/deployment/roles/agent">agent</Link> or <Link to="/docs/setup/deployment/roles/service">service</Link>.
       </>
     ),
   },
   {
     title: 'Logs, Metrics, & Events',
-    imageUrl: 'img/undraw_docusaurus_react.svg',
+    icon: 'shuffle',
     description: (
       <>
-        Vector unifies logs, metrics, and events at the source, making it collect and ship all observability data.
+        Vector unifies <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link> at the source, making it collect and ship all observability data.
       </>
     ),
   },
   {
     title: 'Programmable Transforms',
-    imageUrl: 'img/undraw_docusaurus_react.svg',
+    icon: 'code',
     description: (
       <>
         An <Link to="/docs/components/transforms/lua">embedded LUA engine</Link> makes it easy to program powerful transforms. Handle complex use cases without limitations.
@@ -65,7 +74,7 @@ const features = [
   },
   {
     title: 'Clear Guarantees',
-    imageUrl: 'img/undraw_docusaurus_react.svg',
+    icon: 'shield',
     description: (
       <>
         Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
@@ -100,47 +109,162 @@ function Features({features}) {
   );
 }
 
-function Feature({imageUrl, title, description}) {
-  const imgUrl = useBaseUrl(imageUrl);
+function Feature({icon, title, description}) {
   return (
     <div className={classnames('col col--4', styles.feature)}>
-      {imgUrl && (
-        <div className="text--center">
-          <img className={styles.featureImage} src={imgUrl} alt={title} />
-        </div>
-      )}
+      <div className={styles.featureIcon}>
+        <i className={classnames('feather', `icon-${icon}`)}></i>
+      </div>
       <h3>{title}</h3>
       <p>{description}</p>
     </div>
   );
 }
 
+function Integrations() {
+  const context = useDocusaurusContext();
+  const {siteConfig = {}} = context;
+  const {components: {sources, transforms, sinks}} = siteConfig.customFields;
+
+  const classes = {
+    'aws_s3_sink': 'large',
+    'clickhouse_sink': 'medium',
+    'docker_source': 'large',
+    'elasticsearch_sink': 'large',
+    'file_source': 'medium',
+    'http_sink': 'small',
+    'kafka_source': 'large',
+    'log_to_metric_transform': 'large',
+    'lua_transform': 'medium',
+    'prometheus_sink': 'large',
+    'regex_parser': 'medium',
+    'syslog_source': 'medium',
+  }
+
+  return (
+    <section className={classnames(styles.integrations, 'integrations')}>
+      <div className="container">
+        <h2>Integrates With Everything</h2>
+        <div className={classnames(styles.components, 'components')}>
+          <h3>
+            <div>
+              <span className="line-break">{Object.keys(sources).length} sources</span>
+              <span className="line-break">{Object.keys(transforms).length} transforms</span>
+              <span className="line-break">{Object.keys(sinks).length} sinks</span>
+            </div>
+          </h3>
+          <div className={styles.componentsCanvas} id="component-canvas"></div>
+          <ul>
+            {Object.keys(sources).map((key, index) => (
+              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/components/sources/${key}`}>{sources[key].name}</Link></li>
+            ))}
+            {Object.keys(transforms).map((key, index) => (
+              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/components/transforms/${key}`}>{transforms[key].name}</Link></li>
+            ))}
+            {Object.keys(sinks).map((key, index) => (
+              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/components/sinks/${key}`}>{sinks[key].name}</Link></li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Home() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if(typeof(SVG) != "undefined") {
+        cloudify({});
+        clearInterval(interval)
+        return true;
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <Layout
       title={`${siteConfig.title}: ${siteConfig.tagline}`}
       description={siteConfig.description}>
-      <div className="fixed-width">
-        <header className={classnames('hero', styles.hero)}>
-          <div className="container">
-            <h1 className={styles.heroH1}>Vector Makes Observability Data Simple</h1>
-            <p className="hero__subtitle">
-              Vector is an <a href={repoUrl()}>open-source</a> utility for
-              collecting, transforming, and routing logs, metrics, and events.
-            </p>
-            <div className="hero__buttons">
-              <button className="button button--primary">Get Started</button>
-              <button className="button button--primary">Get Started</button>
-            </div>
-            <Diagram className={styles.heroDiagram} width="100%" />
+      <header className={classnames('hero', styles.hero)}>
+        <div className="container">
+          <h1 className={styles.heroH1}>Vector Makes Observability Data Simple</h1>
+          <p className="hero__subtitle">
+            Vector is an <a href={repoUrl()}>open-source</a> utility for
+            collecting, transforming, and routing logs, metrics, and events.
+          </p>
+          <div className="hero__buttons">
+            <button className="button button--primary">Get Started</button>
+            <button className="button button--primary">Download v0.5.0</button>
           </div>
-        </header>
-        <main>
-          {features && features.length && <Features features={features} />}
-        </main>
-      </div>
+          <Diagram className={styles.heroDiagram} width="100%" />
+        </div>
+      </header>
+      <main>
+        {features && features.length && <Features features={features} />}
+        <section>
+          <div className="container">
+            <h2>Performance</h2>
+          </div>
+        </section>
+        <section>
+          <div className="container">
+            <h2>Correctness</h2>
+          </div>
+        </section>
+        <section>
+          <div className="container">
+            <h2>Simple To Configure</h2>
+          </div>
+        </section>
+        <Integrations />
+        <section className={styles.installation}>
+          <div className="container">
+            <h2>Installs Everywhere</h2>
+            <Tabs
+              defaultValue="humans"
+              values={[
+                { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
+                { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
+              ]
+            }>
+              <TabItem value="humans">
+                <CodeBlock className="language-bash">
+                  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
+                </CodeBlock>
+              </TabItem>
+              <TabItem value="machines">
+                <CodeBlock className="language-bash">
+                  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y
+                </CodeBlock>
+              </TabItem>
+            </Tabs>
+
+            <h3 className={styles.platformTitle}>Or choose your platform:</h3>
+
+            <div className="row">
+              <div className="col">
+                <Jump to="/docs">Kubernetes</Jump>
+              </div>
+              <div className="col">
+                <Jump to="/docs">Docker</Jump>
+              </div>
+              <div className="col">
+                <Jump to="/docs">Ubuntu</Jump>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section>
+          <div className="container">
+            <h2>Roadmap</h2>
+          </div>
+        </section>
+      </main>
     </Layout>
   );
 }

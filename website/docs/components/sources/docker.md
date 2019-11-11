@@ -111,11 +111,10 @@ A list of container ids to match against when filtering running containers. This
 
 </Fields>
 
-## Output
+## Output (log)
 
-The following schema represents events as that are output from this source.
-
-<CodeHeader fileName="example.json" />
+This component outputs [`log` events][docs.data-model.log].
+For example:
 
 ```javascript
 {
@@ -125,7 +124,7 @@ The following schema represents events as that are output from this source.
   "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
-
+More detail on the output schema is below.
 
 <Fields filters={true}>
 
@@ -220,8 +219,9 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [urls.docker_daemon]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
 [urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

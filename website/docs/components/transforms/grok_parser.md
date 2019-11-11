@@ -240,10 +240,10 @@ While this is still plenty fast for most use cases we recommend using the
 performance issues.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.performance]: ../../about/performance
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.performance]: /docs/about/performance
+[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns

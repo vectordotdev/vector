@@ -8,19 +8,13 @@
 
 ## Options
 
-<%= options_sections(component.specific_options_list, heading_depth: 3) %>
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output (log)
+
+<%= component_output(:log, component.output.log, heading_depth: 3) %>
 
 ## Output
-
-<%- if component.fields_list.any? -%>
-The following schema represents events as that are output from this source.
-
-<%= fields(component.fields_list, heading_depth: 3) %>
-<%- else -%>
-This component does not automatically add any fields.
-<%- end -%>
-
-## Input/Output
 
 Given the following input line:
 

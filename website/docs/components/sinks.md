@@ -7,11 +7,13 @@ hide_pagination: true
 Sinks are last in the [pipeline][docs.configuration#composition], responsible
 for sending [events][docs.data-model#event] downstream.
 
+---
+
 import Components from '@site/src/components/Components';
 
 import Component from '@site/src/components/Component';
 
-<Components>
+<Components titles={false}>
 
 <Component
   delivery_guarantee={"at_least_once"}
@@ -19,7 +21,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"aws_cloudwatch_logs_sink"}
   name={"aws_cloudwatch_logs"}
-  path="../components/sinks/aws_cloudwatch_logs"
+  path="/docs/components/sinks/aws_cloudwatch_logs"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -28,7 +30,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"aws_cloudwatch_metrics_sink"}
   name={"aws_cloudwatch_metrics"}
-  path="../components/sinks/aws_cloudwatch_metrics"
+  path="/docs/components/sinks/aws_cloudwatch_metrics"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -37,7 +39,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"aws_kinesis_streams_sink"}
   name={"aws_kinesis_streams"}
-  path="../components/sinks/aws_kinesis_streams"
+  path="/docs/components/sinks/aws_kinesis_streams"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -46,7 +48,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"aws_s3_sink"}
   name={"aws_s3"}
-  path="../components/sinks/aws_s3"
+  path="/docs/components/sinks/aws_s3"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -55,7 +57,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"blackhole_sink"}
   name={"blackhole"}
-  path="../components/sinks/blackhole"
+  path="/docs/components/sinks/blackhole"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -64,7 +66,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"clickhouse_sink"}
   name={"clickhouse"}
-  path="../components/sinks/clickhouse"
+  path="/docs/components/sinks/clickhouse"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -73,7 +75,7 @@ import Component from '@site/src/components/Component';
   event_types={["log","metric"]}
   id={"console_sink"}
   name={"console"}
-  path="../components/sinks/console"
+  path="/docs/components/sinks/console"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -82,7 +84,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"datadog_metrics_sink"}
   name={"datadog_metrics"}
-  path="../components/sinks/datadog_metrics"
+  path="/docs/components/sinks/datadog_metrics"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -91,7 +93,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"elasticsearch_sink"}
   name={"elasticsearch"}
-  path="../components/sinks/elasticsearch"
+  path="/docs/components/sinks/elasticsearch"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -100,7 +102,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"file_sink"}
   name={"file"}
-  path="../components/sinks/file"
+  path="/docs/components/sinks/file"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -109,7 +111,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"http_sink"}
   name={"http"}
-  path="../components/sinks/http"
+  path="/docs/components/sinks/http"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -118,7 +120,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"kafka_sink"}
   name={"kafka"}
-  path="../components/sinks/kafka"
+  path="/docs/components/sinks/kafka"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -127,7 +129,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"prometheus_sink"}
   name={"prometheus"}
-  path="../components/sinks/prometheus"
+  path="/docs/components/sinks/prometheus"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -136,7 +138,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"splunk_hec_sink"}
   name={"splunk_hec"}
-  path="../components/sinks/splunk_hec"
+  path="/docs/components/sinks/splunk_hec"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -145,7 +147,7 @@ import Component from '@site/src/components/Component';
   event_types={["metric"]}
   id={"statsd_sink"}
   name={"statsd"}
-  path="../components/sinks/statsd"
+  path="/docs/components/sinks/statsd"
   status={"beta"}
   type={"sink"} />
 <Component
@@ -154,7 +156,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"tcp_sink"}
   name={"tcp"}
-  path="../components/sinks/tcp"
+  path="/docs/components/sinks/tcp"
   status={"prod-ready"}
   type={"sink"} />
 <Component
@@ -163,7 +165,7 @@ import Component from '@site/src/components/Component';
   event_types={["log"]}
   id={"vector_sink"}
   name={"vector"}
-  path="../components/sinks/vector"
+  path="/docs/components/sinks/vector"
   status={"prod-ready"}
   type={"sink"} />
 
@@ -176,5 +178,5 @@ import Jump from '@site/src/components/Jump';
 </Jump>
 
 
-[docs.configuration#composition]: ../setup/configuration#composition
-[docs.data-model#event]: ../about/data-model#event
+[docs.configuration#composition]: /docs/setup/configuration#composition
+[docs.data-model#event]: /docs/about/data-model#event

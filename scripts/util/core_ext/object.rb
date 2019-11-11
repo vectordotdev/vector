@@ -1,4 +1,20 @@
 class Object
+  def deep_to_h
+    if is_a?(OpenStruct)
+      to_h.deep_to_h
+    elsif is_a?(Hash)
+      new_h = {}
+      each do |k, v|
+        new_h[k] = v.deep_to_h
+      end
+      new_h
+    elsif is_a?(Array)
+      map(&:deep_to_h)
+    else
+      to_h
+    end
+  end
+
   def is_primitive_type?
     is_a?(String) ||
       is_a?(Integer) ||

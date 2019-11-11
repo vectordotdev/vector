@@ -723,12 +723,12 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry_backoff_secs`](#retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#event]: ../../about/data-model#event
-[docs.data-model#log]: ../../about/data-model#log
-[docs.guarantees]: ../../about/guarantees
-[docs.monitoring#logs]: ../../administration/monitoring#logs
-[docs.transforms.add_fields]: ../../components/transforms/add_fields
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.guarantees]: /docs/about/guarantees
+[docs.monitoring#logs]: /docs/administration/monitoring#logs
+[docs.transforms.add_fields]: /docs/components/transforms/add_fields
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

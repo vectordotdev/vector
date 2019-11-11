@@ -788,8 +788,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
@@ -798,19 +798,17 @@ enabling dynamic values derived from the event's data. This syntax accepts
   group_name = "group-name"
   # ...
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.configuration#template-syntax]: ../../setup/configuration#template-syntax
-[docs.data-model#event]: ../../about/data-model#event
-[docs.data-model#log]: ../../about/data-model#log
-[docs.guarantees]: ../../about/guarantees
-[docs.monitoring#logs]: ../../administration/monitoring#logs
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.configuration#template-syntax]: /docs/setup/configuration#template-syntax
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.guarantees]: /docs/about/guarantees
+[docs.monitoring#logs]: /docs/administration/monitoring#logs
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

@@ -163,20 +163,71 @@ The list of units names to monitor. If empty or not present, all units are accep
 
 </Fields>
 
-## Output
+## Output (log)
 
-The following schema represents events as that are output from this source.
+This component outputs [`log` events][docs.data-model.log].
 
-<CodeHeader fileName="example.json" />
+Given the following input:
 
-```javascript
-{
-  "host": "my.host.com",
-  "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
-  "timestamp": "2019-11-01T21:15:47+00:00"
-}
+```
+__REALTIME_TIMESTAMP=1564173027000443
+__MONOTONIC_TIMESTAMP=98694000446
+_BOOT_ID=124c781146e841ae8d9b4590df8b9231
+SYSLOG_FACILITY=3
+_UID=0
+_GID=0
+_CAP_EFFECTIVE=3fffffffff
+_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
+_HOSTNAME=lorien.example.com
+PRIORITY=6
+_TRANSPORT=stdout
+_STREAM_ID=92c79f4b45c4457490ebdefece29995e
+SYSLOG_IDENTIFIER=ntpd
+_PID=2156
+_COMM=ntpd
+_EXE=/usr/sbin/ntpd
+_CMDLINE=ntpd: [priv]
+_SYSTEMD_CGROUP=/system.slice/ntpd.service
+_SYSTEMD_UNIT=ntpd.service
+_SYSTEMD_SLICE=system.slice
+_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
+MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
+
 ```
 
+A [`log` event][docs.data-model.log] will be output with the
+following structure:
+
+```json
+{
+  "timestamp": <2019-07-26T20:30:27.000443Z>,
+  "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
+  "host": "lorien.example.com",
+  "__REALTIME_TIMESTAMP": "1564173027000443",
+  "__MONOTONIC_TIMESTAMP": "98694000446",
+  "_BOOT_ID": "124c781146e841ae8d9b4590df8b9231",
+  "SYSLOG_FACILITY": "3",
+  "_UID": "0",
+  "_GID": "0",
+  "_CAP_EFFECTIVE": "3fffffffff",
+  "_MACHINE_ID": "c36e9ea52800a19d214cb71b53263a28",
+  "PRIORITY": "6",
+  "_TRANSPORT": "stdout",
+  "_STREAM_ID": "92c79f4b45c4457490ebdefece29995e",
+  "SYSLOG_IDENTIFIER": "ntpd",
+  "_PID": "2156",
+  "_COMM": "ntpd",
+  "_EXE": "/usr/sbin/ntpd",
+  "_CMDLINE": "ntpd: [priv]",
+  "_SYSTEMD_CGROUP": "/system.slice/ntpd.service",
+  "_SYSTEMD_UNIT": "ntpd.service",
+  "_SYSTEMD_SLICE": "system.slice",
+  "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
+}
+
+```
+
+More detail on the output schema is below.
 
 <Fields filters={true}>
 
@@ -232,81 +283,25 @@ The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
 </Field>
 
 
+<Field
+  enumValues={null}
+  examples={["my-value"]}
+  name={"*"}
+  path={null}
+  required={false}
+  type={"*"}
+  >
+
+### *
+
+Additional Journald fields are passed through as log fields.
+
+
+
+</Field>
+
+
 </Fields>
-
-## Input/Output
-
-Given the following journald record:
-
-{% code-tabs %}
-{% code-tabs-item title="journald record" %}
-
-```
-__REALTIME_TIMESTAMP=1564173027000443
-__MONOTONIC_TIMESTAMP=98694000446
-_BOOT_ID=124c781146e841ae8d9b4590df8b9231
-SYSLOG_FACILITY=3
-_UID=0
-_GID=0
-_CAP_EFFECTIVE=3fffffffff
-_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
-_HOSTNAME=lorien.example.com
-PRIORITY=6
-_TRANSPORT=stdout
-_STREAM_ID=92c79f4b45c4457490ebdefece29995e
-SYSLOG_IDENTIFIER=ntpd
-_PID=2156
-_COMM=ntpd
-_EXE=/usr/sbin/ntpd
-_CMDLINE=ntpd: [priv]
-_SYSTEMD_CGROUP=/system.slice/ntpd.service
-_SYSTEMD_UNIT=ntpd.service
-_SYSTEMD_SLICE=system.slice
-_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
-MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-A [`log` event][docs.data-model#log] will be output with the following structure:
-
-{% code-tabs %}
-{% code-tabs-item title="log" %}
-```javascript
-{
-  "timestamp": <2019-07-26T20:30:27.000443Z>,
-  "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
-  "host": "lorien.example.com",
-  "__REALTIME_TIMESTAMP": "1564173027000443",
-  "__MONOTONIC_TIMESTAMP": "98694000446",
-  "_BOOT_ID": "124c781146e841ae8d9b4590df8b9231",
-  "SYSLOG_FACILITY": "3",
-  "_UID": "0",
-  "_GID": "0",
-  "_CAP_EFFECTIVE": "3fffffffff",
-  "_MACHINE_ID": "c36e9ea52800a19d214cb71b53263a28",
-  "PRIORITY": "6",
-  "_TRANSPORT": "stdout",
-  "_STREAM_ID": "92c79f4b45c4457490ebdefece29995e",
-  "SYSLOG_IDENTIFIER": "ntpd",
-  "_PID": "2156",
-  "_COMM": "ntpd",
-  "_EXE": "/usr/sbin/ntpd",
-  "_CMDLINE": "ntpd: [priv]",
-  "_SYSTEMD_CGROUP": "/system.slice/ntpd.service",
-  "_SYSTEMD_UNIT": "ntpd.service",
-  "_SYSTEMD_SLICE": "system.slice",
-  "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
-}
-```
-
-Vector extracts the `"MESSAGE"` field as `"message"`, `"_HOSTNAME"` as
-`"host"`, and parses `"_SOURCE_REALTIME_TIMESTAMP"` into `"timestamp"`. All
-other fields from journald are kept intact from the source record. You can
-further parse the `"message"` key with a [transform][docs.transforms], such as
-the [`regex_parser` transform][docs.transforms.regex_parser].
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 ## How It Works
 
@@ -320,7 +315,6 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[docs.transforms]: ../../components/transforms
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log

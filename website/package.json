@@ -10,15 +10,13 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.32",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.32",
+    "@docusaurus/core": "^2.0.0-alpha.33",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.33",
     "classnames": "^2.2.6",
-    "docusaurus": "^2.0.0-alpha.32",
+    "docusaurus": "^2.0.0-alpha.33",
     "prismjs": "^1.17.1",
     "react": "^16.8.4",
-    "react-dom": "^16.8.4",
-    "remarkable": "^1.7.4",
-    "swizzle": "^1.1.0"
+    "react-dom": "^16.8.4"
   },
   "browserslist": {
     "production": [

@@ -9,5 +9,5 @@ Afterwards, we recommend moving onto [deployments][docs.deployment] so you can
 begin to formalize how Vector will fit into your infrastructure.
 
 
-[docs.deployment]: ../setup/deployment
-[docs.sending-your-first-event]: ../setup/getting-started/sending-your-first-event
+[docs.deployment]: /docs/setup/deployment
+[docs.sending-your-first-event]: /docs/setup/getting-started/sending-your-first-event

@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 
 import './styles.css';
 
-function Components({children}) {
+function Components({children, titles}) {
   const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(false);
   const [onlyLog, setOnlyLog] = useState(false);
   const [onlyMetric, setOnlyMetric] = useState(false);
@@ -10,6 +10,7 @@ function Components({children}) {
   const [searchTerm, setSearchTerm] = useState(null);
 
   let filteredChildren = children;
+  let showTitles = titles || titles == undefined;
 
   if (onlyAtLeastOnce) {
     filteredChildren = filteredChildren.filter(child => child.props.delivery_guarantee == "at_least_once");
@@ -82,28 +83,28 @@ function Components({children}) {
         {!Array.isArray(filteredChildren) || filteredChildren.length > 0 ?
           <div>
             {!Array.isArray(sources) || sources.length > 0 ?
-              <div>
-                <h3>{sources.length} Sources</h3>
+              <>
+                {showTitles && <h3>{sources.length} Sources</h3>}
                 <div className="component-cards">
                   {sources}
                 </div>
-              </div>:
+              </>:
               ''}
             {!Array.isArray(transforms) || transforms.length > 0 ?
-              <div>
-                <h3>{transforms.length} Transforms</h3>
+              <>
+                {showTitles && <h3>{transforms.length} Transforms</h3>}
                 <div className="component-cards">
                   {transforms}
                 </div>
-              </div>:
+              </>:
               ''}
             {!Array.isArray(sinks) || sinks.length > 0 ?
-              <div>
-                <h3>{sinks.length} Sinks</h3>
+              <>
+                {showTitles && <h3>{sinks.length} Sinks</h3>}
                 <div className="component-cards">
                   {sinks}
                 </div>
-              </div>:
+              </>:
               ''}
           </div> :
           <div className="empty">

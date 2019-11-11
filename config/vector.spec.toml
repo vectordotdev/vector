@@ -3562,6 +3562,3 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
-
-
-

@@ -246,7 +246,7 @@ Parsing the `"message"` field would result the following structure:
 ```
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.correctness]: ../../about/correctness
-[docs.data-model#log]: ../../about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.correctness]: /docs/about/correctness
+[docs.data-model#log]: /docs/about/data-model#log
 [urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

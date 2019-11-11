@@ -429,7 +429,7 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry_backoff_secs`](#retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#metric]: ../../about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#metric]: /docs/about/data-model#metric
 [urls.datadog]: https://www.datadoghq.com
 [urls.new_datadog_metrics_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+datadog_metrics

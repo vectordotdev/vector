@@ -138,11 +138,10 @@ The maximum bytes size of incoming messages before they are discarded.
 
 </Fields>
 
-## Output
+## Output (log)
 
-The following schema represents events as that are output from this source.
-
-<CodeHeader fileName="example.json" />
+This component outputs [`log` events][docs.data-model.log].
+For example:
 
 ```javascript
 {
@@ -151,7 +150,7 @@ The following schema represents events as that are output from this source.
   "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
-
+More detail on the output schema is below.
 
 <Fields filters={true}>
 
@@ -212,7 +211,7 @@ The exact time the event was ingested.
 
 </Fields>
 
-## Input/Output
+## Output
 
 Given the following input line:
 
@@ -264,7 +263,8 @@ section.
 Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[docs.transforms]: ../../components/transforms
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
+[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
+[docs.transforms]: /docs/components/transforms

@@ -213,11 +213,10 @@ The Kafka topics names to read events from. Regex is supported if the topic begi
 
 </Fields>
 
-## Output
+## Output (log)
 
-The following schema represents events as that are output from this source.
-
-<CodeHeader fileName="example.json" />
+This component outputs [`log` events][docs.data-model.log].
+For example:
 
 ```javascript
 {
@@ -225,7 +224,7 @@ The following schema represents events as that are output from this source.
   "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
-
+More detail on the output schema is below.
 
 <Fields filters={true}>
 
@@ -268,36 +267,6 @@ The exact time the event was ingested.
 
 </Fields>
 
-## Input/Output
-
-Given the following message in a Kafka topic:
-
-{% code-tabs %}
-{% code-tabs-item title="stdin" %}
-```
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-A [`log` event][docs.data-model#log] will be output with the following structure:
-
-{% code-tabs %}
-{% code-tabs-item title="log" %}
-```javascript
-{
-  "timestamp": <timestamp> # current time,
-  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
-  "host": "10.2.22.122" # current nostname
-}
-```
-
-The "timestamp" and `"host"` keys were automatically added as context. You can
-further parse the `"message"` key with a [transform][docs.transforms], such as
-the [`regex_parser` transform][docs.transforms.regex_parser].
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
 ## How It Works
 
 ### Environment Variables
@@ -310,8 +279,7 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#log]: ../../about/data-model#log
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[docs.transforms]: ../../components/transforms
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

@@ -14,5 +14,5 @@ import Jump from '@site/src/components/Jump';
 <Jump to="from-source">From source</Jump>
 
 
-[docs.operating_systems]: ../../setup/installation/operating-systems
-[docs.platforms]: ../../setup/installation/platforms
+[docs.operating_systems]: /docs/setup/installation/operating-systems
+[docs.platforms]: /docs/setup/installation/platforms

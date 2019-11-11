@@ -177,19 +177,19 @@ continue running while Vector restarts. When Vector is restarted, it can resume
 where it left off.
 
 
-[docs.performance]: ../../../about/performance
-[docs.platforms.docker]: ../../../setup/installation/platforms/docker
-[docs.platforms]: ../../../setup/installation/platforms
-[docs.process-management#reloading]: ../../../administration/process-management#reloading
-[docs.roles.service]: ../../../setup/deployment/roles/service
-[docs.sinks.vector]: ../../../components/sinks/vector
-[docs.sinks]: ../../../components/sinks
-[docs.sources.file]: ../../../components/sources/file
-[docs.sources.stdin]: ../../../components/sources/stdin
-[docs.sources.vector]: ../../../components/sources/vector
-[docs.topologies#centralized]: ../../../setup/deployment/topologies#centralized
-[docs.topologies#stream-based]: ../../../setup/deployment/topologies#stream-based
-[docs.updating]: ../../../administration/updating
+[docs.performance]: /docs/about/performance
+[docs.platforms.docker]: /docs/setup/installation/platforms/docker
+[docs.platforms]: /docs/setup/installation/platforms
+[docs.process-management#reloading]: /docs/administration/process-management#reloading
+[docs.roles.service]: /docs/setup/deployment/roles/service
+[docs.sinks.vector]: /docs/components/sinks/vector
+[docs.sinks]: /docs/components/sinks
+[docs.sources.file]: /docs/components/sources/file
+[docs.sources.stdin]: /docs/components/sources/stdin
+[docs.sources.vector]: /docs/components/sources/vector
+[docs.topologies#centralized]: /docs/setup/deployment/topologies#centralized
+[docs.topologies#stream-based]: /docs/setup/deployment/topologies#stream-based
+[docs.updating]: /docs/administration/updating
 [urls.big_query_streaming]: https://cloud.google.com/bigquery/streaming-data-into-bigquery
 [urls.cgroups_limit_resources]: https://the.binbashtheory.com/control-resources-cgroups/
 [urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html

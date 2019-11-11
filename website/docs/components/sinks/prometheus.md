@@ -412,13 +412,13 @@ ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#metric#counters]: ../../about/data-model#metric#counters
-[docs.data-model#metric#gauges]: ../../about/data-model#metric#gauges
-[docs.data-model#metric#histogram]: ../../about/data-model#metric#histogram
-[docs.data-model#metric#histograms]: ../../about/data-model#metric#histograms
-[docs.data-model#metric#sets]: ../../about/data-model#metric#sets
-[docs.data-model#metric]: ../../about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#metric#counters]: /docs/about/data-model#metric#counters
+[docs.data-model#metric#gauges]: /docs/about/data-model#metric#gauges
+[docs.data-model#metric#histogram]: /docs/about/data-model#metric#histogram
+[docs.data-model#metric#histograms]: /docs/about/data-model#metric#histograms
+[docs.data-model#metric#sets]: /docs/about/data-model#metric#sets
+[docs.data-model#metric]: /docs/about/data-model#metric
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710
 [urls.prometheus]: https://prometheus.io/

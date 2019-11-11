@@ -491,11 +491,10 @@ When `true` Vector will read from the beginning of new files, when `false` Vecto
 
 </Fields>
 
-## Output
+## Output (log)
 
-The following schema represents events as that are output from this source.
-
-<CodeHeader fileName="example.json" />
+This component outputs [`log` events][docs.data-model.log].
+For example:
 
 ```javascript
 {
@@ -505,7 +504,7 @@ The following schema represents events as that are output from this source.
   "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
-
+More detail on the output schema is below.
 
 <Fields filters={true}>
 
@@ -705,11 +704,12 @@ Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
 
 
-[docs.configuration#data-directory]: ../../setup/configuration#data-directory
-[docs.configuration#data_dir]: ../../setup/configuration#data_dir
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.correctness]: ../../about/correctness
-[docs.data-model#log]: ../../about/data-model#log
+[docs.configuration#data-directory]: /docs/setup/configuration#data-directory
+[docs.configuration#data_dir]: /docs/setup/configuration#data_dir
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.correctness]: /docs/about/correctness
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
 [urls.inode]: https://en.wikipedia.org/wiki/Inode

@@ -101,5 +101,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#metric]: ../../about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#metric]: /docs/about/data-model#metric

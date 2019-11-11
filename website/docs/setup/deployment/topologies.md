@@ -263,12 +263,12 @@ A good balance of simplicity, stability, and control. For most, this topology is
             <g id="Centralized-(Black)" transform="translate(0.000000, 71.000000)">
                 <g id="Group-55" transform="translate(768.000000, 160.000000)">
                     <g id="S3-Arrow" transform="translate(126.298615, 165.899588)">
-                        <path d="M1.70530257e-13,-1.0658141e-14 C1.70530257e-13,-1.0658141e-14 34.3250833,23.6213992 119.922545,33.8506173 C177.567084,40.7397119 240.210027,39.3728395 274.976261,37.7467078" id="Stroke-12" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="32,20"></path>
+                        <path d="M1.70530257e-13,-1.0658141e-14 C1.70530257e-13,-1.0658141e-14 34.3250833,23.6213992 119.922545,33.8506173 C177.567084,40.7397119 240.210027,39.3728395 274.976261,37.7467078" id="Stroke-12" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" strokeDasharray="32,20"></path>
                         <polygon id="Fill-13" fill="#000000" points="293.368833 36.6365597 274.549636 30.8460185 275.382578 44.6480741"></polygon>
                         <polygon id="Stroke-14" stroke="#000000" stroke-width="4" points="293.368833 36.636214 274.549636 30.8460905 275.382578 44.6487654"></polygon>
                     </g>
                     <g id="Search-Arrow" transform="translate(128.085214, 0.905556)">
-                        <path d="M0,61.3450617 C0,61.3450617 23.0126296,37.9469136 109.905488,22.3711934 C170.136498,11.5744856 241.428099,8.05576132 279.507235,6.91213992" id="Stroke-15" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4,13"></path>
+                        <path d="M0,61.3450617 C0,61.3450617 23.0126296,37.9469136 109.905488,22.3711934 C170.136498,11.5744856 241.428099,8.05576132 279.507235,6.91213992" id="Stroke-15" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" strokeDasharray="4,13"></path>
                         <polygon id="Fill-16" fill="#000000" points="297.927173 6.54211934 279.355712 0.000288065844 279.633551 13.8247119"></polygon>
                         <polygon id="Stroke-17" stroke="#000000" stroke-width="4" points="297.927173 6.54197531 279.355712 1.90070182e-13 279.633551 13.8242798"></polygon>
                     </g>
@@ -503,4 +503,4 @@ The most durable and elastic topology. This topology is typically adopted for ve
 * **More expensive.** In addition the management cost, the added stream cluster will require more resources which will increase operational cost.
 
 
-[docs.roles]: ../../setup/deployment/roles
+[docs.roles]: /docs/setup/deployment/roles

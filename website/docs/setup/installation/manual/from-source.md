@@ -138,10 +138,10 @@ cp -av distribution/systemd/vector /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration#data-directory]: ../../../setup/configuration#data-directory
-[docs.configuration]: ../../../setup/configuration
-[docs.from_archives]: ../../../setup/installation/manual/from-archives
-[docs.operating_systems]: ../../../setup/installation/operating-systems
-[docs.platforms]: ../../../setup/installation/platforms
+[docs.configuration#data-directory]: /docs/setup/configuration#data-directory
+[docs.configuration]: /docs/setup/configuration
+[docs.from_archives]: /docs/setup/installation/manual/from-archives
+[docs.operating_systems]: /docs/setup/installation/operating-systems
+[docs.platforms]: /docs/setup/installation/platforms
 [urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [urls.rust]: https://www.rust-lang.org/

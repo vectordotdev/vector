@@ -9,8 +9,6 @@ making it quick and easy. We'll start with the simplest of examples: accepting
 an event via the [`stdin` source][docs.sources.stdin], and then printing it out
 via the [`console` sink][docs.sinks.console].
 
-![][assets.getting-started-guide]
-
 ## 1. Install Vector
 
 If you haven't already, [install Vector][docs.installation]:
@@ -110,14 +108,13 @@ of Vector. From here, you can start to think about the various
 you'll need to combine to create your pipelines.
 
 
-[assets.getting-started-guide]: ../../assets/getting-started-guide.svg
-[docs.concepts]: ../../about/concepts
-[docs.configuration]: ../../setup/configuration
-[docs.data-model#event]: ../../about/data-model#event
-[docs.installation]: ../../setup/installation
-[docs.sinks.console]: ../../components/sinks/console
-[docs.sinks]: ../../components/sinks
-[docs.sources.stdin]: ../../components/sources/stdin
-[docs.sources]: ../../components/sources
-[docs.transforms.regex_parser]: ../../components/transforms/regex_parser
-[docs.transforms]: ../../components/transforms
+[docs.concepts]: /docs/about/concepts
+[docs.configuration]: /docs/setup/configuration
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.installation]: /docs/setup/installation
+[docs.sinks.console]: /docs/components/sinks/console
+[docs.sinks]: /docs/components/sinks
+[docs.sources.stdin]: /docs/components/sources/stdin
+[docs.sources]: /docs/components/sources
+[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
+[docs.transforms]: /docs/components/transforms

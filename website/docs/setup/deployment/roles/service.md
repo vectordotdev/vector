@@ -204,17 +204,17 @@ service, restarting without disruption is achieved by higher level design
 decisions, such as [load balancing][docs.roles.service#load-balancing].
 
 
-[docs.performance]: ../../../about/performance
-[docs.process-management#reloading]: ../../../administration/process-management#reloading
-[docs.roles.service#load-balancing]: ../../../setup/deployment/roles/service#load-balancing
-[docs.roles.service#on-disk-buffering]: ../../../setup/deployment/roles/service#on-disk-buffering
-[docs.sinks.http]: ../../../components/sinks/http
-[docs.sinks.tcp]: ../../../components/sinks/tcp
-[docs.sinks.vector]: ../../../components/sinks/vector
-[docs.sources.syslog]: ../../../components/sources/syslog
-[docs.sources.tcp]: ../../../components/sources/tcp
-[docs.sources.vector]: ../../../components/sources/vector
-[docs.updating]: ../../../administration/updating
+[docs.performance]: /docs/about/performance
+[docs.process-management#reloading]: /docs/administration/process-management#reloading
+[docs.roles.service#load-balancing]: /docs/setup/deployment/roles/service#load-balancing
+[docs.roles.service#on-disk-buffering]: /docs/setup/deployment/roles/service#on-disk-buffering
+[docs.sinks.http]: /docs/components/sinks/http
+[docs.sinks.tcp]: /docs/components/sinks/tcp
+[docs.sinks.vector]: /docs/components/sinks/vector
+[docs.sources.syslog]: /docs/components/sources/syslog
+[docs.sources.tcp]: /docs/components/sources/tcp
+[docs.sources.vector]: /docs/components/sources/vector
+[docs.updating]: /docs/administration/updating
 [urls.aws_elb]: https://aws.amazon.com/elasticloadbalancing/
 [urls.haproxy]: https://www.haproxy.org/
 [urls.nginx]: https://www.nginx.com/

@@ -56,25 +56,30 @@ UDP socket address to bind to.
 
 </Fields>
 
-## Output
+## Output (metric)
 
-This component does not automatically add any fields.
+This component outputs [`metric` events][docs.data-model.metric].
 
-## Input/Output
+import Tabs from '@theme/Tabs';
 
-{% tabs %}
-{% tab title="Counter" %}
-Given the following Statsd counter:
+<Tabs
+  defaultValue="counter"
+  values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer/Histogram","value":"timer-histogram"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="counter">
+
+Given the following input:
 
 ```
 login.invocations:1|c
 ```
 
-A [`metric` event][docs.data-model#metric] will be output with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the
+following structure:
 
-{% code-tabs %}
-{% code-tabs-item title="metric" %}
-```javascript
+```json
 {
   "counter": {
     "name": "login.invocations",
@@ -83,22 +88,21 @@ A [`metric` event][docs.data-model#metric] will be output with the following str
   }
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-{% endtab %}
-{% tab title="Gauge" %}
-Given the following Statsd gauge:
+</TabItem>
+
+<TabItem value="gauge">
+
+Given the following input:
 
 ```
 gas_tank:0.50|g
 ```
 
-A [`metric` event][docs.data-model#metric] will be output with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the
+following structure:
 
-{% code-tabs %}
-{% code-tabs-item title="metric" %}
-```javascript
+```json
 {
   "gauge": {
     "name": "gas_tank",
@@ -107,22 +111,21 @@ A [`metric` event][docs.data-model#metric] will be output with the following str
   }
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-{% endtab %}
-{% tab title="Set" %}
-Given the following Statsd set:
+</TabItem>
+
+<TabItem value="set">
+
+Given the following input:
 
 ```
 unique_users:foo|s
 ```
 
-A [`metric` event][docs.data-model#metric] will be output with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the
+following structure:
 
-{% code-tabs %}
-{% code-tabs-item title="metric" %}
-```javascript
+```json
 {
   "set": {
     "name": "unique_users",
@@ -131,22 +134,21 @@ A [`metric` event][docs.data-model#metric] will be output with the following str
   }
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-{% endtab %}
-{% tab title="Timer" %}
-Given the following Statsd timer:
+</TabItem>
+
+<TabItem value="timer-histogram">
+
+Given the following input:
 
 ```
-login.time:22|ms 
+login.time:22|ms
 ```
 
-A [`metric` event][docs.data-model#metric] will be output with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the
+following structure:
 
-{% code-tabs %}
-{% code-tabs-item title="metric" %}
-```javascript
+```json
 {
   "timer": {
     "name": "login.time",
@@ -155,11 +157,9 @@ A [`metric` event][docs.data-model#metric] will be output with the following str
   }
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-{% endtab %}
-{% endtabs %}
+</TabItem>
+</Tabs>
 
 ## How It Works
 
@@ -180,5 +180,6 @@ more closely represent the metric's time in situations here it can be used. See
 the [metric][docs.data-model#metric] data model page for more info.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#metric]: ../../about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.data-model.metric]: /docs/about/data-model/metric

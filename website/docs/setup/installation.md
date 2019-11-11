@@ -13,8 +13,8 @@ import Tabs from '@theme/Tabs';
 <Tabs
   defaultValue="humans"
   values={[
-    { label: 'For Humans', value: 'humans', },
-    { label: 'For Machines', value: 'machines', },
+    { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
+    { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
   ]
 }>
 

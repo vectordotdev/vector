@@ -798,10 +798,10 @@ your Spunk HTTP Collectory you'll be provided a[`host`](#host) and[`token`](#tok
 should supply to the[`host`](#host) and[`token`](#token) options.
 
 
-[docs.configuration#environment-variables]: ../../setup/configuration#environment-variables
-[docs.data-model#event]: ../../about/data-model#event
-[docs.data-model#log]: ../../about/data-model#log
-[docs.guarantees]: ../../about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.guarantees]: /docs/about/guarantees
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
