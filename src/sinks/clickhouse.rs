@@ -18,7 +18,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -121,14 +120,12 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
                 request
             });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(request.in_flight_limit)
-        .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-        .retry(request.retry_policy(ClickhouseRetryLogic {
+    let service = request.service(
+        ClickhouseRetryLogic {
             inner: HttpRetryLogic,
-        }))
-        .timeout(request.timeout)
-        .service(http_service);
+        },
+        http_service,
+    );
 
     let sink = BatchServiceSink::new(service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)

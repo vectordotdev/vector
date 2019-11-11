@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
-use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -125,12 +124,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
                 builder.body(body).unwrap()
             });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(request.in_flight_limit)
-        .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-        .retry(request.retry_policy(HttpRetryLogic))
-        .timeout(request.timeout)
-        .service(http_service);
+    let service = request.service(HttpRetryLogic, http_service);
 
     let sink = BatchServiceSink::new(service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)

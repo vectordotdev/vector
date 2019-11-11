@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{convert::TryInto, fmt, sync::Arc};
 use string_cache::DefaultAtom as Atom;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
@@ -96,12 +96,7 @@ impl KinesisService {
 
         let kinesis = KinesisService { client, config };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit)
-            .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(request.retry_policy(KinesisRetryLogic))
-            .timeout(request.timeout)
-            .service(kinesis);
+        let svc = request.service(KinesisRetryLogic, kinesis);
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(Vec::new(), &batch)

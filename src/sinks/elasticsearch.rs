@@ -24,7 +24,6 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -287,12 +286,7 @@ fn es(
             }
         });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(request.in_flight_limit)
-        .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-        .retry(request.retry_policy(HttpRetryLogic))
-        .timeout(request.timeout)
-        .service(http_service);
+    let service = request.service(HttpRetryLogic, http_service);
 
     let sink = BatchServiceSink::new(service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)

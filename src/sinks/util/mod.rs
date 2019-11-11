@@ -12,7 +12,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
-use tower::Service;
+use tower::{
+    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
+    retry::Retry,
+    timeout::Timeout,
+    Service, ServiceBuilder,
+};
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
 pub use buffer::metrics::MetricBuffer;
@@ -374,5 +379,30 @@ pub struct TowerRequestSettings {
 impl TowerRequestSettings {
     pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
         FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
+    }
+
+    pub fn service<L, R, S>(
+        &self,
+        retry_logic: L,
+        service: S,
+    ) -> ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>
+    // Would like to return `impl Service<R>` here, but that doesn't
+    // work with later calls to `BatchServiceSink::batched_with_min`
+    // (via `trait SinkExt` above), as it is missing a bound on the
+    // associated types that cannot be expressed in stable Rust.
+    where
+        L: RetryLogic<Error = S::Error, Response = S::Response>,
+        S: Clone + Service<R>,
+        S::Error: 'static + std::error::Error + Send + Sync,
+        S::Response: std::fmt::Debug,
+        R: Clone,
+    {
+        let policy = self.retry_policy(retry_logic);
+        ServiceBuilder::new()
+            .concurrency_limit(self.in_flight_limit)
+            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
+            .retry(policy)
+            .timeout(self.timeout)
+            .service(service)
     }
 }

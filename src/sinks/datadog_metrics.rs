@@ -15,7 +15,7 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -133,12 +133,7 @@ impl DatadogSvc {
             inner: http_service,
         };
 
-        let service = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit)
-            .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(request.retry_policy(HttpRetryLogic))
-            .timeout(request.timeout)
-            .service(datadog_http_service);
+        let service = request.service(HttpRetryLogic, datadog_http_service);
 
         let sink =
             BatchServiceSink::new(service, acker).batched_with_min(MetricBuffer::new(), &batch);

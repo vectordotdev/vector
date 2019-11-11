@@ -17,7 +17,7 @@ use rusoto_core::{Region, RusotoError, RusotoFuture};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
@@ -79,12 +79,7 @@ impl CloudWatchMetricsSvc {
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit)
-            .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(request.retry_policy(CloudWatchMetricsRetryLogic))
-            .timeout(request.timeout)
-            .service(cloudwatch_metrics);
+        let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
         let sink = BatchServiceSink::new(svc, acker).batched_with_min(MetricBuffer::new(), &batch);
 

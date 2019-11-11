@@ -19,7 +19,7 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::convert::TryInto;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
@@ -139,12 +139,7 @@ impl S3Sink {
             filename_extension: config.filename_extension.clone(),
         };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit)
-            .rate_limit(request.rate_limit_num, request.rate_limit_duration)
-            .retry(request.retry_policy(S3RetryLogic))
-            .timeout(request.timeout)
-            .service(s3);
+        let svc = request.service(S3RetryLogic, s3);
 
         let sink = BatchServiceSink::new(svc, acker)
             .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
