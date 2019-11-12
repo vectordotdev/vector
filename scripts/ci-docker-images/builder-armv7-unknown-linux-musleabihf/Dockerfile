@@ -11,8 +11,6 @@ ARG LLVM_GIT_COMMIT=8adf9bdccfefb8d03f0e8db3b012fb41da1580a4
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
 ARG LINUX_HEADERS_VERSION=5.3.10
-# OpenSSL needs to be compiled against MUSL too, so we install it from source.
-ARG OPENSSL_VERSION=1.1.0l
 ARG TARGET=armv7-unknown-linux-musleabihf
 
 # Locations for produced tools and libraries.
@@ -259,24 +257,6 @@ RUN echo > dummy.c && \
   $LIBS_PREFIX/bin/cc -c dummy.c && \
   $CLANG_PREFIX/bin/ar cr $LIBS_PREFIX/lib/libstdc++.a dummy.o && \
   rm dummy.c dummy.o
-
-# Install OpenSSL
-WORKDIR $OPENSSL_DIR
-# OpenSSL tries to use secure_getenv function when compiled with MUSL here
-# https://github.com/openssl/openssl/blob/master/crypto/getenv.c. However, this
-# function was added to MUSL only in 1.23 release, while Rust still uses 1.22.
-# So until there is a Rust version using MUSL 1.23 we need to resort to patching
-# OpenSSL to disallow usage of unsupported secure_getenv function.
-COPY openssl-disable-secure-getenv.patch .
-RUN patch -p1 < openssl-disable-secure-getenv.patch
-ENV CC=$LIBS_PREFIX/bin/musl-cc
-ENV CXX=$LIBS_PREFIX/bin/musl-c++
-ENV CFLAGS=""
-ENV CXXFLAGS=""
-ENV LDFLAGS=""
-ENV CROSS_COMPILE=""
-RUN ./Configure --prefix=$LIBS_PREFIX linux-generic32 no-shared && \
-  make install
 
 # The actual builder.
 FROM ubuntu:18.04
