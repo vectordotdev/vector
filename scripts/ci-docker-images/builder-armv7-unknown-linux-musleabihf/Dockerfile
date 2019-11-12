@@ -53,7 +53,7 @@ ENV LLVM_DIR=$SRC_DIR/llvm-project
 FROM llvm-source AS clang-builder
 RUN apt-get update && apt-get -y install build-essential ninja-build cmake python3-distutils
 ARG CLANG_PREFIX
-ARG CLANG_TAGET
+ARG LLVM_TARGET
 WORKDIR $LLVM_DIR
 RUN mkdir build && \
   cd build && \
