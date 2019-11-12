@@ -71,12 +71,14 @@ end
 
 def post_process(content, doc, links)
   if doc.end_with?(".md")
+    content = content.clone
     content = PostProcessors::ComponentImporter.import!(content)
     content = PostProcessors::SectionSorter.sort!(content)
     content = PostProcessors::SectionReferencer.reference!(content)
     content = PostProcessors::LinkDefiner.define!(content, doc, links)
     content = PostProcessors::OptionLinker.link!(content)
   end
+
   content
 end
 
@@ -188,6 +190,7 @@ docs.each do |doc|
   path = doc.gsub(/^#{ROOT_DIR}\//, "")
   original_content = File.read(doc)
   new_content = post_process(original_content, doc, metadata.links)
+
   if original_content != new_content
     File.write(doc, new_content)
     say("Processed - #{path}", color: :green)

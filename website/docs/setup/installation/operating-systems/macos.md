@@ -6,14 +6,11 @@ description: Install Vector on MacOS
 
 Vector can be installed on MacOS through the following methods:
 
-{% page-ref page="../package-managers/homebrew.md" %}
+import Jump from '@site/src/components/Jump';
 
-{% page-ref page="../manual/from-archives.md" %}
-
-{% page-ref page="../manual/from-source.md" %}
-
-Homebrew is generally the preferred package manager on MacOS, and is the
-method we recommend.
+<Jump to="/docs/setup/installation/package-managers/homebrew">Homebrew (recommended)</Jump>
+<Jump to="/docs/setup/installation/manual/from-archives">Install From an Archive</Jump>
+<Jump to="/docs/setup/installation/manual/from-source">Install From Source</Jump>
 
 
 

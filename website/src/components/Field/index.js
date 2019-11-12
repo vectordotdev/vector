@@ -124,7 +124,7 @@ function Field({children, common, defaultValue, enumValues, examples, name, path
   }
 
   return (
-    <div className={classnames('field', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
+    <div className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
         {common && <span className="badge badge--primary" title="This is a popular  that we recommend for getting started">common</span>}
         {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}

@@ -5,57 +5,86 @@ description: Install Vector from the Vector source code
 ---
 
 Installing Vector from source should be a last resort if Vector does not
-support your [platform][docs.platforms],
-[operating system][docs.operating_systems], or provide a pre-built
+support your [container system][docs.containers], [operating
+system][docs.operating_systems], or provide a pre-built
 [archive][docs.from_archives]. Because Vector is written in [Rust][urls.rust]
 it can compile to a single static binary. You can view an example of this
 in the [musl builder Docker image][urls.musl_builder_docker_image].
 
 ## Installation
 
-{% hint style="info" %}
+import Alert from '@site/src/components/Alert';
+
+<Alert type="info">
+
 This guide does _not_ cover cross compiling Vector. This guide is intended
 to be followed on your target machine.
-{% endhint %}
+
+</Alert>
+
+<div class="section-list section-list--lg">
+<div class="section">
 
 ### 1. Install Rust
 
 ```bash
-curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ```
 
-### 2. Download Vector's Source
+</div>
+<div class="section">
 
-Create a directory to unpack the Vector source into:
+### 2. Create the `vector` directory
 
 ```bash
 mkdir vector
 ```
 
-Download and unarchive the [Vector source](https://github.com/timberio/vector):
+</div>
+<div class="section">
 
-{% code-tabs %}
-{% code-tabs-item title="master" %}
+### 3. Download Vector's Source
+
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  defaultValue="master"
+  values={[
+    { label: 'Master', value: 'master', },
+    { label: 'Latest', value: 'latest', }
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="master">
+
 ```bash
 curl -OL https://github.com/timberio/vector/archive/master.tar.gz | tar -xzf - --directory="vector"
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="latest" %}
+
+</TabItem>
+<TabItem value="latest">
+
 ```bash
 curl -OL https://github.com/timberio/vector/releases/latest/download/source.tar.gz | tar -xzf --directory="vector"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-Change into the `vector` directory:
+</TabItem>
+</Tabs>
+</div>
+<div class="section">
+
+### 4. Change into the `vector` directory
 
 ```bash
 cd vector
 ```
 
-### 3. Compile Vector
+</div>
+<div class="section">
 
-And build the project via the `build` Make target:
+### 5. Compile Vector
 
 ```bash
 make build
@@ -66,13 +95,19 @@ For example, if you are building Vector on your Mac, your target triple
 is `x86_64-apple-darwin`, and the Vector binary will be located at
 `target/x86_64-apple-darwin/release/vector`.
 
-### 4. Start Vector
+</div>
+<div class="section">
 
-Finally, go ahead and start vector:
+### 6. Start Vector
+
+Finally, start vector:
 
 ```bash
 target/<target>/release/vector --config config/vector.toml
 ```
+
+</div>
+</div>
 
 ## Next Steps
 
@@ -108,10 +143,12 @@ And in your `vector.toml` file:
 data_dir = "/var/lib/vector"
 ```
 
-{% hint style="warning" %}
+<Alert type="warning">
+
 If you plan to run Vector under a separate user, be sure that the directory
 is writable by the `vector` process.
-{% endhint %}
+
+</Alert>
 
 ### Service Managers
 
@@ -140,8 +177,8 @@ Simply follow the same [installation instructions above](#installation).
 
 [docs.configuration#data-directory]: /docs/setup/configuration#data-directory
 [docs.configuration]: /docs/setup/configuration
+[docs.containers]: /docs/setup/installation/containers
 [docs.from_archives]: /docs/setup/installation/manual/from-archives
 [docs.operating_systems]: /docs/setup/installation/operating-systems
-[docs.platforms]: /docs/setup/installation/platforms
 [urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [urls.rust]: https://www.rust-lang.org/

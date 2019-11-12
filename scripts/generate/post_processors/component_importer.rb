@@ -8,6 +8,7 @@ module PostProcessors
   # post processor ensures imports are always present.
   class ComponentImporter
     IMPORTS = {
+      'Alert' => "import Alert from '@site/src/components/Alert';",
       'CodeHeader' => "import CodeHeader from '@site/src/components/CodeHeader';",
       'Components' => "import Components from '@site/src/components/Components';",
       'Component' => "import Component from '@site/src/components/Component';",
@@ -15,6 +16,8 @@ module PostProcessors
       'Fields' => "import Fields from '@site/src/components/Fields';",
       'Field' => "import Field from '@site/src/components/Field';",
       'Jump' => "import Jump from '@site/src/components/Jump';",
+      'Step' => "import Step from '@site/src/components/Step';",
+      'Steps' => "import Steps from '@site/src/components/Steps';",
       'Tabs' => "import Tabs from '@theme/Tabs';",
       'TabItem' => "import TabItem from '@theme/TabItem';"
     }

@@ -36,7 +36,7 @@ simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation] - [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
+* [**Installation**][docs.installation] - [platforms][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -196,6 +196,7 @@ the License.
 [docs.archives]: https://vector.dev/docs/setup/installation/manual/from-archives
 [docs.concepts]: https://vector.dev/docs/about/concepts
 [docs.configuration]: https://vector.dev/docs/setup/configuration
+[docs.containers]: https://vector.dev/docs/setup/installation/containers
 [docs.correctness]: https://vector.dev/docs/about/correctness
 [docs.data-model#log]: https://vector.dev/docs/about/data-model#log
 [docs.data-model#metric]: https://vector.dev/docs/about/data-model#metric
@@ -211,7 +212,6 @@ the License.
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems
 [docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers
 [docs.performance]: https://vector.dev/docs/about/performance
-[docs.platforms]: https://vector.dev/docs/setup/installation/platforms
 [docs.process-management#reloading]: https://vector.dev/docs/administration/process-management#reloading
 [docs.process-management]: https://vector.dev/docs/administration/process-management
 [docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent

@@ -141,9 +141,9 @@ variable example.
 
 ### Example Location
 
-The location of your Vector configuration file depends on your
-[platform][docs.platforms] or [operating system][docs.operating_systems]. For
-most Linux based systems the file can be found at `/etc/vector/vector.toml`.
+The location of your Vector configuration file depends on your [installation
+method][docs.installation]. For most Linux based systems the file can be
+found at `/etc/vector/vector.toml`.
 
 ### Format
 
@@ -250,8 +250,7 @@ All TOML values types are supported. For convenience this includes:
 
 [docs.configuration#composition]: /docs/setup/configuration#composition
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.operating_systems]: /docs/setup/installation/operating-systems
-[docs.platforms]: /docs/setup/installation/platforms
+[docs.installation]: /docs/setup/installation
 [docs.process-management#flags]: /docs/administration/process-management#flags
 [docs.process-management#starting]: /docs/administration/process-management#starting
 [docs.sinks]: /docs/components/sinks

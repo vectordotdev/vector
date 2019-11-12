@@ -1,5 +1,5 @@
 ---
-title: Install Vector On Docker
+title: Use Vector On Docker
 sidebar_label: Docker
 description: Using Vector on Docker
 ---

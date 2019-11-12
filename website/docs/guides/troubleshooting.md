@@ -55,10 +55,13 @@ tail -f /usr/local/var/log/vector.log
 
 ## 3. Enable backtraces
 
-{% hint style="info" %}
+import Alert from '@site/src/components/Alert';
+
+<Alert type="info">
+
 You can skip to the [next section](#3-enable-debug-logging) if you do not
-see an exception in your vector logs.
-{% endhint %}
+
+</Alert>
 
 If you see an exception in Vector's logs then we've clearly found the issue.
 Before you report a bug, please enable backtraces:
@@ -75,10 +78,12 @@ please [open a bug report issue][urls.new_bug_report].
 If you do not see an error in your Vector logs, and the Vector logs appear
 to be frozen, then you'll want to drop your log level to `debug`:
 
-{% hint style="info" %}
+<Alert type="info">
+
 Vector [rate limits][docs.monitoring#rate-limiting] logs in the hot path.
 As a result, dropping to the `debug` level is safe for production environments.
-{% endhint %}
+
+</Alert>
 
 {% tabs %}
 {% tab title="Env Var" %}

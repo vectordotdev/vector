@@ -7,14 +7,11 @@ description: Install Vector on the Debian operating system
 Vector can be installed on the Debian operating system through the following
 methods:
 
-{% page-ref page="../package-managers/dpkg.md" %}
+import Jump from '@site/src/components/Jump';
 
-{% page-ref page="../manual/from-archives.md" %}
-
-{% page-ref page="../manual/from-source.md" %}
-
-DPKG is the package manager that ships with Debian, and is the method we
-recommend.
+<Jump to="/docs/setup/installation/package-managers/dpkg">DPKG (recommended)</Jump>
+<Jump to="/docs/setup/installation/manual/from-archives">Install From an Archive</Jump>
+<Jump to="/docs/setup/installation/manual/from-source">Install From Source</Jump>
 
 
 

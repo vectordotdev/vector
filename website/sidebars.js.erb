@@ -31,9 +31,9 @@ module.exports = {
               type: 'category',
               label: 'Platforms',
               items: [
-                <%= metadata.links.fetch_id("docs.installation.platforms").to_json %>,
-                <%- metadata.installation.platforms.each do |platform| -%>
-                  <%= metadata.links.fetch_id("docs.installation.platforms.#{platform.id}").to_json %>,
+                <%= metadata.links.fetch_id("docs.installation.containers").to_json %>,
+                <%- metadata.installation.containers.each do |container| -%>
+                  <%= metadata.links.fetch_id("docs.installation.containers.#{container.id}").to_json %>,
                 <%- end -%>
               ],
             },

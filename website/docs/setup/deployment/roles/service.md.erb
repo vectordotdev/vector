@@ -49,10 +49,13 @@ data_dir = "/var/lib/vector"
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-{% hint style="warning" %}
+
+<Alert type="warning">
+
 Please make sure that the Vector user has write access to the specified
 `data_dir`.
-{% endhint %}
+
+</Alert>
 
 Please note that there is a performance hit to enabling on-disk buffers of
 about 3X. We believe this to be a worthwhile tradeoff to ensure data is not
@@ -123,20 +126,3 @@ possible.
 To [update][docs.updating] Vector you'll need to restart the process. Like any
 service, restarting without disruption is achieved by higher level design
 decisions, such as [load balancing][docs.roles.service#load-balancing].
-
-
-[assets.centralized-service]: ../../../assets/centralized-service.svg
-[docs.performance]: ../../../about/performance
-[docs.process-management#reloading]: ../../../administration/process-management#reloading
-[docs.roles.service#load-balancing]: ../../../setup/deployment/roles/service#load-balancing
-[docs.roles.service#on-disk-buffering]: ../../../setup/deployment/roles/service#on-disk-buffering
-[docs.sinks.http]: ../../../components/sinks/http
-[docs.sinks.tcp]: ../../../components/sinks/tcp
-[docs.sinks.vector]: ../../../components/sinks/vector
-[docs.sources.syslog]: ../../../components/sources/syslog
-[docs.sources.tcp]: ../../../components/sources/tcp
-[docs.sources.vector]: ../../../components/sources/vector
-[docs.updating]: ../../../administration/updating
-[urls.aws_elb]: https://aws.amazon.com/elasticloadbalancing/
-[urls.haproxy]: https://www.haproxy.org/
-[urls.nginx]: https://www.nginx.com/

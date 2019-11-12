@@ -217,12 +217,17 @@ response_time_s_count 2
 Note, the buckets used are those defined by the[`buckets`](#buckets) option, and the
 buckets above reflect the default buckets.
 
-{% hint style="warning" %}
+import Alert from '@site/src/components/Alert';
+
+<Alert type="warning">
+
 It's important that your metric units align with your bucket units. The default
 buckets are in seconds and any metric values passed should also be in seconds.
 If your metrics are not in seconds you can override the buckets to reflect
 your units.
-{% endhint %}
+
+</Alert>
+
 {% endtab %}
 {% tab title="Counters" %}
 This example demonstrates how Vector's internal [`counter` metric \
@@ -352,11 +357,13 @@ These defaults are tailored to broadly measure the response time (in seconds)
 of a network service. Most likely, however, you will be required to define
 buckets customized to your use case.
 
-{% hint style="warning" %}
+<Alert type="warning">
+
 Note: These values are in `seconds`, therefore,
 your metric values should also be in `seconds`.
 If this is not the case you should adjust your metric or buckets to coincide.
-{% endhint %}
+
+</Alert>
 
 ### In-Memory Aggregation
 

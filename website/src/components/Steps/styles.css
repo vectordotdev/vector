@@ -1,0 +1,15 @@
+ol.steps {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  list-style: disc;
+}
+
+ol.steps > li {
+  margin-left: calc( var(--ifm-list-left-padding) * -0.65 );
+  margin-top: 0;
+  padding-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+ol.steps > li > h3 {
+  background: var(--ifm-background-color);
+  padding-bottom: calc( var(--ifm-spacing-vertical) * 1.5 );
+}

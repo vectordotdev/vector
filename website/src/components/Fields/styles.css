@@ -29,8 +29,3 @@
 .fields .filters .search input {
   width: 100%;
 }
-
-.fields .fields-list {
-  border-left: 1px solid var(--ifm-hr-border-color);
-  margin-left: 0.25em;
-}

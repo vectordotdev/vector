@@ -69,11 +69,6 @@ measurement. This is a type of [Vector event][docs.data-model#metric].
 "Pipeline" refers to the end result from combining [sources][docs.sources],
 [transforms][docs.transforms], and [sinks][docs.sinks].
 
-## Platform
-
-"Platform" refers to a [platform][docs.platforms] that Vector can be deployed
-on, such as [Docker][docs.platforms.docker].
-
 ## Reducer
 
 "Reducer" refers to a [transform][docs.transforms] that reduces data into
@@ -151,8 +146,6 @@ reducing cost, etc.
 [docs.data_model]: /docs/about/data-model
 [docs.guides]: /docs/guides
 [docs.performance]: /docs/about/performance
-[docs.platforms.docker]: /docs/setup/installation/platforms/docker
-[docs.platforms]: /docs/setup/installation/platforms
 [docs.roles]: /docs/setup/deployment/roles
 [docs.sinks]: /docs/components/sinks
 [docs.sources]: /docs/components/sources

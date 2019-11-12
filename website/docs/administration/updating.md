@@ -6,8 +6,8 @@ description: Updating Vector to a later version
 Updating Vector depends largely on your [installation][docs.installation] 
 method. Each installation guide provides it's own "Updating" section:
 
-1. Platforms
-   1. [Updating Docker][docs.platforms.docker#updating]
+1. Containers
+   1. [Updating Docker][docs.containers.docker#updating]
 2. Package Managers
    1. [Updating with DPKG][docs.dpkg#updating]
    2. [Updating with Homebrew][docs.homebrew#updating]
@@ -35,10 +35,10 @@ data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
 
 
+[docs.containers.docker#updating]: /docs/setup/installation/containers/docker#updating
 [docs.dpkg#updating]: /docs/setup/installation/package-managers/dpkg#updating
 [docs.from_archives#updating]: /docs/setup/installation/manual/from-archives#updating
 [docs.homebrew#updating]: /docs/setup/installation/package-managers/homebrew#updating
 [docs.installation]: /docs/setup/installation
-[docs.platforms.docker#updating]: /docs/setup/installation/platforms/docker#updating
 [docs.rpm#updating]: /docs/setup/installation/package-managers/rpm#updating
 [docs.topologies]: /docs/setup/deployment/topologies

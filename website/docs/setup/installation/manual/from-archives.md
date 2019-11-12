@@ -5,69 +5,72 @@ description: Install Vector from pre-compiled archives
 ---
 
 Installing Vector from a pre-built archive should be a last resort if Vector
-cannot be installed through a supported [platform][docs.platforms] or
+cannot be installed through a supported [container system][docs.containers] or
 [operating system][docs.operating_systems]. Archives are built for released
 versions as well as nightly builds.
 
 ## Installation
 
-### 1. Download The Archive
+<Alert type="info">
 
-{% hint style="info" %}
 If you don't see your target, then we recommend [building Vector from source][docs.from_source].
 You can also request a target by [opening an issue][urls.new_target] requesting
 your new target.
-{% endhint %}
 
-Copy the download URL for the appropriate archive:
+</Alert>
+
+<div class="section-list section-list--lg">
+<div class="section">
+
+### 1. Copy the Vector archive URL
+
+import Alert from '@site/src/components/Alert';
 
 * [**Latest release**][urls.vector_downloads.latest]
 * [**Latest nightly**][urls.vector_downloads.nightly/latest]
 * [**Historical releases**][urls.vector_downloads]
 
-### 2. Unpack The Archive
+</div>
+<div class="section">
 
-Copy the appropriate download link above and then proceed to download it:
+### 2. Download & unpack the archive
 
 ```bash
 curl -o <release-download-url> | tar -xzf --directory="vector" --strip-components=1
 ```
 
-This will create a directory called `vector`. Let's change into that directory:
+</div>
+<div class="section">
+
+### 3. Change into the `vector` directory
 
 ```bash
 cd vector
 ```
 
-Issuing the `ls` command shows the following directory structure:
+</div>
+<div class="section">
 
-```
-LICENSE
-README.md
-bin/vector - The vector binary
-config/vector.toml - Default Vector configuration
-config/vector.spec.toml - Full Vector configuration specification
-config/examples/* - A variety of configuration examples
-etc/systemd/vector.service - Systemd service file
-etc/init.d/vector - Init.d service file
-```
-
-### 3. Move vector into your $PATH
-
-To ensure `vector` is in your `$PATH` let's add it to your profile:
+### 4. Move `vector` into your $PATH
 
 ```bash
 echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
 source $HOME/.profile
 ```
 
-### 4. Start Vector
+</div>
+<div class="section">
+
+### 5. Start Vector
 
 That's it! You can start vector with:
 
 ```bash
 vector --config config/vector.toml
 ```
+
+</div>
+</div>
 
 ## Next Steps
 
@@ -98,10 +101,12 @@ And in your `vector.toml` file:
 data_dir = "/var/lib/vector"
 ```
 
-{% hint style="warning" %}
+<Alert type="warning">
+
 If you plan to run Vector under a separate user, be sure that the directory
 is writable by the `vector` process.
-{% endhint %}
+
+</Alert>
 
 ### Service Managers
 
@@ -130,9 +135,9 @@ Simply follow the same [installation instructions above](#installation).
 
 [docs.configuration#data-directory]: /docs/setup/configuration#data-directory
 [docs.configuration]: /docs/setup/configuration
+[docs.containers]: /docs/setup/installation/containers
 [docs.from_source]: /docs/setup/installation/manual/from-source
 [docs.operating_systems]: /docs/setup/installation/operating-systems
-[docs.platforms]: /docs/setup/installation/platforms
 [urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations
 [urls.vector_downloads.latest]: https://packages.timber.io/vector/latest
 [urls.vector_downloads.nightly/latest]: https://packages.timber.io/vector/nightly/latest

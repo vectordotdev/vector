@@ -57,7 +57,7 @@ function Fields({children, filters}) {
           </div>
         </div>) :
         null}
-      <div className="fields-list">
+      <div className="section-list">
         {!Array.isArray(filteredChildren) || filteredChildren.length > 0 ?
           filteredChildren :
           <div className="empty">

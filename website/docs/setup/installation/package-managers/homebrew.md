@@ -9,19 +9,19 @@ used on MacOS systems.
 
 ## Install
 
-Add the Timber tap and install `vector`:
+1. Add the Timber tap and install `vector`:
 
-```bash
-brew tap timberio/brew && brew install vector
-```
+   ```bash
+   brew tap timberio/brew && brew install vector
+   ```
 
-Start Vector:
+2. Start Vector:
 
-```bash
-brew services start vector
-```
+   ```bash
+   brew services start vector
+   ```
 
-That's it! Proceed to [configure](#configuring) Vector for your use case.
+   That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 ## Previous Versions
 

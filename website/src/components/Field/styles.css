@@ -1,25 +1,3 @@
-.field {
-  border-radius: 5px;
-  font-size: 0.95em;
-  padding-top: calc( var(--ifm-spacing-vertical) / 1.5 );
-  padding-left: var(--ifm-spacing-horizontal);
-}
-
-.field:hover > h3 > .hash-link,
-.field:hover > h4 > .hash-link {
-  opacity: 1;
-}
-
-.field h3 .hash-link {
-  margin-left: calc((var(--ifm-spacing-horizontal) * -1) - 1.5rem) !important;
-  padding-right: 3rem;
-}
-
-.field h4 .hash-link {
-  margin-left: calc((var(--ifm-spacing-horizontal) * -2) - 1.5rem) !important;
-  padding-right: 4.25rem;
-}
-
 .field .badges {
   float: right;
   margin-top: -0.25em;
@@ -29,50 +7,4 @@
 .field .badges .badge {
   font-size: 0.7em;
   margin-left: 3px;
-}
-
-.field h3::before,
-.field h4::before {
-  content: "• ";
-  float: left;
-  display: block;
-  width: calc( var(--ifm-spacing-horizontal) * 2);
-  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
-  text-align: center;
-}
-
-.field h3, 
-.field h4 {
-  margin-bottom: 1em;
-}
-
-.field .info {
-  border-left: 1px solid var(--ifm-hr-border-color);
-  color: var(--ifm-color-content-secondary);
-  font-size: 0.9em;
-  margin-top: calc( var(--ifm-spacing-horizontal) * -1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
-  margin-left: 0.25em;
-  padding-left: var(--ifm-spacing-horizontal);
-}
-
-.field .info > div:before {
-  content: "• ";
-  float: left;
-  display: block;
-  width: calc( var(--ifm-spacing-horizontal) * 2);
-  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
-  text-align: center;
-}
-
-.field .info > div {
-}
-
-.field .info .show-more {
-  color: var(--ifm-color-primary);
-  cursor: pointer;
-}
-
-.field .info .examples {
-  margin-top: 0.5em;
 }

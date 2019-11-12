@@ -53,7 +53,7 @@ class Metadata
     # installation
 
     installation_hash = hash.fetch("installation")
-    @installation.platforms = installation_hash.fetch("platforms").collect { |h| OpenStruct.new(h) }
+    @installation.containers = installation_hash.fetch("containers").collect { |h| OpenStruct.new(h) }
     @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
     @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 

@@ -31,8 +31,8 @@ module.exports = {
               type: 'category',
               label: 'Platforms',
               items: [
-                "setup/installation/platforms",
-                  "setup/installation/platforms/docker",
+                "setup/installation/containers",
+                  "setup/installation/containers/docker",
               ],
             },
             {

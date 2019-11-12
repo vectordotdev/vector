@@ -130,7 +130,7 @@ updated versions of Vector through various channels.
 1. Install Rust via [`rustup`](https://rustup.rs/):
 
    ```bash
-   curl https://sh.rustup.rs -sSf | sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 2. Install [OpenSSL 1.0.x](https://www.openssl.org/source/) and set two environment variables

@@ -58,15 +58,15 @@ function Download() {
                   </td>
                 </tr>
                 <tr>
-                  <td>Package Managers</td>
-                  <td>
-                    <a href="#">DPKG</a>
-                  </td>
-                </tr>
-                <tr>
                   <td>Platforms</td>
                   <td>
                     <a href="#">Docker</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Package Managers</td>
+                  <td>
+                    <a href="#">DPKG</a>
                   </td>
                 </tr>
               </table>

@@ -81,15 +81,15 @@ citizen, limiting its resource usage and efficiently forwarding data.
 
 ### Collecting Data
 
-#### In a platform context
+#### In a container context
 
-If you're deploying Vector in a [platform context][docs.platforms], such as
-[Docker][docs.platforms.docker], then data collection is handled for you as
+If you're deploying Vector in a [container context][docs.containers], such as
+[Docker][docs.containers.docker], then data collection is handled for you as
 part of installation, please proceed to the next section.
 
-#### Not in a platform context
+#### Not in a container context
 
-If you are not deploying Vector in a platform context, then data collection
+If you are not deploying Vector in a container context, then data collection
 must be achieved through more generic means, such as [journald][urls.journald],
 a [file][docs.sources.file], or [stdin][docs.sources.stdin]. The method you use
 depends on your setup. In general, we recommend avoiding stdin unless reducing
@@ -177,9 +177,9 @@ continue running while Vector restarts. When Vector is restarted, it can resume
 where it left off.
 
 
+[docs.containers.docker]: /docs/setup/installation/containers/docker
+[docs.containers]: /docs/setup/installation/containers
 [docs.performance]: /docs/about/performance
-[docs.platforms.docker]: /docs/setup/installation/platforms/docker
-[docs.platforms]: /docs/setup/installation/platforms
 [docs.process-management#reloading]: /docs/administration/process-management#reloading
 [docs.roles.service]: /docs/setup/deployment/roles/service
 [docs.sinks.vector]: /docs/components/sinks/vector

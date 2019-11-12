@@ -128,10 +128,15 @@ data_dir = "/var/lib/vector"
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-{% hint style="warning" %}
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="warning">
+
 Please make sure that the Vector user has write access to the specified
 `data_dir`.
-{% endhint %}
+
+</Alert>
 
 Please note that there is a performance hit to enabling on-disk buffers of
 about 3X. We believe this to be a worthwhile tradeoff to ensure data is not

@@ -17,6 +17,7 @@ module.exports = {
         darkSrc: 'img/logo-dark.svg'
       },
       links: [
+        {to: 'components', label: 'Components', position: 'right'},
         {to: 'docs', label: 'Docs', position: 'right'},
         {to: 'blog', label: 'Blog', position: 'right'},
         {to: 'download', label: 'Download', position: 'right'},

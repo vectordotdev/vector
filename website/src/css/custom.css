@@ -41,6 +41,7 @@
   --ifm-color-emphasis-50: var(--ifm-color-gray-50);
   --ifm-color-emphasis-75: var(--ifm-color-gray-75);
   --ifm-color-pink: #f44af5;
+  --ifm-color-pink-rgb: 244, 74 ,245;
   --ifm-color-primary: #28D9F2;
   --ifm-color-primary-rgb: 40,217,242;
   --ifm-color-primary-dark: #0FBCE1;
@@ -163,8 +164,6 @@ blockquote {
 .component-statuses .value {
   font-size: 2rem;
 }
-
-
 
 .empty {
   color: var(--ifm-color-emphasis-400);
@@ -562,6 +561,80 @@ section .sub-title {
 
 .alternate-bg section:nth-child(even) {
   background: var(--ifm-panel-background);
+}
+
+.section-list {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  margin-left: 0.25em;
+}
+
+.section-list .section {
+  border-radius: 5px;
+  font-size: 0.95em;
+  padding-top: calc( var(--ifm-spacing-vertical) / 1.5 );
+  padding-left: var(--ifm-spacing-horizontal);
+}
+
+.section-list .section:hover > h3 > .hash-link,
+.section-list .section:hover > h4 > .hash-link {
+  opacity: 1;
+}
+
+.section-list .section h3 .hash-link {
+  margin-left: calc((var(--ifm-spacing-horizontal) * -1) - 1.5rem) !important;
+  padding-right: 3rem;
+}
+
+.section-list .section h4 .hash-link {
+  margin-left: calc((var(--ifm-spacing-horizontal) * -2) - 1.5rem) !important;
+  padding-right: 4.25rem;
+}
+
+.section-list .section h3::before,
+.section-list .section h4::before {
+  content: "• ";
+  float: left;
+  display: block;
+  width: calc( var(--ifm-spacing-horizontal) * 2);
+  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
+  text-align: center;
+}
+
+.section-list .section h3, 
+.section-list .section h4 {
+  margin-bottom: 1em;
+}
+
+.section-list .section .info {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  color: var(--ifm-color-content-secondary);
+  font-size: 0.9em;
+  margin-top: calc( var(--ifm-spacing-horizontal) * -1 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
+  margin-left: 0.25em;
+  padding-left: var(--ifm-spacing-horizontal);
+}
+
+.section-list .section .info > div:before {
+  content: "• ";
+  float: left;
+  display: block;
+  width: calc( var(--ifm-spacing-horizontal) * 2);
+  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
+  text-align: center;
+}
+
+.section-list .section .info .show-more {
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+}
+
+.section-list .section .info .examples {
+  margin-top: 0.5em;
+}
+
+.section-list.section-list--lg .section {
+  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
 table {

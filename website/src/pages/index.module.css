@@ -30,7 +30,7 @@
   animation: heroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), heroPulsating 2.5s linear infinite;
   animation-delay: 650ms, 1350ms;
   animation-fill-mode: forwards;
-  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.3), transparent 15%);
+  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
   background-position: center center;
   border-bottom: 0px none;
   min-height: calc( 100vh - var(--ifm-navbar-height) );
@@ -128,7 +128,7 @@ html[data-theme="dark"] .hero {
 .correctnessResults tr td {
   border-left: 10px solid var(--ifm-background-color);
   color: var(--ifm-background-color);
-  min-width: 110px;
+  min-width: 90px;
   text-align: center;
 }
 
@@ -140,15 +140,27 @@ html[data-theme="dark"] .hero {
 }
 
 .correctnessResultsFailed {
-  background: var(--ifm-color-pink);
+  background: rgba( var(--ifm-color-pink-rgb), 0.7 );
 }
 
 .correctnessResultsPassed {
-  background: var(--ifm-color-primary);
+  background: rgba( var(--ifm-color-primary-rgb), 0.7 );
 }
 
 .correctnessResultsWarning {
-  background: var(--ifm-color-warning);
+  background: rgba( var(--ifm-color-warning-rgb), 0.7 )
+}
+
+.correctnessResults tr:hover .correctnessResultsWarning {
+  background: rgba( var(--ifm-color-warning-rgb), 1 );
+}
+
+.correctnessResults tr:hover .correctnessResultsFailed {
+  background: rgba( var(--ifm-color-pink-rgb), 1 );
+}
+
+.correctnessResults tr:hover .correctnessResultsPassed {
+  background: rgba( var(--ifm-color-primary-rgb), 1 );
 }
 
 /*
