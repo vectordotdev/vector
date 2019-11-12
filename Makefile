@@ -67,6 +67,9 @@ test: ## Spins up Docker resources and runs _every_ test
 	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4
 
+clean: ## Remove build artifacts
+	@cargo clean
+
 ##@ Releasing
 
 build-archive: ## Build a Vector archive for a given $TARGET and $VERSION

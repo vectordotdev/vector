@@ -91,6 +91,10 @@ impl Transform for JsonParser {
                 }
             });
 
+        if self.drop_field {
+            event.as_mut_log().remove(&self.field);
+        }
+
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
@@ -113,10 +117,6 @@ impl Transform for JsonParser {
             }
         } else if self.drop_invalid {
             return None;
-        }
-
-        if self.drop_field {
-            event.as_mut_log().remove(&self.field);
         }
 
         Some(event)
@@ -416,6 +416,26 @@ mod test {
             event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
             1234.into()
         );
+    }
+
+    #[test]
+    fn drop_field_before_adding() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: true,
+            ..Default::default()
+        });
+
+        let event = Event::from(
+            r#"{
+                "key": "data",
+                "message": "inner" 
+            }"#,
+        );
+
+        let event = parser.transform(event).unwrap();
+
+        assert_eq!(event.as_log()[&Atom::from("key")], "data".into());
+        assert_eq!(event.as_log()[&Atom::from("message")], "inner".into());
     }
 
     #[test]
