@@ -16,6 +16,8 @@ ARG MUSL_VERSION=1.1.22
 # https://forge.rust-lang.org/release/platform-support.html.
 # Example: "armv7-unknown-linux-musleabihf".
 ARG TARGET="armv7-unknown-linux-musleabihf"
+# Target architecture for LLVM
+ARG LLVM_TARGET="ARM"
 # We also need GCC for the target architecture to compile compier-rt. Because
 # GCC target triples are different from LLVM, we need to specify it explicitly.
 # Example: "arm-linux-gnueabihf".
@@ -51,11 +53,13 @@ ENV LLVM_DIR=$SRC_DIR/llvm-project
 FROM llvm-source AS clang-builder
 RUN apt-get update && apt-get -y install build-essential ninja-build cmake python3-distutils
 ARG CLANG_PREFIX
+ARG CLANG_TAGET
 WORKDIR $LLVM_DIR
 RUN mkdir build && \
   cd build && \
   cmake \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
+  -DLLVM_TARGETS_TO_BUILD="$LLVM_TARGET" \
   -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
   -DCMAKE_BUILD_TYPE=release \
   -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
