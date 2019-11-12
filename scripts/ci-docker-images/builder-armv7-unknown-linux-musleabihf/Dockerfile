@@ -1,17 +1,31 @@
+# A version like "1.38.0" or "nightly-2019-11-01".
 ARG RUST_VERSION=1.39.0
+# We use Clang and libc++ from LLVM. The commit should match the one
+# used by Rust. For each Rust version it can be found here
+# https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
+# submodule "llvm-project". Example "71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5".
+ARG LLVM_GIT_COMMIT=8adf9bdccfefb8d03f0e8db3b012fb41da1580a4
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
+# Exampel: "1.1.22".
 ARG MUSL_VERSION=1.1.22
-# We use Clang and libc++ from LLVM. The commit should match the one
-# used by Rust. For each Rust version it can be found here
-# https://github.com/rust-lang/rust/tree/$RUST_VERSION/src as the commit hash of the
-# submodule "llvm-project".
-ARG LLVM_GIT_COMMIT=8adf9bdccfefb8d03f0e8db3b012fb41da1580a4
+
+# LLVM target triple for Linux and MUSL. Full list of supported triples
+# can be found here:
+# https://forge.rust-lang.org/release/platform-support.html.
+# Example: "armv7-unknown-linux-musleabihf".
+ARG TARGET="armv7-unknown-linux-musleabihf"
+# We also need GCC for the target architecture to compile compier-rt. Because
+# GCC target triples are different from LLVM, we need to specify it explicitly.
+# Example: "arm-linux-gnueabihf".
+ARG GNU_TARGET="arm-linux-gnueabihf"
+
+ARG LTO="lto"
+
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
 ARG LINUX_HEADERS_VERSION=5.3.10
-ARG TARGET=armv7-unknown-linux-musleabihf
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
@@ -42,13 +56,12 @@ RUN mkdir build && \
   cd build && \
   cmake \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
-  -DLLVM_TARGETS_TO_BUILD="ARM" \
   -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
   -DCMAKE_BUILD_TYPE=release \
   -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
   -G Ninja \
   ../llvm && \
-  ninja install
+  cmake --build . --target install
 
 # Libs
 FROM llvm-source AS libs-builder
@@ -57,7 +70,7 @@ ARG CLANG_PREFIX
 COPY --from=clang-builder $CLANG_PREFIX $CLANG_PREFIX
 ENV PATH="$CLANG_PREFIX/bin:$PATH"
 
-# Get all sources at first, so that changes in compilation
+# Get all sources at first, so that changes in arguments
 # flags would not redownload them.
 RUN apt-get update && apt-get -y install curl xz-utils
 
@@ -73,24 +86,21 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
   tar xJf -
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
-ARG OPENSSL_VERSION
-RUN curl --proto '=https' --tlsv1.2 -sSf \
-  https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz| \
-  tar xzf -
-ENV OPENSSL_DIR=$SRC_DIR/openssl-$OPENSSL_VERSION
-
 # Install build dependencies.
-RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils gcc-arm-linux-gnueabihf
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils 
 
 ARG TARGET
 ARG LIBS_PREFIX
 
 # Compile Clang runtime (https://compiler-rt.llvm.org).
 # We need crtbegin.o, crtend.o, and libclang_rt.builtins.a from there.
-RUN apt-get install -y g++-arm-linux-gnueabihf
+# Because Clang toolchain is not fully bootstrapped yet (no standard library),
+# it is necessary to use GCC to compile it.
+ARG GNU_TARGET
+RUN apt-get install -y gcc${GNU_TARGET:+-${GNU_TARGET}} g++${GNU_TARGET:+-${GNU_TARGET}}
 WORKDIR $LLVM_DIR/compiler-rt
-ENV CC=arm-linux-gnueabihf-gcc
-ENV CXX=arm-linux-gnueabihf-g++
+ENV CC=${GNU_TARGET:+${GNU_TARGET}-}gcc
+ENV CXX=${GNU_TARGET:+${GNU_TARGET}-}g++
 ENV CFLAGS=""
 ENV CXXFLAGS=""
 ENV LDFLAGS=""
@@ -107,7 +117,7 @@ RUN mkdir build && \
     -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
     -G Ninja \
     .. && \
-  ninja install
+  cmake --build . --target install
 
 # Compile musl.
 WORKDIR $MUSL_DIR
@@ -157,7 +167,7 @@ RUN mkdir build && \
   -DLLVM_PATH=$LLVM_DIR \
   -G Ninja \
   .. && \
-  ninja install
+  cmake --build . --target install
 
 # libc++abi
 WORKDIR $LLVM_DIR/libcxxabi
@@ -175,11 +185,10 @@ RUN mkdir build && \
   -DLIBCXXABI_LIBUNWIND_PATH=$LLVM_DIR/libunwind \
   -DLIBCXXABI_LIBCXX_INCLUDES=$LLVM_DIR/libcxx/include \
   -DLIBCXXABI_INSTALL_PREFIX=$LIBS_PREFIX/ \
-  -DLIBCXXABI_INSTALL_HEADER_PREFIX=$LIBS_PREFIX/include/c++/v1 \
   -DLLVM_PATH=$LLVM_DIR \
   -G Ninja \
   .. && \
-  ninja install
+  cmake --build . --target install
 
 # libc++
 WORKDIR $LLVM_DIR/libcxx
@@ -203,7 +212,7 @@ RUN mkdir build && \
   -DLLVM_PATH=$LLVM_DIR \
   -G Ninja \
   .. && \
-  ninja install
+  cmake --build . --target install
 
 # Create wrappers for Clang that automatically use correct libraries and start files.
 # See
@@ -213,8 +222,8 @@ RUN mkdir build && \
 ENV MUSL_CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
-ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -lclang_rt.builtins-armhf -lc"
-ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $LIBS_PREFIX/lib/linux/clang_rt.crtbegin-armhf.o $LIBS_PREFIX/lib/linux/clang_rt.crtend-armhf.o"
+ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -l$(ls $LIBS_PREFIX/lib/linux/clang_rt.builtins*) -lc"
+ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
@@ -236,11 +245,11 @@ RUN chmod +x $LIBS_PREFIX/bin/*
 # use it as a drop-in replacement for the system-wide GCC.
 RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/cc
 RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/gcc
-RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/arm-linux-musleabihf-gcc
+RUN if [ -n "$GNU_TARGET" ]; then ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/$(echo $GNU_TARGET | sed 's/gnu/musl/g')-gcc; fi
 RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/musl-gcc
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/c++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/g++
-RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/arm-linux-musleabihf-g++
+RUN if [ -n "$GNU_TARGET" ]; then ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/$(echo $GNU_TARGET | sed 's/gnu/musl/g')-g++; fi
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
 RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/arm-linux-musleabihf-ar
@@ -248,7 +257,7 @@ RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/arm-linux-musleabihf-ar
 # Use stdatomic.h header provided by Clang because it is not present in musl.
 RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
 
-# Some build systems hardcode -lstdc++ linker flag on all Linux systems.
+# Some build scripts hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
 # we can just provide dummy libstdc++ to be compatible with GNU systems.
 # For example, macOS provides similar experience, where
@@ -263,14 +272,14 @@ FROM ubuntu:18.04
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
-ARG RUST_PREFIX
 ARG RUST_VERSION
+ARG TARGET
+ARG RUST_PREFIX
 ENV RUSTUP_HOME=$RUST_PREFIX
 ENV CARGO_HOME=$RUST_PREFIX
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --default-toolchain $RUST_VERSION
+  sh -s -- -y --default-toolchain $RUST_VERSION --target "$TARGET"
 ENV PATH="$RUST_PREFIX/bin:$PATH"
-RUN rustup target add armv7-unknown-linux-musleabihf
 
 ARG CLANG_PREFIX
 COPY --from=clang-builder $CLANG_PREFIX $CLANG_PREFIX
@@ -280,7 +289,8 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y --install-recommends build-essential cmake pkg-config openssh-client git
+# Essential tools needed for compiling native dependencies
+RUN apt-get update && apt-get install -y --install-recommends build-essential cmake git
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to
@@ -301,15 +311,17 @@ ENV AR_x86_64_unknown_linux_gnu=/usr/bin/ar
 
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
 
-# Set up pkg-config.
-ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
-ENV PKG_CONFIG_ALLOW_CROSS=1
+# # Set up environment for pkg-config
+# ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
+# ENV PKG_CONFIG_ALLOW_CROSS=1
 
 # Set up environment variables for Rust bindgen
 # See https://github.com/rust-lang/rust-bindgen/issues/1229#issuecomment-473493753
-ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target armv7-unknown-linux-musleabihf"
+ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target $TARGET"
 
-# Set env vars for the scripts/build-archive.sh file
-ENV TARGET=armv7-unknown-linux-musleabihf
+# Set default Cargo target
+RUN mkdir -p ~/.cargo
+RUN echo -e "[build]\ntarget = \"$TARGET\"" > ~/.cargo/config
 
-RUN apt-get update && apt-get install -y qemu-user
+# In case of non-native target, install QEMU-user to enable runing `cargo test`
+RUN if [ -n "$GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
