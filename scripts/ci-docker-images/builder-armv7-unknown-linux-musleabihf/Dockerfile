@@ -1,16 +1,16 @@
-ARG RUST_VERSION=1.38.0
+ARG RUST_VERSION=1.39.0
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
 ARG MUSL_VERSION=1.1.22
 # We use Clang and libc++ from LLVM. The commit should match the one
 # used by Rust. For each Rust version it can be found here
-# https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
+# https://github.com/rust-lang/rust/tree/$RUST_VERSION/src as the commit hash of the
 # submodule "llvm-project".
-ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
+ARG LLVM_GIT_COMMIT=8adf9bdccfefb8d03f0e8db3b012fb41da1580a4
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
-ARG LINUX_HEADERS_VERSION=5.3.1
+ARG LINUX_HEADERS_VERSION=5.3.10
 # OpenSSL needs to be compiled against MUSL too, so we install it from source.
 ARG OPENSSL_VERSION=1.1.0l
 ARG TARGET=armv7-unknown-linux-musleabihf
@@ -44,6 +44,7 @@ RUN mkdir build && \
   cd build && \
   cmake \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
+  -DLLVM_TARGETS_TO_BUILD="ARM" \
   -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
   -DCMAKE_BUILD_TYPE=release \
   -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
