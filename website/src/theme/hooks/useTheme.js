@@ -12,25 +12,25 @@ const useTheme = () => {
   if (typeof document !== 'undefined')
     defaultTheme = document.querySelector('html').getAttribute('data-theme');
 
-  if (defaultTheme === null && typeof window !== 'undefined' && window.localStorage.getItem('theme') != null)
+  if (defaultTheme === null && typeof window !== 'undefined')
     defaultTheme = window.localStorage.getItem('theme');
 
   if (defaultTheme === null && typeof document !== 'undefined') {
     let utcDate = new Date();
     let offset = (new Date().getTimezoneOffset() / 60) * -1;
     let date = new Date(utcDate.getTime() + offset);
-    defaultTheme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
+    defaultTheme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : null);
   }
 
   const [theme, setTheme] = React.useState(defaultTheme);
 
-  // React.useEffect(() => {
-  //   try {
-  //     setTheme(localStorage.getItem('theme'));
-  //   } catch (err) {
-  //     console.error(err);
-  //   }
-  // }, [setTheme]);
+  React.useEffect(() => {
+    try {
+      setTheme(localStorage.getItem('theme'));
+    } catch (err) {
+      console.error(err);
+    }
+  }, [setTheme]);
 
   const setThemeSyncWithLocalStorage = React.useCallback(
     nextTheme => {
