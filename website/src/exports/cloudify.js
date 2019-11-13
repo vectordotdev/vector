@@ -1,4 +1,4 @@
-import $ from 'jquery';
+import $ from 'cash-dom';
 
 if (typeof document !== 'undefined')
   SVG = require('svg.js');
@@ -32,7 +32,7 @@ export default function cloudify() {
     });
   }
   setCanvasOffsets();
-  $(window).resize(setCanvasOffsets);
+  $(window).on('resize', setCanvasOffsets);
 
   // ----------------------------------------
   // VECTORS
@@ -303,7 +303,7 @@ export default function cloudify() {
   // ----------------------------------------
   // MOUSE MOVEMENTS
 
-  $("#component-canvas").mousemove(function(e) {
+  $("#component-canvas").on('mousemove', function(e) {
 
     var offset = $("#component-canvas").offset();
     var mouse = new Vector(
