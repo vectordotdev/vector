@@ -345,7 +345,7 @@ function Home() {
   const {siteConfig = {}} = context;
 
   useEffect(() => {
-
+    cloudify();
   }, []);
 
   return (
