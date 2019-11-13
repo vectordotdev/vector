@@ -2253,13 +2253,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example.
-  # 
-  # * required
-  # * type: string
-  host = "http://10.24.32.122:9000"
-
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
   # Elasticsearch has removed it.
@@ -2275,6 +2268,14 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+
+  # The host of your Elasticsearch cluster. This should be the full URL as shown
+  # in the example. This is required if the `provider` is not `"aws"`
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://10.24.32.122:9000"
 
   # Index name to write events to.
   # 

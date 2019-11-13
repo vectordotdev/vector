@@ -32,7 +32,6 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
 [sinks.my_sink_id]
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"]
-  host = "http://10.24.32.122:9000"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
@@ -41,11 +40,11 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   # REQUIRED - General
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"]
-  host = "http://10.24.32.122:9000"
   
   # OPTIONAL - General
   doc_type = "_doc" # default
   healthcheck = true # default
+  host = "http://10.24.32.122:9000" # no default
   index = "vector-%Y-%m-%d" # default
   provider = "default" # default, enum: "default" or "aws"
   region = "us-east-1" # no default
@@ -196,9 +195,9 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-`required` `type: string` `example: "http://10.24.32.122:9000"`
+`optional` `no default` `type: string` `example: "http://10.24.32.122:9000"`
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`
 
 ### index
 

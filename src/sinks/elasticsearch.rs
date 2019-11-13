@@ -31,7 +31,7 @@ use tower::ServiceBuilder;
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    pub host: String,
+    pub host: Option<String>,
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
@@ -68,7 +68,7 @@ pub struct ElasticSearchBasicAuthConfig {
     pub user: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     Default,
@@ -99,7 +99,7 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 struct ElasticSearchCommon {
-    host: String,
+    base_url: String,
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
@@ -110,6 +110,8 @@ struct ElasticSearchCommon {
 enum ParseError {
     #[snafu(display("Invalid host {:?}: {:?}", host, source))]
     InvalidHost { host: String, source: InvalidUri },
+    #[snafu(display("Default provider requires a configured host"))]
+    DefaultRequiresHost,
     #[snafu(display("AWS provider requires a configured region"))]
     AWSRequiresRegion,
     #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
@@ -120,12 +122,6 @@ enum ParseError {
 
 impl ElasticSearchCommon {
     fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", config.host);
-        uri.parse::<Uri>().with_context(|| InvalidHost {
-            host: config.host.clone(),
-        })?;
-
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))
@@ -137,13 +133,35 @@ impl ElasticSearchCommon {
             Err(error) => return Err(error.into()),
         };
 
-        let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
+        let provider = config.provider.unwrap_or(Provider::Default);
+
+        let base_url = match provider {
+            Provider::Default => match config.host {
+                Some(ref host) => host.clone(),
+                None => return Err(ParseError::DefaultRequiresHost.into()),
+            },
+            Provider::Aws => match region {
+                None => return Err(ParseError::AWSRequiresRegion.into()),
+                Some(ref region) => match region {
+                    // Adapted from rusoto_core::signature::build_hostname, which is unfortunately not pub
+                    Region::Custom { endpoint, .. } if endpoint.contains("://") => endpoint.clone(),
+                    Region::Custom { endpoint, .. } => format!("https://{}", endpoint),
+                    Region::CnNorth1 | Region::CnNorthwest1 => {
+                        format!("https://es.{}.amazonaws.com.cn", region.name())
+                    }
+                    _ => format!("https://es.{}.amazonaws.com", region.name()),
+                },
+            },
+        };
+
+        // Test the configured host, but ignore the result
+        let uri = format!("{}/_test", base_url);
+        uri.parse::<Uri>()
+            .with_context(|| InvalidHost { host: &base_url })?;
+
+        let credentials = match provider {
             Provider::Default => None,
             Provider::Aws => {
-                if region.is_none() {
-                    return Err(ParseError::AWSRequiresRegion.into());
-                }
-
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
@@ -160,7 +178,7 @@ impl ElasticSearchCommon {
         let tls_settings = TlsSettings::from_options(&config.tls)?;
 
         Ok(Self {
-            host: config.host.clone(),
+            base_url,
             authorization,
             region,
             credentials,
@@ -169,7 +187,7 @@ impl ElasticSearchCommon {
     }
 
     fn request_builder(&self, method: Method, path: &str) -> (Uri, http::request::Builder) {
-        let uri = format!("{}{}", self.host, path);
+        let uri = format!("{}{}", self.base_url, path);
         let uri = uri.parse::<Uri>().unwrap(); // Already tested that this parses above.
         let mut builder = Request::builder();
         builder.method(method);
@@ -392,7 +410,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Event;
+    use crate::{assert_downcast_matches, Event};
     use serde_json::json;
 
     #[test]
@@ -437,18 +455,52 @@ mod tests {
         assert_eq!(json!({}), action);
     }
 
-    #[test]
-    fn region_is_not_required() {
-        let input = r#"
-            host = "https://example.com"
-            doc_type = "_doc"
-            index = "my-jobs"
-            compression = "none"
-        "#;
-
+    fn parse_config(input: &str) -> crate::Result<ElasticSearchCommon> {
         let config: ElasticSearchConfig = toml::from_str(input).unwrap();
-        let common = ElasticSearchCommon::parse_config(&config).unwrap();
+        ElasticSearchCommon::parse_config(&config)
+    }
+
+    fn parse_config_err(input: &str) -> crate::Error {
+        // ElasticSearchCommon doesn't impl Debug, so can't just unwrap_err
+        match parse_config(input) {
+            Ok(_) => panic!("Mis-parsed invalid config"),
+            Err(err) => err,
+        }
+    }
+
+    #[test]
+    fn host_is_required_for_default() {
+        let err = parse_config_err(r#"provider = "default""#);
+        assert_downcast_matches!(err, ParseError, ParseError::DefaultRequiresHost);
+    }
+
+    #[test]
+    fn host_is_not_required_for_aws() {
+        let result = parse_config(
+            r#"
+                provider = "aws"
+                region = "us-east-1"
+            "#,
+        );
+        // If not running in an AWS context, this will fail with a
+        // credentials error, but that is valid too.
+        match result {
+            Ok(_) => (),
+            Err(err) => assert_downcast_matches!(err, ParseError, ParseError::AWSCredentialsGenerateFailed { .. }),
+        }
+    }
+
+    #[test]
+    fn region_is_not_required_for_default() {
+        let common = parse_config(r#"host = "https://example.com""#).unwrap();
+
         assert_eq!(None, common.region);
+    }
+
+    #[test]
+    fn region_is_required_for_aws() {
+        let err = parse_config_err(r#"provider = "aws""#);
+        assert_downcast_matches!(err, ParseError, ParseError::AWSRequiresRegion { .. });
     }
 }
 
@@ -475,13 +527,14 @@ mod integration_tests {
     fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            host: Some("http://localhost:9200".into()),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
             ..config()
         };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
@@ -497,10 +550,10 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(&config)).unwrap();
+        block_on(flush(&common)).unwrap();
 
         let response = reqwest::Client::new()
-            .get(&format!("{}/{}/_search", config.host, index))
+            .get(&format!("{}/{}/_search", common.base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
@@ -530,7 +583,7 @@ mod integration_tests {
     #[test]
     fn insert_events_over_http() {
         run_insert_tests(ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            host: Some("http://localhost:9200".into()),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             ..config()
@@ -540,7 +593,7 @@ mod integration_tests {
     #[test]
     fn insert_events_over_https() {
         run_insert_tests(ElasticSearchConfig {
-            host: "https://localhost:9201".into(),
+            host: Some("https://localhost:9201".into()),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             tls: Some(TlsOptions {
@@ -553,11 +606,9 @@ mod integration_tests {
 
     #[test]
     fn insert_events_on_aws() {
-        let url = "http://localhost:4571";
         run_insert_tests(ElasticSearchConfig {
-            host: url.into(),
             provider: Some(Provider::Aws),
-            region: RegionOrEndpoint::with_endpoint(url.into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
             ..config()
         });
     }
@@ -565,6 +616,7 @@ mod integration_tests {
     fn run_insert_tests(mut config: ElasticSearchConfig) {
         let index = gen_index();
         config.index = Some(index.clone());
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
         let (sink, healthcheck) = config.build(Acker::Null).expect("Building config failed");
 
@@ -576,7 +628,7 @@ mod integration_tests {
         let _ = block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&config)).expect("Flushing writes failed");
+        block_on(flush(&common)).expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -591,7 +643,7 @@ mod integration_tests {
             .expect("Could not build HTTP client");
 
         let response = client
-            .get(&format!("{}/{}/_search", config.host, index))
+            .get(&format!("{}/{}/_search", common.base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
@@ -615,12 +667,11 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(config: &ElasticSearchConfig) -> impl Future<Item = (), Error = crate::Error> {
-        let uri = format!("{}/_flush", config.host);
+    fn flush(common: &ElasticSearchCommon) -> impl Future<Item = (), Error = crate::Error> {
+        let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let common = ElasticSearchCommon::parse_config(config).expect("Config error");
-        https_client(common.tls_settings)
+        https_client(common.tls_settings.clone())
             .expect("Could not build client to flush")
             .request(request)
             .map_err(|source| dbg!(source).into())
