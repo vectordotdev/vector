@@ -9,7 +9,7 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
-use futures::{Future, Sink};
+use futures::{stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
@@ -129,14 +129,16 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
             acker,
         )
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with(move |event: Event| {
-            let mut body = serde_json::to_vec(&event.as_log().all_fields())
-                .expect("Events should be valid json!");
-            body.push(b'\n');
-            Ok(body)
-        });
+        .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
 
     Ok(Box::new(sink))
+}
+
+fn encode_event(event: Event) -> Option<Vec<u8>> {
+    let mut body =
+        serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+    body.push(b'\n');
+    Some(body)
 }
 
 fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> super::Healthcheck {
