@@ -9,9 +9,9 @@ import classnames from 'classnames';
 import styles from './components.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-function Components() {
+function Components(props) {
   useEffect(() => {
-    var canvas = document.querySelector("canvas");
+    let canvas = document.querySelector("canvas");
     animatedGraph(canvas);
   }, []);
 
@@ -29,7 +29,7 @@ function Components() {
         </div>
       </header>
       <main className="container container--fluid">
-        <VectorComponents filterColumn={true} headingLevel={2} />
+        <VectorComponents filterColumn={true} headingLevel={2} location={props.location} />
       </main>
     </Layout>
   );

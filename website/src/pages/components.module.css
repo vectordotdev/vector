@@ -1,5 +1,6 @@
 .componentsHero {
   padding: 0;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
   overflow: hidden;
 }
 

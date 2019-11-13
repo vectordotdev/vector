@@ -1,8 +1,10 @@
 import React, {useState} from 'react';
 
+import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
 import classnames from 'classnames';
+import queryString from 'query-string';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
@@ -40,14 +42,16 @@ function Component({delivery_guarantee, description, event_types, name, status, 
 function VectorComponents(props) {
   const {siteConfig} = useDocusaurusContext();
   const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
-  const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(false);
-  const [onlyLog, setOnlyLog] = useState(false);
-  const [onlyMetric, setOnlyMetric] = useState(false);
-  const [onlyProductionReady, setOnlyProductionReady] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(null);
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
   const HeadingTag = `h${props.headingLevel || 3}`;
+  const queryObj = props.location ? queryString.parse(props.location.search) : {};
+
+  const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
+  const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
+  const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
+  const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
+  const [searchTerm, setSearchTerm] = useState(null);
 
   let components = [];
   if (props.sources || props.sources == undefined) components = components.concat(Object.values(sources));
@@ -199,6 +203,10 @@ function VectorComponents(props) {
                 </div>
               </>:
               ''}
+            <hr />
+            <Jump to="https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature" target="_blank" icon="plus-circle">
+              Request a new component
+            </Jump>
           </> :
           <div className="empty">
             <div className="icon">☹</div>

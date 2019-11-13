@@ -647,5 +647,11 @@ Specific value.
 
 </Fields>
 
+## Components
+
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/components?metric=true">View all metric compatible components</Jump>
+
 
 

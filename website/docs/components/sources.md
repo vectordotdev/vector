@@ -19,12 +19,6 @@ import VectorComponents from '@site/src/components/VectorComponents';
 
 <VectorComponents titles={false} sinks={false} transforms={false} />
 
-import Jump from '@site/src/components/Jump';
-
-<Jump to="https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature" icon="plus-circle">
-  Request a new source
-</Jump>
-
 
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.roles.agent]: /docs/setup/deployment/roles/agent

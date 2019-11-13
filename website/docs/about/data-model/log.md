@@ -263,6 +263,12 @@ A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. See [Timestamp 
 
 </Fields>
 
+## Components
+
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/components?log=true">View all log compatible components</Jump>
+
 ## How It Works
 
 ### Time Zones

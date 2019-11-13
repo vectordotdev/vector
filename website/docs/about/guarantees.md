@@ -19,7 +19,7 @@ delivery](#does-vector-support-exactly-once-delivery) FAQ below).
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/components">View all at-least-once components</Jump>
+<Jump to="/components?at-least-once=true">View all at-least-once components</Jump>
 
 #### Prerequisites
 
@@ -51,7 +51,7 @@ once delivery?"](#do-i-need-at-least-once-delivery) FAQ.
 
 ## Reliability Guarantee
 
-### Prod-Ready <i className="feather icon-award"></i>
+### Prod-Ready
 
 The `prod-ready` status is a _subjective_ status defined by the Vector team
 intended to give you a general idea of it's reliability for production
@@ -64,7 +64,7 @@ criteria:
    tested.
 3. There are no major [open bugs][urls.vector_bug_issues] for the component.
 
-<Jump to="/docs/components">View all prod-ready components</Jump>
+<Jump to="/components?prod-ready=true">View all prod-ready components</Jump>
 
 ### Beta
 

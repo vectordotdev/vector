@@ -1,5 +1,7 @@
 import $ from 'jquery';
-import SVG from 'svg.js';
+
+if (typeof document !== 'undefined')
+  SVG = require('svg.js');
 
 export default function cloudify() {
   var SVG_INSTANCE = SVG('component-canvas').size('100%', '100%')

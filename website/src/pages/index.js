@@ -19,8 +19,6 @@ import classnames from 'classnames';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import repoUrl from '@site/src/exports/repoUrl';
-import {$,jQuery} from 'jquery';
-import SVG from 'svg.js'
 import cloudify from '@site/src/exports/cloudify';
 
 import styles from './index.module.css';
@@ -347,7 +345,7 @@ function Home() {
   const {siteConfig = {}} = context;
 
   useEffect(() => {
-    cloudify({});
+
   }, []);
 
   return (
