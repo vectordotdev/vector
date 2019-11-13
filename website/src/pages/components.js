@@ -15,7 +15,7 @@ function Components() {
         <div className="container">
           <h1>Vector Components</h1>
           <div className="hero__subtitle">
-            High-quality, reliabile components, allow you to build flexible pipelines. <Link href="/docs/about/concepts">Learn more</Link>.
+            Components allow you to collect, transform, and route data with ease. <Link href="/docs/about/concepts">Learn more</Link>.
           </div>
         </div>
       </header>

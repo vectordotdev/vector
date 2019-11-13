@@ -271,6 +271,29 @@ header.hero h1 {
   }
 }
 
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  -o-appearance: none;
+  appearance: none;
+  background: var(--ifm-background-color);
+  background-clip: padding-box;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 4px;
+  cursor: pointer;
+  height: 1rem;
+  margin-bottom: 0.5rem;
+  width: 1rem;
+  outline: none;
+  transition-duration: var(--ifm-transition-fast);
+  vertical-align: middle;
+}
+
+input:checked {
+  background-color: var(--ifm-color-primary);
+  border: 1px solid var(--ifm-color-primary);
+}
+
 input[type="text"] {
   background: var(--ifm-panel-background);
   border: 1px solid var(--ifm-panel-border-color);
@@ -918,24 +941,5 @@ html[data-theme='dark']  .menu .menu__link.menu__link--sublist::after {
 }
 
 html[data-theme='dark'] input[type="checkbox"] {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  -o-appearance: none;
-  appearance: none;
   background: var(--ifm-color-emphasis-200);
-  background-clip: padding-box;
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 4px;
-  cursor: pointer;
-  height: 1rem;
-  margin-bottom: 0.5rem;
-  width: 1rem;
-  outline: none;
-  transition-duration: var(--ifm-transition-fast);
-  vertical-align: middle;
-}
-
-html[data-theme='dark'] input:checked {
-  background-color: var(--ifm-color-primary);
-  border: 1px solid var(--ifm-color-primary);
 }
