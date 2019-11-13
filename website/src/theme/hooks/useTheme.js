@@ -7,12 +7,20 @@
 import * as React from 'react';
 
 const useTheme = () => {
-  let utcDate = new Date();
-  let offset = (new Date().getTimezoneOffset() / 60) * -1;
-  let date = new Date(utcDate.getTime() + offset);
-  let defaultTheme = typeof window !== 'undefined' && localStorage.getItem('theme') != null ?
-    localStorage.getItem('theme') :
-    (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
+  let defaultTheme = null;
+
+  if (typeof document !== 'undefined')
+    defaultTheme = document.querySelector('html').getAttribute('data-theme');
+
+  if (defaultTheme === null && typeof window !== 'undefined' && window.localStorage.getItem('theme') != null)
+    defaultTheme = window.localStorage.getItem('theme');
+
+  if (defaultTheme === null && typeof document !== 'undefined') {
+    let utcDate = new Date();
+    let offset = (new Date().getTimezoneOffset() / 60) * -1;
+    let date = new Date(utcDate.getTime() + offset);
+    defaultTheme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : '');
+  }
 
   const [theme, setTheme] = React.useState(defaultTheme);
 
