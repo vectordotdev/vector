@@ -10,20 +10,7 @@ transform [events][docs.data-model#event] or the stream as a whole.
 
 ---
 
-<Components titles={false}>
-
-<%- metadata.transforms_list.each do |component| -%>
-<Component
-  delivery_guarantee={<%= (component.respond_to?(:delivery_guarantee) ? component.delivery_guarantee : nil).to_json %>}
-  event_types={<%= component.event_types.to_json %>}
-  id={<%= component.id.to_json %>}
-  name={<%= component.name.to_json %>}
-  path="[[[docs.<%= component.type.pluralize %>.<%= component.name %>]]]"
-  status={<%= component.status.to_json %>}
-  type={<%= component.type.to_json %>} />
-<%- end -%>
-
-</Components>
+<VectorComponents titles={false} sinks={false} sources={false} />
 
 <Jump to="[[[urls.new_transform]]]" icon="plus-circle">
   Request a new transform

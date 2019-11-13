@@ -9,21 +9,7 @@ for sending [events][docs.data-model#event] downstream.
 
 ---
 
-<Components titles={false}>
-
-<%- metadata.sinks_list.each do |component| -%>
-<Component
-  delivery_guarantee={<%= (component.respond_to?(:delivery_guarantee) ? component.delivery_guarantee : nil).to_json %>}
-  description={<%= component_description(component).remove_markdown_links.to_json %>}
-  event_types={<%= component.event_types.to_json %>}
-  id={<%= component.id.to_json %>}
-  name={<%= component.name.to_json %>}
-  path="[[[docs.<%= component.type.pluralize %>.<%= component.name %>]]]"
-  status={<%= component.status.to_json %>}
-  type={<%= component.type.to_json %>} />
-<%- end -%>
-
-</Components>
+<VectorComponents titles={false} sources={false} transforms={false} />
 
 <Jump to="[[[urls.new_sink]]]" icon="plus-circle">
   Request a new sink

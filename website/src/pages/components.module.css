@@ -1,17 +1,3 @@
-.componentsMain {
-  dispay: flex;
-}
-
-.componentsSidebar {
-  background: red;
-  width: 250px;
-}
-
-.componentsList {
-  background: green;
-  flex-grow: 1;
-}
-
-
 .componentsHero {
+  padding: 3vw 0;
 }

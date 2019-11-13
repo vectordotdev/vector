@@ -223,12 +223,11 @@ header.hero h1 {
 
 .hero {
   padding: 5vw 0;
-  text-align: center
+  text-align: center;
 }
 
 .hero .hero__subtitle {
   font-size: 1.1rem;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
 .hero .hero__subtitle a {

@@ -28,6 +28,7 @@ class Sink < Component
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
+
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 

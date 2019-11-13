@@ -123,9 +123,13 @@ class Component
   def to_h
     {
       beta: beta?,
+      delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
+      event_types: event_types,
       id: id,
       name: name,
       options: options.deep_to_h,
+      service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
+      status: status,
       type: type
     }
   end

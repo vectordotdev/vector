@@ -10,8 +10,6 @@ module PostProcessors
     IMPORTS = {
       'Alert' => "import Alert from '@site/src/components/Alert';",
       'CodeHeader' => "import CodeHeader from '@site/src/components/CodeHeader';",
-      'Components' => "import Components from '@site/src/components/Components';",
-      'Component' => "import Component from '@site/src/components/Component';",
       'Diagram' => "import Diagram from '@site/src/components/Diagram';",
       'Fields' => "import Fields from '@site/src/components/Fields';",
       'Field' => "import Field from '@site/src/components/Field';",
@@ -19,7 +17,8 @@ module PostProcessors
       'Step' => "import Step from '@site/src/components/Step';",
       'Steps' => "import Steps from '@site/src/components/Steps';",
       'Tabs' => "import Tabs from '@theme/Tabs';",
-      'TabItem' => "import TabItem from '@theme/TabItem';"
+      'TabItem' => "import TabItem from '@theme/TabItem';",
+      'VectorComponents' => "import VectorComponents from '@site/src/components/VectorComponents';"
     }
 
     class << self

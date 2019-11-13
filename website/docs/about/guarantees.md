@@ -51,7 +51,7 @@ once delivery?"](#do-i-need-at-least-once-delivery) FAQ.
 
 ## Reliability Guarantee
 
-### Prod-Ready
+### Prod-Ready <i className="feather icon-award"></i>
 
 The `prod-ready` status is a _subjective_ status defined by the Vector team
 intended to give you a general idea of it's reliability for production
