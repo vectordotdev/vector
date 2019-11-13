@@ -19,8 +19,7 @@ use std::{
 use stream_cancel::{Trigger, Tripwire};
 use string_cache::DefaultAtom as Atom;
 
-// TODO: HTTPS
-
+// Event fields unique to splunk_hec source
 lazy_static! {
     pub static ref CHANNEL: Atom = Atom::from("channel");
     pub static ref INDEX: Atom = Atom::from("index");
@@ -28,39 +27,31 @@ lazy_static! {
     pub static ref SOURCETYPE: Atom = Atom::from("sourcetype");
 }
 
+/// Cashed bodies for common responses
 mod splunk_response {
     use bytes::Bytes;
     use lazy_static::lazy_static;
-    use serde_json::json;
+    use serde_json::{json, Value};
+
+    fn json_to_bytes(value: Value) -> Bytes {
+        serde_json::to_string(&value).unwrap().into()
+    }
+
     lazy_static! {
         pub static ref INVALID_AUTHORIZATION: Bytes =
-            json!({"text":"Invalid authorization","code":3})
-                .as_str()
-                .unwrap()
-                .into();
-        pub static ref MISSING_CREDENTIALS: Bytes = json!({"text":"Token is required","code":2})
-            .as_str()
-            .unwrap()
-            .into();
-        pub static ref NO_DATA: Bytes = json!({"text":"No data","code":5}).as_str().unwrap().into();
-        pub static ref SUCCESS: Bytes = json!({"text":"Success","code":0}).as_str().unwrap().into();
-        pub static ref SERVER_ERROR: Bytes = json!({"text":"Internal server error","code":8})
-            .as_str()
-            .unwrap()
-            .into();
-        pub static ref SERVER_SHUTDOWN: Bytes = json!({"text":"Server is shuting down","code":9})
-            .as_str()
-            .unwrap()
-            .into();
+            json_to_bytes(json!({"text":"Invalid authorization","code":3}));
+        pub static ref MISSING_CREDENTIALS: Bytes =
+            json_to_bytes(json!({"text":"Token is required","code":2}));
+        pub static ref NO_DATA: Bytes = json_to_bytes(json!({"text":"No data","code":5}));
+        pub static ref SUCCESS: Bytes = json_to_bytes(json!({"text":"Success","code":0}));
+        pub static ref SERVER_ERROR: Bytes =
+            json_to_bytes(json!({"text":"Internal server error","code":8}));
+        pub static ref SERVER_SHUTDOWN: Bytes =
+            json_to_bytes(json!({"text":"Server is shuting down","code":9}));
         pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
-            json!({"text":"unsupported content encoding"})
-                .as_str()
-                .unwrap()
-                .into();
-        pub static ref NO_CHANNEL: Bytes = json!({"text":"Data channel is missing","code":10})
-            .as_str()
-            .unwrap()
-            .into();
+            json_to_bytes(json!({"text":"unsupported content encoding"}));
+        pub static ref NO_CHANNEL: Bytes =
+            json_to_bytes(json!({"text":"Data channel is missing","code":10}));
     }
 }
 
@@ -90,7 +81,7 @@ impl SourceConfig for SplunkConfig {
 
         let source = Arc::new(SplunkSource::new(self, out, trigger));
 
-        let service = move || future::ok::<_, String>(Connection::new(&source));
+        let service = move || future::ok::<_, String>(Connection::new(source.clone()));
 
         // Build server
         let server = Server::bind(&self.address)
@@ -110,6 +101,7 @@ impl SourceConfig for SplunkConfig {
     }
 }
 
+/// Shared data for responding to requests.
 struct SplunkSource {
     /// Source output
     out: mpsc::Sender<Event>,
@@ -151,6 +143,7 @@ impl SplunkSource {
         })
     }
 
+    /// Ok if request is authorized to be done
     fn authorize(&self, req: &Request<Body>) -> Result<(), Response<Body>> {
         match req.headers().get("Authorization") {
             Some(credentials) if credentials.as_bytes() == self.credentials => Ok(()),
@@ -172,10 +165,8 @@ struct Connection {
 }
 
 impl Connection {
-    fn new(source: &Arc<SplunkSource>) -> Self {
-        Connection {
-            source: source.clone(),
-        }
+    fn new(source: Arc<SplunkSource>) -> Self {
+        Connection { source }
     }
 
     fn is_gzip(req: &Request<Body>) -> Result<bool, Response<Body>> {
@@ -190,7 +181,6 @@ impl Connection {
     }
 
     fn channel(req: &Request<Body>) -> Option<HeaderValue> {
-        // TODO: Validate GUID
         req.headers()
             .get("x-splunk-request-channel")
             .map(Clone::clone)
@@ -268,6 +258,7 @@ impl Connection {
         ))
     }
 
+    /// Api point corespoding to '/services/collector/health/1.0'
     fn health_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
         // Process header
         self.source
@@ -286,6 +277,7 @@ impl Connection {
     }
 }
 
+/// Responds to incoming requests
 impl Service for Connection {
     type ReqBody = Body;
     type ResBody = Body;
@@ -309,14 +301,17 @@ impl Service for Connection {
     }
 }
 
+/// Returned by Connector as a response to a request.
 enum RequestFuture {
+    /// Response is already known
     Done(Option<Response<Body>>),
+    /// Response is yet to be computed
     Future(Box<dyn Future<Item = Response<Body>, Error = crate::Error> + Send>),
 }
 
 impl RequestFuture {
-    fn from_future<F: Future<Item = Response<Body>, Error = crate::Error> + 'static + Send>(
-        f: F,
+    fn from_future(
+        f: impl Future<Item = Response<Body>, Error = crate::Error> + 'static + Send,
     ) -> Self {
         RequestFuture::Future(Box::new(f) as _)
     }
@@ -350,43 +345,8 @@ impl From<Result<RequestFuture, Response<Body>>> for RequestFuture {
     }
 }
 
-fn empty_response(code: StatusCode) -> Response<Body> {
-    let mut res = Response::default();
-    *res.status_mut() = code;
-    res
-}
-
-fn response(code: StatusCode, body: impl Into<Body>) -> Response<Body> {
-    let mut res = Response::new(body.into());
-    *res.status_mut() = code;
-    res
-}
-
-fn json_response(code: StatusCode, body: Value) -> Response<Body> {
-    match serde_json::to_string(&body) {
-        Ok(string) => response(code, string),
-        Err(error) => {
-            error!("Error encoding json body: {}", error);
-            response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                splunk_response::SERVER_ERROR.clone(),
-            )
-        }
-    }
-}
-
-fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
-    json_response(
-        StatusCode::BAD_REQUEST,
-        json!({
-            "text":text,
-            "code":code,
-            "invalid-event-number":event
-        }),
-    )
-}
-
-/// If errors it's done with input.
+/// Constructs one ore more events from json-s coming from reader.
+/// If errors, it's done with input.
 struct EventStream<R: Read> {
     /// Remaining request with JSON events
     data: R,
@@ -514,6 +474,7 @@ impl<R: Read> Stream for EventStream<R> {
     }
 }
 
+/// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
     field: &'static Atom,
     value: Option<ValueKind>,
@@ -538,6 +499,7 @@ impl DefaultExtractor {
     }
 }
 
+/// Creates event from raw request
 fn raw_event(bytes: Bytes, gzip: bool, channel: HeaderValue) -> Result<Event, Response<Body>> {
     // Process gzip
     let bytes = if gzip {
@@ -572,6 +534,7 @@ fn raw_event(bytes: Bytes, gzip: bool, channel: HeaderValue) -> Result<Event, Re
     Ok(event)
 }
 
+/// Recursevly inserts json values to event under given name
 pub fn insert(event: &mut LogEvent, name: String, value: Value) {
     match value {
         Value::String(string) => {
@@ -605,6 +568,39 @@ pub fn insert(event: &mut LogEvent, name: String, value: Value) {
                 let item_name = format!("{}.{}", name, key);
                 insert(event, item_name, value);
             }
+        }
+    }
+}
+
+/// Response without body
+fn empty_response(code: StatusCode) -> Response<Body> {
+    let mut res = Response::default();
+    *res.status_mut() = code;
+    res
+}
+
+/// Response with body
+fn response(code: StatusCode, body: impl Into<Body>) -> Response<Body> {
+    let mut res = Response::new(body.into());
+    *res.status_mut() = code;
+    res
+}
+
+/// Error happened during parsing of events
+fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
+    let body = json!({
+        "text":text,
+        "code":code,
+        "invalid-event-number":event
+    });
+    match serde_json::to_string(&body) {
+        Ok(string) => response(StatusCode::BAD_REQUEST, string),
+        Err(error) => {
+            error!("Error encoding json body: {}", error);
+            response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                splunk_response::SERVER_ERROR.clone(),
+            )
         }
     }
 }
