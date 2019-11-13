@@ -95,12 +95,12 @@ A key/value pair representing the new log fields to be added. Accepts all [suppo
 
 </Fields>
 
-## Input/Output
+## Output
 
 Given the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [transforms.my_transform]
   type = "add_fields"
@@ -116,13 +116,9 @@ Given the following configuration:
     field7.nested = "nested value",
     field8 = "#{HOSTNAME}"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```javascript
 {
   // ... existing fields
@@ -137,12 +133,10 @@ A [`log` event][docs.data-model#log] will be output with the following structure
   "field8": "my.hostname.com"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 While unrealistic, this example demonstrates the various accepted
 [types][docs.configuration#value-types] and how they're repsented in Vector's
-internal [log structure][docs.data-model#log].
+internal [log structure][docs.data-model.log].
 
 ## How It Works
 
@@ -170,7 +164,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data-model#log] are structured.
+Learn more about how [`log` events][docs.data-model.log] are structured.
 
 ### Complex Transforming
 
@@ -213,7 +207,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data-model#log] are structured.
+Learn more about how [`log` events][docs.data-model.log] are structured.
 
 ### Removing Fields
 
@@ -221,7 +215,7 @@ See the [`remove_fields` transform][docs.transforms.remove_fields].
 
 ### Special Characters
 
-Aside from the [special characters][docs.data-model#log#special-characters]
+Aside from the [special characters][docs.data-model.log#special-characters]
 listed in the [Data Model][docs.data-model] doc, Vector does not restrict the
 characters allowed in keys. You can wrap key names in `" "` quote to preserve
 spaces and use `\` to escape quotes.
@@ -236,8 +230,9 @@ special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.configuration#value-types]: /docs/setup/configuration#value-types
 [docs.configuration#value_types]: /docs/setup/configuration#value_types
-[docs.data-model#log#special-characters]: /docs/about/data-model#log#special-characters
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log#special-characters]: /docs/about/data-model/log#special-characters
+[docs.data-model.log]: /docs/about/data-model/log
 [docs.data-model]: /docs/about/data-model
 [docs.transforms.lua]: /docs/components/transforms/lua
 [docs.transforms.remove_fields]: /docs/components/transforms/remove_fields

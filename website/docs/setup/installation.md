@@ -6,7 +6,13 @@ hide_pagination: true
 ---
 
 Vector compiles to a single `musl` static binary with no dependencies, making it
-simple to install:
+simple to install.
+
+## Install script
+
+This light-weight script will perform platform detection and determine the best
+method to install Vector:
+
 
 import Tabs from '@theme/Tabs';
 
@@ -41,10 +47,7 @@ Disables prompts and installs without input.
 </TabItem>
 </Tabs>
 
-## Manual Installation
-
-If you prefer a manual approach you can explore the various installation
-methods below:
+## Other methods
 
 import Jump from '@site/src/components/Jump';
 

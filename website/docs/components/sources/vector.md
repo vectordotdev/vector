@@ -8,7 +8,7 @@ status: "beta"
 title: "vector source" 
 ---
 
-The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events.
+The `vector` source ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events.
 
 ## Configuration
 

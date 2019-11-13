@@ -109,12 +109,6 @@ class Templates
     render("#{partials_path}/_component_header.md", binding).strip
   end
 
-  def component_output(type, output, breakout_top_keys: false, heading_depth: 1)
-    examples = output.examples
-    fields = output.fields.to_h.values.sort
-    render("#{partials_path}/_component_output.md", binding).strip
-  end
-
   def component_sections(component)
     render("#{partials_path}/_component_sections.md", binding).strip
   end
@@ -173,16 +167,6 @@ class Templates
 
   def docker_docs
     render("#{partials_path}/_docker_docs.md")
-  end
-
-  def embed_svg(file_name)
-    File.read("#{ASSETS_ROOT}/img/#{file_name}.svg").
-      sub(/^<\?.*\?>/, '').
-      gsub(/ *xmlns:xlink=".*"/, '').
-      gsub(/ *<!--.*-->\n/, '').
-      gsub(/ *<use .*>\n/, '').
-      gsub(/stroke-dasharray/, 'strokeDasharray').
-      strip
   end
 
   def encoding_description(encoding)
@@ -435,10 +419,21 @@ class Templates
     EOF
   end
 
+  def sink_output(component)
+    examples = component.output.examples
+    render("#{partials_path}/_sink_output.md", binding).strip
+  end
+
   def source_description(source)
     strip <<~EOF
     Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.
     EOF
+  end
+
+  def source_output(type, output, breakout_top_keys: false, heading_depth: 1)
+    examples = output.examples
+    fields = output.fields.to_h.values.sort
+    render("#{partials_path}/_source_output.md", binding).strip
   end
 
   def subpages

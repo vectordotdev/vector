@@ -10,13 +10,23 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-<%- if component.respond_to?(:log_fields_list) && component.log_fields_list.any? -%>
-## Log Fields
+<%- if if component.source? -%>
+<%- component.output.log -%>
+## Output (log)
 
-The following schema represents [`log` events][docs.data-model.log] as they are
-output from this source.
+<%= source_output(:log, component.output.log, heading_depth: 3) %>
 
-<%= fields(component.log_fields_list, heading_depth: 3) %>
+<%- end -%>
+<%- if component.output.metric -%>
+## Output (metric)
+
+<%= source_output(:metric, component.output.metric, heading_depth: 3) %>
+
+<%- end -%>
+<%- elsif component.sink? && component.output -%>
+## Output
+
+<%= sink_output(component) %>
 
 <%- end -%>
 <%- if component.respond_to?(:metric_fields_list) && component.metric_fields_list.any? -%>

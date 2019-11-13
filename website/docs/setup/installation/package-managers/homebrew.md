@@ -49,7 +49,9 @@ configuring Vector in the [Configuration][docs.configuration] section.
 Vector can be managed through the [Homebrew services][urls.homebrew_services]
 manager:
 
-{% page-ref page="../../../usage/administration" %}
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/docs/administration">Administration</Jump>
 
 ## Uninstalling
 

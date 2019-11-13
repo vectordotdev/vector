@@ -12,39 +12,7 @@
 
 ## Output
 
-The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
-
-The `aws_s3` sink batches [`log`][docs.data-model#log] up to the `batch_size` or
-`batch_timeout` options. When flushed, Vector will write to [AWS S3][urls.aws_s3]
-via the [`PutObject` API
-endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
-The encoding is dictated by the `encoding` option. For example:
-
-```http
-POST / HTTP/1.1
-Host: kinesis.<region>.<domain>
-Content-Length: <byte_size>
-Content-Type: application/x-amz-json-1.1
-Connection: Keep-Alive 
-X-Amz-Target: Kinesis_20131202.PutRecords
-{
-    "Records": [
-        {
-            "Data": "<base64_encoded_event>",
-            "PartitionKey": "<partition_key>"
-        },
-        {
-            "Data": "<base64_encoded_event>",
-            "PartitionKey": "<partition_key>"
-        },
-        {
-            "Data": "<base64_encoded_event>",
-            "PartitionKey": "<partition_key>"
-        },
-    ],
-    "StreamName": "<stream_name>"
-}
-```
+<%= sink_output(component) %>
 
 ## How It Works [[sort]]
 
@@ -59,33 +27,42 @@ Vector has plans to support column formats, such as ORC and Parquet, in
 
 By default, Vector will name your S3 objects in the following format:
 
-{% code-tabs %}
-{% code-tabs-item title="no compression" %}
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Without Compression', value: 'without_compression', },
+    { label: 'With Compression', value: 'with_compression', },
+  ]
+}>
+
+<TabItem value="without_compression">
+
 ```
 <key_prefix><timestamp>-<uuidv4>.log
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="gzip" %}
-```
-<key_prefix><timestamp>-<uuidv4>.log.gz
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 For example:
 
-{% code-tabs %}
-{% code-tabs-item title="no compression" %}
 ```
 date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="gzip" %}
+
+</TabItem>
+<TabItem value="with_compression">
+
+```
+<key_prefix><timestamp>-<uuidv4>.log.gz
+```
+
+For example:
+
 ```
 date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+
+</TabItem>
+</Tabs>
 
 Vector appends a [UUIDV4][urls.uuidv4] token to ensure there are no name
 conflicts in the unlikely event 2 Vector instances are writing data at the same

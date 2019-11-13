@@ -115,10 +115,19 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
 
 </Fields>
 
-## Input/Output
+## Output
 
-{% tabs %}
-{% tab title="Simple" %}
+<Tabs
+  block={true}
+  defaultValue="simple"
+  values={[
+    { label: 'Simple', value: 'simple', },
+    { label: 'Wrapped', value: 'wrapped', },
+  ]
+}>
+
+<TabItem value="simple">
+
 Given the following log event:
 
 ```
@@ -147,8 +156,9 @@ This would produce the following event as output:
 By default, Vector drops fields after parsing them via the `drop_field`
 option.
 
-{% endtab %}
-{% tab title="Wrapped" %}
+</TabItem>
+<TabItem value="wrapped">
+
 It is possible to chain `json_parser` transforms to effectively "unwrap"
 nested JSON documents. For example, give this log event:
 
@@ -188,8 +198,8 @@ This would produce the following event as output:
 By default, Vector drops fields after parsing them via the `drop_field`
 option.
 
-{% endtab %}
-{% endtabs %}
+</TabItem>
+</Tabs>
 
 ## How It Works
 

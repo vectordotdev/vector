@@ -178,7 +178,7 @@ section.
 You'll notice that each metric contains a `timestamp` field. This is an optional
 descriptive field that represents when the metric was received. It helps to
 more closely represent the metric's time in situations here it can be used. See
-the [metric][docs.data-model#metric] data model page for more info.
+the [metric][docs.data-model.metric] data model page for more info.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables

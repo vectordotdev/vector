@@ -35,3 +35,32 @@ type = "string"
 examples = ["my-stream"]
 null = false
 description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
+
+[[sinks.aws_kinesis_streams.output.examples]]
+label = "Generic"
+output.type = "http"
+output.body = """\
+POST / HTTP/1.1
+Host: kinesis.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive 
+X-Amz-Target: Kinesis_20131202.PutRecords
+{
+    "Records": [
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+    ],
+    "StreamName": "<stream_name>"
+}\
+"""

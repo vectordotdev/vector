@@ -261,14 +261,24 @@ Key/value pairs representing [metric tags][docs.data-model#tags]. Environment va
 
 </Fields>
 
-## Input/Output
+## Output
 
-{% tabs %}
-{% tab title="Timings" %}
+<Tabs
+  block={true}
+  defaultValue="timings"
+  values={[
+    { label: 'Timings', value: 'timings', },
+    { label: 'Counting', value: 'counting', },
+    { label: 'Summing', value: 'summing', },
+    { label: 'Gauges', value: 'gauges', },
+    { label: 'Sets', value: 'sets', },
+  ]
+}>
+
+<TabItem value="timings">
+
 This example demonstrates capturing timings in your logs.
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "host": "10.22.11.222",
@@ -277,13 +287,9 @@ This example demonstrates capturing timings in your logs.
   "time": 54.2,
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can convert the `time` field into a `histogram` metric:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
@@ -295,10 +301,8 @@ You can convert the `time` field into a `histogram` metric:
     tags.status = "{{status}}" # optional
     tags.host = "{{host}}" # optional
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`metric` event][docs.data-model#metric] will be output with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -319,14 +323,13 @@ This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
 sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
-{% endtab %}
-{% tab title="Counting" %}
+</TabItem>
+<TabItem value="counting">
+
 This example demonstrates counting HTTP status codes.
 
 Given the following log line:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "host": "10.22.11.222",
@@ -334,13 +337,9 @@ Given the following log line:
   "status": 200
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can count the number of responses by status code:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
@@ -352,10 +351,8 @@ You can count the number of responses by status code:
     tags.status = "{{status}}"
     tags.host = "{{host}}"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`metric` event][docs.data-model#metric] will be output with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -374,15 +371,15 @@ structure:
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
 sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
-{% endtab %}
-{% tab title="Summing" %}
+
+</TabItem>
+<TabItem value="summing">
+
 In this example we'll demonstrate computing a sum. The scenario we've chosen
 is to compute the total of orders placed.
 
 Given the following log line:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "host": "10.22.11.222",
@@ -390,14 +387,10 @@ Given the following log line:
   "total": 122.2
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can reduce this log into a `counter` metric that increases by the
 field's value:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
@@ -409,10 +402,8 @@ field's value:
     increment_by_value = true # optional
     tags.host = "{{host}}" # optional
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`metric` event][docs.data-model#metric] will be output with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -430,15 +421,15 @@ structure:
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
 sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
-{% endtab %}
-{% tab title="Gauges" %}
+
+</TabItem>
+<TabItem value="gauges">
+
 In this example we'll demonstrate creating a gauge that represents the current
 CPU load verages.
 
 Given the following log line:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "host": "10.22.11.222",
@@ -448,13 +439,9 @@ Given the following log line:
   "15m_load_avg": 48.7
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can reduce this logs into multiple `gauge` metrics:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
@@ -474,10 +461,8 @@ You can reduce this logs into multiple `gauge` metrics:
     field = "15m_load_avg"
     tags.host = "{{host}}" # optional
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-Multiple [`metric` events][docs.data-model#metric] will be output with the following
+Multiple [`metric` events][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -515,8 +500,10 @@ structure:
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
 sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
-{% endtab %}
-{% tab title="Sets" %}
+
+</TabItem>
+<TabItem value="sets">
+
 In this example we'll demonstrate how to use sets. Sets are primarly a Statsd
 concept that represent the number of unique values seens for a given metric.
 The idea is that you pass the unique/high-cardinality value as the metric value
@@ -524,8 +511,6 @@ and the metric store will count the number of unique values seen.
 
 For example, given the following log line:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "host": "10.22.11.222",
@@ -533,13 +518,9 @@ For example, given the following log line:
   "remote_addr": "233.221.232.22"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can count the number of unique `remote_addr` values by using a set:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
@@ -549,10 +530,8 @@ You can count the number of unique `remote_addr` values by using a set:
     field = "remote_addr"
     tags.host = "{{host}}" # optional
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`metric` event][docs.data-model#metric] will be output with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -570,8 +549,9 @@ structure:
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
 sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
-{% endtab %}
-{% endtabs %}
+
+</TabItem>
+</Tabs>
 
 ## How It Works
 
@@ -612,7 +592,7 @@ individual metrics for reduction in the metrics storage itself.
 [docs.data-model#gauges]: /docs/about/data-model#gauges
 [docs.data-model#histograms]: /docs/about/data-model#histograms
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model#metric]: /docs/about/data-model#metric
 [docs.data-model#sets]: /docs/about/data-model#sets
 [docs.data-model#tags]: /docs/about/data-model#tags
+[docs.data-model.metric]: /docs/about/data-model/metric
 [docs.sinks.prometheus]: /docs/components/sinks/prometheus

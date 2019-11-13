@@ -9,6 +9,9 @@ tradeoffs or your usecase.
 
 ## Delivery Gaurantees
 
+<div class="section-list">
+<div class="section">
+
 ### At-Least-Once
 
 The `at-least-once` delivery guarantee ensures that an
@@ -17,11 +20,9 @@ once to the configured destination(s). While rare, it is possible for an event
 to be delivered more than once. See the [Does Vector support exactly once
 delivery](#does-vector-support-exactly-once-delivery) FAQ below).
 
-import Jump from '@site/src/components/Jump';
+import Alert from '@site/src/components/Alert';
 
-<Jump to="/components?at-least-once=true">View all at-least-once components</Jump>
-
-#### Prerequisites
+<Alert type="warning">
 
 In order to achieve at least once delivery your source must be configured to
 use `disk` based buffers:
@@ -40,7 +41,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
     max_size = 104900000 # 100MiB
 ```
 
-Each [sink][docs.sinks] documents the buffer options.
+Each [sink][docs.sinks] will include documentation for its buffer options.
+
+</Alert>
+
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/components?at-least-once=true">View all at-least-once components</Jump>
+
+</div>
+<div class="section">
 
 ### Best-Effort
 
@@ -49,7 +59,13 @@ deliver each event, but cannot guarantee delivery. While rare, this means it is
 possible for the occasional event to not be lost. See the ["Do I need at least
 once delivery?"](#do-i-need-at-least-once-delivery) FAQ.
 
+</div>
+</div>
+
 ## Reliability Guarantee
+
+<div class="section-list">
+<div class="section">
 
 ### Prod-Ready
 
@@ -66,11 +82,17 @@ criteria:
 
 <Jump to="/components?prod-ready=true">View all prod-ready components</Jump>
 
+</div>
+<div class="section">
+
 ### Beta
 
 The `beta` status means that a component has not met the criteria outlined in
 the [Prod-Ready](#prod-ready) section and therefore should be used with caution
 in production environments.
+
+</div>
+</div>
 
 ## FAQs
 

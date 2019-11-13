@@ -7,7 +7,7 @@ Vector can be deployed to form a variety of topologies. This section showcases c
 
 ## Distributed
 
-<%= embed_svg("topologies-distributed") %>
+<SVG src="/img/topologies-distributed.svg" />
 
 The simplest topology. This topology offers direct communication with your downstream services from your client nodes.
 
@@ -26,7 +26,7 @@ The simplest topology. This topology offers direct communication with your downs
 
 ## Centralized
 
-<%= embed_svg("topologies-centralized") %>
+<SVG src="/img/topologies-centralized.svg" />
 
 A good balance of simplicity, stability, and control. For most, this topology is a good compromise between the [distributed](#distributed) and [stream-based](#stream-based) topologies. It offers many of the advantages of the stream-based topology without the management overhead and cost of running a Kafka cluster.
 
@@ -43,7 +43,7 @@ A good balance of simplicity, stability, and control. For most, this topology is
 
 ## Stream-Based
 
-<%= embed_svg("topologies-stream-based") %>
+<SVG src="/img/topologies-stream-based.svg" />
 
 The most durable and elastic topology. This topology is typically adopted for very large streams with teams that are familiar with running a stream-based service such as Kafka.
 

@@ -22,10 +22,10 @@ how to do this.
 
 ### Buffers & Batches
 
-<%- if component.partition_options.any? -%> 
-<%= embed_svg("buffers-and-batches-partitioned") %>
+<%- if component.partition_options.any? -%>
+<SVG src="/img/buffers-and-batches-partitioned.svg" />
 <%- else -%>
-<%= embed_svg("buffers-and-batches-serial") %>
+<SVG src="/img/buffers-and-batches-serial.svg" />
 <%- end -%>
 
 The `<%= component.name %>` <%= component.type %> buffers & batches data as

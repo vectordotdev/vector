@@ -1,7 +1,7 @@
 .alert {
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-color-content) !important;
-  font-size: 85%;
+  font-size: 95%;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
   padding-left: 5em;
 }

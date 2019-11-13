@@ -10,10 +10,20 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Input/Output
+## Output
 
-{% tabs %}
-{% tab title="Add fields" %}
+<Tabs
+  block={true}
+  defaultValue="timings"
+  values={[
+    { label: 'Add Fields', value: 'add_fields', },
+    { label: 'Remove Fields', value: 'remove_fields', },
+    { label: 'Drop Event', value: 'drop_event', },
+  ]
+}>
+
+<TabItem value="add_fields">
+
 Add a field to an event. Supply this as a the `source` value:
 
 ```lua
@@ -24,8 +34,9 @@ event["new_field"] = "new value"
 event["parent.child"] = "nested value"
 ```
 
-{% endtab %}
-{% tab title="Remove fields" %}
+</TabItem>
+<TabItem value="remove_fields">
+
 Remove a field from an event. Supply this as a the `source` value:
 
 ```lua
@@ -36,8 +47,9 @@ event["field"] = nil
 event["parent.child"] = nil
 ```
 
-{% endtab %}
-{% tab title="Drop event" %}
+</TabItem>
+<TabItem value="drop_event">
+
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
@@ -45,8 +57,8 @@ Drop an event entirely. Supply this as a the `source` value:
 event = nil
 ```
 
-{% endtab %}
-{% endtabs %}
+</TabItem>
+</Tabs>
 
 ## How It Works [[sort]]
 
@@ -69,7 +81,7 @@ variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
 |:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model#log#default-schema]. |
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
 
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].

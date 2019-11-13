@@ -110,7 +110,7 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping
 
 ### buckets
 
-Default buckets to use for [histogram][docs.data-model#metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
+Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
 
 
 </Field>
@@ -165,17 +165,21 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 
 </Fields>
 
-## Input/Output
+## Output
 
-{% tabs %}
-{% tab title="Histograms" %}
-This example demonstrates how Vector's internal [`histogram` metric \
-type][docs.data-model#metric#histograms] is exposed via Prometheus' [text-based \
-exposition format][urls.prometheus_text_based_exposition_format].
+The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
+For example:
 
-For example, given the following internal Vector histograms:
+<Tabs
+  block={true}
+  defaultValue="histograms"
+  values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
 
-```javascript
+<TabItem value="histograms">
+
+Given the following input:
+
+```json
 [
   {
     "histogram": {
@@ -190,10 +194,9 @@ For example, given the following internal Vector histograms:
     }
   }
 ]
-````
+```
 
-The `prometheus` sink will expose this data in Prometheus'
-[text-based exposition format][urls.prometheus_text_based_exposition_format]:
+The following output will be produced:
 
 ```text
 # HELP response_time_s response_time_s
@@ -214,29 +217,13 @@ response_time_s_sum 0.789
 response_time_s_count 2
 ```
 
-Note, the buckets used are those defined by the[`buckets`](#buckets) option, and the
-buckets above reflect the default buckets.
+</TabItem>
 
-import Alert from '@site/src/components/Alert';
+<TabItem value="counters">
 
-<Alert type="warning">
+Given the following input:
 
-It's important that your metric units align with your bucket units. The default
-buckets are in seconds and any metric values passed should also be in seconds.
-If your metrics are not in seconds you can override the buckets to reflect
-your units.
-
-</Alert>
-
-{% endtab %}
-{% tab title="Counters" %}
-This example demonstrates how Vector's internal [`counter` metric \
-type][docs.data-model#metric#counters] is exposed via Prometheus' [text-based \
-exposition format][urls.prometheus_text_based_exposition_format].
-
-For example, given the following internal Vector gauges:
-
-```javascript
+```json
 [
   {
     "counter": {
@@ -251,27 +238,24 @@ For example, given the following internal Vector gauges:
     }
   }
 ]
-````
+```
 
-The `prometheus` sink will expose this data in Prometheus'
-[text-based exposition format][urls.prometheus_text_based_exposition_format]:
+The following output will be produced:
 
 ```text
 # HELP logins logins
 # TYPE logins counter
 logins 4
+
 ```
 
-Notice that Vector aggregates the metric and exposes the final value.
-{% endtab %}
-{% tab title="Gauges" %}
-This example demonstrates how Vector's internal [`gauge` metric \
-type][docs.data-model#metric#gauges] is exposed via Prometheus' [text-based \
-exposition format][urls.prometheus_text_based_exposition_format].
+</TabItem>
 
-For example, given the following internal Vector gauges:
+<TabItem value="gauges">
 
-```javascript
+Given the following input:
+
+```json
 [
   {
     "gauge": {
@@ -288,20 +272,19 @@ For example, given the following internal Vector gauges:
     }
   }
 ]
-````
+```
 
-The `prometheus` sink will expose this data in Prometheus'
-[text-based exposition format][urls.prometheus_text_based_exposition_format]:
+The following output will be produced:
 
 ```text
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225
+
 ```
 
-Notice that Vector aggregates the metric and exposes the final value.
-{% endtab %}
-{% endtabs %}
+</TabItem>
+</Tabs>
 
 ## How It Works
 
@@ -357,6 +340,8 @@ These defaults are tailored to broadly measure the response time (in seconds)
 of a network service. Most likely, however, you will be required to define
 buckets customized to your use case.
 
+import Alert from '@site/src/components/Alert';
+
 <Alert type="warning">
 
 Note: These values are in `seconds`, therefore,
@@ -383,21 +368,21 @@ see examples of this in the [examples section](#examples).
 
 ### Metric Types
 
-As described in the [metric data model][docs.data-model#metric] page, Vector offers
+As described in the [metric data model][docs.data-model.metric] page, Vector offers
 a variety of metric types. Their support, as as well as their mappings, are
 described below:
 
 | Vector Metric Type                               | Prometheus Metric Type               |
 |:-------------------------------------------------|:-------------------------------------|
-| [`counter`][docs.data-model#metric#counters]     | ['counter'][urls.prometheus_counter] |
-| [`gauge`][docs.data-model#metric#gauges]         | ['gauge'][urls.prometheus_gauge]     |
-| [`histogram`][docs.data-model#metric#histograms] | ['histogram'][urls.prometheus_gauge] |
-| [`set`][docs.data-model#metric#sets]             | ⚠️ not supported                     |
+| [`counter`][docs.data-model.metric#counters]     | ['counter'][urls.prometheus_counter] |
+| [`gauge`][docs.data-model.metric#gauges]         | ['gauge'][urls.prometheus_gauge]     |
+| [`histogram`][docs.data-model.metric#histograms] | ['histogram'][urls.prometheus_gauge] |
+| [`set`][docs.data-model.metric#sets]             | ⚠️ not supported                     |
 | -                                                | ['summary'][urls.prometheus_summary] |
 
 #### Sets
 
-Prometheus does not have a [`set`][docs.data-model#metric#sets] type. Sets are
+Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
 generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `prometheus` sink it will be dropped, and a rate limited warning
 level log will be output.
@@ -421,12 +406,13 @@ discussion with your use case if you find this to be a problem.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric#counters]: /docs/about/data-model#metric#counters
-[docs.data-model#metric#gauges]: /docs/about/data-model#metric#gauges
-[docs.data-model#metric#histogram]: /docs/about/data-model#metric#histogram
-[docs.data-model#metric#histograms]: /docs/about/data-model#metric#histograms
-[docs.data-model#metric#sets]: /docs/about/data-model#metric#sets
 [docs.data-model#metric]: /docs/about/data-model#metric
+[docs.data-model.metric#counters]: /docs/about/data-model/metric#counters
+[docs.data-model.metric#gauges]: /docs/about/data-model/metric#gauges
+[docs.data-model.metric#histogram]: /docs/about/data-model/metric#histogram
+[docs.data-model.metric#histograms]: /docs/about/data-model/metric#histograms
+[docs.data-model.metric#sets]: /docs/about/data-model/metric#sets
+[docs.data-model.metric]: /docs/about/data-model/metric
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710
 [urls.prometheus]: https://prometheus.io/
@@ -436,5 +422,4 @@ discussion with your use case if you find this to be a problem.
 [urls.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
 [urls.prometheus_metric_naming]: https://prometheus.io/docs/practices/naming/#metric-names
 [urls.prometheus_summary]: https://prometheus.io/docs/concepts/metric_types/#summary
-[urls.prometheus_text_based_exposition_format]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format
 [urls.statsd_set]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#sets

@@ -210,24 +210,18 @@ A definition of log field type conversions. They key is the log field name and t
 
 </Fields>
 
-## Input/Output
+## Output
 
 Given the following log line:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "message": "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 And the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.<transform-id>]
   type = "regex_parser"
@@ -240,10 +234,8 @@ And the following configuration:
   status = "int"
   bytes_out = "int"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -344,6 +336,7 @@ documentation][urls.regex_grouping_and_flags].
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
 [docs.performance]: /docs/about/performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression

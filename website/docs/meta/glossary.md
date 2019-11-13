@@ -4,7 +4,7 @@ title: Glossary
 
 ## Batch
 
-"Batch" refers to a [batched payload][docs.data-model#log] within a sink. It is a batch of events encoded into a payload that the downstream service understands.
+"Batch" refers to a [batched payload][docs.data-model.log] within a sink. It is a batch of events encoded into a payload that the downstream service understands.
 
 ## Benchmark
 
@@ -49,7 +49,7 @@ title: Glossary
 ## Log
 
 "Log" refers to an individual log event. This is a type of
-[Vector event][docs.data-model#metric].
+[Vector event][docs.data-model.metric].
 
 ## Lucio
 
@@ -58,7 +58,7 @@ A sporty Italian that bleeds Rust, is a core member of the Vector team, and does
 ## Metric
 
 "Metric" refers to an individual data unit used to represent a point in time
-measurement. This is a type of [Vector event][docs.data-model#metric].
+measurement. This is a type of [Vector event][docs.data-model.metric].
 
 ## Parser
 
@@ -141,8 +141,8 @@ reducing cost, etc.
 
 
 [docs.configuration]: /docs/setup/configuration
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.data-model.log]: /docs/about/data-model/log
+[docs.data-model.metric]: /docs/about/data-model/metric
 [docs.data_model]: /docs/about/data-model
 [docs.guides]: /docs/guides
 [docs.performance]: /docs/about/performance

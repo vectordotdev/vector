@@ -116,28 +116,46 @@ daemonize and manage your processes. Vector provides a
 
 The Vector process should be stopped by sending it a `SIGTERM` process signal:
 
-{% tabs %}
-{% tab title="Manual" %}
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Manual', value: 'manual', },
+    { label: 'Systemd', value: 'systemd', },
+    { label: 'Initd', value: 'initd', },
+    { label: 'Homebrew', value: 'homebrew', },
+  ]
+}>
+
+<TabItem value="manual">
+
 ```bash
 kill -SIGTERM <vector-process-id>
 ```
-{% endtab %}
-{% tab title="Systemd" %}
+
+</TabItem>
+<TabItem value="systemd">
+
 ```bash
 sudo systemctl stop vector
 ```
-{% endtab %}
-{% tab title="Initd" %}
+
+</TabItem>
+<TabItem value="initd">
+
 ```bash
 /etc/init.d/vector stop
 ```
-{% endtab %}
-{% tab title="Homebrew" %}
+
+</TabItem>
+<TabItem value="homebrew">
+
 ```bash
 brew services stop vector
 ```
-{% endtab %}
-{% endtabs %}
+
+</TabItem>
+</Tabs>
 
 If you are currently running the Vector process in your terminal, this can be
 achieved by a single `ctrl+c` key combination.
@@ -175,8 +193,19 @@ are:
 Vector can be reloaded, on the fly, to recognize any configuration changes by
 sending the Vector process a `SIGHUP` signal:
 
-{% tabs %}
-{% tab title="Manual" %}
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Manual', value: 'manual', },
+    { label: 'Systemd', value: 'systemd', },
+    { label: 'Initd', value: 'initd', },
+    { label: 'Homebrew', value: 'homebrew', },
+  ]
+}>
+
+<TabItem value="manual">
+
 ```bash
 kill -SIGHUP <vector-process-id>
 ```
@@ -186,18 +215,24 @@ You can find the Vector process ID with:
 ```bash
 ps -ax vector | grep vector
 ```
-{% endtab %}
-{% tab title="Systemd" %}
+
+</TabItem>
+<TabItem value="systemd">
+
 ```bash
 systemctl kill -s HUP --kill-who=main vector.service
 ```
-{% endtab %}
-{% tab title="Initd" %}
+
+</TabItem>
+<TabItem value="initd">
+
 ```bash
 /etc/init.d/vector reload
 ```
-{% endtab %}
-{% tab title="Homebrew" %}
+
+</TabItem>
+<TabItem value="homebrew">
+
 ```bash
 kill -SIGHUP <vector-process-id>
 ```
@@ -207,8 +242,9 @@ You can find the Vector process ID with:
 ```bash
 ps -ax vector | grep vector
 ```
-{% endtab %}
-{% endtabs %}
+
+</TabItem>
+</Tabs>
 
 ### Configuration Errors
 

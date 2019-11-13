@@ -10,12 +10,12 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Input/Output
+## Output
 
 Given the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [transforms.my_transform]
   type = "add_fields"
@@ -31,13 +31,9 @@ Given the following configuration:
     field7.nested = "nested value",
     field8 = "#{HOSTNAME}"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```javascript
 {
   // ... existing fields
@@ -52,12 +48,10 @@ A [`log` event][docs.data-model#log] will be output with the following structure
   "field8": "my.hostname.com"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 While unrealistic, this example demonstrates the various accepted
 [types][docs.configuration#value-types] and how they're repsented in Vector's
-internal [log structure][docs.data-model#log].
+internal [log structure][docs.data-model.log].
 
 ## How It Works [[sort]]
 
@@ -87,7 +81,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data-model#log] are structured.
+Learn more about how [`log` events][docs.data-model.log] are structured.
 
 ### Complex Transforming
 
@@ -121,7 +115,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data-model#log] are structured.
+Learn more about how [`log` events][docs.data-model.log] are structured.
 
 ### Removing Fields
 
@@ -129,7 +123,7 @@ See the [`remove_fields` transform][docs.transforms.remove_fields].
 
 ### Special Characters
 
-Aside from the [special characters][docs.data-model#log#special-characters]
+Aside from the [special characters][docs.data-model.log#special-characters]
 listed in the [Data Model][docs.data-model] doc, Vector does not restrict the
 characters allowed in keys. You can wrap key names in `" "` quote to preserve
 spaces and use `\` to escape quotes.

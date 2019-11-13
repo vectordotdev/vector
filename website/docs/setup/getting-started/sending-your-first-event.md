@@ -24,8 +24,10 @@ Or view [platform specific installation instructions][docs.installation].
 Start by creating a temporary [Vector configuration file][docs.configuration]
 in your home directory:
 
-{% code-tabs %}
-{% code-tabs-item title="~/vector.toml" %}
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" />
+
 ```bash
 echo '
 [sources.in]
@@ -36,8 +38,6 @@ echo '
     type = "console"
 ' > ~/vector.toml
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 Now pipe an event through Vector:
 

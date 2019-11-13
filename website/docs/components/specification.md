@@ -7,8 +7,10 @@ description: Full Vector config specification
 Below is a full config specification. Note, this file is included with
 Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
-{% code-tabs %}
-{% code-tabs-item title="/etc/vector/vector.spec.toml" %}
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 #                                    __   __  __  
 #                                    \ \ / / / /
@@ -557,7 +559,7 @@ data_dir = "/var/lib/vector"
   # * type: string
   host_key = "host"
 
-# Ingests data through another upstream Vector instance and outputs `log` and `metric` events.
+# Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `vector`.
@@ -3498,7 +3500,7 @@ end
     verify_hostname = true
     verify_hostname = false
 
-# Streams `log` events to another downstream Vector instance.
+# Streams `log` events to another downstream `vector` source.
 [sinks.vector]
   #
   # General
@@ -3575,8 +3577,6 @@ end
     when_full = "block"
     when_full = "drop_newest"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 
 

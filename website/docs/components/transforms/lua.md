@@ -94,10 +94,24 @@ The inline Lua source to evaluate. See [Global Variables](#global-variables) for
 
 </Fields>
 
-## Input/Output
+## Output
 
-{% tabs %}
-{% tab title="Add fields" %}
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="timings"
+  values={[
+    { label: 'Add Fields', value: 'add_fields', },
+    { label: 'Remove Fields', value: 'remove_fields', },
+    { label: 'Drop Event', value: 'drop_event', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="add_fields">
+
 Add a field to an event. Supply this as a the[`source`](#source) value:
 
 ```lua
@@ -108,8 +122,9 @@ event["new_field"] = "new value"
 event["parent.child"] = "nested value"
 ```
 
-{% endtab %}
-{% tab title="Remove fields" %}
+</TabItem>
+<TabItem value="remove_fields">
+
 Remove a field from an event. Supply this as a the[`source`](#source) value:
 
 ```lua
@@ -120,8 +135,9 @@ event["field"] = nil
 event["parent.child"] = nil
 ```
 
-{% endtab %}
-{% tab title="Drop event" %}
+</TabItem>
+<TabItem value="drop_event">
+
 Drop an event entirely. Supply this as a the[`source`](#source) value:
 
 ```lua
@@ -129,8 +145,8 @@ Drop an event entirely. Supply this as a the[`source`](#source) value:
 event = nil
 ```
 
-{% endtab %}
-{% endtabs %}
+</TabItem>
+</Tabs>
 
 ## How It Works
 
@@ -160,7 +176,7 @@ variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
 |:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model#log#default-schema]. |
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
 
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
@@ -188,8 +204,8 @@ function][urls.lua_require].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log#default-schema]: /docs/about/data-model#log#default-schema
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log#default-schema]: /docs/about/data-model/log#default-schema
 [docs.data_model]: /docs/about/data-model
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/

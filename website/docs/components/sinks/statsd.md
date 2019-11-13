@@ -139,13 +139,21 @@ A prefix that will be added to all metric names.
 
 </Fields>
 
-## Input/Output
+## Output
 
-The `statsd` sink batches [`metric`][docs.data-model#metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][urls.statsd_multi]. For example:
+The `statsd` sink [streams](#streaming) [`metric`][docs.data-model#metric] events to [StatsD][urls.statsd] metrics service.
+For example:
 
+<TabItem value="generic">
+
+```text
+gorets:1|c
+glork:320|ms
+gaugor:333|g
+uniques:765|s
 ```
-gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s
-```
+
+</TabItem>
 
 ## How It Works
 
@@ -167,4 +175,3 @@ event-by-event basis. It does not batch data.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#metric]: /docs/about/data-model#metric
 [urls.statsd]: https://github.com/statsd/statsd
-[urls.statsd_multi]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets

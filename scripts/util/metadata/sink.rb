@@ -10,6 +10,7 @@ class Sink < Component
     :egress_method,
     :input_types,
     :healthcheck,
+    :output,
     :service_limits_short_link,
     :service_provider,
     :tls,
@@ -26,9 +27,9 @@ class Sink < Component
     encodings = hash["encodings"]
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
+    @output = OpenStruct.new
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
-
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -42,6 +43,16 @@ class Sink < Component
 
     if @write_to_description.strip[-1] == "."
       raise("#{self.class.name}#write_to_description cannot not end with a period")
+    end
+
+    # output
+
+    output = hash["output"] || {}
+    @output.examples = (output["examples"] || []).collect do |e|
+      s = OpenStruct.new(e)
+      s.input = OpenStruct.new(s.input) if s.input
+      s.output = OpenStruct.new(s.output) if s.output
+      s
     end
 
     # Healthcheck option

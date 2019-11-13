@@ -10,35 +10,9 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Input/Output
+## Output
 
-The `aws_kinesis_streams` sink batches [`log`][docs.data-model#log] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
-
-```http
-POST / HTTP/1.1
-Host: kinesis.<region>.<domain>
-Content-Length: <byte_size>
-Content-Type: application/x-amz-json-1.1
-Connection: Keep-Alive 
-X-Amz-Target: Kinesis_20131202.PutRecords
-{
-    "Records": [
-        {
-            "Data": "<base64_encoded_event>",
-            "PartitionKey": "<partition_key>"
-        },
-        {
-            "Data": "<base64_encoded_event>",
-            "PartitionKey": "<partition_key>"
-        },
-        {
-            "Data": "<base64_encoded_event>",
-            "PartitionKey": "<partition_key>"
-        },
-    ],
-    "StreamName": "<stream_name>"
-}
-```
+<%= sink_output(component) %>
 
 ## How It Works [[sort]]
 

@@ -71,10 +71,10 @@
   --ifm-menu-color: var(--ifm-color-emphasis-600);
   --ifm-navbar-link-color: var(--ifm-heading-color);
   --ifm-panel-background: var(--ifm-background-color);
-  --ifm-panel-background-active: var(--ifm-background-color);
+  --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
   --ifm-panel-border-color: var(--ifm-hr-border-color);
   --ifm-panel-border-color-active: var(--ifm-color-primary);
-  --ifm-panel-box-shadow: var(--ifm-global-shadow-md);
+  --ifm-panel-box-shadow: none;
   --ifm-panel-box-shadow-active: var(--ifm-panel-box-shadow);
   --ifm-panel-color: var(--ifm-color-emphasis-800);
   --ifm-panel-color-active: var(--ifm-color-primary);
@@ -840,7 +840,6 @@ html[data-theme="dark"] {
   --ifm-heading-color: rgb(200, 214, 229);
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-panel-background: var(--ifm-color-emphasis-50);
-  --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
   --ifm-panel-box-shadow: none;
   --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.5 );
 }

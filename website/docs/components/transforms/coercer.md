@@ -94,12 +94,10 @@ A definition of log field type conversions. They key is the log field name and t
 
 </Fields>
 
-## Input/Output
+## Output
 
-Given the following input event:
+Given the following input:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   // ... existing fields
@@ -112,13 +110,11 @@ Given the following input event:
   "user_id": "zieme4647"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 And the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [transforms.<transform-id>]
   type = "coercer"
@@ -129,10 +125,8 @@ And the following configuration:
   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
   status = "int"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -161,4 +155,5 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

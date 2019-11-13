@@ -21,37 +21,59 @@ to the specific component via the `lable` filter.
 We've taken great care to ensure Vector's logs are high-quality and helpful.
 In most cases the logs will surface the issue:
 
-{% tabs %}
-{% tab title="Manual" %}
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Manual', value: 'manual', },
+    { label: 'Systemd', value: 'systemd', },
+    { label: 'Initd', value: 'initd', },
+    { label: 'Homebrew', value: 'homebrew', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="manual">
+
 If you are not using a service manager, and you're redirecting Vector's
 output to a file then you can use a utility like `tail` to access your logs:
 
 ```bash
 tail /var/log/vector.log
 ```
-{% endtab %}
-{% tab title="Systemd" %}
+
+</TabItem>
+<TabItem value="systemd">
+
 Tail logs:
 
 ```bash
 sudo journalctl -fu vector
 ```
-{% endtab %}
-{% tab title="Initd" %}
+
+</TabItem>
+<TabItem value="initd">
+
 Tail logs:
 
 ```bash
 tail -f /var/log/vector.log
 ```
-{% endtab %}
-{% tab title="Homebrew" %}
+
+</TabItem>
+<TabItem value="homebrew">
+
 Tail logs:
 
 ```bash
 tail -f /usr/local/var/log/vector.log
 ```
-{% endtab %}
-{% endtabs %}
+
+</TabItem>
+</Tabs>
 
 ## 3. Enable backtraces
 
@@ -85,18 +107,30 @@ As a result, dropping to the `debug` level is safe for production environments.
 
 </Alert>
 
-{% tabs %}
-{% tab title="Env Var" %}
+<Tabs
+  block={true}
+  defaultValue="env_var"
+  values={[
+    { label: 'Env Var', value: 'env_var', },
+    { label: 'Flag', value: 'flag', },
+  ]
+}>
+
+<TabItem value="env_var">
+
 ```bash
 LOG=debug vector --config=/etc/vector/vector.toml
 ```
-{% endtab %}
-{% tab title="Flag" %}
+
+</TabItem>
+<TabItem value="flag">
+
 ```bash
 vector --verbose --config=/etc/vector/vector.toml
 ```
-{% endtab %}
-{% endtabs %}
+
+</TabItem>
+</Tabs>
 
 ## 5. Get help
 

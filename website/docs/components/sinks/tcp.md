@@ -469,6 +469,10 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 </Fields>
 
+## Output
+
+The `tcp` sink [streams](#streaming) [`log`][docs.data-model#log] events to a TCP connection.
+
 ## How It Works
 
 ### Environment Variables

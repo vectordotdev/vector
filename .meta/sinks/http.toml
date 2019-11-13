@@ -61,3 +61,31 @@ type = "string"
 examples = ["https://10.22.212.22:9000/endpoint"]
 null = false
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
+
+[[sinks.elasticsearch.output.examples]]
+label = "NDJSON"
+output.type = "http"
+ooutput.body = """\
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
+
+<json_encoded_log>
+<json_encoded_log>
+<json_encoded_log>\
+"""
+
+[[sinks.http.output.examples]]
+label = "Text"
+output.type = "http"
+output.body = """\
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: text/plain
+Content-Length: <byte_size>
+
+<log.message>
+<log.message>
+<log.message>\
+"""

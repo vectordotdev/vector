@@ -117,17 +117,46 @@ The maxiumum bytes size of a message before it is discarded.
 ## Output (log)
 
 This component outputs [`log` events][docs.data-model.log].
-For example:
 
-```javascript
-{
-  "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
-  "timestamp": "2019-11-01T21:15:47+00:00"
-}
+Given the following input:
+
 ```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+
+A [`log` event][docs.data-model.log] will be output with the
+following structure:
+
+```json
+{
+  "timestamp": <current_timestamp>,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "host": "<local_hostname>"
+}
+
+```
+
 More detail on the output schema is below.
 
 <Fields filters={true}>
+
+
+<Field
+  enumValues={null}
+  examples={["my.host.com"]}
+  name={"host"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### host
+
+The local hostname.
+
+
+
+</Field>
 
 
 <Field
@@ -168,36 +197,6 @@ The exact time the event was ingested.
 
 </Fields>
 
-## Output
-
-Given the following input line:
-
-{% code-tabs %}
-{% code-tabs-item title="stdin" %}
-```
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-A [`log` event][docs.data-model#log] will be output with the following structure:
-
-{% code-tabs %}
-{% code-tabs-item title="log" %}
-```javascript
-{
-  "timestamp": <timestamp> # current time,
-  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
-  "host": "10.2.22.122" # current hostname
-}
-```
-
-The "timestamp" and `"host"` keys were automatically added as context. You can
-further parse the `"message"` key with a [transform][docs.transforms], such as
-the [`regex_parser` transform][docs.transforms.regex_parser].
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
 ## How It Works
 
 ### Context
@@ -223,5 +222,3 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.data-model.log]: /docs/about/data-model/log
-[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
-[docs.transforms]: /docs/components/transforms

@@ -5,18 +5,34 @@ description: Validate Vector's configuration
 
 Vector provides a `--dry-run` option to validate configuration only:
 
-{% code-tabs %}
-{% code-tabs-item title="config only" %}
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Config Only', value: 'config', },
+    { label: 'Config + Healthchecks', value: 'config_healthchecks', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="config">
+
 ```bash
 vector --config /etc/vector/vector.toml --dry-run
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="config + health checks" %}
+
+</TabItem>
+<TabItem value="config_healthchecks">
+
 ```bash
 vector --config /etc/vector/vector.toml --dry-run --require-healthy
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+
+</TabItem>
+</Tabs>
 
 If validation fails, Vector will exit with a `78`, and if validation succeeds
 Vector will exit with a `0`.

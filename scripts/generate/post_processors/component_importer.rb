@@ -16,6 +16,7 @@ module PostProcessors
       'Jump' => "import Jump from '@site/src/components/Jump';",
       'Step' => "import Step from '@site/src/components/Step';",
       'Steps' => "import Steps from '@site/src/components/Steps';",
+      'SVG' => "import SVG from 'react-inlinesvg';",
       'Tabs' => "import Tabs from '@theme/Tabs';",
       'TabItem' => "import TabItem from '@theme/TabItem';",
       'VectorComponents' => "import VectorComponents from '@site/src/components/VectorComponents';"

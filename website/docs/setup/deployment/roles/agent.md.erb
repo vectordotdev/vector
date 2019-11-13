@@ -4,7 +4,7 @@ sidebar_label: Agent
 description: Deploying and running Vector as an agent
 ---
 
-<%= embed_svg("roles-agent") %>
+<SVG src="/img/roles-agent.svg" />
 
 When Vector serves as an agent, its purpose is to efficiently and quietly
 collect data. In this scenario, Vector is typically sharing a host with a more
@@ -40,8 +40,6 @@ If you're forwarding data to a downstream [Vector service][docs.roles.service],
 then you should use the [`vector` sink][docs.sinks.vector]. The downstream
 Vector service should use the [`vector` source][docs.sources.vector]. This
 handles communication between Vector instances.
-
-{% page-ref page="../../../usage/guides/vector-to-vector-guide.md" %}
 
 #### Not forwarding to a downstream Vector service
 

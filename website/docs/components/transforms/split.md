@@ -234,24 +234,18 @@ A definition of log field type conversions. They key is the log field name and t
 
 </Fields>
 
-## Input/Output
+## Output
 
 Given the following log line:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   "message": "5.86.210.12,zieme4647,19/06/2019:17:20:49 -0400,GET /embrace/supply-chains/dynamic/vertical,201,20574"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 And the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
 ```toml
 [transforms.<transform-id>]
 type = "split"
@@ -261,10 +255,8 @@ fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
     status = "int"
     bytes = "int"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -297,4 +289,5 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

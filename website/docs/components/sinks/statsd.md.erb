@@ -10,13 +10,9 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Input/Output
+## Output
 
-The `statsd` sink batches [`metric`][docs.data-model#metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][urls.statsd_multi]. For example:
-
-```
-gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s
-```
+<%= sink_output(component) %>
 
 ## How It Works [[sort]]
 

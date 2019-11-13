@@ -10,37 +10,50 @@ This document will cover monitoring Vector.
 Vector writes all output to `STDOUT`, therefore, you have complete control of
 the output destination. Accessing the logs depends on your service manager:
 
-{% tabs %}
-{% tab title="Manual" %}
-If you are not using a service manager, and you're redirecting Vector's
-output to a file then you can use a utility like `tail` to access your logs:
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Manual', value: 'manual', },
+    { label: 'Systemd', value: 'systemd', },
+    { label: 'Initd', value: 'initd', },
+    { label: 'Homebrew', value: 'homebrew', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="manual">
 
 ```bash
 tail /var/log/vector.log
 ```
-{% endtab %}
-{% tab title="Systemd" %}
-Tail logs:
+
+</TabItem>
+<TabItem value="systemd">
 
 ```bash
 sudo journalctl -fu vector
 ```
-{% endtab %}
-{% tab title="Initd" %}
-Tail logs:
+
+</TabItem>
+<TabItem value="initd">
 
 ```bash
 tail -f /var/log/vector.log
 ```
-{% endtab %}
-{% tab title="Homebrew" %}
-Tail logs:
+
+</TabItem>
+<TabItem value="homebrew">
 
 ```bash
 tail -f /usr/local/var/log/vector.log
 ```
-{% endtab %}
-{% endtabs %}
+
+</TabItem>
+</Tabs>
 
 ### Levels
 
@@ -78,7 +91,9 @@ just as you would metrics from any other source.
 
 Please refer to our troubleshooting guide:
 
-{% page-ref page="../usage/guides/troubleshooting.md" %}
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/docs/guides/troubleshooting">Troubleshooting Guide</Jump>
 
 
 [docs.process-management#flags]: /docs/administration/process-management#flags

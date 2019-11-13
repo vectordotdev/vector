@@ -4,7 +4,7 @@ delivery_guarantee = "best_effort"
 egress_method = "streaming"
 healthcheck = true
 input_types = ["log"]
-write_to_description = "another downstream Vector instance"
+write_to_description = "another downstream [`vector` source][docs.sources.vector]"
 
 [sinks.vector.options.address]
 type = "string"

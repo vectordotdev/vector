@@ -118,8 +118,8 @@ specify a[`data_dir`](#data_dir).
 Vector will interpolate environment variables within your configuration file
 with the following syntax:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [transforms.add_host]
     type = "add_fields"
@@ -127,8 +127,6 @@ with the following syntax:
     [transforms.add_host.fields]
         host = "${HOSTNAME}"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 The entire `${HOSTNAME}` variable will be replaced, hence the requirement of
 quotes around the definition.
@@ -167,7 +165,7 @@ For simplicity, Vector allows you to supply [strftime \
 specifiers][urls.strftime_specifiers] directly as part of the value to produce
 formatted timestamp values based off of the event's `timestamp` field.
 
-For example, given the following [`log` event][docs.data-model#log]:
+For example, given the following [`log` event][docs.data-model.log]:
 
 ```rust
 LogEvent {
@@ -179,15 +177,13 @@ LogEvent {
 
 And the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [sinks.my_s3_sink_id]
   type = "aws_s3"
   key_prefix = "date=%Y-%m-%d"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 Vector would produce the following value for the `key_prefix` field:
 
@@ -202,7 +198,7 @@ This effectively enables time partitioning.
 In addition to formatting the `timestamp` field, Vector allows you to directly
 access event fields with the `{{ <field-name> }}` syntax.
 
-For example, given the following [`log` event][docs.data-model#log]:
+For example, given the following [`log` event][docs.data-model.log]:
 
 ```rust
 LogEvent {
@@ -214,15 +210,13 @@ LogEvent {
 
 And the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [sinks.my_s3_sink_id]
   type = "aws_s3"
   key_prefix = "application_id={{ application_id }}/date=%Y-%m-%d"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 Vector would produce the following value for the `key_prefix` field:
 
@@ -249,7 +243,7 @@ All TOML values types are supported. For convenience this includes:
 
 
 [docs.configuration#composition]: /docs/setup/configuration#composition
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
 [docs.installation]: /docs/setup/installation
 [docs.process-management#flags]: /docs/administration/process-management#flags
 [docs.process-management#starting]: /docs/administration/process-management#starting

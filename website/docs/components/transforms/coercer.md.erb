@@ -10,12 +10,10 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Input/Output
+## Output
 
-Given the following input event:
+Given the following input:
 
-{% code-tabs %}
-{% code-tabs-item title="log" %}
 ```json
 {
   // ... existing fields
@@ -28,13 +26,11 @@ Given the following input event:
   "user_id": "zieme4647"
 }
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 And the following configuration:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [transforms.<transform-id>]
   type = "coercer"
@@ -45,10 +41,8 @@ And the following configuration:
   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
   status = "int"
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-A [`log` event][docs.data-model#log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {

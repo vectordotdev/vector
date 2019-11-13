@@ -8,7 +8,7 @@ status: "prod-ready"
 title: "vector sink" 
 ---
 
-The `vector` sink [streams](#streaming) [`log`][docs.data-model#log] events to another downstream Vector instance.
+The `vector` sink [streams](#streaming) [`log`][docs.data-model#log] events to another downstream [`vector` source][docs.sources.vector].
 
 ## Configuration
 
@@ -241,6 +241,10 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 </Fields>
 
+## Output
+
+The `vector` sink [streams](#streaming) [`log`][docs.data-model#log] events to another downstream [`vector` source][docs.sources.vector].
+
 ## How It Works
 
 ### Environment Variables
@@ -281,3 +285,4 @@ event-by-event basis. It does not batch data.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.sources.vector]: /docs/components/sources/vector

@@ -51,7 +51,9 @@ Vector in the [Configuration][docs.configuration] section.
 
 Vector can be managed through the [Systemd][urls.systemd] service manager:
 
-{% page-ref page="../../../usage/administration" %}
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/docs/administration">Administration</Jump>
 
 ## Uninstalling
 

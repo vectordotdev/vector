@@ -31,7 +31,7 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log event][docs.data-model#log], [metric event][docs.data-model#metric]
+* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
@@ -59,7 +59,7 @@ simple and unified.
 * **Correct** - Obsessed with [getting the details right][docs.correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
 * **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service].
-* **Logs, Metrics, or Events** - [Logs][docs.data-model#log], [metrics][docs.data-model#metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
+* **Logs, Metrics, or Events** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
 * **Correlate Logs & Metrics** - [Derive metrics from logs][docs.transforms.log_to_metric], add shared context with [transforms][docs.transforms].
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
 * **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
@@ -117,7 +117,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`syslog`**][docs.sources.syslog] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model#log] events. |
 | [**`tcp`**][docs.sources.tcp] | Ingests data through the TCP protocol and outputs [`log`][docs.data-model#log] events. |
 | [**`udp`**][docs.sources.udp] | Ingests data through the UDP protocol and outputs [`log`][docs.data-model#log] events. |
-| [**`vector`**][docs.sources.vector] | Ingests data through another upstream Vector instance and outputs [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events. |
+| [**`vector`**][docs.sources.vector] | Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events. |
 
 [+ request a new source][urls.new_source]
 
@@ -164,7 +164,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
 | [**`statsd`**][docs.sinks.statsd] | [Streams](#streaming) [`metric`][docs.data-model#metric] events to [StatsD][urls.statsd] metrics service. |
 | [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model#log] events to a TCP connection. |
-| [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model#log] events to another downstream Vector instance. |
+| [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model#log] events to another downstream [`vector` source][docs.sources.vector]. |
 
 [+ request a new sink][urls.new_sink]
 
@@ -200,6 +200,8 @@ the License.
 [docs.correctness]: https://vector.dev/docs/about/correctness
 [docs.data-model#log]: https://vector.dev/docs/about/data-model#log
 [docs.data-model#metric]: https://vector.dev/docs/about/data-model#metric
+[docs.data-model.log]: https://vector.dev/docs/about/data-model/log
+[docs.data-model.metric]: https://vector.dev/docs/about/data-model/metric
 [docs.data_model]: https://vector.dev/docs/about/data-model
 [docs.deployment]: https://vector.dev/docs/setup/deployment
 [docs.from-archives]: https://vector.dev/docs/setup/installation/manual/from-archives

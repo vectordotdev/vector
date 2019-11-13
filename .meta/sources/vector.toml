@@ -4,7 +4,7 @@ delivery_guarantee = "best_effort"
 guides = []
 output_types = ["log", "metric"]
 resources = []
-through_description = "another upstream Vector instance"
+through_description = "another upstream [`vector` sink][docs.sinks.vector]"
 
 [sources.vector.options.address]
 type = "string"

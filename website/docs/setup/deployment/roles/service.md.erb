@@ -4,7 +4,7 @@ sidebar_label: Service
 description: Deploying and running Vector as a service
 ---
 
-<%= embed_svg("roles-service") %>
+<SVG src="/img/roles-service.svg" />
 
 When Vector serves as a service, its purpose is to efficiently receive,
 aggregate, and route data downstream. In this scenario, Vector is the primary
@@ -33,9 +33,9 @@ by adding a simple `[buffer]` table to each of your configured sinks. In
 addition, we recommend specifying an explicit `data_dir` for Vector's buffer.
 For example:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
-[[``](](`c
+<CodeHeader fileName="vector.toml" />
+
+```toml
 data_dir = "/var/lib/vector"
 
 [sinks.backups]
@@ -45,9 +45,7 @@ data_dir = "/var/lib/vector"
     [sinks.backups.buffer]
         type = "disk"
         max_size = 5000000000 # 5gb
-[[``](](`
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+```
 
 
 <Alert type="warning">
@@ -101,8 +99,6 @@ local NVME SSD drive, such as the `c5d.*` instances. The size of the disk should
 be at least 3 times your cumulative buffer size.
 
 ### Load balancing
-
-TODO: make this better
 
 If you've configured Vector to receive data over the network then you'll
 benefit from load balancing. Select sinks offer built-in load balancing,
