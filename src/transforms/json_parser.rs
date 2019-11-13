@@ -17,6 +17,7 @@ pub struct JsonParserConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub target_field: Option<String>,
+    pub overwrite_target: Option<bool>,
 }
 
 inventory::submit! {
@@ -47,6 +48,7 @@ pub struct JsonParser {
     drop_invalid: bool,
     drop_field: bool,
     target_field: Option<String>,
+    overwrite_target: bool,
 }
 
 impl From<JsonParserConfig> for JsonParser {
@@ -62,6 +64,7 @@ impl From<JsonParserConfig> for JsonParser {
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
             target_field: config.target_field.clone(),
+            overwrite_target: config.overwrite_target.unwrap_or(false),
         }
     }
 }
@@ -98,7 +101,12 @@ impl Transform for JsonParser {
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
-                    if event.as_log().contains(&target_field.as_str().into()) {
+                    let target_atom: Atom = target_field.as_str().into();
+                    let contains_target = event.as_log().contains(&target_atom);
+                    if self.overwrite_target && contains_target {
+                        event.as_mut_log().remove(&target_atom);
+                    }
+                    if !self.overwrite_target && contains_target {
                         error!(
                             message = "target field already exsists",
                             target_field = field::display(target_field)
@@ -470,5 +478,24 @@ mod test {
         assert_eq!(event[&"message".into()], message.into());
         assert_eq!(event.get(&"message.greeting".into()), None);
         assert_eq!(event.get(&"message.name".into()), None);
+    }
+
+    #[test]
+    fn target_field_overwrites_existing() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
+            target_field: Some("message".into()),
+            overwrite_target: Some(true),
+            ..Default::default()
+        });
+
+        let message = r#"{"greeting": "hello", "name": "bob"}"#;
+        let event = Event::from(message);
+        let event = parser.transform(event).unwrap();
+        let event = event.as_log();
+
+        assert_eq!(event.get(&"message".into()), None);
+        assert_eq!(event[&Atom::from("message.greeting")], "hello".into());
+        assert_eq!(event[&Atom::from("message.name")], "bob".into());
     }
 }

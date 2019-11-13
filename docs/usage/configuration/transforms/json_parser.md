@@ -38,6 +38,7 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
   
   # OPTIONAL
   field = "message" # default
+  overwrite_target = "false" # default
   target_field = "target" # no default
 ```
 {% endcode-tabs-item %}
@@ -56,6 +57,12 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
 `optional` `default: "message"` `type: string`
 
 The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+
+### overwrite_target
+
+`optional` `default: "false"` `type: bool`
+
+If `target_field` is set and the log contains a field of the same name as the target, it will only be overwritten if this is set to `true`.
 
 ### target_field
 
