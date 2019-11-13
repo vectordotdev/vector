@@ -128,7 +128,7 @@ jobs:
           docker_layer_caching: true
       - run:
           name: Test
-          command: cargo test --all --features docker -- --test-threads 4
+          command: cargo test --all --features docker --jobs 8 -- --test-threads 4
       - store_test_results:
           path: ./test-results
 
