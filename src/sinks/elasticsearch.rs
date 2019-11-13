@@ -486,7 +486,9 @@ mod tests {
         // credentials error, but that is valid too.
         match result {
             Ok(_) => (),
-            Err(err) => assert_downcast_matches!(err, ParseError, ParseError::AWSCredentialsGenerateFailed { .. }),
+            Err(err) => {
+                assert_downcast_matches!(err, ParseError, ParseError::AWSCredentialsGenerateFailed { .. })
+            }
         }
     }
 
