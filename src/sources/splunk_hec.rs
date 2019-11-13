@@ -9,8 +9,8 @@ use futures::{future, sync::mpsc, Async, Future, Sink, Stream};
 use hyper::service::Service;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde::{de, Deserialize, Serialize};
+use serde_json::{de::IoRead, json, Deserializer, Value};
 use std::sync::{Arc, Mutex};
 use std::{
     io::Read,
@@ -186,6 +186,10 @@ impl Connection {
             .map(Clone::clone)
     }
 
+    fn host(req: &Request<Body>) -> Option<HeaderValue> {
+        req.headers().get("host").map(Clone::clone)
+    }
+
     fn body_to_bytes(req: Request<Body>) -> impl Future<Item = Bytes, Error = crate::Error> {
         req.into_body()
             .map_err(|error| Box::new(error) as crate::Error)
@@ -197,8 +201,9 @@ impl Connection {
         read: impl Read,
         sink: impl Sink<SinkItem = Event, SinkError = Response<Body>>,
         channel: Option<HeaderValue>,
+        host: Option<HeaderValue>,
     ) -> impl Future<Item = Response<Body>, Error = crate::Error> {
-        EventStream::new(read, channel)
+        EventStream::new(read, channel, host)
             .forward(sink)
             .then(Self::ok_success())
     }
@@ -220,6 +225,7 @@ impl Connection {
         self.source.authorize(&req)?;
         let gzip = Self::is_gzip(&req)?;
         let channel = Self::channel(&req);
+        let host = Self::host(&req);
 
         // Construct event parser
         let sink = self.source.sink_with_shutdown();
@@ -227,13 +233,13 @@ impl Connection {
             Ok(RequestFuture::from_future(
                 Self::body_to_bytes(req)
                     .map(|bytes| GzDecoder::new(bytes.into_buf()))
-                    .and_then(move |read| Self::stream_events(read, sink, channel)),
+                    .and_then(move |read| Self::stream_events(read, sink, channel, host)),
             ))
         } else {
             Ok(RequestFuture::from_future(
                 Self::body_to_bytes(req)
                     .map(|bytes| bytes.into_buf())
-                    .and_then(move |read| Self::stream_events(read, sink, channel)),
+                    .and_then(move |read| Self::stream_events(read, sink, channel, host)),
             ))
         }
     }
@@ -246,12 +252,13 @@ impl Connection {
         let channel = Self::channel(&req).ok_or_else(|| {
             response(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL.clone())
         })?;
+        let host = Self::host(&req);
 
         // Construct raw parser
         let sink = self.source.sink_with_shutdown();
         Ok(RequestFuture::from_future(
             Self::body_to_bytes(req).and_then(move |bytes| {
-                futures::stream::once(raw_event(bytes, gzip, channel))
+                futures::stream::once(raw_event(bytes, gzip, channel, host))
                     .forward(sink)
                     .then(Self::ok_success())
             }),
@@ -267,6 +274,9 @@ impl Connection {
 
         Ok(match self.source.out.clone().poll_ready() {
             Ok(Async::Ready(())) => empty_response(StatusCode::OK),
+            // Since channel of mpsc::Sender increase by one with each sender, technically
+            // channel will never be full, and this will never be returned.
+            // This behavior dosn't fulfill one of purposes of healthcheck.
             Ok(Async::NotReady) => empty_response(StatusCode::SERVICE_UNAVAILABLE),
             Err(_) => response(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -284,17 +294,18 @@ impl Service for Connection {
     type Error = crate::Error;
     type Future = RequestFuture;
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
+        trace!(request = ?req);
         match (req.method(), req.uri().path()) {
             // Accepts multiple log messages in inline and json format
             (&Method::POST, "/services/collector/event/1.0")
             | (&Method::POST, "/services/collector/event")
             | (&Method::POST, "/services/collector") => self.event_api(req).into(),
-            // Accepts multiple log messages in raw format
+            // Accepts log message in raw format
             (&Method::POST, "/services/collector/raw/1.0")
             | (&Method::POST, "/services/collector/raw") => self.raw_api(req).into(),
             // Accepts healthcheck requests
             (&Method::GET, "/services/collector/health/1.0")
-            | (&Method::POST, "/services/collector/health") => self.health_api(req).into(),
+            | (&Method::GET, "/services/collector/health") => self.health_api(req).into(),
             // Unknown request
             _ => empty_response(StatusCode::NOT_FOUND).into(),
         }
@@ -327,6 +338,12 @@ impl Future for RequestFuture {
             }
             RequestFuture::Future(future) => return future.poll(),
         }
+        .map(|asyn| {
+            asyn.map(|response| {
+                trace!(?response);
+                response
+            })
+        })
     }
 }
 
@@ -361,14 +378,14 @@ struct EventStream<R: Read> {
 }
 
 impl<R: Read> EventStream<R> {
-    fn new(data: R, channel: Option<HeaderValue>) -> Self {
+    fn new(data: R, channel: Option<HeaderValue>, host: Option<HeaderValue>) -> Self {
         EventStream {
             data,
             events: 0,
             channel: channel.map(|value| value.as_bytes().into()),
             time: None,
             extractors: [
-                DefaultExtractor::new(&event::HOST),
+                DefaultExtractor::new_with(&event::HOST, host.map(|value| value.as_bytes().into())),
                 DefaultExtractor::new(&INDEX),
                 DefaultExtractor::new(&SOURCE),
                 DefaultExtractor::new(&SOURCETYPE),
@@ -382,23 +399,21 @@ impl<R: Read> Stream for EventStream<R> {
     type Error = Response<Body>;
     fn poll(&mut self) -> Result<Async<Option<Event>>, Response<Body>> {
         // Parse JSON object
-        let mut json = match serde_json::from_reader::<_, Value>(&mut self.data) {
-            Ok(json) => json,
-            Err(error) => {
-                return if error.is_eof() {
-                    if self.events == 0 {
-                        Err(response(
-                            StatusCode::BAD_REQUEST,
-                            splunk_response::NO_DATA.clone(),
-                        ))
-                    } else {
-                        // Assume EOF occured because data was empty
-                        Ok(Async::Ready(None))
-                    }
+        let mut json = match from_reader_take::<_, Value>(&mut self.data) {
+            Ok(Some(json)) => json,
+            Ok(None) => {
+                return if self.events == 0 {
+                    Err(response(
+                        StatusCode::BAD_REQUEST,
+                        splunk_response::NO_DATA.clone(),
+                    ))
                 } else {
-                    error!(message = "Malformed request body",%error);
-                    Err(event_error("Invalid data format", 6, self.events))
-                };
+                    Ok(Async::Ready(None))
+                }
+            }
+            Err(error) => {
+                error!(message = "Malformed request body",%error);
+                return Err(event_error("Invalid data format", 6, self.events));
             }
         };
 
@@ -485,6 +500,13 @@ impl DefaultExtractor {
         DefaultExtractor { field, value: None }
     }
 
+    fn new_with(field: &'static Atom, value: impl Into<Option<ValueKind>>) -> Self {
+        DefaultExtractor {
+            field,
+            value: value.into(),
+        }
+    }
+
     fn extract(&mut self, log: &mut LogEvent, value: &mut Value) {
         // Process json_field
         if let Some(Value::String(new_value)) = value.get_mut(self.field.as_ref()).map(Value::take)
@@ -500,7 +522,12 @@ impl DefaultExtractor {
 }
 
 /// Creates event from raw request
-fn raw_event(bytes: Bytes, gzip: bool, channel: HeaderValue) -> Result<Event, Response<Body>> {
+fn raw_event(
+    bytes: Bytes,
+    gzip: bool,
+    channel: HeaderValue,
+    host: Option<HeaderValue>,
+) -> Result<Event, Response<Body>> {
     // Process gzip
     let bytes = if gzip {
         let mut data = Vec::new();
@@ -530,6 +557,11 @@ fn raw_event(bytes: Bytes, gzip: bool, channel: HeaderValue) -> Result<Event, Re
 
     // Add channel
     log.insert_explicit(CHANNEL.clone(), channel.as_bytes().into());
+
+    // Add host
+    if let Some(host) = host {
+        log.insert_explicit(event::HOST.clone(), host.as_bytes().into());
+    }
 
     Ok(event)
 }
@@ -572,6 +604,21 @@ pub fn insert(event: &mut LogEvent, name: String, value: Value) {
     }
 }
 
+/// As serde_json::from_reader, but doesn't require that all data has to be consumed,
+/// nor that it has to exist.
+pub fn from_reader_take<R, T>(rdr: R) -> Result<Option<T>, serde_json::Error>
+where
+    R: Read,
+    T: de::DeserializeOwned,
+{
+    use serde_json::de::Read;
+    let mut reader = IoRead::new(rdr);
+    match reader.peek()? {
+        None => Ok(None),
+        Some(_) => Deserialize::deserialize(&mut Deserializer::new(reader)).map(|data| Some(data)),
+    }
+}
+
 /// Response without body
 fn empty_response(code: StatusCode) -> Response<Body> {
     let mut res = Response::default();
@@ -602,5 +649,263 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
                 splunk_response::SERVER_ERROR.clone(),
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SplunkConfig;
+    use crate::buffers::Acker;
+    use crate::runtime::Runtime;
+    use crate::sinks::splunk_hec::{Encoding, HecSinkConfig};
+    use crate::sinks::{util::Compression, Healthcheck, RouterSink};
+    use crate::test_util::{self, collect_n};
+    use crate::{
+        event::{self, Event},
+        topology::config::{GlobalOptions, SinkConfig, SourceConfig},
+    };
+    use futures::{stream, sync::mpsc, Sink};
+    use http::Method;
+    use std::net::SocketAddr;
+
+    /// Splunk token
+    const TOKEN: &'static str = "token";
+
+    const CHANNEL_CAPACITY: usize = 1000;
+
+    fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
+        test_util::trace_init();
+        let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
+        let address = test_util::next_addr();
+        rt.spawn(
+            SplunkConfig {
+                address,
+                token: TOKEN.to_owned(),
+            }
+            .build("default", &GlobalOptions::default(), sender)
+            .unwrap(),
+        );
+        (recv, address)
+    }
+
+    fn sink(
+        address: SocketAddr,
+        encoding: Encoding,
+        compression: Compression,
+    ) -> (RouterSink, Healthcheck) {
+        HecSinkConfig {
+            host: format!("http://{}", address),
+            token: TOKEN.to_owned(),
+            encoding,
+            compression: Some(compression),
+            ..HecSinkConfig::default()
+        }
+        .build(Acker::Null)
+        .unwrap()
+    }
+
+    fn start(
+        encoding: Encoding,
+        compression: Compression,
+    ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
+        let mut rt = test_util::runtime();
+        let (source, address) = source(&mut rt);
+        let (sink, health) = sink(address, encoding, compression);
+        assert!(rt.block_on(health).is_ok());
+        (rt, sink, source)
+    }
+
+    fn channel_n(
+        messages: Vec<impl Into<Event> + Send + 'static>,
+        sink: RouterSink,
+        source: mpsc::Receiver<Event>,
+        rt: &mut Runtime,
+    ) -> Vec<Event> {
+        let n = messages.len();
+        assert!(
+            n <= CHANNEL_CAPACITY,
+            "To much messages for the sink channel"
+        );
+        let pump = sink.send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
+        let _ = rt.block_on(pump).unwrap();
+        let events = rt.block_on(collect_n(source, n)).unwrap();
+
+        assert_eq!(n, events.len());
+
+        events
+    }
+
+    fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
+        send_with(address, api, Method::POST, message, TOKEN)
+    }
+
+    fn send_with(
+        address: SocketAddr,
+        api: &str,
+        method: Method,
+        message: &str,
+        token: &str,
+    ) -> u16 {
+        reqwest::Client::new()
+            .request(method, &format!("http://{}/{}", address, api))
+            .header("Authorization", format!("Splunk {}", token))
+            .header("x-splunk-request-channel", "guid")
+            .body(message.to_owned())
+            .send()
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
+    #[test]
+    fn no_compression_text_event() {
+        let message = "gzip_text_event";
+        let (mut rt, sink, source) = start(Encoding::Text, Compression::None);
+
+        let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
+
+        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+    }
+
+    #[test]
+    fn one_simple_text_event() {
+        let message = "one_simple_text_event";
+        let (mut rt, sink, source) = start(Encoding::Text, Compression::Gzip);
+
+        let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
+
+        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+    }
+
+    #[test]
+    fn multiple_simple_text_event() {
+        let n = 200;
+        let (mut rt, sink, source) = start(Encoding::Text, Compression::None);
+
+        let messages = (0..n)
+            .into_iter()
+            .map(|i| format!("multiple_simple_text_event_{}", i))
+            .collect::<Vec<_>>();
+        let events = channel_n(messages.clone(), sink, source, &mut rt);
+
+        for (msg, event) in messages.into_iter().zip(events.into_iter()) {
+            assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
+        }
+    }
+
+    #[test]
+    fn one_simple_json_event() {
+        let message = "one_simple_json_event";
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+
+        let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
+
+        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+    }
+
+    #[test]
+    fn multiple_simple_json_event() {
+        let n = 200;
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+
+        let messages = (0..n)
+            .into_iter()
+            .map(|i| format!("multiple_simple_json_event{}", i))
+            .collect::<Vec<_>>();
+        let events = channel_n(messages.clone(), sink, source, &mut rt);
+
+        for (msg, event) in messages.into_iter().zip(events.into_iter()) {
+            assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
+        }
+    }
+
+    #[test]
+    fn json_event() {
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+
+        let mut event = Event::new_empty_log();
+        event
+            .as_mut_log()
+            .insert_explicit("greeting".into(), "hello".into());
+        event
+            .as_mut_log()
+            .insert_explicit("name".into(), "bob".into());
+
+        let pump = sink.send(event);
+        let _ = rt.block_on(pump).unwrap();
+        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
+
+        assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
+        assert_eq!(event.as_log()[&"name".into()], "bob".into());
+    }
+
+    #[test]
+    fn raw() {
+        let message = "raw";
+        let mut rt = test_util::runtime();
+        let (source, address) = source(&mut rt);
+
+        assert_eq!(200, post(address, "services/collector/raw", message));
+
+        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
+        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+    }
+
+    #[test]
+    fn no_data() {
+        let mut rt = test_util::runtime();
+        let (_source, address) = source(&mut rt);
+
+        assert_eq!(400, post(address, "services/collector/event", ""));
+    }
+
+    #[test]
+    fn invalid_token() {
+        let mut rt = test_util::runtime();
+        let (_source, address) = source(&mut rt);
+
+        assert_eq!(
+            401,
+            send_with(
+                address,
+                "services/collector/event",
+                Method::POST,
+                "",
+                "nope"
+            )
+        );
+    }
+
+    #[test]
+    fn partial() {
+        let message = r#"{"event":"first"}{"event":"second""#;
+        let mut rt = test_util::runtime();
+        let (source, address) = source(&mut rt);
+
+        assert_eq!(400, post(address, "services/collector/event", message));
+
+        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
+        assert_eq!(event.as_log()[&event::MESSAGE], "first".into());
+    }
+
+    #[test]
+    fn default() {
+        let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
+        let mut rt = test_util::runtime();
+        let (source, address) = source(&mut rt);
+
+        assert_eq!(200, post(address, "services/collector/event", message));
+
+        let events = rt.block_on(collect_n(source, 3)).unwrap();
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], "first".into());
+        assert_eq!(events[0].as_log()[&"source".into()], "main".into());
+
+        assert_eq!(events[1].as_log()[&event::MESSAGE], "second".into());
+        assert_eq!(events[1].as_log()[&"source".into()], "main".into());
+
+        assert_eq!(events[2].as_log()[&event::MESSAGE], "third".into());
+        assert_eq!(events[2].as_log()[&"source".into()], "secondary".into());
     }
 }
