@@ -289,7 +289,7 @@ input[type="checkbox"] {
   vertical-align: middle;
 }
 
-input:checked {
+input[type="checkbox"]:checked {
   background-color: var(--ifm-color-primary);
   border: 1px solid var(--ifm-color-primary);
 }
@@ -942,4 +942,8 @@ html[data-theme='dark']  .menu .menu__link.menu__link--sublist::after {
 
 html[data-theme='dark'] input[type="checkbox"] {
   background: var(--ifm-color-emphasis-200);
+}
+
+html[data-theme='dark'] input[type="checkbox"]:checked {
+  background-color: var(--ifm-color-primary);
 }

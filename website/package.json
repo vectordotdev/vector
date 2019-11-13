@@ -17,7 +17,10 @@
     "prismjs": "^1.17.1",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",
-    "react-inlinesvg": "^1.1.7"
+    "react-inlinesvg": "^1.1.7",
+    "svg.js": "^2.6.2",
+    "jquery": "^3.4.1",
+    "d3-timer": "^1.0.9"
   },
   "browserslist": {
     "production": [

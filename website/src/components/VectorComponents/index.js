@@ -87,7 +87,6 @@ function VectorComponents(props) {
     map(component => component.service_provider).
     sort((a, b) => (a > b) ? 1 : -1);
 
-  console.log(components)
   serviceProvers = new Set(serviceProvers);
   serviceProvers = Array.from(serviceProvers);
 
@@ -153,6 +152,10 @@ function VectorComponents(props) {
                   <input
                     type="checkbox"
                     onChange={(event) => {
+                      history.push({
+                        pathname: '/dresses',
+                        search: '?color=blue'
+                      })
                       setOnlyAtLeastOnce(event.currentTarget.checked)
                     }}
                     checked={onlyAtLeastOnce} />

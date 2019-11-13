@@ -47,10 +47,7 @@ module.exports = {
       },
     ],
   ],
-  scripts: [
-    'https://cdnjs.cloudflare.com/ajax/libs/svg.js/2.7.1/svg.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js',
-  ],
+  scripts: [],
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
     'https://at-ui.github.io/feather-font/css/iconfont.css',

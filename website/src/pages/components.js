@@ -4,18 +4,27 @@ import VectorComponents from '@site/src/components/VectorComponents';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 
+import animatedGraph from '@site/src/exports/animatedGraph';
 import classnames from 'classnames';
 import styles from './components.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 function Components() {
+  useEffect(() => {
+    var canvas = document.querySelector("canvas");
+    animatedGraph(canvas);
+  }, []);
+
   return (
     <Layout title="Vector Components">
       <header className={classnames('hero', styles.componentsHero)}>
-        <div className="container">
-          <h1>Vector Components</h1>
-          <div className="hero__subtitle">
-            Components allow you to collect, transform, and route data with ease. <Link href="/docs/about/concepts">Learn more</Link>.
+        <div className="container container--fluid">
+          <canvas width="2000" height="300"></canvas>
+          <div className={styles.componentsHeroOverlay}>
+            <h1>Vector Components</h1>
+            <div className="hero__subtitle">
+              Components allow you to collect, transform, and route data with ease. <Link href="/docs/about/concepts">Learn more</Link>.
+            </div>
           </div>
         </div>
       </header>
