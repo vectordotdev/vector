@@ -191,9 +191,9 @@ mod tests {
     #[test]
     fn geoip_lookup_success() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
-        let event = Event::from(r#"{"remote_addr": "49.255.14.118", "request_path": "foo/bar"}"#);
+        let event = Event::from(r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoLite2-City.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
@@ -204,21 +204,21 @@ mod tests {
         let geodata_s = geodata.unwrap().to_string_lossy();
         let g: GeoipDecodedData = serde_json::from_str(&geodata_s).unwrap();
 
-        assert_eq!(g.city_name, "Sydney");
-        assert_eq!(g.country_code, "AU");
-        assert_eq!(g.continent_code, "OC");
-        assert_eq!(g.time_zone, "Australia/Sydney");
-        assert_eq!(g.latitude, "-33.8591");
-        assert_eq!(g.longitude, "151.2002");
-        assert_eq!(g.postal_code, "2000");
+        assert_eq!(g.city_name, "Boxford");
+        assert_eq!(g.country_code, "GB");
+        assert_eq!(g.continent_code, "EU");
+        assert_eq!(g.time_zone, "Europe/London");
+        assert_eq!(g.latitude, "51.75");
+        assert_eq!(g.longitude, "-1.25");
+        assert_eq!(g.postal_code, "OX1");
     }
 
     #[test]
     fn geoip_lookup_partial_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
-        let event = Event::from(r#"{"remote_addr": "8.8.8.8", "request_path": "foo/bar"}"#);
+        let event = Event::from(r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoLite2-City.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
@@ -230,11 +230,11 @@ mod tests {
         let g: GeoipDecodedData = serde_json::from_str(&geodata_s).unwrap();
 
         assert_eq!(g.city_name, "");
-        assert_eq!(g.country_code, "US");
-        assert_eq!(g.continent_code, "NA");
-        assert_eq!(g.time_zone, "America/Chicago");
-        assert_eq!(g.latitude, "37.751");
-        assert_eq!(g.longitude, "-97.822");
+        assert_eq!(g.country_code, "BT");
+        assert_eq!(g.continent_code, "AS");
+        assert_eq!(g.time_zone, "Asia/Thimphu");
+        assert_eq!(g.latitude, "27.5");
+        assert_eq!(g.longitude, "90.5");
         assert_eq!(g.postal_code, "");
     }
     #[test]
@@ -242,7 +242,7 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform(event).unwrap();
-        let reader = maxminddb::Reader::open_readfile("test-data/GeoLite2-City.mmdb").unwrap();
+        let reader = maxminddb::Reader::open_readfile("test-data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
