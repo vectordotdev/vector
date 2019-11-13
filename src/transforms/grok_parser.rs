@@ -79,14 +79,11 @@ impl Transform for GrokParser {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
 
-        let mut drop_field = self.drop_field;
         if let Some(value) = value {
             if let Some(matches) = self.pattern.match_against(&value) {
+                let drop_field = self.drop_field && !matches.get(&self.field).is_some();
                 for (name, value) in matches.iter() {
                     let name: Atom = name.into();
-                    if name == self.field {
-                        drop_field = false;
-                    }
                     let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
                         Ok(value) => event.insert_explicit(name, value),
