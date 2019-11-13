@@ -74,6 +74,33 @@ pub struct MetricBuffer {
 }
 
 impl MetricBuffer {
+    // Metric buffer is a data structure for creating normalised
+    // batched metrics data from the flow of datapoints.
+    //
+    // Batching mostly means that we will aggregate away timestamp information, and
+    // apply metric-specific compression to improve the performance of the pipeline.
+    // For example, multiple counter observations will be summed up into single observation.
+    //
+    // Normalisation is required to make sure Sources and Sinks are exchanging compatible data
+    // structures. For instance, delta gauges produced by Statsd source cannot be directly
+    // sent to Datadog API. In this case the buffer will keep the state of a gauge value, and
+    // produce absolute values gauges that are well supported by Datadog.
+    //
+    // Another example of normalisation is disaggregation of counters. Most sinks would expect we send
+    // them delta counters (e.g. how many events occured during the flush period). And most sources are
+    // producting exactly this kind of counters, with Prometheus being a notable exception. If the counter
+    // comes allready aggregated inside the source, the buffer will compare it's values with the previous
+    // known and calculate the delta.
+    //
+    // This table will summarise how metrics are transforming inside the buffer:
+    // Counter                  => Counter
+    // Gauge                    => AggregatedGauge
+    // Histogram                => AggregatedDistribution
+    // Set                      => AggregatedSet
+    // AggregatedCounter        => Counter
+    // AggregatedGauge          => AggregatedGauge
+    // AggregatedDistribution   => AggregatedDistribution
+    // AggregatedSet            => AggregatedSet
     pub fn new() -> Self {
         Self {
             state: HashSet::new(),
@@ -117,7 +144,7 @@ impl Batch for MetricBuffer {
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {
-            if entry.0.is_aggregated_gauge() {
+            if entry.0.is_aggregated_gauge() || entry.0.is_aggregated_counter() {
                 state.insert(entry.clone());
             }
         }
