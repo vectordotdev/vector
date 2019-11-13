@@ -1,13 +1,12 @@
 use super::Transform;
 
 use crate::{
-    event::Event,
+    event::{Event, ValueKind},
     topology::config::{DataType, TransformConfig},
 };
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
-use indexmap::IndexMap;
 use std::str::FromStr;
 use tracing::field;
 
@@ -24,17 +23,6 @@ pub struct Geoip {
     pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub source: Atom,
     pub target: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct GeoipDecodedData {
-    pub city_name: String,
-    pub continent_code: String,
-    pub country_code: String,
-    pub time_zone: String,
-    pub latitude: String,
-    pub longitude: String,
-    pub postal_code: String,
 }
 
 fn default_geoip_target_field() -> String {
@@ -77,12 +65,12 @@ impl Geoip {
 
 impl Transform for Geoip {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        let target_field = self.target.clone();
         let ipaddress = event
             .as_log()
             .get(&self.source)
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
-            let mut lookup_results = IndexMap::new();
             if let Ok(ip) = FromStr::from_str(ipaddress) {
                 if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
                     let city = data.city;
@@ -91,75 +79,61 @@ impl Transform for Geoip {
                         if let Some(city_names) = city_names {
                             let city_name_en = city_names.get("en");
                             if let Some(city_name_en) = city_name_en {
-                                lookup_results.insert(Atom::from("city_name"), city_name_en.into());
+                                event.as_mut_log().insert_explicit(
+                                    Atom::from(format!("{}.city_name", target_field)),
+                                    ValueKind::from(city_name_en.to_string()),
+                                );
                             }
                         }
                     }
                     let continent_code = data.continent.and_then(|c| c.code);
                     if let Some(continent_code) = continent_code {
-                        lookup_results.insert(Atom::from("continent_code"), continent_code.into());
+                        event.as_mut_log().insert_explicit(
+                            Atom::from(format!("{}.continent_code", target_field)),
+                            ValueKind::from(continent_code.to_string()),
+                        );
                     }
 
                     let iso_code = data.country.and_then(|cy| cy.iso_code);
                     if let Some(iso_code) = iso_code {
-                        lookup_results.insert(Atom::from("country_code"), iso_code.into());
+                        event.as_mut_log().insert_explicit(
+                            Atom::from(format!("{}.country_code", target_field)),
+                            ValueKind::from(iso_code.to_string()),
+                        );
                     }
 
                     let time_zone = data.location.clone().and_then(|loc| loc.time_zone);
                     if let Some(time_zone) = time_zone {
-                        lookup_results.insert(Atom::from("time_zone"), time_zone.to_string());
+                        event.as_mut_log().insert_explicit(
+                            Atom::from(format!("{}.timezone", target_field)),
+                            ValueKind::from(time_zone.to_string()),
+                        );
                     }
 
                     let latitude = data.location.clone().and_then(|loc| loc.latitude);
                     if let Some(latitude) = latitude {
-                        lookup_results.insert(Atom::from("latitude"), latitude.to_string());
+                        event.as_mut_log().insert_explicit(
+                            Atom::from(format!("{}.latitude", target_field)),
+                            ValueKind::from(latitude.to_string()),
+                        );
                     }
 
                     let longitude = data.location.clone().and_then(|loc| loc.longitude);
                     if let Some(longitude) = longitude {
-                        lookup_results.insert(Atom::from("longitude"), longitude.to_string());
+                        event.as_mut_log().insert_explicit(
+                            Atom::from(format!("{}.longitude", target_field)),
+                            ValueKind::from(longitude.to_string()),
+                        );
                     }
 
                     let postal_code = data.postal.clone().and_then(|p| p.code);
                     if let Some(postal_code) = postal_code {
-                        lookup_results.insert(Atom::from("postal_code"), postal_code.into());
+                        event.as_mut_log().insert_explicit(
+                            Atom::from(format!("{}.postal_code", target_field)),
+                            ValueKind::from(postal_code.to_string()),
+                        );
                     }
                 }
-
-                let geoipdata = GeoipDecodedData {
-                    city_name: lookup_results
-                        .get(&Atom::from("city_name"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                    continent_code: lookup_results
-                        .get(&Atom::from("continent_code"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                    country_code: lookup_results
-                        .get(&Atom::from("country_code"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                    time_zone: lookup_results
-                        .get(&Atom::from("time_zone"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                    latitude: lookup_results
-                        .get(&Atom::from("latitude"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                    longitude: lookup_results
-                        .get(&Atom::from("longitude"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                    postal_code: lookup_results
-                        .get(&Atom::from("postal_code"))
-                        .unwrap_or(&String::from(""))
-                        .to_string(),
-                };
-                event.as_mut_log().insert_explicit(
-                    Atom::from(self.target.clone()),
-                    serde_json::to_string(&geoipdata).unwrap().into(), //FIXME: handle pnic heere
-                );
             } else {
                 debug!(
                     message = "IP Address not parsed correctly.",
@@ -173,6 +147,27 @@ impl Transform for Geoip {
             );
         };
 
+        // If we have any of the geoip fields missing, we insert
+        // empty values so that we know that the transform was executed
+        // but the lookup didn't find the result
+        let geoip_fields = [
+            format!("{}.city_name", target_field),
+            format!("{}.country_code", target_field),
+            format!("{}.continent_code", target_field),
+            format!("{}.timezone", target_field),
+            format!("{}.latitude", target_field),
+            format!("{}.longitude", target_field),
+            format!("{}.postal_code", target_field),
+        ];
+        for field in geoip_fields.iter() {
+            let e = event.as_mut_log();
+            let d = e.get(&Atom::from(field.to_string()));
+            match d {
+                None => e.insert_explicit(Atom::from(field.to_string()), ValueKind::from("")),
+                _ => (),
+            }
+        }
+
         Some(event)
     }
 }
@@ -180,12 +175,12 @@ impl Transform for Geoip {
 #[cfg(test)]
 mod tests {
     use super::Geoip;
-    use super::GeoipDecodedData;
     use crate::{
         event::Event,
         transforms::json_parser::{JsonParser, JsonParserConfig},
         transforms::Transform,
     };
+    use std::collections::HashMap;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -198,19 +193,24 @@ mod tests {
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
-        let geodata_k = Atom::from("geo".to_string());
-        let geodata = new_event.as_log().get(&geodata_k);
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("city_name", "Boxford");
+        exp_geoip_attr.insert("country_code", "GB");
+        exp_geoip_attr.insert("continent_code", "EU");
+        exp_geoip_attr.insert("timezone", "Europe/London");
+        exp_geoip_attr.insert("latitude", "51.75");
+        exp_geoip_attr.insert("longitude", "-1.25");
+        exp_geoip_attr.insert("postal_code", "OX1");
 
-        let geodata_s = geodata.unwrap().to_string_lossy();
-        let g: GeoipDecodedData = serde_json::from_str(&geodata_s).unwrap();
+        for field in exp_geoip_attr.keys() {
+            let k = Atom::from(format!("geo.{}", field).to_string());
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
 
-        assert_eq!(g.city_name, "Boxford");
-        assert_eq!(g.country_code, "GB");
-        assert_eq!(g.continent_code, "EU");
-        assert_eq!(g.time_zone, "Europe/London");
-        assert_eq!(g.latitude, "51.75");
-        assert_eq!(g.longitude, "-1.25");
-        assert_eq!(g.postal_code, "OX1");
+            match exp_geoip_attr.get(field) {
+                Some(&v) => assert_eq!(geodata, v),
+                _ => assert!(false),
+            }
+        }
     }
 
     #[test]
@@ -223,20 +223,25 @@ mod tests {
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
-        let geodata_k = Atom::from("geo".to_string());
-        let geodata = new_event.as_log().get(&geodata_k);
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("city_name", "");
+        exp_geoip_attr.insert("country_code", "BT");
+        exp_geoip_attr.insert("continent_code", "AS");
+        exp_geoip_attr.insert("timezone", "Asia/Thimphu");
+        exp_geoip_attr.insert("latitude", "27.5");
+        exp_geoip_attr.insert("longitude", "90.5");
+        exp_geoip_attr.insert("postal_code", "");
 
-        let geodata_s = geodata.unwrap().to_string_lossy();
-        let g: GeoipDecodedData = serde_json::from_str(&geodata_s).unwrap();
-
-        assert_eq!(g.city_name, "");
-        assert_eq!(g.country_code, "BT");
-        assert_eq!(g.continent_code, "AS");
-        assert_eq!(g.time_zone, "Asia/Thimphu");
-        assert_eq!(g.latitude, "27.5");
-        assert_eq!(g.longitude, "90.5");
-        assert_eq!(g.postal_code, "");
+        for field in exp_geoip_attr.keys() {
+            let k = Atom::from(format!("geo.{}", field).to_string());
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            match exp_geoip_attr.get(field) {
+                Some(&v) => assert_eq!(geodata, v),
+                _ => assert!(false),
+            }
+        }
     }
+
     #[test]
     fn geoip_lookup_no_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
@@ -247,18 +252,23 @@ mod tests {
         let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
-        let geodata_k = Atom::from("geo".to_string());
-        let geodata = new_event.as_log().get(&geodata_k);
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("city_name", "");
+        exp_geoip_attr.insert("country_code", "");
+        exp_geoip_attr.insert("continent_code", "");
+        exp_geoip_attr.insert("timezone", "");
+        exp_geoip_attr.insert("latitude", "");
+        exp_geoip_attr.insert("longitude", "");
+        exp_geoip_attr.insert("postal_code", "");
 
-        let geodata_s = geodata.unwrap().to_string_lossy();
-        let g: GeoipDecodedData = serde_json::from_str(&geodata_s).unwrap();
-
-        assert_eq!(g.city_name, "");
-        assert_eq!(g.country_code, "");
-        assert_eq!(g.continent_code, "");
-        assert_eq!(g.time_zone, "");
-        assert_eq!(g.latitude, "");
-        assert_eq!(g.longitude, "");
-        assert_eq!(g.postal_code, "");
+        for field in exp_geoip_attr.keys() {
+            let k = Atom::from(format!("geo.{}", field).to_string());
+            println!("Looking for {:?}", k);
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            match exp_geoip_attr.get(field) {
+                Some(&v) => assert_eq!(geodata, v),
+                _ => assert!(false),
+            }
+        }
     }
 }
