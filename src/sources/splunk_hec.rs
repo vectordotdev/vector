@@ -3,18 +3,17 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{buf::IntoBuf, Bytes};
-use chrono::{DateTime, TimeZone, Utc};
-use codec::BytesDelimitedCodec;
+use chrono::{TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{future, sync::mpsc, Async, Future, Sink, Stream};
-use hyper::service::{service_fn_ok, Service};
-use hyper::{Body, Chunk, Method, Request, Response, Server, StatusCode, Uri};
+use hyper::service::Service;
+use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 use std::{
-    io::{self, Read},
+    io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
 use stream_cancel::{Trigger, Tripwire};
@@ -35,16 +34,33 @@ mod splunk_response {
     use serde_json::json;
     lazy_static! {
         pub static ref INVALID_AUTHORIZATION: Bytes =
-            r#"{"text":"Invalid authorization","code":3}"#.into();
-        pub static ref MISSING_CREDENTIALS: Bytes =
-            r#"{"text":"Token is required","code":2}"#.into();
-        pub static ref NO_DATA: Bytes = r#"{"text":"No data","code":5}"#.into();
-        pub static ref SUCCESS: Bytes = r#"{"text":"Success","code":0}"#.into();
-        pub static ref SERVER_ERROR: Bytes = r#"{"text":"Internal server error","code":8}"#.into();
-        pub static ref SERVER_SHUTDOWN: Bytes =
-            r#"{"text":"Server is shuting down","code":9}"#.into();
+            json!({"text":"Invalid authorization","code":3})
+                .as_str()
+                .unwrap()
+                .into();
+        pub static ref MISSING_CREDENTIALS: Bytes = json!({"text":"Token is required","code":2})
+            .as_str()
+            .unwrap()
+            .into();
+        pub static ref NO_DATA: Bytes = json!({"text":"No data","code":5}).as_str().unwrap().into();
+        pub static ref SUCCESS: Bytes = json!({"text":"Success","code":0}).as_str().unwrap().into();
+        pub static ref SERVER_ERROR: Bytes = json!({"text":"Internal server error","code":8})
+            .as_str()
+            .unwrap()
+            .into();
+        pub static ref SERVER_SHUTDOWN: Bytes = json!({"text":"Server is shuting down","code":9})
+            .as_str()
+            .unwrap()
+            .into();
         pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
-            r#"{"text":"unsupported content encoding"}"#.into();
+            json!({"text":"unsupported content encoding"})
+                .as_str()
+                .unwrap()
+                .into();
+        pub static ref NO_CHANNEL: Bytes = json!({"text":"Data channel is missing","code":10})
+            .as_str()
+            .unwrap()
+            .into();
     }
 }
 
@@ -66,8 +82,8 @@ fn default_socket_address() -> SocketAddr {
 impl SourceConfig for SplunkConfig {
     fn build(
         &self,
-        name: &str,
-        globals: &GlobalOptions,
+        _: &str,
+        _: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();
@@ -95,10 +111,10 @@ impl SourceConfig for SplunkConfig {
 }
 
 struct SplunkSource {
-    /// Sorce output
+    /// Source output
     out: mpsc::Sender<Event>,
     /// Trigger for ending http server
-    trigger: Mutex<Option<Trigger>>,
+    trigger: Arc<Mutex<Option<Trigger>>>,
 
     credentials: Bytes,
 }
@@ -108,16 +124,31 @@ impl SplunkSource {
         SplunkSource {
             credentials: format!("Splunk {}", config.token).into(),
             out,
-            trigger: Mutex::new(Some(trigger)),
+            trigger: Arc::new(Mutex::new(Some(trigger))),
         }
     }
 
-    /// Stops source
-    fn stop(&self) {
-        // If locking fails, that means someone else is closing it.
-        self.trigger.try_lock().map(|mut lock| {
-            lock.take();
-        });
+    /// Sink shutdowns this source once source output is closed
+    fn sink_with_shutdown(
+        &self,
+    ) -> impl Sink<SinkItem = Event, SinkError = Response<Body>> + 'static {
+        let trigger = self.trigger.clone();
+        self.out.clone().sink_map_err(move |_| {
+            // Sink has been closed so server should stop listening
+            trigger
+                .try_lock()
+                .map(|mut lock| {
+                    // Stopping
+                    lock.take();
+                })
+                // If locking fails, that means someone else is stopping it.
+                .ok();
+
+            response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                splunk_response::SERVER_SHUTDOWN.clone(),
+            )
+        })
     }
 
     fn authorize(&self, req: &Request<Body>) -> Result<(), Response<Body>> {
@@ -146,6 +177,113 @@ impl Connection {
             source: source.clone(),
         }
     }
+
+    fn is_gzip(req: &Request<Body>) -> Result<bool, Response<Body>> {
+        match req.headers().get("Content-Encoding") {
+            Some(s) if s.as_bytes() == b"gzip" => Ok(true),
+            Some(_) => Err(response(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                splunk_response::UNSUPPORTED_MEDIA_TYPE.clone(),
+            )),
+            None => Ok(false),
+        }
+    }
+
+    fn channel(req: &Request<Body>) -> Option<HeaderValue> {
+        // TODO: Validate GUID
+        req.headers()
+            .get("x-splunk-request-channel")
+            .map(Clone::clone)
+    }
+
+    fn body_to_bytes(req: Request<Body>) -> impl Future<Item = Bytes, Error = crate::Error> {
+        req.into_body()
+            .map_err(|error| Box::new(error) as crate::Error)
+            .concat2()
+            .map(|chunk| chunk.into_bytes())
+    }
+
+    fn stream_events(
+        read: impl Read,
+        sink: impl Sink<SinkItem = Event, SinkError = Response<Body>>,
+        channel: Option<HeaderValue>,
+    ) -> impl Future<Item = Response<Body>, Error = crate::Error> {
+        EventStream::new(read, channel)
+            .forward(sink)
+            .then(Self::ok_success())
+    }
+
+    fn ok_success<T>(
+    ) -> impl FnOnce(Result<T, Response<Body>>) -> future::FutureResult<Response<Body>, crate::Error>
+    {
+        |result| {
+            future::ok(match result {
+                Ok(_) => response(StatusCode::OK, splunk_response::SUCCESS.clone()),
+                Err(response) => response,
+            })
+        }
+    }
+
+    /// Api point corespoding to '/services/collector/event/1.0'
+    fn event_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
+        // Process header
+        self.source.authorize(&req)?;
+        let gzip = Self::is_gzip(&req)?;
+        let channel = Self::channel(&req);
+
+        // Construct event parser
+        let sink = self.source.sink_with_shutdown();
+        if gzip {
+            Ok(RequestFuture::from_future(
+                Self::body_to_bytes(req)
+                    .map(|bytes| GzDecoder::new(bytes.into_buf()))
+                    .and_then(move |read| Self::stream_events(read, sink, channel)),
+            ))
+        } else {
+            Ok(RequestFuture::from_future(
+                Self::body_to_bytes(req)
+                    .map(|bytes| bytes.into_buf())
+                    .and_then(move |read| Self::stream_events(read, sink, channel)),
+            ))
+        }
+    }
+
+    /// Api point corespoding to '/services/collector/raw/1.0'
+    fn raw_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
+        // Process header
+        self.source.authorize(&req)?;
+        let gzip = Self::is_gzip(&req)?;
+        let channel = Self::channel(&req).ok_or_else(|| {
+            response(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL.clone())
+        })?;
+
+        // Construct raw parser
+        let sink = self.source.sink_with_shutdown();
+        Ok(RequestFuture::from_future(
+            Self::body_to_bytes(req).and_then(move |bytes| {
+                futures::stream::once(raw_event(bytes, gzip, channel))
+                    .forward(sink)
+                    .then(Self::ok_success())
+            }),
+        ))
+    }
+
+    fn health_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
+        // Process header
+        self.source
+            .authorize(&req)
+            .map_err(|_| empty_response(StatusCode::BAD_REQUEST))?;
+
+        Ok(match self.source.out.clone().poll_ready() {
+            Ok(Async::Ready(())) => empty_response(StatusCode::OK),
+            Ok(Async::NotReady) => empty_response(StatusCode::SERVICE_UNAVAILABLE),
+            Err(_) => response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                splunk_response::SERVER_SHUTDOWN.clone(),
+            ),
+        }
+        .into())
+    }
 }
 
 impl Service for Connection {
@@ -158,80 +296,16 @@ impl Service for Connection {
             // Accepts multiple log messages in inline and json format
             (&Method::POST, "/services/collector/event/1.0")
             | (&Method::POST, "/services/collector/event")
-            | (&Method::POST, "/services/collector") => {
-                // Perform authorization
-                if let Err(error) = self.source.authorize(&req) {
-                    return error.into();
-                }
-
-                // Detect gzip
-                let gzip = match req.headers().get("Content-Encoding") {
-                    Some(s) if s.as_bytes() == b"gzip" => true,
-                    Some(_) => {
-                        return response(
-                            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                            splunk_response::UNSUPPORTED_MEDIA_TYPE.clone(),
-                        )
-                        .into()
-                    }
-                    None => false,
-                };
-
-                // Construct event parser
-                let source = self.source.clone();
-                let prelude = req
-                    .into_body()
-                    .map_err(|error| Box::new(error) as crate::Error)
-                    .concat2()
-                    .map(|chunk| chunk.into_bytes().into_buf());
-                let sink = source.out.clone().sink_map_err(move |_| {
-                    // Sink has been closed so server should stop listening
-                    source.stop();
-                    response(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        splunk_response::SERVER_SHUTDOWN.clone(),
-                    )
-                });
-                let finish = |result| {
-                    future::ok(match result {
-                        Ok(()) => response(StatusCode::OK, splunk_response::SUCCESS.clone()),
-                        Err(response) => response,
-                    })
-                };
-
-                // Combine parts depending on gzip
-                if gzip {
-                    RequestFuture::from_future(prelude.map(GzDecoder::new).and_then(move |read| {
-                        EventStream::new(read)
-                            .forward(sink)
-                            .map(|(_)| ())
-                            .then(finish)
-                    }))
-                } else {
-                    RequestFuture::from_future(prelude.and_then(move |read| {
-                        EventStream::new(read)
-                            .forward(sink)
-                            .map(|(_)| ())
-                            .then(finish)
-                    }))
-                }
-            }
+            | (&Method::POST, "/services/collector") => self.event_api(req).into(),
             // Accepts multiple log messages in raw format
             (&Method::POST, "/services/collector/raw/1.0")
-            | (&Method::POST, "/services/collector/raw") => {
-                unimplemented!();
-            }
+            | (&Method::POST, "/services/collector/raw") => self.raw_api(req).into(),
             // Accepts healthcheck requests
             (&Method::GET, "/services/collector/health/1.0")
-            | (&Method::POST, "/services/collector/health") => {
-                unimplemented!();
-            }
-            // Invalid request
-            _ => {
-                unimplemented!();
-            }
+            | (&Method::POST, "/services/collector/health") => self.health_api(req).into(),
+            // Unknown request
+            _ => empty_response(StatusCode::NOT_FOUND).into(),
         }
-        // Ok(Response::new(Body::empty()))
     }
 }
 
@@ -265,6 +339,21 @@ impl From<Response<Body>> for RequestFuture {
     fn from(r: Response<Body>) -> Self {
         RequestFuture::Done(Some(r))
     }
+}
+
+impl From<Result<RequestFuture, Response<Body>>> for RequestFuture {
+    fn from(r: Result<RequestFuture, Response<Body>>) -> Self {
+        match r {
+            Ok(future) => future,
+            Err(response) => response.into(),
+        }
+    }
+}
+
+fn empty_response(code: StatusCode) -> Response<Body> {
+    let mut res = Response::default();
+    *res.status_mut() = code;
+    res
 }
 
 fn response(code: StatusCode, body: impl Into<Body>) -> Response<Body> {
@@ -303,6 +392,8 @@ struct EventStream<R: Read> {
     data: R,
     /// Count of sended events
     events: usize,
+    /// Optinal channel from headers
+    channel: Option<ValueKind>,
     /// Extracted default time
     time: Option<ValueKind>,
     /// Remaining extracted default values
@@ -310,10 +401,11 @@ struct EventStream<R: Read> {
 }
 
 impl<R: Read> EventStream<R> {
-    fn new(data: R) -> Self {
+    fn new(data: R, channel: Option<HeaderValue>) -> Self {
         EventStream {
             data,
             events: 0,
+            channel: channel.map(|value| value.as_bytes().into()),
             time: None,
             extractors: [
                 DefaultExtractor::new(&event::HOST),
@@ -383,6 +475,8 @@ impl<R: Read> Stream for EventStream<R> {
         // Process channel field
         if let Some(Value::String(guid)) = json.get_mut("channel").map(Value::take) {
             log.insert_explicit(CHANNEL.clone(), guid.into());
+        } else if let Some(guid) = self.channel.as_ref() {
+            log.insert_explicit(CHANNEL.clone(), guid.clone());
         }
 
         // Process fields field
@@ -444,37 +538,39 @@ impl DefaultExtractor {
     }
 }
 
-// struct KnownRead<R: Read> {
-//     read: R,
-//     done: u64,
-//     len: u64,
-// }
+fn raw_event(bytes: Bytes, gzip: bool, channel: HeaderValue) -> Result<Event, Response<Body>> {
+    // Process gzip
+    let bytes = if gzip {
+        let mut data = Vec::new();
+        match GzDecoder::new(bytes.into_buf()).read_to_end(&mut data) {
+            Ok(0) => {
+                return Err(response(
+                    StatusCode::BAD_REQUEST,
+                    splunk_response::NO_DATA.clone(),
+                ))
+            }
+            Ok(_) => data.into(),
+            Err(error) => {
+                error!(message = "Malformed request body",%error);
+                return Err(event_error("Invalid data format", 6, 0));
+            }
+        }
+    } else {
+        bytes
+    };
 
-// impl<R: Read> KnownRead<R> {
-//     fn new(read: R, len: u64) -> Self {
-//         KnownRead { read, done: 0, len }
-//     }
+    // Construct event
+    let mut event = Event::new_empty_log();
+    let log = event.as_mut_log();
 
-//     fn is_empty(&self) -> bool {
-//         self.done >= self.len
-//     }
+    // Add message
+    log.insert_explicit(event::MESSAGE.clone(), bytes.into());
 
-//     fn done(&mut self, r: io::Result<usize>) -> io::Result<usize> {
-//         unimplemented!();
-//     }
-// }
+    // Add channel
+    log.insert_explicit(CHANNEL.clone(), channel.as_bytes().into());
 
-// impl<R: Read> io::Read for KnownRead<R> {
-//     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-//         self.done(self.read.read(buf))
-//     }
-
-//     // fn read_vectored(&mut self, bufs: &mut [IoSliceMut]) -> Result<usize> { ... }
-//     // unsafe fn initializer(&self) -> Initializer { ... }
-//     // fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> { ... }
-//     // fn read_to_string(&mut self, buf: &mut String) -> Result<usize> { ... }
-//     // fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> { ... }
-// }
+    Ok(event)
+}
 
 pub fn insert(event: &mut LogEvent, name: String, value: Value) {
     match value {

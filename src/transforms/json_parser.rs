@@ -99,7 +99,7 @@ impl Transform for JsonParser {
     }
 }
 
-pub fn insert(event: &mut Event, name: String, value: Value) {
+fn insert(event: &mut Event, name: String, value: Value) {
     match value {
         Value::String(string) => {
             event
