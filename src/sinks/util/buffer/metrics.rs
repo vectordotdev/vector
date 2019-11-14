@@ -13,23 +13,6 @@ impl Hash for MetricEntry {
         std::mem::discriminant(&self.0).hash(state);
 
         match &self.0 {
-            Metric::Counter { name, .. } | Metric::AggregatedCounter { name, .. } => {
-                name.hash(state);
-            }
-            Metric::Gauge { name, .. } | Metric::AggregatedGauge { name, .. } => {
-                name.hash(state);
-            }
-            Metric::Set { name, val, .. } => {
-                name.hash(state);
-                val.hash(state);
-            }
-            Metric::Histogram { name, val, .. } => {
-                name.hash(state);
-                val.to_bits().hash(state);
-            }
-            Metric::AggregatedDistribution { name, .. } | Metric::AggregatedSet { name, .. } => {
-                name.hash(state);
-            }
             Metric::AggregatedHistogram { name, buckets, .. } => {
                 name.hash(state);
                 for bucket in buckets {
@@ -43,6 +26,9 @@ impl Hash for MetricEntry {
                 for quantile in quantiles {
                     quantile.to_bits().hash(state);
                 }
+            }
+            other => {
+                other.name().hash(state);
             }
         }
 
@@ -93,14 +79,20 @@ impl MetricBuffer {
     // known and calculate the delta.
     //
     // This table will summarise how metrics are transforming inside the buffer:
-    // Counter                  => Counter
-    // Gauge                    => AggregatedGauge
-    // Histogram                => AggregatedDistribution
-    // Set                      => AggregatedSet
-    // AggregatedCounter        => Counter
-    // AggregatedGauge          => AggregatedGauge
-    // AggregatedDistribution   => AggregatedDistribution
-    // AggregatedSet            => AggregatedSet
+    //
+    // Normalised and accumulated metrics
+    //   Counter                  => Counter
+    //   AggregatedCounter        => Counter
+    //   Gauge                    => AggregatedGauge
+    //
+    // Deduplicated metrics
+    //   AggregatedGauge          => AggregatedGauge
+    //   AggregatedDistribution   => AggregatedDistribution
+    //   AggregatedSet            => AggregatedSet
+    //
+    // Metrics put into collections
+    //   Histogram                => AggregatedDistribution
+    //   Set                      => AggregatedSet
     pub fn new() -> Self {
         Self {
             state: HashSet::new(),
@@ -121,9 +113,78 @@ impl Batch for MetricBuffer {
         let item = item.into_metric();
 
         match &item {
+            Metric::Counter { .. } => {
+                let new = MetricEntry(item.clone());
+                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                    existing.add(&item);
+                    self.metrics.insert(MetricEntry(existing));
+                } else {
+                    self.metrics.insert(new);
+                }
+            }
+            Metric::AggregatedCounter {
+                ref name,
+                ref val,
+                ref timestamp,
+                ref tags,
+            } => {
+                let new = MetricEntry(item.clone());
+                if let Some(MetricEntry(Metric::AggregatedCounter { val: val0, .. })) =
+                    self.state.get(&new)
+                {
+                    // Counters are disaggregated. We take the previoud value from the state
+                    // and emit the difference between previous and current as a Counter
+                    let delta = MetricEntry(Metric::Counter {
+                        name: name.clone(),
+                        val: val - val0,
+                        timestamp: timestamp.clone(),
+                        tags: tags.clone(),
+                    });
+
+                    // The resulting Counters could be added up normally
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        self.metrics.insert(delta);
+                    }
+                    self.state.replace(new);
+                } else {
+                    self.state.insert(new);
+                }
+            }
+            Metric::Gauge {
+                ref name,
+                ref timestamp,
+                ref tags,
+                ..
+            } => {
+                let new = MetricEntry(item.clone().into_aggregated());
+                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                    existing.add(&item);
+                    self.metrics.insert(MetricEntry(existing));
+                } else {
+                    // If the metric is not present in active batch,
+                    // then we look it up in permanent state, where we keep track
+                    // of its values throughout the entire application uptime
+                    let mut initial = if let Some(default) = self.state.get(&new) {
+                        default.0.clone()
+                    } else {
+                        // Otherwise we start from zero value
+                        Metric::AggregatedGauge {
+                            name: name.clone(),
+                            val: 0.0,
+                            timestamp: timestamp.clone(),
+                            tags: tags.clone(),
+                        }
+                    };
+                    initial.add(&item);
+                    self.metrics.insert(MetricEntry(initial));
+                }
+            }
             metric if metric.is_aggregated() => {
                 let new = MetricEntry(item);
-                self.metrics.insert(new);
+                self.metrics.replace(new);
             }
             _ => {
                 let new = MetricEntry(item.clone().into_aggregated());
@@ -145,7 +206,7 @@ impl Batch for MetricBuffer {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {
             if entry.0.is_aggregated_gauge() || entry.0.is_aggregated_counter() {
-                state.insert(entry.clone());
+                state.replace(entry.clone());
             }
         }
 
@@ -234,37 +295,37 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-0".into(),
                     val: 0.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-0".into(),
                     val: 6.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-1".into(),
                     val: 1.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-1".into(),
                     val: 1.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-2".into(),
                     val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-3".into(),
                     val: 3.0,
                     timestamp: None,
@@ -276,13 +337,13 @@ mod test {
         assert_eq!(
             sorted(&buffer[1].clone().finish()),
             [
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-2".into(),
                     val: 2.0,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
-                Metric::AggregatedCounter {
+                Metric::Counter {
                     name: "counter-3".into(),
                     val: 3.0,
                     timestamp: None,
@@ -293,13 +354,13 @@ mod test {
     }
 
     #[test]
-    fn metric_buffer_gauges() {
-        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 4, Some(Duration::from_secs(1)));
+    fn metric_buffer_aggregated_counters() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric::Gauge {
-                name: "gauge-0".into(),
+            let event = Event::Metric(Metric::AggregatedCounter {
+                name: format!("counter-{}", i),
                 val: i as f64,
                 timestamp: None,
                 tags: Some(tag("production")),
@@ -307,7 +368,62 @@ mod test {
             events.push(event);
         }
 
-        for i in 0..5 {
+        for i in 0..4 {
+            let event = Event::Metric(Metric::AggregatedCounter {
+                name: format!("counter-{}", i),
+                val: i as f64 * 3.0,
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+        assert_eq!(buffer[0].len(), 4);
+
+        assert_eq!(
+            sorted(&buffer[0].clone().finish()),
+            [
+                Metric::Counter {
+                    name: "counter-0".into(),
+                    val: 0.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Counter {
+                    name: "counter-1".into(),
+                    val: 2.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Counter {
+                    name: "counter-2".into(),
+                    val: 4.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Counter {
+                    name: "counter-3".into(),
+                    val: 6.0,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_gauges() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for i in 1..5 {
             let event = Event::Metric(Metric::Gauge {
                 name: format!("gauge-{}", i),
                 val: i as f64,
@@ -317,7 +433,7 @@ mod test {
             events.push(event);
         }
 
-        for i in 0..5 {
+        for i in 1..5 {
             let event = Event::Metric(Metric::Gauge {
                 name: format!("gauge-{}", i),
                 val: i as f64,
@@ -333,26 +449,87 @@ mod test {
             .unwrap();
 
         let buffer = buffer.into_inner();
-        assert_eq!(buffer.len(), 3);
+        assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 4);
-        assert_eq!(buffer[1].len(), 4);
-        assert_eq!(buffer[2].len(), 3);
 
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
                 Metric::AggregatedGauge {
-                    name: "gauge-0".into(),
-                    val: 0.0,
+                    name: "gauge-1".into(),
+                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::AggregatedGauge {
-                    name: "gauge-0".into(),
+                    name: "gauge-2".into(),
+                    val: 4.0,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+                Metric::AggregatedGauge {
+                    name: "gauge-3".into(),
                     val: 6.0,
                     timestamp: None,
-                    tags: Some(tag("production")),
+                    tags: Some(tag("staging")),
                 },
+                Metric::AggregatedGauge {
+                    name: "gauge-4".into(),
+                    val: 8.0,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_aggregated_gauges() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for i in 3..6 {
+            let event = Event::Metric(Metric::AggregatedGauge {
+                name: format!("gauge-{}", i),
+                val: i as f64 * 10.0,
+                timestamp: None,
+                tags: Some(tag("staging")),
+            });
+            events.push(event);
+        }
+
+        for i in 1..4 {
+            let event = Event::Metric(Metric::Gauge {
+                name: format!("gauge-{}", i),
+                val: i as f64,
+                timestamp: None,
+                tags: Some(tag("staging")),
+            });
+            events.push(event);
+        }
+
+        for i in 2..5 {
+            let event = Event::Metric(Metric::AggregatedGauge {
+                name: format!("gauge-{}", i),
+                val: i as f64 * 2.0,
+                timestamp: None,
+                tags: Some(tag("staging")),
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+        assert_eq!(buffer[0].len(), 5);
+
+        assert_eq!(
+            sorted(&buffer[0].clone().finish()),
+            [
                 Metric::AggregatedGauge {
                     name: "gauge-1".into(),
                     val: 1.0,
@@ -361,61 +538,25 @@ mod test {
                 },
                 Metric::AggregatedGauge {
                     name: "gauge-2".into(),
-                    val: 2.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-            ]
-        );
-
-        assert_eq!(
-            sorted(&buffer[1].clone().finish()),
-            [
-                Metric::AggregatedGauge {
-                    name: "gauge-0".into(),
-                    val: 0.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::AggregatedGauge {
-                    name: "gauge-1".into(),
-                    val: 1.0,
+                    val: 4.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::AggregatedGauge {
                     name: "gauge-3".into(),
-                    val: 3.0,
+                    val: 6.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::AggregatedGauge {
                     name: "gauge-4".into(),
-                    val: 4.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-            ]
-        );
-
-        assert_eq!(
-            sorted(&buffer[2].clone().finish()),
-            [
-                Metric::AggregatedGauge {
-                    name: "gauge-2".into(),
-                    val: 2.0,
+                    val: 8.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::AggregatedGauge {
-                    name: "gauge-3".into(),
-                    val: 3.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::AggregatedGauge {
-                    name: "gauge-4".into(),
-                    val: 4.0,
+                    name: "gauge-5".into(),
+                    val: 50.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
@@ -474,7 +615,7 @@ mod test {
         let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
-        for _i in 2..6 {
+        for _ in 2..6 {
             let event = Event::Metric(Metric::Histogram {
                 name: "hist-2".into(),
                 val: 2.0,
@@ -544,7 +685,7 @@ mod test {
         let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
-        for _i in 2..5 {
+        for _ in 2..5 {
             let event = Event::Metric(Metric::AggregatedHistogram {
                 name: "buckets-2".into(),
                 buckets: vec![1.0, 2.0, 4.0],
@@ -584,8 +725,8 @@ mod test {
                 Metric::AggregatedHistogram {
                     name: "buckets-2".into(),
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1, 2, 4],
-                    count: 6,
+                    counts: vec![2, 4, 8],
+                    count: 12,
                     sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),

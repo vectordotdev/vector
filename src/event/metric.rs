@@ -107,6 +107,21 @@ impl Metric {
         }
     }
 
+    pub fn name(&self) -> &str {
+        match self {
+            Metric::Counter { name, .. } => name,
+            Metric::Gauge { name, .. } => name,
+            Metric::Histogram { name, .. } => name,
+            Metric::Set { name, .. } => name,
+            Metric::AggregatedCounter { name, .. } => name,
+            Metric::AggregatedGauge { name, .. } => name,
+            Metric::AggregatedSet { name, .. } => name,
+            Metric::AggregatedDistribution { name, .. } => name,
+            Metric::AggregatedHistogram { name, .. } => name,
+            Metric::AggregatedSummary { name, .. } => name,
+        }
+    }
+
     pub fn is_aggregated(&self) -> bool {
         match self {
             Metric::Counter { .. } => false,
@@ -181,6 +196,9 @@ impl Metric {
 
     pub fn add(&mut self, other: &Self) {
         match (self, other) {
+            (Metric::Counter { ref mut val, .. }, Metric::Counter { val: inc, .. }) => {
+                *val += *inc;
+            }
             (Metric::AggregatedCounter { ref mut val, .. }, Metric::Counter { val: inc, .. }) => {
                 *val += *inc;
             }
