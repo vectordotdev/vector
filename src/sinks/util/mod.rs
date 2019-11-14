@@ -2,6 +2,7 @@ pub mod batch;
 pub mod buffer;
 pub mod http;
 pub mod retries;
+pub mod service;
 pub mod tls;
 
 use crate::buffers::Acker;
@@ -17,6 +18,7 @@ pub use batch::{Batch, BatchSink};
 pub use buffer::metrics::MetricBuffer;
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use service::ServiceBuilderExt;
 
 pub trait SinkExt<T>
 where
