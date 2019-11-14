@@ -758,6 +758,41 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+# Accepts `log` events and allows you to concat (substrings) of other fields to a new one.
+[transforms.concat]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `concat`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "concat"
+  type = "concat"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # A list of substring definitons in the format of source_field[start..end]. For
+  # both start and end negative values are counted from the end of thestring.
+  # 
+  # * required
+  # * type: [string]
+  items = ["fist[..3]", "second[-5..]", "third[3..6]"]
+
+  # The string that is used to join all items.
+  # 
+  # * required
+  # * type: string
+  joiner = " "
+
+  # The name for the new label.
+  # 
+  # * required
+  # * type: string
+  target = "dest_field_name"
+
 # Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which

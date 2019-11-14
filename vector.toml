@@ -1,0 +1,17 @@
+data_dir = "/tmp/vector"
+
+[sources.in]
+  type = "stdin"
+
+[transforms.test]
+  inputs = ["in"]
+  type = "concat"
+
+  target = "test"
+  joiner = " "
+  items = ["message", "host[1..5]"]
+
+[sinks.out]
+  inputs   = ["test"]
+  type     = "console"
+  encoding = "text"

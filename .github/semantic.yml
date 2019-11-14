@@ -62,6 +62,7 @@ scopes:
   - add_tags transform
   - ansi_stripper transform
   - coercer transform
+  - concat transform
   - field_filter transform
   - geoip transform
   - grok_parser transform

@@ -152,6 +152,8 @@ module.exports = {
             
               "reference/transforms/coercer",
             
+              "reference/transforms/concat",
+            
               "reference/transforms/field_filter",
             
               "reference/transforms/geoip",
