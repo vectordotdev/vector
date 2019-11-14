@@ -492,7 +492,7 @@ When `true` Vector will read from the beginning of new files, when `false` Vecto
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 For example:

@@ -10,17 +10,14 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-<%- if if component.source? -%>
-<%- component.output.log -%>
-## Output (log)
+<%- if component.source? -%>
+## Output
 
+<%- if component.output.log -%>
 <%= source_output(:log, component.output.log, heading_depth: 3) %>
-
-<%- end -%>
-<%- if component.output.metric -%>
-## Output (metric)
-
+<%- else -%>
 <%= source_output(:metric, component.output.metric, heading_depth: 3) %>
+<%- end -%>
 
 <%- end -%>
 <%- elsif component.sink? && component.output -%>

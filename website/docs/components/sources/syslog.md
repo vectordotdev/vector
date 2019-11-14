@@ -193,7 +193,7 @@ The unix socket path. *This should be absolute path.*
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 For example:

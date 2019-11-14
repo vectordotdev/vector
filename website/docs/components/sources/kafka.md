@@ -214,7 +214,7 @@ The Kafka topics names to read events from. Regex is supported if the topic begi
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 For example:

@@ -139,7 +139,7 @@ The maximum bytes size of incoming messages before they are discarded.
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 

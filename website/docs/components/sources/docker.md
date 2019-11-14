@@ -112,7 +112,7 @@ A list of container ids to match against when filtering running containers. This
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 For example:

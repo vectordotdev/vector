@@ -164,7 +164,7 @@ The list of units names to monitor. If empty or not present, all units are accep
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 

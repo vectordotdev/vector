@@ -163,7 +163,7 @@ The timeout before a connection is forcefully closed during shutdown.
 
 </Fields>
 
-## Output (log)
+## Output
 
 This component outputs [`log` events][docs.data-model.log].
 
