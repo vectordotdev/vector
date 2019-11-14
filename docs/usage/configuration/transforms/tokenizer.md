@@ -83,7 +83,7 @@ Key/Value pairs representing mapped log field types.
 
 `required` `type: string`
 
-A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
 
 The field is an enumeration and only accepts the following values:
 
@@ -93,7 +93,7 @@ The field is an enumeration and only accepts the following values:
 | `"float"` | Coerce to a 64 bit float. |
 | `"int"` | Coerce to a 64 bit integer. |
 | `"string"` | Coerce to a string. |
-| `"timestamp"` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
+| `"timestamp"` | Coerces to a Vector timestamp. [`strptime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Input/Output
 
