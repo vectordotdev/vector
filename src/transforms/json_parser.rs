@@ -6,7 +6,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -107,10 +106,7 @@ impl Transform for JsonParser {
                         event.as_mut_log().remove(&target_atom);
                     }
                     if !self.overwrite_target && contains_target {
-                        error!(
-                            message = "target field already exsists",
-                            target_field = field::display(target_field)
-                        );
+                        error!(message = "target field already exsists", %target_field);
                     } else {
                         for (name, value) in object {
                             insert(&mut event, format!("{}.{}", target_field, name), value);
