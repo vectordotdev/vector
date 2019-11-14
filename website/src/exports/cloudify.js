@@ -1,3 +1,6 @@
+let $ = null;
+let SVG = null;
+
 if (typeof document !== 'undefined') {
   $ = require('cash-dom');
   SVG = require('svg.js');
