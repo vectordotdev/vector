@@ -60,6 +60,42 @@ vector list
 By default this prints a human readable representation of all components. You
 can view options for customizing the output of `list` with `vector list --help`.
 
+## Configuration
+
+In order to assist with writing a Vector configuration file it's possible to
+generate one containing a custom set of components with the subcommand
+`generate`:
+
+{% tabs %}
+{% tab title="List" %}
+```bash
+vector generate 'stdin|json_parser,add_fields|console'
+```
+{% endtab %}
+{% endtabs %}
+
+The format of a generate expression is three comma-separated lists of sources,
+transforms and sinks respectively, separated by pipes. If subsequent component
+types are not needed then their pipes can be omitted from the expression.
+
+Here are some examples:
+
+- `|json_parser` prints a `json_parser` transform.
+- `||file,http` prints a `file` and `http` sink.
+- `stdin||http` prints a `stdin` source and an `http` sink.
+
+Vector makes a best attempt at constructing a sensible topology. The first
+transform generated will consume from all sources and subsequent transforms
+will consume from their predecessor. All sinks will consume from the last
+transform or, if none are specified, from all sources. It is then up to you to
+restructure the `inputs` of each component to build the topology you need.
+
+Generated components are given incremental names (`source1`, `source2`, etc)
+which should be replaced in order to provide better context.
+
+You can view options for customizing the output of `generate` with
+`vector generate --help`.
+
 ## Daemonizing
 
 Vector does not _directly_ offer a way to daemonize the Vector process. We
