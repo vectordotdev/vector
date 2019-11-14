@@ -18,8 +18,6 @@ function Download() {
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
   const {containers, package_managers: packageManagers, operating_systems: operatingSystems} = installation;
 
-  console.log(containers)
-
   return (
     <Layout title="Download Vector">
       <header className={classnames('hero', styles.downloadHeroBanner)}>

@@ -11,8 +11,10 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 function Components(props) {
   useEffect(() => {
-    let canvas = document.querySelector("canvas");
-    animatedGraph(canvas);
+    if (typeof document !== 'undefined') {
+      let canvas = document.querySelector("canvas");
+      animatedGraph(canvas);
+    }
   }, []);
 
   return (

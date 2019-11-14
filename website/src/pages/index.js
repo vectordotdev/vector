@@ -345,10 +345,8 @@ function Home() {
   const {siteConfig = {}} = context;
   const {metadata: {latest_release}} = siteConfig.customFields;
 
-  console.log(latest_release)
-
   useEffect(() => {
-    cloudify();
+    //cloudify();
   }, []);
 
   return (

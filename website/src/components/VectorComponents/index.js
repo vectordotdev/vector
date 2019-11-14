@@ -95,7 +95,7 @@ function Components({components, headingLevel, titles}) {
   }
 }
 
-function FilterList({label, values, currentState, setState}) {
+function FilterList({label, icon, values, currentState, setState}) {
   if (values.size == 0)
     return null;
 
@@ -121,7 +121,7 @@ function FilterList({label, values, currentState, setState}) {
               setState(newValues);
             }}
             checked={currentState.has(value)} />
-          {humanizeString(value)}
+          {humanizeString(value)} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
         </label>
       ))}
     </span>
@@ -262,6 +262,7 @@ function VectorComponents(props) {
           </span>
           <FilterList
             label="Service Providers"
+            icon="cloud"
             values={serviceProviders}
             currentState={onlyProviders}
             setState={setOnlyProviders} />

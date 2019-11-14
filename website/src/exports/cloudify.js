@@ -1,7 +1,7 @@
-import $ from 'cash-dom';
-
-if (typeof document !== 'undefined')
+if (typeof document !== 'undefined') {
+  $ = require('cash-dom');
   SVG = require('svg.js');
+}
 
 export default function cloudify() {
   var SVG_INSTANCE = SVG('component-canvas').size('100%', '100%')
