@@ -306,6 +306,19 @@ impl Service for Connection {
             // Accepts healthcheck requests
             (&Method::GET, "/services/collector/health/1.0")
             | (&Method::GET, "/services/collector/health") => self.health_api(req).into(),
+            // Accepts querying for options
+            (&Method::OPTIONS, "/services/collector/event/1.0")
+            | (&Method::OPTIONS, "/services/collector/event")
+            | (&Method::OPTIONS, "/services/collector")
+            | (&Method::OPTIONS, "/services/collector/raw/1.0")
+            | (&Method::OPTIONS, "/services/collector/raw") => {
+                empty_response_with_header(StatusCode::OK, &[("Allow", "POST")]).into()
+            }
+            // Accepts querying for options
+            (&Method::OPTIONS, "/services/collector/health/1.0")
+            | (&Method::OPTIONS, "/services/collector/health") => {
+                empty_response_with_header(StatusCode::OK, &[("Allow", "GET")]).into()
+            }
             // Unknown request
             _ => empty_response(StatusCode::NOT_FOUND).into(),
         }
@@ -336,7 +349,7 @@ impl Future for RequestFuture {
             RequestFuture::Done(done) => {
                 Ok(Async::Ready(done.take().expect("cannot poll Future twice")))
             }
-            RequestFuture::Future(future) => return future.poll(),
+            RequestFuture::Future(future) => future.poll(),
         }
         .map(|asyn| {
             asyn.map(|response| {
@@ -431,6 +444,7 @@ impl<R: Read> Stream for EventStream<R> {
                     log.insert_explicit(event::MESSAGE.clone(), string.into())
                 }
                 Value::Object(object) => {
+                    trace!("Inserting json event");
                     if object.is_empty() {
                         return Err(event_error("Event field cannot be blank", 13, self.events));
                     }
@@ -463,14 +477,30 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process time field
         let parsed_time = match json.get_mut("time").map(Value::take) {
-            Some(Value::Number(time)) => Some(time.as_u64()),
-            Some(Value::String(time)) => Some(time.parse::<u64>().ok()),
+            Some(Value::Number(time)) => Some(Some(time)),
+            Some(Value::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
             _ => None,
         };
         match parsed_time {
             None => (),
-            Some(Some(t)) => self.time = Some(Utc.timestamp(t as i64, 0).into()),
-            Some(None) => return Err(event_error("Invalid data format", 6, self.events)),
+            Some(Some(t)) => {
+                if let Some(t) = t.as_u64() {
+                    self.time = Some(Utc.timestamp(t as i64, 0).into());
+                } else if let Some(t) = t.as_f64() {
+                    self.time = Some(
+                        Utc.timestamp(
+                            t.floor() as i64,
+                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                        )
+                        .into(),
+                    );
+                } else {
+                    return Err(event_error("Invalid data format", 6, self.events));
+                }
+            }
+            Some(None) => {
+                return Err(event_error("Invalid data format", 6, self.events));
+            }
         }
 
         // Add time field
@@ -623,6 +653,20 @@ where
 fn empty_response(code: StatusCode) -> Response<Body> {
     let mut res = Response::default();
     *res.status_mut() = code;
+    res
+}
+
+/// Response without body
+fn empty_response_with_header(
+    code: StatusCode,
+    header: &[(&'static str, &'static str)],
+) -> Response<Body> {
+    let mut res = Response::default();
+    *res.status_mut() = code;
+    let headers = res.headers_mut();
+    for &(key, value) in header {
+        headers.insert(key, HeaderValue::from_static(value));
+    }
     res
 }
 
