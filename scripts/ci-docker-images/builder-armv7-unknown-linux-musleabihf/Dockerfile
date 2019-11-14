@@ -321,7 +321,7 @@ ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target $TARGET"
 
 # Set default Cargo target
 RUN mkdir -p ~/.cargo
-RUN echo -e "[build]\ntarget = \"$TARGET\"" > ~/.cargo/config
+RUN printf "[build]\ntarget = \"$TARGET\"\n" > ~/.cargo/config
 
 # In case of non-native target, install QEMU-user to enable running `cargo test`
 RUN if [ -n "$GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
