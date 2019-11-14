@@ -1,10 +1,10 @@
 # A version like "1.38.0" or "nightly-2019-11-01".
-ARG RUST_VERSION=1.39.0
+ARG RUST_VERSION=1.38.0
 # We use Clang and libc++ from LLVM. The commit should match the one
 # used by Rust. For each Rust version it can be found here
 # https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
 # submodule "llvm-project". Example "71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5".
-ARG LLVM_GIT_COMMIT=8adf9bdccfefb8d03f0e8db3b012fb41da1580a4
+ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
@@ -23,7 +23,7 @@ ARG LLVM_TARGET="ARM"
 # Example: "arm-linux-gnueabihf".
 ARG GNU_TARGET="arm-linux-gnueabihf"
 
-ARG LTO="lto"
+ARG LTO=""
 
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
@@ -282,7 +282,7 @@ ARG RUST_PREFIX
 ENV RUSTUP_HOME=$RUST_PREFIX
 ENV CARGO_HOME=$RUST_PREFIX
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --default-toolchain $RUST_VERSION --target "$TARGET"
+  sh -s -- -y --default-toolchain $RUST_VERSION --target $TARGET
 ENV PATH="$RUST_PREFIX/bin:$PATH"
 
 ARG CLANG_PREFIX
@@ -315,10 +315,6 @@ ENV AR_x86_64_unknown_linux_gnu=/usr/bin/ar
 
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
 
-# # Set up environment for pkg-config
-# ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
-# ENV PKG_CONFIG_ALLOW_CROSS=1
-
 # Set up environment variables for Rust bindgen
 # See https://github.com/rust-lang/rust-bindgen/issues/1229#issuecomment-473493753
 ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target $TARGET"
@@ -329,3 +325,6 @@ RUN echo -e "[build]\ntarget = \"$TARGET\"" > ~/.cargo/config
 
 # In case of non-native target, install QEMU-user to enable running `cargo test`
 RUN if [ -n "$GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
+
+# Add dependencies for running tests
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
