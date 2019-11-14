@@ -109,6 +109,8 @@ function FilterList({label, icon, values, currentState, setState}) {
       {valuesArray.map((value, idx) => {
         let label = typeof value === 'string' ? humanizeString(value) : value;
 
+        console.log(label);
+
         return (
           <label key={idx}>
             <input
@@ -200,17 +202,17 @@ function VectorComponents(props) {
   // Filter options
   //
 
-  let serviceProviders =
+  const serviceProvidersArr =
     components.filter(component => component.service_provider).
     map(component => component.service_provider).
     sort((a, b) => (a > b) ? 1 : -1);
-  serviceProviders = new Set(serviceProviders);
+  const serviceProviders = new Set(serviceProvidersArr);
 
-  let functionCategories =
+  const functionCategoriesArr =
     components.filter(component => component.function_category).
     map(component => component.function_category).
     sort((a, b) => (a > b) ? 1 : -1);
-  functionCategories = new Set(functionCategories);
+  const functionCategories = new Set(functionCategoriesArr);
 
   //
   // Rendering

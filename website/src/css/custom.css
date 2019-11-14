@@ -513,20 +513,20 @@ input[type="text"]:focus {
   margin-left: calc( var(--ifm-navbar-item-padding-horizontal) * 0.5 );
 }
 .navbar .navbar__item .badge {
+  border-color: var(--ifm-background-color) !important;
   border-radius: 1em;
   display: block;
   float: right;
   font-size: 0.6em;
-  margin-top: -0.5em;
+  margin-top: -0.7em;
   margin-right: -1.5em;
-  margin-left: -0.5em;
-  padding: 0.2em 0.4em;
+  margin-left: -0.8em;
+  padding: 0.25em 0.5em;
   position: relative;
   z-index: 1;
 }
 .navbar .navbar__item .badge--default {
   background: var(--ifm-navbar-link-color);
-  border-color: var(--ifm-navbar-link-color);
   color: var(--ifm-background-color);
 }
 
