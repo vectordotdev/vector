@@ -107,9 +107,7 @@ function FilterList({label, icon, values, currentState, setState}) {
         {label}
       </div>
       {valuesArray.map((value, idx) => {
-        let label = humanizeString(value);
-        console.log(value);
-        console.log(label);
+        let label = typeof value === 'string' ? humanizeString(value) : value;
 
         return (
           <label key={idx}>
