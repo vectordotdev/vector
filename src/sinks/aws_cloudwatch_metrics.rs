@@ -168,16 +168,28 @@ impl CloudWatchMetricsSvc {
                     dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
                 }),
-                Metric::Histogram {
+                Metric::AggregatedDistribution {
                     name,
-                    val,
-                    sample_rate,
+                    values,
+                    sample_rates,
                     timestamp,
                     tags,
                 } => Some(MetricDatum {
                     metric_name: name.to_string(),
-                    values: Some(vec![val]),
-                    counts: Some(vec![f64::from(sample_rate)]),
+                    values: Some(values),
+                    counts: Some(sample_rates.into_iter().map(f64::from).collect()),
+                    timestamp: timestamp.map(timestamp_to_string),
+                    dimensions: tags.map(tags_to_dimensions),
+                    ..Default::default()
+                }),
+                Metric::AggregatedSet {
+                    name,
+                    values,
+                    timestamp,
+                    tags,
+                } => Some(MetricDatum {
+                    metric_name: name.to_string(),
+                    value: Some(values.len() as f64),
                     timestamp: timestamp.map(timestamp_to_string),
                     dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
@@ -358,11 +370,11 @@ mod tests {
     }
 
     #[test]
-    fn encode_events_histogram() {
-        let events = vec![Metric::Histogram {
+    fn encode_events_distribution() {
+        let events = vec![Metric::AggregatedDistribution {
             name: "latency".into(),
-            val: 11.0,
-            sample_rate: 100,
+            values: vec![11.0, 12.0],
+            sample_rates: vec![100, 50],
             timestamp: None,
             tags: None,
         }];
@@ -373,8 +385,30 @@ mod tests {
                 namespace: "vector".into(),
                 metric_data: vec![MetricDatum {
                     metric_name: "latency".into(),
-                    values: Some(vec![11.0]),
-                    counts: Some(vec![100.0]),
+                    values: Some(vec![11.0, 12.0]),
+                    counts: Some(vec![100.0, 50.0]),
+                    ..Default::default()
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn encode_events_set() {
+        let events = vec![Metric::AggregatedSet {
+            name: "users".into(),
+            values: vec!["alice".into(), "bob".into()].into_iter().collect(),
+            timestamp: None,
+            tags: None,
+        }];
+
+        assert_eq!(
+            svc().encode_events(events),
+            PutMetricDataInput {
+                namespace: "vector".into(),
+                metric_data: vec![MetricDatum {
+                    metric_name: "users".into(),
+                    value: Some(2.0),
                     ..Default::default()
                 }],
             }
@@ -444,12 +478,12 @@ mod integration_tests {
             events.push(event);
         }
 
-        let histogram_name = random_string(10);
+        let distribution_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::Histogram {
-                name: format!("histogram-{}", histogram_name),
-                val: i as f64,
-                sample_rate: 100,
+            let event = Event::Metric(Metric::AggregatedDistribution {
+                name: format!("distribution-{}", distribution_name),
+                values: vec![i as f64],
+                sample_rates: vec![100],
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
             });
