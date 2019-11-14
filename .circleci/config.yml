@@ -196,6 +196,23 @@ jobs:
           paths:
             - "*-x86_64-unknown-linux-musl.tar.gz"
 
+  build-armv7-unknown-linux-musleabihf-archive:
+    docker:
+      - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: Build archive
+          command: |
+            export RUST_LTO="lto"
+            export TARGET="armv7-unknown-linux-musleabihf"
+            make build-archive
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*-armv7-unknown-linux-musleabihf.tar.gz"
+
   #
   # Checks
   #
@@ -580,6 +597,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-generate
     - test-stable
     - build-x86_64-unknown-linux-musl-archive
+    - build-armv7-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
@@ -614,6 +632,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
+      - build-armv7-unknown-linux-musleabihf-archive
       - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:
@@ -672,6 +691,8 @@ workflows:
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
           <<: *release-filters
       - build-x86_64-unknown-linux-musl-archive:
+          <<: *release-filters
+      - build-armv7-unknown-linux-musleabihf-archive:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
@@ -762,6 +783,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
+      - build-armv7-unknown-linux-musleabihf-archive
       - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:
