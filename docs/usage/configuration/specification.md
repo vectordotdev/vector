@@ -702,7 +702,7 @@ data_dir = "/var/lib/vector"
 
   [transforms.coercer.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -793,7 +793,7 @@ data_dir = "/var/lib/vector"
 
   [transforms.grok_parser.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1011,7 +1011,7 @@ end
 
   [transforms.regex_parser.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1160,7 +1160,7 @@ end
 
   [transforms.split.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1221,7 +1221,7 @@ end
 
   [transforms.tokenizer.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
