@@ -199,8 +199,6 @@ jobs:
   build-armv7-unknown-linux-musleabihf-archive:
     machine:
       docker_layer_caching: true
-    docker:
-      - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
     resource_class: xlarge
     steps:
       - checkout
