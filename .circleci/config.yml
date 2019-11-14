@@ -209,6 +209,7 @@ jobs:
               --privileged \
               -e RUST_LTO="lto" \
               -e TARGET="armv7-unknown-linux-musleabihf" \
+              -e FEATURES="default rdkafka/cmake_build" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
               -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
