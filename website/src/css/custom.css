@@ -805,6 +805,10 @@ html[data-theme='dark'] .navbar__brand img {
 html[data-theme='dark'] .navbar__sidebar__backdrop {
   background: var(--ifm-color-emphasis-100);
 }
+html[data-theme='dark'] .navbar .navbar__item .badge--default {
+  background: var(--ifm-color-emphasis-100);
+  color: var(--ifm-panel-color);
+}
 
 html[data-theme='dark']  div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) .badge {
   background: rgba(var(--ifm-color-primary-rgb), 0.2);

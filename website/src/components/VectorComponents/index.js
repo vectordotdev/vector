@@ -99,7 +99,7 @@ function FilterList({label, icon, values, currentState, setState}) {
   if (values.size == 0)
     return null;
 
-  const valuesArray = [...values];
+  const valuesArray = Array.from(values);
 
   return (
     <span className="vector-components--filters--section">
