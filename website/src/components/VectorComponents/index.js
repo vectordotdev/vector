@@ -145,18 +145,6 @@ function VectorComponents(props) {
   if (props.sinks || props.sinks == undefined) components = components.concat(Object.values(sinks));
   components = components.sort((a, b) => (a.name > b.name) ? 1 : -1);
 
-  let serviceProviders =
-    components.filter(component => component.service_provider).
-    map(component => component.service_provider).
-    sort((a, b) => (a > b) ? 1 : -1);
-  serviceProviders = new Set(serviceProviders);
-
-  let functionCategories =
-    components.filter(component => component.function_category).
-    map(component => component.function_category).
-    sort((a, b) => (a > b) ? 1 : -1);
-  functionCategories = new Set(functionCategories);
-
   //
   // State
   //
@@ -203,6 +191,22 @@ function VectorComponents(props) {
   if (onlyProviders.size > 0) {
     components = components.filter(component => onlyProviders.has(component.service_provider) );
   }
+
+  //
+  // Filter options
+  //
+
+  let serviceProviders =
+    components.filter(component => component.service_provider).
+    map(component => component.service_provider).
+    sort((a, b) => (a > b) ? 1 : -1);
+  serviceProviders = new Set(serviceProviders);
+
+  let functionCategories =
+    components.filter(component => component.function_category).
+    map(component => component.function_category).
+    sort((a, b) => (a > b) ? 1 : -1);
+  functionCategories = new Set(functionCategories);
 
   //
   // Rendering
