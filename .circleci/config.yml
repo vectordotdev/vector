@@ -197,6 +197,8 @@ jobs:
             - "*-x86_64-unknown-linux-musl.tar.gz"
 
   build-armv7-unknown-linux-musleabihf-archive:
+    machine:
+      docker_layer_caching: true
     docker:
       - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
     resource_class: xlarge
@@ -205,9 +207,14 @@ jobs:
       - run:
           name: Build archive
           command: |
-            export RUST_LTO="lto"
-            export TARGET="armv7-unknown-linux-musleabihf"
-            make build-archive
+            docker run \
+              --privileged \
+              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
+              -e RUST_LTO="lto" \
+              -e TARGET="armv7-unknown-linux-musleabihf" \
+              -w "$PWD" \
+              -v "$PWD":"$PWD" \
+              make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:

@@ -328,3 +328,6 @@ RUN if [ -n "$GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user;
 
 # Add dependencies for running tests
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
+
+COPY builder-armv7-unknown-linux-musleabihf/start.sh /start.sh
+ENTRYPOINT ["/start.sh"]
