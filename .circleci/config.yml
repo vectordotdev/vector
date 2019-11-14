@@ -199,7 +199,7 @@ jobs:
   build-armv7-unknown-linux-musleabihf-archive:
     machine:
       docker_layer_caching: true
-    resource_class: xlarge
+    resource_class: large # xlarge is not supported with "machine" executor
     steps:
       - checkout
       - run:
