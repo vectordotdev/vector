@@ -174,5 +174,3 @@ nightly = []
 [[bench]]
 name = "bench"
 harness = false
-[profile.release]
-lto = true
