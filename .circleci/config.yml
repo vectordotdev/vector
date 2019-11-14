@@ -207,11 +207,11 @@ jobs:
           command: |
             docker run \
               --privileged \
-              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
               -e RUST_LTO="lto" \
               -e TARGET="armv7-unknown-linux-musleabihf" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
+              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
               make build-archive
       - persist_to_workspace:
           root: target/artifacts
