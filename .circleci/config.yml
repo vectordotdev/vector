@@ -597,7 +597,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-generate
     - test-stable
     - build-x86_64-unknown-linux-musl-archive
-    - build-armv7-unknown-linux-musl-archive
+    - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-apple-darwin-archive
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
