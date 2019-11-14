@@ -81,6 +81,7 @@ impl Transform for GrokParser {
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern.match_against(&value) {
+                let drop_field = self.drop_field && !matches.get(&self.field).is_some();
                 for (name, value) in matches.iter() {
                     let name: Atom = name.into();
                     let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
@@ -97,7 +98,7 @@ impl Transform for GrokParser {
                     }
                 }
 
-                if self.drop_field {
+                if drop_field {
                     event.remove(&self.field);
                 }
             } else {
@@ -251,6 +252,24 @@ mod tests {
             "rawrequest": "",
             "response": 200,
             "bytes": 4263,
+        });
+
+        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+    }
+
+    #[test]
+    fn grok_parser_does_not_drop_parsed_message_field() {
+        let event = parse_log(
+            "12/Dec/2015:18:32:56 +0100 42",
+            "%{HTTPDATE:timestamp} %{NUMBER:message}",
+            None,
+            true,
+            &[],
+        );
+
+        let expected = json!({
+            "timestamp": "12/Dec/2015:18:32:56 +0100",
+            "message": "42",
         });
 
         assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());

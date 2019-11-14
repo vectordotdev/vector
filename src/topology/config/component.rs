@@ -1,7 +1,16 @@
 use inventory;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::marker::PhantomData;
 use toml::Value;
+
+#[derive(Debug, Snafu, Clone, PartialEq)]
+pub enum ExampleError {
+    #[snafu(display("unable to create an example for this component"))]
+    MissingExample,
+    #[snafu(display("component type '{}' does not exist", type_str))]
+    DoesNotExist { type_str: String },
+}
 
 /// Describes a component plugin storing its type name, an example config, and
 /// other useful information about the plugin.
@@ -50,14 +59,14 @@ where
     }
 
     /// Returns an example config for a plugin identified by its type.
-    pub fn example(type_str: &str) -> Result<Value, String> {
+    pub fn example(type_str: &str) -> Result<Value, ExampleError> {
         inventory::iter::<ComponentDescription<T>>
             .into_iter()
             .find(|t| t.type_str == type_str)
-            .ok_or(format!("unrecognized type '{}'", type_str))
-            .and_then(|t| {
-                (t.example_value)().ok_or(format!("example not found for type '{}'", type_str))
+            .ok_or(ExampleError::DoesNotExist {
+                type_str: type_str.to_owned(),
             })
+            .and_then(|t| (t.example_value)().ok_or(ExampleError::MissingExample))
     }
 
     /// Returns a sorted Vec of all plugins registered of a type.

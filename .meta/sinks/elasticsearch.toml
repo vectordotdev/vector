@@ -26,8 +26,8 @@ description = "The `doc_type` for your index data. This is only relevant for Ela
 [sinks.elasticsearch.options.host]
 type = "string"
 examples = ["http://10.24.32.122:9000"]
-null = false
-description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
+null = true
+description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
 
 [sinks.elasticsearch.options.index]
 type = "string"

@@ -22,3 +22,23 @@ null = false
 description = """\
 The log field to decode as JSON. Must be a `string` value type.\
 """
+
+[transforms.json_parser.options.overwrite_target]
+type = "bool"
+null = true
+default = "false"
+description = """\
+If `target_field` is set and the log contains a field of the same name \
+as the target, it will only be overwritten if this is set to `true`.\
+"""
+
+[transforms.json_parser.options.target_field]
+type = "string"
+null = true
+examples = ["target"]
+description = """\
+If this setting is present, the parsed JSON will be inserted into the \
+log as a sub-object with this name. \
+If a field with the same name already exists, the parser will fail and \
+produce an error.\
+"""
