@@ -47,5 +47,6 @@ mod test {
         assert_eq!("dogs", interpolate("${FOO:-cats}", &vars));
         assert_eq!("dogcats", interpolate("${NOT:-dogcats}", &vars));
         assert_eq!("dogs and cats", interpolate("${NOT:-dogs and cats}", &vars));
+        assert_eq!("${:-cats}", interpolate("${:-cats}", &vars));
     }
 }
