@@ -838,6 +838,23 @@ data_dir = "/var/lib/vector"
   # * type: string
   field = "message"
 
+  # If `target_field` is set and the log contains a field of the same name as the
+  # target, it will only be overwritten if this is set to `true`.
+  # 
+  # * optional
+  # * default: "false"
+  # * type: bool
+  overwrite_target = "false"
+
+  # If this setting is present, the parsed JSON will be inserted into the log as
+  # a sub-object with this name. If a field with the same name already exists,
+  # the parser will fail and produce an error.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  target_field = "target"
+
 # Accepts `log` events and allows you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
