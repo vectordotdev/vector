@@ -61,7 +61,7 @@ module PostProcessors
 
         if definition.start_with?("/")
           if !in_website?
-            definition = DOCS_HOST + definition.gsub(/\.md$/, "")
+            definition = HOST + definition.gsub(/\.md$/, "")
           end
         end
 

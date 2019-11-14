@@ -101,7 +101,7 @@ class Links
 
   def fetch_id(id)
     # Docusaurus does not allow a leading `/`
-    fetch(id).gsub(/^\//, "")
+    fetch(id).gsub(/^#{DOCS_BASE_PATH}\//, "")
   end
 
   private

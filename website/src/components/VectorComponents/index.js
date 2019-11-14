@@ -107,7 +107,6 @@ function FilterList({label, icon, values, currentState, setState}) {
         {label}
       </div>
       {valuesArray.map((value, idx) => {
-        console.log(value);
         let label = humanizeString(value);
 
         return (

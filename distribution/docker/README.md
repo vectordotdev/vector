@@ -119,17 +119,17 @@ docker run timberio/vector:nightly-alpine
 ```
 
 
-[docs.administration]: https://vector.dev/docs/docs/administration
-[docs.configuration]: https://vector.dev/docs/docs/setup/configuration
-[docs.correctness]: https://vector.dev/docs/docs/about/correctness
-[docs.deployment]: https://vector.dev/docs/docs/setup/deployment
-[docs.performance]: https://vector.dev/docs/docs/about/performance
-[docs.roles.agent]: https://vector.dev/docs/docs/setup/deployment/roles/agent
-[docs.roles.service]: https://vector.dev/docs/docs/setup/deployment/roles/service
-[docs.sinks]: https://vector.dev/docs/docs/components/sinks
-[docs.sources]: https://vector.dev/docs/docs/components/sources
-[docs.transforms]: https://vector.dev/docs/docs/components/transforms
-[docs.use_cases]: https://vector.dev/docs/docs/use_cases
+[docs.administration]: https://vector.dev/docs/administration
+[docs.configuration]: https://vector.dev/docs/setup/configuration
+[docs.correctness]: https://vector.dev/docs/about/correctness
+[docs.deployment]: https://vector.dev/docs/setup/deployment
+[docs.performance]: https://vector.dev/docs/about/performance
+[docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent
+[docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service
+[docs.sinks]: https://vector.dev/docs/components/sinks
+[docs.sources]: https://vector.dev/docs/components/sources
+[docs.transforms]: https://vector.dev/docs/components/transforms
+[docs.use_cases]: https://vector.dev/docs/use_cases
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian

@@ -494,6 +494,7 @@ input[type="text"]:focus {
   display: inline-block;
   font-family: monospace;
   font-size: 0.5rem;
+  font-weight: bold;
   height: 1rem;
   line-height: 1rem;
   margin-right: 2px;
@@ -504,8 +505,29 @@ input[type="text"]:focus {
   bottom: auto;
   top: 0.75rem;
 }
+
 .navbar .navbar__items--right {
   flex-grow: 2;
+}
+.navbar .navbar__items--right .react-toggle {
+  margin-left: calc( var(--ifm-navbar-item-padding-horizontal) * 0.5 );
+}
+.navbar .navbar__item .badge {
+  border-radius: 1em;
+  display: block;
+  float: right;
+  font-size: 0.6em;
+  margin-top: -0.5em;
+  margin-right: -1.5em;
+  margin-left: -0.5em;
+  padding: 0.2em 0.4em;
+  position: relative;
+  z-index: 1;
+}
+.navbar .navbar__item .badge--default {
+  background: var(--ifm-navbar-link-color);
+  border-color: var(--ifm-navbar-link-color);
+  color: var(--ifm-background-color);
 }
 
 .pagination-nav .pagination-nav__link {
