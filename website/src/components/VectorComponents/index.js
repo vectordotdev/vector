@@ -4,11 +4,14 @@ import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
 import classnames from 'classnames';
-import humanizeString from 'humanize-string';
 import queryString from 'query-string';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
+
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
 
 function Component({delivery_guarantee, description, event_types, name, status, type}) {
   let path = null;
@@ -121,7 +124,7 @@ function FilterList({label, icon, values, currentState, setState}) {
               setState(newValues);
             }}
             checked={currentState.has(value)} />
-          {humanizeString(value)} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
+          {capitalizeFirstLetter(value)} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
         </label>
       ))}
     </span>

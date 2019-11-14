@@ -346,7 +346,7 @@ function Home() {
   const {metadata: {latest_release}} = siteConfig.customFields;
 
   useEffect(() => {
-    //cloudify();
+    cloudify();
   }, []);
 
   return (
