@@ -57,19 +57,18 @@ pub struct TransformOuter {
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
-    pub sources: IndexMap<String, Value>,
-    pub transforms: IndexMap<String, TransformOuter>,
-    pub sinks: IndexMap<String, SinkOuter>,
+    pub sources: Option<IndexMap<String, Value>>,
+    pub transforms: Option<IndexMap<String, TransformOuter>>,
+    pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let components: Vec<Vec<String>> = opts
+    let components: Vec<Vec<_>> = opts
         .expression
         .split('|')
         .map(|s| {
-            s.to_owned()
-                .split(',')
-                .map(|s| s.trim().to_owned())
+            s.split(',')
+                .map(|s| s.trim())
                 .filter(|s| s.len() > 0)
                 .collect()
         })
@@ -80,84 +79,100 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let mut errs = Vec::new();
 
-    let mut i = 0;
     let mut source_names = Vec::new();
-    components
-        .get(0)
-        .unwrap_or(&Vec::new())
-        .iter()
-        .for_each(|c| {
-            i += 1;
+    if let Some(source_types) = components.get(0) {
+        let mut sources = IndexMap::new();
+
+        for (i, source_type) in source_types.iter().enumerate() {
             let name = format!("source{}", i);
             source_names.push(name.clone());
-            config.sources.insert(name, {
-                let mut d = SourceDescription::example(c)
-                    .map_err(|e| {
-                        match e {
-                            ExampleError::MissingExample => {}
-                            _ => errs.push(e.clone()),
-                        }
-                        e
-                    })
-                    .unwrap_or(Value::Table(BTreeMap::new()));
-                d.as_table_mut().map(|s| {
-                    s.insert("type".to_owned(), c.to_owned().into());
-                    s
-                });
-                d
-            });
-        });
 
-    i = 0;
+            let mut example = match SourceDescription::example(source_type) {
+                Ok(example) => example,
+                Err(err) => {
+                    if err != ExampleError::MissingExample {
+                        errs.push(err);
+                    }
+                    Value::Table(BTreeMap::new())
+                }
+            };
+            example
+                .as_table_mut()
+                .expect("examples are always tables")
+                .insert("type".into(), source_type.to_owned().into());
+
+            sources.insert(name, example);
+        }
+
+        if sources.len() > 0 {
+            config.sources = Some(sources);
+        }
+    }
+
     let mut transform_names = Vec::new();
-    components
-        .get(1)
-        .unwrap_or(&Vec::new())
-        .iter()
-        .for_each(|c| {
-            i += 1;
+    if let Some(transform_types) = components.get(1) {
+        let mut transforms = IndexMap::new();
+
+        for (i, transform_type) in transform_types.iter().enumerate() {
             let name = format!("transform{}", i);
             transform_names.push(name.clone());
-            let targets = if i == 1 {
+
+            let targets = if i == 0 {
                 source_names.clone()
             } else {
                 vec![transform_names
-                    .get(i - 2)
+                    .get(i - 1)
                     .unwrap_or(&"TODO".to_owned())
                     .to_owned()]
             };
-            config.transforms.insert(
+
+            let mut example = match TransformDescription::example(transform_type) {
+                Ok(example) => example,
+                Err(err) => {
+                    if err != ExampleError::MissingExample {
+                        errs.push(err);
+                    }
+                    Value::Table(BTreeMap::new())
+                }
+            };
+            example
+                .as_table_mut()
+                .expect("examples are always tables")
+                .insert("type".into(), transform_type.to_owned().into());
+
+            transforms.insert(
                 name,
                 TransformOuter {
                     inputs: targets,
-                    inner: {
-                        let mut d = TransformDescription::example(c)
-                            .map_err(|e| {
-                                match e {
-                                    ExampleError::MissingExample => {}
-                                    _ => errs.push(e.clone()),
-                                }
-                                e
-                            })
-                            .unwrap_or(Value::Table(BTreeMap::new()));
-                        d.as_table_mut().map(|s| {
-                            s.insert("type".to_owned(), c.to_owned().into());
-                            s
-                        });
-                        d
-                    },
+                    inner: example,
                 },
             );
-        });
+        }
 
-    i = 0;
-    components
-        .get(2)
-        .unwrap_or(&Vec::new())
-        .iter()
-        .for_each(|c| {
-            i += 1;
-            config.sinks.insert(
+        if transforms.len() > 0 {
+            config.transforms = Some(transforms);
+        }
+    }
+
+    if let Some(sink_types) = components.get(2) {
+        let mut sinks = IndexMap::new();
+
+        for (i, sink_type) in sink_types.iter().enumerate() {
+            let mut example = match SinkDescription::example(sink_type) {
+                Ok(example) => example,
+                Err(err) => {
+                    if err != ExampleError::MissingExample {
+                        errs.push(err);
+                    }
+                    Value::Table(BTreeMap::new())
+                }
+            };
+            example
+                .as_table_mut()
+                .expect("examples are always tables")
+                .insert("type".into(), sink_type.to_owned().into());
+
+            sinks.insert(
                 format!("sink{}", i),
                 SinkOuter {
                     inputs: transform_names
@@ -173,25 +188,15 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                         .unwrap_or(vec!["TODO".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
                     healthcheck: true,
-                    inner: {
-                        let mut d = SinkDescription::example(c)
-                            .map_err(|e| {
-                                match e {
-                                    ExampleError::MissingExample => {}
-                                    _ => errs.push(e.clone()),
-                                }
-                                e
-                            })
-                            .unwrap_or(Value::Table(BTreeMap::new()));
-                        d.as_table_mut().map(|s| {
-                            s.insert("type".to_owned(), c.to_owned().into());
-                            s
-                        });
-                        d
-                    },
+                    inner: example,
                 },
             );
-        });
+        }
+
+        if sinks.len() > 0 {
+            config.sinks = Some(sinks);
+        }
+    }
 
     if errs.len() > 0 {
         errs.iter().for_each(|e| eprintln!("Generate error: {}", e));

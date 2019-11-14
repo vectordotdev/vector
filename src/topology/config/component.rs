@@ -4,7 +4,7 @@ use snafu::Snafu;
 use std::marker::PhantomData;
 use toml::Value;
 
-#[derive(Debug, Snafu, Clone)]
+#[derive(Debug, Snafu, Clone, PartialEq)]
 pub enum ExampleError {
     #[snafu(display("unable to create an example for this component"))]
     MissingExample,
