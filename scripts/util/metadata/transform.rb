@@ -39,7 +39,7 @@ class Transform < Component
             "float" => "Coerce to a 64 bit float.",
             "int" => "Coerce to a 64 bit integer.",
             "string" => "Coerce to a string.",
-            "timestamp" => "Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string."
+            "timestamp" => "Coerces to a Vector timestamp. [`strptime` specificiers][urls.strftime_specifiers] must be used to parse the string."
           },
           "examples" => [
             {"name" => "status", "value" => "int"},
@@ -48,9 +48,9 @@ class Transform < Component
             {"name" => "timestamp", "value" => "timestamp|%s", "comment" => "unix"},
             {"name" => "timestamp", "value" => "timestamp|%+", "comment" => "iso8601 (date and time)"},
             {"name" => "timestamp", "value" => "timestamp|%F", "comment" => "iso8601 (date)"},
-            {"name" => "timestamp", "value" => "timestamp|%a %b %e %T %Y", "comment" => "custom strftime format"},
+            {"name" => "timestamp", "value" => "timestamp|%a %b %e %T %Y", "comment" => "custom strptime format"},
           ],
-          "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.",
+          "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.",
           "null" => false,
           "simple" => true,
           "type" => "string"
