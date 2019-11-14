@@ -36,7 +36,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "kafka" # example, must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"] # example
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
 ```
 
 </TabItem>
@@ -50,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "kafka" # example, must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"] # example
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
   
   # OPTIONAL
   auto_offset_reset = "smallest" # default
@@ -192,7 +192,7 @@ The Kafka session timeout in milliseconds.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["topic-1","topic-2","^(prefix1|prefix2)-.+"]]}
+  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
   name={"topics"}
   nullable={false}
   path={null}

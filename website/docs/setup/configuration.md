@@ -122,14 +122,22 @@ with the following syntax:
 
 ```toml
 [transforms.add_host]
-    type = "add_fields"
+  type = "add_fields"
     
-    [transforms.add_host.fields]
-        host = "${HOSTNAME}"
+  [transforms.add_host.fields]
+    host = "${HOSTNAME}"
+    environment = "${ENV:-development}" # default value when not present
 ```
 
-The entire `${HOSTNAME}` variable will be replaced, hence the requirement of
+import Alert from '@site/src/components/Alert';
+
+<Alert type="info">
+
+Interpolation is done before parsing the configuration file. As such, the
+entire `${ENV_VAR}` variable will be replaced, hence the requirement of
 quotes around the definition.
+
+</Alert>
 
 #### Escaping
 

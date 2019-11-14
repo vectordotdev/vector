@@ -520,7 +520,7 @@ input[type="text"]:focus {
   font-size: 0.6em;
   margin-top: -0.7em;
   margin-right: -1.5em;
-  margin-left: -0.8em;
+  margin-left: -0.5em;
   padding: 0.25em 0.5em;
   position: relative;
   z-index: 1;

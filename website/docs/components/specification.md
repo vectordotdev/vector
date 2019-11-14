@@ -326,7 +326,7 @@ data_dir = "/var/lib/vector"
   # 
   # * required
   # * type: [string]
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.
