@@ -14,7 +14,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
 
 ```toml
 [sources.my_source_id]

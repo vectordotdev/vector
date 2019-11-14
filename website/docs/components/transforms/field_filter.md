@@ -14,7 +14,7 @@ The `field_filter` transform accepts [`log`][docs.data-model#log] and [`metric`]
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
 
 ```toml
 [transforms.my_transform_id]

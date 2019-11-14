@@ -1,6 +1,6 @@
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-export default function useBaseUrl(url) {
+export default function repoUrl(url) {
   const {siteConfig} = useDocusaurusContext();
   const githubHost = siteConfig.githubHost || 'github.com';
 

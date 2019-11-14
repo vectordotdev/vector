@@ -4,18 +4,19 @@ module.exports = {
       type: 'category',
       label: 'About',
       items: [
-        'what_is_vector',
-        'about/concepts',
+        "docs/about",
+        "docs/about/what-is-vector",
+        "docs/about/concepts",
         {
           type: 'category',
           label: 'Data Model',
           items: [
-            "about/data-model",
-            "about/data-model/log",
-            "about/data-model/metric",
+            "docs/about/data-model",
+            "docs/about/data-model/log",
+            "docs/about/data-model/metric",
           ]
         },
-        'about/guarantees',
+        "docs/about/guarantees",
       ],
     },
     {
@@ -26,65 +27,65 @@ module.exports = {
           type: 'category',
           label: 'Installation',
           items: [
-            "setup/installation",
+            "docs/setup/installation",
             {
               type: 'category',
-              label: 'Platforms',
+              label: 'Containers',
               items: [
-                "setup/installation/containers",
-                  "setup/installation/containers/docker",
+                "docs/setup/installation/containers",
+                  "docs/setup/installation/containers/docker",
               ],
             },
             {
               type: 'category',
               label: 'Package Managers',
               items: [
-                "setup/installation/package-managers",
-                  "setup/installation/package-managers/dpkg",
-                  "setup/installation/package-managers/homebrew",
-                  "setup/installation/package-managers/rpm",
+                "docs/setup/installation/package-managers",
+                  "docs/setup/installation/package-managers/dpkg",
+                  "docs/setup/installation/package-managers/homebrew",
+                  "docs/setup/installation/package-managers/rpm",
               ],
             },
             {
               type: 'category',
               label: 'Operating Systems',
               items: [
-                "setup/installation/operating-systems",
-                  "setup/installation/operating-systems/amazon-linux",
-                  "setup/installation/operating-systems/centos",
-                  "setup/installation/operating-systems/debian",
-                  "setup/installation/operating-systems/macos",
-                  "setup/installation/operating-systems/rhel",
-                  "setup/installation/operating-systems/ubuntu",
+                "docs/setup/installation/operating-systems",
+                  "docs/setup/installation/operating-systems/amazon-linux",
+                  "docs/setup/installation/operating-systems/centos",
+                  "docs/setup/installation/operating-systems/debian",
+                  "docs/setup/installation/operating-systems/macos",
+                  "docs/setup/installation/operating-systems/rhel",
+                  "docs/setup/installation/operating-systems/ubuntu",
               ],
             },
             {
               type: 'category',
               label: 'Manual',
               items: [
-                "setup/installation/manual",
-                "setup/installation/manual/from-archives",
-                "setup/installation/manual/from-source",              
+                "docs/setup/installation/manual",
+                "docs/setup/installation/manual/from-archives",
+                "docs/setup/installation/manual/from-source",              
               ],
             },
           ],
         },
-        "setup/configuration",
+        "docs/setup/configuration",
         {
           type: 'category',
           label: 'Deployment',
           items: [
-            "setup/deployment",
+            "docs/setup/deployment",
             {
               type: 'category',
               label: 'Roles',
               items: [
-                "setup/deployment/roles",
-                "setup/deployment/roles/agent",
-                "setup/deployment/roles/service",
+                "docs/setup/deployment/roles",
+                "docs/setup/deployment/roles/agent",
+                "docs/setup/deployment/roles/service",
               ]
             },
-            "setup/deployment/topologies",
+            "docs/setup/deployment/topologies",
           ]
         },
       ],
@@ -93,32 +94,32 @@ module.exports = {
       type: 'category',
       label: 'Components',
       items: [
-        "components",
+        "docs/components",
         {
           type: 'category',
           label: 'Sources',
           items: [
-            "components/sources",
+            "docs/components/sources",
             
-              "components/sources/docker",
+              "docs/components/sources/docker",
             
-              "components/sources/file",
+              "docs/components/sources/file",
             
-              "components/sources/journald",
+              "docs/components/sources/journald",
             
-              "components/sources/kafka",
+              "docs/components/sources/kafka",
             
-              "components/sources/statsd",
+              "docs/components/sources/statsd",
             
-              "components/sources/stdin",
+              "docs/components/sources/stdin",
             
-              "components/sources/syslog",
+              "docs/components/sources/syslog",
             
-              "components/sources/tcp",
+              "docs/components/sources/tcp",
             
-              "components/sources/udp",
+              "docs/components/sources/udp",
             
-              "components/sources/vector",
+              "docs/components/sources/vector",
             
           ]
         },
@@ -126,35 +127,35 @@ module.exports = {
           type: 'category',
           label: 'Transforms',
           items: [
-            "components/transforms",
+            "docs/components/transforms",
             
-              "components/transforms/add_fields",
+              "docs/components/transforms/add_fields",
             
-              "components/transforms/add_tags",
+              "docs/components/transforms/add_tags",
             
-              "components/transforms/coercer",
+              "docs/components/transforms/coercer",
             
-              "components/transforms/field_filter",
+              "docs/components/transforms/field_filter",
             
-              "components/transforms/grok_parser",
+              "docs/components/transforms/grok_parser",
             
-              "components/transforms/json_parser",
+              "docs/components/transforms/json_parser",
             
-              "components/transforms/log_to_metric",
+              "docs/components/transforms/log_to_metric",
             
-              "components/transforms/lua",
+              "docs/components/transforms/lua",
             
-              "components/transforms/regex_parser",
+              "docs/components/transforms/regex_parser",
             
-              "components/transforms/remove_fields",
+              "docs/components/transforms/remove_fields",
             
-              "components/transforms/remove_tags",
+              "docs/components/transforms/remove_tags",
             
-              "components/transforms/sampler",
+              "docs/components/transforms/sampler",
             
-              "components/transforms/split",
+              "docs/components/transforms/split",
             
-              "components/transforms/tokenizer",
+              "docs/components/transforms/tokenizer",
             
           ]
         },
@@ -162,41 +163,41 @@ module.exports = {
           type: 'category',
           label: 'Sinks',
           items: [
-            "components/sinks",
+            "docs/components/sinks",
             
-              "components/sinks/aws_cloudwatch_logs",
+              "docs/components/sinks/aws_cloudwatch_logs",
             
-              "components/sinks/aws_cloudwatch_metrics",
+              "docs/components/sinks/aws_cloudwatch_metrics",
             
-              "components/sinks/aws_kinesis_streams",
+              "docs/components/sinks/aws_kinesis_streams",
             
-              "components/sinks/aws_s3",
+              "docs/components/sinks/aws_s3",
             
-              "components/sinks/blackhole",
+              "docs/components/sinks/blackhole",
             
-              "components/sinks/clickhouse",
+              "docs/components/sinks/clickhouse",
             
-              "components/sinks/console",
+              "docs/components/sinks/console",
             
-              "components/sinks/datadog_metrics",
+              "docs/components/sinks/datadog_metrics",
             
-              "components/sinks/elasticsearch",
+              "docs/components/sinks/elasticsearch",
             
-              "components/sinks/file",
+              "docs/components/sinks/file",
             
-              "components/sinks/http",
+              "docs/components/sinks/http",
             
-              "components/sinks/kafka",
+              "docs/components/sinks/kafka",
             
-              "components/sinks/prometheus",
+              "docs/components/sinks/prometheus",
             
-              "components/sinks/splunk_hec",
+              "docs/components/sinks/splunk_hec",
             
-              "components/sinks/statsd",
+              "docs/components/sinks/statsd",
             
-              "components/sinks/tcp",
+              "docs/components/sinks/tcp",
             
-              "components/sinks/vector",
+              "docs/components/sinks/vector",
             
           ],
         },
@@ -206,19 +207,19 @@ module.exports = {
       type: 'category',
       label: 'Administration',
       items: [
-        "administration/process-management",
-        "administration/monitoring",
-        "administration/tuning",
-        "administration/updating",
-        "administration/validating",
-        "administration/env-vars",
+        "docs/administration/process-management",
+        "docs/administration/monitoring",
+        "docs/administration/tuning",
+        "docs/administration/updating",
+        "docs/administration/validating",
+        "docs/administration/env-vars",
       ],
     },
     {
       type: 'category',
       label: 'Meta',
       items: [
-        "meta/glossary",
+        "docs/meta/glossary",
       ],
     },
   ]

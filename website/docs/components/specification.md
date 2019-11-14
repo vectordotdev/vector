@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# /setup/configuration
+# /docs/setup/configuration
 
 # ------------------------------------------------------------------------------
 # Global

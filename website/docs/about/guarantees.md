@@ -29,7 +29,7 @@ be configured to use `disk` based buffers:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
 
 ```toml
 [sinks.my_sink_id]
@@ -122,11 +122,11 @@ keep you in the loop if this ever changes.
 
 ### How can I find components that meet these guarantees?
 
-Head over to the [components section][docs.components] and use the guarantee
+Head over to the [components section][pages.components] and use the guarantee
 filters.
 
 
-[docs.components]: /docs/components
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.sinks]: /docs/components/sinks
+[pages.components]: /components
 [urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

@@ -33,12 +33,15 @@ include Printer
 # Constants
 #
 
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s
+HOST = "https://vector.dev"
+DOCS_BASE_PATH = "/docs"
 
+ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s
+WEBSITE_ROOT = File.join(ROOT_DIR, "website")
 ASSETS_ROOT = File.join(ROOT_DIR, "website", "static")
 DOCS_ROOT = File.join(ROOT_DIR, "website", "docs")
+DOCS_HOST = "#{HOST}#{DOCS_BASE_PATH}"
 META_ROOT = File.join(ROOT_DIR, ".meta")
+PAGES_ROOT = File.join(ROOT_DIR, "website", "src", "pages")
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
 PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials")
-
-DOCS_BASE_PATH = "/docs"

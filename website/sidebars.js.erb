@@ -4,8 +4,9 @@ module.exports = {
       type: 'category',
       label: 'About',
       items: [
-        'what_is_vector',
-        'about/concepts',
+        <%= metadata.links.fetch_id("docs.about").to_json %>,
+        <%= metadata.links.fetch_id("docs.what-is-vector").to_json %>,
+        <%= metadata.links.fetch_id("docs.concepts").to_json %>,
         {
           type: 'category',
           label: 'Data Model',
@@ -15,7 +16,7 @@ module.exports = {
             <%= metadata.links.fetch_id("docs.data-model.metric").to_json %>,
           ]
         },
-        'about/guarantees',
+        <%= metadata.links.fetch_id("docs.guarantees").to_json %>,
       ],
     },
     {
@@ -29,7 +30,7 @@ module.exports = {
             <%= metadata.links.fetch_id("docs.installation").to_json %>,
             {
               type: 'category',
-              label: 'Platforms',
+              label: 'Containers',
               items: [
                 <%= metadata.links.fetch_id("docs.installation.containers").to_json %>,
                 <%- metadata.installation.containers.each do |container| -%>

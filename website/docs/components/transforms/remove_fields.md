@@ -14,7 +14,7 @@ The `remove_fields` transform accepts [`log`][docs.data-model#log] events and al
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
 
 ```toml
 [transforms.my_transform_id]

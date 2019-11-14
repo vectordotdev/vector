@@ -33,26 +33,90 @@ module.exports = {
       darkTheme: require('prism-react-renderer/themes/dracula'),
     },
     footer: {
-      style: 'dark',
       links: [
+        {
+          title: 'About',
+          items: [
+            {
+              label: 'Sources',
+              to: 'docs/components/sources',
+            },
+            {
+              label: 'Transforms',
+              to: 'docs/components/trasnforms',
+            },
+            {
+              label: 'Sinks',
+              to: 'docs/components/sinks',
+            },
+          ],
+        },
+        {
+          title: 'Components',
+          items: [
+            {
+              label: 'Sources',
+              to: 'docs/components/sources',
+            },
+            {
+              label: 'Transforms',
+              to: 'docs/components/trasnforms',
+            },
+            {
+              label: 'Sinks',
+              to: 'docs/components/sinks',
+            },
+          ],
+        },
         {
           title: 'Docs',
           items: [
             {
-              label: 'Introduction',
-              to: 'docs/introduction',
+              label: 'Install',
+              to: 'docs/setup/installation',
             },
             {
-              label: 'Installation',
-              to: 'docs/installation',
+              label: 'Deployment',
+              to: 'docs/setup/deployment',
             },
             {
-              label: 'Migration from v1 to v2',
-              to: 'docs/migrating-from-v1-to-v2',
+              label: 'Configuration',
+              to: 'docs/setup/configuration',
+            },
+            {
+              label: 'Administration',
+              to: 'docs/administration',
             },
           ],
         },
-      ]
+        {
+          title: 'Community',
+          items: [
+            {
+              label: 'Chat',
+              to: 'https://chat.vector.dev',
+            },
+            {
+              label: 'Github',
+              to: 'https://github.com/timberio/vector',
+            },
+            {
+              label: 'Mailing List',
+              to: 'mailing-list',
+            },
+            {
+              label: 'Blog',
+              to: '/blog',
+            },
+          ],
+        },
+      ],
+      logo: {
+        alt: 'Timber.io',
+        src: '/img/timber-logo.png',
+        href: 'https://timber.io/',
+      },
+      copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
     }
   },
   presets: [

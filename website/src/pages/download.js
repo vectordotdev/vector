@@ -33,7 +33,7 @@ function Download() {
               block={true}
               defaultValue="latest"
               values={[
-                { label: 'Latest', value: 'latest', },
+                { label: `Latest (${latestRelease.version})`, value: 'latest', },
                 { label: 'Nightly', value: 'nightly', },
               ]
             }>

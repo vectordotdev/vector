@@ -19,7 +19,7 @@ pipelines, allowing you to ingest, transform, and send data.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/components">View All Components</Jump>
+<Jump to="/components">View All Components</Jump>
 
 ### Sources
 

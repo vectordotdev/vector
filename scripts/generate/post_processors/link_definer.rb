@@ -8,8 +8,6 @@ module PostProcessors
   #
   # See the `Links` class for more info on how links are resoolved.
   class LinkDefiner
-    DOCS_HOST = "https://vector.dev#{DOCS_BASE_PATH}"
-    
     class << self
       def define!(*args)
         new(*args).define!
@@ -62,9 +60,7 @@ module PostProcessors
         definition = links.fetch(link_id)
 
         if definition.start_with?("/")
-          if in_docs?
-            definition = "#{DOCS_BASE_PATH}#{definition}"
-          else
+          if !in_website?
             definition = DOCS_HOST + definition.gsub(/\.md$/, "")
           end
         end
@@ -72,8 +68,8 @@ module PostProcessors
         definition
       end
 
-      def in_docs?
-        @file_path.start_with?(DOCS_ROOT)
+      def in_website?
+        @file_path.start_with?(WEBSITE_ROOT)
       end
 
       def verify_no_direct_links!
