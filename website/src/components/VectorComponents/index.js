@@ -108,6 +108,8 @@ function FilterList({label, icon, values, currentState, setState}) {
       </div>
       {valuesArray.map((value, idx) => {
         let label = humanizeString(value);
+        console.log(value);
+        console.log(label);
 
         return (
           <label key={idx}>
@@ -124,7 +126,7 @@ function FilterList({label, icon, values, currentState, setState}) {
                 setState(newValues);
               }}
               checked={currentState.has(value)} />
-            {humanizeString(value)} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
+            {label} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
           </label>
         );
       })}
