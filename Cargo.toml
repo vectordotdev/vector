@@ -106,7 +106,7 @@ toml = "0.4"
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
-leveldb = { version = "0.8.4", optional = true }
+leveldb = { git = "https://github.com/timberio/leveldb", optional = true }
 db-key = "0.0.5"
 headers = "0.2.1"
 rdkafka = { git = "https://github.com/timberio/rust-rdkafka", features = ["ssl", "ssl_vendored"], optional = true }
