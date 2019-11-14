@@ -1145,7 +1145,7 @@ dependencies = [
 [[package]]
 name = "leveldb"
 version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/timberio/leveldb#d4c929b57d724ca789fbc64ff6f07e7ea0fbeb2e"
 dependencies = [
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "leveldb-sys 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3473,7 +3473,7 @@ dependencies = [
  "jemallocator 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "journald 0.1.0",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "leveldb 0.8.4 (git+https://github.com/timberio/leveldb)",
  "libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)",
  "listenfd 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "matches 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3793,7 +3793,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lazy_static 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "76f033c7ad61445c5b347c7382dd1237847eb1bce590fe50365dcb33d546be73"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-"checksum leveldb 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8438a36a31c982ac399c4477d7e3c62cc7a6bf91bb6f42837b7e1033359fcbad"
+"checksum leveldb 0.8.4 (git+https://github.com/timberio/leveldb)" = "<none>"
 "checksum leveldb-sys 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "71f46429bb70612c3e939aaeed27ffd31a24a773d21728a1a426e4089d6778d2"
 "checksum lexical-core 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2304bccb228c4b020f3a4835d247df0a02a7c4686098d4167762cfbbe4c5cb14"
 "checksum libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)" = "1a31a0627fdf1f6a39ec0dd577e101440b7db22672c0901fe00a9a6fbb5c24e8"
