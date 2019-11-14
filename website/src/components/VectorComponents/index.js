@@ -101,31 +101,34 @@ function FilterList({label, icon, values, currentState, setState}) {
 
   const valuesArray = [...values];
 
-  console.log(valuesArray);
-
   return (
     <span className="vector-components--filters--section">
       <div className="vector-components--filters--section--title">
         {label}
       </div>
-      {valuesArray.map((value, idx) => (
-        <label key={idx}>
-          <input
-            type="checkbox"
-            onChange={(event) => {
-              let newValues = new Set(currentState);
+      {valuesArray.map((value, idx) => {
+        console.log(value);
+        let label = humanizeString(value);
 
-              if (event.currentTarget.checked)
-                newValues.add(value);
-              else
-                newValues.delete(value);
+        return (
+          <label key={idx}>
+            <input
+              type="checkbox"
+              onChange={(event) => {
+                let newValues = new Set(currentState);
 
-              setState(newValues);
-            }}
-            checked={currentState.has(value)} />
-          {humanizeString(value)} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
-        </label>
-      ))}
+                if (event.currentTarget.checked)
+                  newValues.add(value);
+                else
+                  newValues.delete(value);
+
+                setState(newValues);
+              }}
+              checked={currentState.has(value)} />
+            {humanizeString(value)} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
+          </label>
+        );
+      })}
     </span>
   );
 }
