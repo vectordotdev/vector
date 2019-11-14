@@ -1,8 +1,10 @@
 [sinks.file]
 buffer = false
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
 encodings = ["ndjson", "text"]
+function_category = "transmit"
 healthcheck = false
 input_types = ["log"]
 write_to_description = "a file"

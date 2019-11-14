@@ -3,7 +3,8 @@ allow_you_to_description = """\
 split a field's value on a given separator \
 and zip the tokens into ordered field names\
 """
-function_categories = ["parse"]
+common = false
+function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
 types_coercion = true

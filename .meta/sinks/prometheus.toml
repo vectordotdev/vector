@@ -1,8 +1,10 @@
 [sinks.prometheus]
 beta = true
 buffer = false
+common = true
 delivery_guarantee = "best_effort"
 egress_method = "exposing"
+function_category = "transmit"
 healthcheck = false
 input_types = ["metric"]
 write_to_description = "[Prometheus][urls.prometheus] metrics service"

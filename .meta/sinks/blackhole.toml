@@ -1,7 +1,9 @@
 [sinks.blackhole]
 buffer = false
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = """\

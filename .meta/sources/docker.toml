@@ -1,6 +1,8 @@
 [sources.docker]
 beta = true
+common = true
 delivery_guarantee = "best_effort"
+function_category = "collect"
 guides = []
 output_types = ["log"]
 resources = []

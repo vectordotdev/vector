@@ -9,17 +9,16 @@ class Component
   include Comparable
 
   attr_reader :beta,
+    :function_category,
     :id,
     :name,
     :options,
     :resources,
     :type
 
-  attr_accessor :alternatives
-
   def initialize(hash)
-    @alternatives = []
     @beta = hash["beta"] == true
+    @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
@@ -125,6 +124,7 @@ class Component
       beta: beta?,
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
       event_types: event_types,
+      function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
       name: name,
       options: options.deep_to_h,

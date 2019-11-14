@@ -1,6 +1,7 @@
 [transforms.remove_tags]
 allow_you_to_description = "remove one or more metric tags"
-function_categories = ["change_tags"]
+common = false
+function_category = "shape"
 input_types = ["metric"]
 output_types = ["metric"]
 

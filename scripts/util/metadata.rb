@@ -115,20 +115,6 @@ class Metadata
       @sinks.send("#{sink_name}=", sink)
     end
 
-    transforms_list = @transforms.to_h.values
-    transforms_list.each do |transform|
-      alternatives = transforms_list.select do |alternative|
-        if transform.function_categories != ["convert_types"] && alternative.function_categories.include?("program")
-          true
-        else
-          function_diff = alternative.function_categories - transform.function_categories
-          alternative != transform && function_diff != alternative.function_categories
-        end
-      end
-
-      transform.alternatives = alternatives.sort
-    end
-
     # options
 
     hash.fetch("options").each do |option_name, option_hash|
@@ -205,6 +191,7 @@ class Metadata
   def to_h
     {
       installation: installation.deep_to_h,
+      latest_release: latest_release.deep_to_h,
       sources: sources.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h

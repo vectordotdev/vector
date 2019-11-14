@@ -1,8 +1,10 @@
 [sinks.tcp]
 buffer = true
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
 encodings = ["json", "text"]
+function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 write_to_description = "a TCP connection"

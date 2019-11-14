@@ -3,7 +3,8 @@ allow_you_to_description = """\
 tokenize a field's value by splitting on white space, ignoring special \
 wrapping characters, and zip the tokens into ordered field names\
 """
-function_categories = ["parse"]
+common = false
+function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
 types_coercion = true

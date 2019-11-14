@@ -1,7 +1,8 @@
 [transforms.lua]
 allow_you_to_description = "transform events with a full embedded [Lua][urls.lua] engine"
 beta = true
-function_categories = ["program"]
+common = true
+function_category = "program"
 guides = []
 input_types = ["log"]
 output_types = ["log"]

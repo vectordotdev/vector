@@ -4,7 +4,6 @@ require_relative "component"
 
 class Transform < Component
   attr_reader :allow_you_to_description,
-    :function_categories,
     :input_types,
     :output_types
 
@@ -12,7 +11,6 @@ class Transform < Component
     super(hash)
 
     @allow_you_to_description = hash.fetch("allow_you_to_description")
-    @function_categories = hash.fetch("function_categories")
     @input_types = hash.fetch("input_types")
     @output_types = hash.fetch("output_types")
     types_coercion = hash["types_coercion"] == true

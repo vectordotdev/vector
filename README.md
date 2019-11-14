@@ -29,20 +29,22 @@ simple and unified.
 
 #### About
 
-* [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
 * [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
 
-* [**Installation**][docs.installation] - [platforms][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
-* [**Getting started**][docs.getting_started]
+* [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
+* [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
-#### Usage
+#### [Components][https://vector.dev/components]
 
-* [**Configuration**][docs.configuration] - [sources][docs.sources], [transforms][docs.transforms], [sinks][docs.sinks]
+* [**Sources**][docs.sources] - 
+* [**Transforms**][docs.transforms]
+* [**Sinks**][docs.sinks]
+
 * [**Administration**][docs.administration] - [process management][docs.process-management], [monitoring][docs.monitoring], [updating][docs.updating], [validating][docs.validating]
 * [**Guides**][docs.guides]
 
@@ -206,7 +208,6 @@ the License.
 [docs.deployment]: https://vector.dev/docs/setup/deployment
 [docs.from-archives]: https://vector.dev/docs/setup/installation/manual/from-archives
 [docs.from-source]: https://vector.dev/docs/setup/installation/manual/from-source
-[docs.getting_started]: https://vector.dev/docs/setup/getting-started
 [docs.guarantees]: https://vector.dev/docs/about/guarantees
 [docs.guides]: https://vector.dev/docs/guides
 [docs.installation]: https://vector.dev/docs/setup/installation

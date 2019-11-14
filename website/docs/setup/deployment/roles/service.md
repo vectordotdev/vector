@@ -106,8 +106,6 @@ be at least 3 times your cumulative buffer size.
 
 ### Load balancing
 
-TODO: make this better
-
 If you've configured Vector to receive data over the network then you'll
 benefit from load balancing. Select sinks offer built-in load balancing,
 such as the [`http`][docs.sinks.http], [`tcp`][docs.sinks.tcp], and

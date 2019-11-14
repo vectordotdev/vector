@@ -1,5 +1,7 @@
 [sources.stdin]
+common = false
 delivery_guarantee = "at_least_once"
+function_category = "receive"
 guides = []
 output_types = ["log"]
 resources = []

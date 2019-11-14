@@ -32,6 +32,28 @@ module.exports = {
       theme: require('prism-react-renderer/themes/github'),
       darkTheme: require('prism-react-renderer/themes/dracula'),
     },
+    footer: {
+      style: 'dark',
+      links: [
+        {
+          title: 'Docs',
+          items: [
+            {
+              label: 'Introduction',
+              to: 'docs/introduction',
+            },
+            {
+              label: 'Installation',
+              to: 'docs/installation',
+            },
+            {
+              label: 'Migration from v1 to v2',
+              to: 'docs/migrating-from-v1-to-v2',
+            },
+          ],
+        },
+      ]
+    }
   },
   presets: [
     [

@@ -4,6 +4,7 @@ import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
 import classnames from 'classnames';
+import humanizeString from 'humanize-string';
 import queryString from 'query-string';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
@@ -39,19 +40,104 @@ function Component({delivery_guarantee, description, event_types, name, status, 
   );
 }
 
+function Components({components, headingLevel, titles}) {
+  const sourceComponents = components.filter(component => component.type == "source");
+  const transformComponents = components.filter(component => component.type == "transform");
+  const sinkComponents = components.filter(component => component.type == "sink");
+  const HeadingTag = `h${headingLevel || 3}`;
+
+  if (components.length > 0) {
+    return (
+      <>
+        {sourceComponents.length > 0 ?
+          <>
+            {titles && <HeadingTag>{sourceComponents.length} Sources</HeadingTag>}
+            <div className="vector-components--grid">
+              {sourceComponents.map((props, idx) => (
+                <Component key={idx} {...props} />
+              ))}
+            </div>
+          </>:
+          ''}
+        {transformComponents.length > 0 ?
+          <>
+            {titles && <HeadingTag>{transformComponents.length} Transforms</HeadingTag>}
+            <div className="vector-components--grid">
+              {transformComponents.map((props, idx) => (
+                <Component key={idx} {...props} />
+              ))}
+            </div>
+          </>:
+          ''}
+        {sinkComponents.length > 0 ?
+          <>
+            {titles && <HeadingTag>{sinkComponents.length} Sinks</HeadingTag>}
+            <div className="vector-components--grid">
+              {sinkComponents.map((props, idx) => (
+                <Component key={idx} {...props} />
+              ))}
+            </div>
+          </>:
+          ''}
+        <hr />
+        <Jump to="https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature" target="_blank" icon="plus-circle">
+          Request a new component
+        </Jump>
+      </>
+    );
+  } else {
+    return (
+      <div className="empty">
+        <div className="icon">☹</div>
+        <div>No components found</div>
+      </div>
+    );
+  }
+}
+
+function FilterList({label, values, currentState, setState}) {
+  if (values.size == 0)
+    return null;
+
+  const valuesArray = [...values];
+
+  return (
+    <span className="vector-components--filters--section">
+      <div className="vector-components--filters--section--title">
+        {label}
+      </div>
+      {valuesArray.map((value, idx) => (
+        <label key={idx}>
+          <input
+            type="checkbox"
+            onChange={(event) => {
+              let newValues = new Set(currentState);
+
+              if (event.currentTarget.checked)
+                newValues.add(value);
+              else
+                newValues.delete(value);
+
+              setState(newValues);
+            }}
+            checked={currentState.has(value)} />
+          {humanizeString(value)}
+        </label>
+      ))}
+    </span>
+  );
+}
+
 function VectorComponents(props) {
+  //
+  // Base Variables
+  //
+
   const {siteConfig} = useDocusaurusContext();
   const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
-  const HeadingTag = `h${props.headingLevel || 3}`;
   const queryObj = props.location ? queryString.parse(props.location.search) : {};
-
-  const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
-  const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
-  const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
-  const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
-  const [searchTerm, setSearchTerm] = useState(null);
 
   let components = [];
   if (props.sources || props.sources == undefined) components = components.concat(Object.values(sources));
@@ -59,8 +145,47 @@ function VectorComponents(props) {
   if (props.sinks || props.sinks == undefined) components = components.concat(Object.values(sinks));
   components = components.sort((a, b) => (a.name > b.name) ? 1 : -1);
 
+  let serviceProviders =
+    components.filter(component => component.service_provider).
+    map(component => component.service_provider).
+    sort((a, b) => (a > b) ? 1 : -1);
+  serviceProviders = new Set(serviceProviders);
+
+  let functionCategories =
+    components.filter(component => component.function_category).
+    map(component => component.function_category).
+    sort((a, b) => (a > b) ? 1 : -1);
+  functionCategories = new Set(functionCategories);
+
+  //
+  // State
+  //
+
+  const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
+  const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['providers']));
+  const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
+  const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
+  const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
+  const [onlyProviders, setOnlyProviders] = useState(new Set(queryObj['providers']));
+  const [searchTerm, setSearchTerm] = useState(null);
+
+  //
+  // Filtering
+  //
+
+  if (searchTerm) {
+    components = components.filter(component => {
+      let fullName = `${component.name.toLowerCase()} ${component.type.toLowerCase()}`;
+      return fullName.includes(searchTerm.toLowerCase())
+    });
+  }
+
   if (onlyAtLeastOnce) {
     components = components.filter(component => component.delivery_guarantee == "at_least_once");
+  }
+
+  if (onlyFunctions.size > 0) {
+    components = components.filter(component => onlyFunctions.has(component.function_category) );
   }
 
   if (onlyLog) {
@@ -75,24 +200,13 @@ function VectorComponents(props) {
     components = components.filter(component => component.status == "prod-ready");
   }
 
-  if (searchTerm) {
-    components = components.filter(component => {
-      let fullName = `${component.name.toLowerCase()} ${component.type.toLowerCase()}`;
-      return fullName.includes(searchTerm.toLowerCase())
-    });
+  if (onlyProviders.size > 0) {
+    components = components.filter(component => onlyProviders.has(component.service_provider) );
   }
 
-  const sourceComponents = components.filter(component => component.type == "source");
-  const transformComponents = components.filter(component => component.type == "transform");
-  const sinkComponents = components.filter(component => component.type == "sink");
-
-  let serviceProvers =
-    components.filter(component => component.service_provider).
-    map(component => component.service_provider).
-    sort((a, b) => (a > b) ? 1 : -1);
-
-  serviceProvers = new Set(serviceProvers);
-  serviceProvers = Array.from(serviceProvers);
+  //
+  // Rendering
+  //
 
   return (
     <div className={classnames('vector-components', {'vector-components--cols': filterColumn})}>
@@ -146,72 +260,20 @@ function VectorComponents(props) {
               Prod-ready <i className="feather icon-award"></i>
             </label>
           </span>
-          {serviceProvers.length > 0 ? (
-            <span className="vector-components--filters--section">
-              <div className="vector-components--filters--section--title">
-                Service Providers
-              </div>
-              {serviceProvers.map((serviceProver, idx) => (
-                <label key={idx} title={`Show only components from the ${serviceProver} provider.`}>
-                  <input
-                    type="checkbox"
-                    onChange={(event) => {
-                      history.push({
-                        pathname: '/dresses',
-                        search: '?color=blue'
-                      })
-                      setOnlyAtLeastOnce(event.currentTarget.checked)
-                    }}
-                    checked={onlyAtLeastOnce} />
-                  {serviceProver} <i className="feather icon-shield"></i>
-                </label>
-              ))}
-            </span>) :
-            null}
+          <FilterList
+            label="Service Providers"
+            values={serviceProviders}
+            currentState={onlyProviders}
+            setState={setOnlyProviders} />
+          <FilterList
+            label="Functions"
+            values={functionCategories}
+            currentState={onlyFunctions}
+            setState={setOnlyFunctions} />
         </div>
       </div>
       <div className="vector-components--results">
-        {components.length > 0 ?
-          <>
-            {sourceComponents.length > 0 ?
-              <>
-                {titles && <HeadingTag>{sourceComponents.length} Sources</HeadingTag>}
-                <div className="vector-components--grid">
-                  {sourceComponents.map((props, idx) => (
-                    <Component key={idx} {...props} />
-                  ))}
-                </div>
-              </>:
-              ''}
-            {transformComponents.length > 0 ?
-              <>
-                {titles && <HeadingTag>{transformComponents.length} Transforms</HeadingTag>}
-                <div className="vector-components--grid">
-                  {transformComponents.map((props, idx) => (
-                    <Component key={idx} {...props} />
-                  ))}
-                </div>
-              </>:
-              ''}
-            {sinkComponents.length > 0 ?
-              <>
-                {titles && <HeadingTag>{sinkComponents.length} Sinks</HeadingTag>}
-                <div className="vector-components--grid">
-                  {sinkComponents.map((props, idx) => (
-                    <Component key={idx} {...props} />
-                  ))}
-                </div>
-              </>:
-              ''}
-            <hr />
-            <Jump to="https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature" target="_blank" icon="plus-circle">
-              Request a new component
-            </Jump>
-          </> :
-          <div className="empty">
-            <div className="icon">☹</div>
-            <div>No components found</div>
-          </div>}
+        <Components components={components} headingLevel={props.headingLevel} titles={titles} />
       </div>
     </div>
   );

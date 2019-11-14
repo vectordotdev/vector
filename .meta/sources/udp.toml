@@ -1,5 +1,7 @@
 [sources.udp]
+common = false
 delivery_guarantee = "best_effort"
+function_category = "receive"
 guides = []
 output_types = ["log"]
 resources = []

@@ -1,8 +1,10 @@
 [sinks.statsd]
 beta = true
 buffer = false
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+function_category = "transmit"
 healthcheck = false
 input_types = ["metric"]
 write_to_description = "[StatsD][urls.statsd] metrics service"

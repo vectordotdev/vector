@@ -343,6 +343,9 @@ function Installation() {
 function Home() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
+  const {metadata: {latest_release}} = siteConfig.customFields;
+
+  console.log(latest_release)
 
   useEffect(() => {
     cloudify();
@@ -361,7 +364,7 @@ function Home() {
           </p>
           <div className="hero__buttons">
             <button className="button button--primary">Get Started</button>
-            <button className="button button--primary">Download v0.5.0</button>
+            <button className="button button--primary">Download v{latest_release.version}</button>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
         </div>

@@ -24,8 +24,8 @@ import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 
-In order to achieve at least once delivery your source must be configured to
-use `disk` based buffers:
+In order to achieve at least once delivery between restarts your source must
+be configured to use `disk` based buffers:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 

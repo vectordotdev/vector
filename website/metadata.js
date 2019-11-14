@@ -47,6 +47,17 @@ module.exports = {
       }
     ]
   },
+  "latest_release": {
+    "date": "2019-10-09",
+    "downloads": {
+      "vector-amd64.deb": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-amd64.deb",
+      "vector-x86_64-apple-darwin.tar.gz": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-x86_64-apple-darwin.tar.gz",
+      "vector-x86_64-unknown-linux-musl.tar.gz": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-x86_64-unknown-linux-musl.tar.gz",
+      "vector-x86_64.rpm": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-x86_64.rpm"
+    },
+    "last_version": "0.4.0",
+    "version": "0.5.0"
+  },
   "sources": {
     "udp": {
       "beta": false,
@@ -54,6 +65,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "receive",
       "id": "udp_source",
       "name": "udp",
       "options": {
@@ -150,6 +162,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "receive",
       "id": "stdin_source",
       "name": "stdin",
       "options": {
@@ -226,6 +239,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "collect",
       "id": "docker_source",
       "name": "docker",
       "options": {
@@ -303,6 +317,7 @@ module.exports = {
         "log",
         "metric"
       ],
+      "function_category": "proxy",
       "id": "vector_source",
       "name": "vector",
       "options": {
@@ -381,6 +396,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "receive",
       "id": "statsd_source",
       "name": "statsd",
       "options": {
@@ -437,6 +453,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "collect",
       "id": "kafka_source",
       "name": "kafka",
       "options": {
@@ -604,6 +621,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "collect",
       "id": "journald_source",
       "name": "journald",
       "options": {
@@ -727,6 +745,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "collect",
       "id": "file_source",
       "name": "file",
       "options": {
@@ -927,9 +946,9 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cce8f78>",
-            "#<Option:0x00007fbf6cce8d98>",
-            "#<Option:0x00007fbf6cce8b90>"
+            "#<Option:0x00007fa393bc5758>",
+            "#<Option:0x00007fa393bc5578>",
+            "#<Option:0x00007fa393bc5348>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1051,6 +1070,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "receive",
       "id": "syslog_source",
       "name": "syslog",
       "options": {
@@ -1202,6 +1222,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "receive",
       "id": "tcp_source",
       "name": "tcp",
       "options": {
@@ -1323,6 +1344,7 @@ module.exports = {
         "log",
         "metric"
       ],
+      "function_category": "convert",
       "id": "log_to_metric_transform",
       "name": "log_to_metric",
       "options": {
@@ -1338,11 +1360,11 @@ module.exports = {
           ],
           "null": false,
           "options": [
-            "#<Option:0x00007fbf6cd00588>",
-            "#<Option:0x00007fbf6cd003a8>",
-            "#<Option:0x00007fbf6cd00218>",
-            "#<Option:0x00007fbf6cd00010>",
-            "#<Option:0x00007fbf6cd0be38>"
+            "#<Option:0x00007fa393bdcbd8>",
+            "#<Option:0x00007fa393bdc9f8>",
+            "#<Option:0x00007fa393bdc868>",
+            "#<Option:0x00007fa393bdc660>",
+            "#<Option:0x00007fa393bdc4d0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1405,6 +1427,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "parse",
       "id": "split_transform",
       "name": "split",
       "options": {
@@ -1549,7 +1572,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd13ef8>"
+            "#<Option:0x00007fa393be4658>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1568,6 +1591,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "parse",
       "id": "json_parser_transform",
       "name": "json_parser",
       "options": {
@@ -1667,6 +1691,7 @@ module.exports = {
         "log",
         "metric"
       ],
+      "function_category": "filter",
       "id": "field_filter_transform",
       "name": "field_filter",
       "options": {
@@ -1765,6 +1790,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "shape",
       "id": "remove_fields_transform",
       "name": "remove_fields",
       "options": {
@@ -1846,6 +1872,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "parse",
       "id": "regex_parser_transform",
       "name": "regex_parser",
       "options": {
@@ -1966,7 +1993,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd19088>"
+            "#<Option:0x00007fa393bf5958>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1985,6 +2012,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "shape",
       "id": "add_tags_transform",
       "name": "add_tags",
       "options": {
@@ -2000,7 +2028,7 @@ module.exports = {
           ],
           "null": false,
           "options": [
-            "#<Option:0x00007fbf6cd18408>"
+            "#<Option:0x00007fa393bf4d00>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2063,6 +2091,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "parse",
       "id": "coercer_transform",
       "name": "coercer",
       "options": {
@@ -2122,7 +2151,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd215a8>"
+            "#<Option:0x00007fa393bfe328>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2141,6 +2170,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "shape",
       "id": "add_fields_transform",
       "name": "add_fields",
       "options": {
@@ -2156,7 +2186,7 @@ module.exports = {
           ],
           "null": false,
           "options": [
-            "#<Option:0x00007fbf6cd20950>"
+            "#<Option:0x00007fa393bfd6d0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2219,6 +2249,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "program",
       "id": "lua_transform",
       "name": "lua",
       "options": {
@@ -2319,6 +2350,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "parse",
       "id": "tokenizer_transform",
       "name": "tokenizer",
       "options": {
@@ -2443,7 +2475,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd33a50>"
+            "#<Option:0x00007fa393c04908>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2462,6 +2494,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "parse",
       "id": "grok_parser_transform",
       "name": "grok_parser",
       "options": {
@@ -2582,7 +2615,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd30f08>"
+            "#<Option:0x00007fa393c0ddc8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2601,6 +2634,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "filter",
       "id": "sampler_transform",
       "name": "sampler",
       "options": {
@@ -2702,6 +2736,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "shape",
       "id": "remove_tags_transform",
       "name": "remove_tags",
       "options": {
@@ -2785,6 +2820,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "transmit",
       "id": "datadog_metrics_sink",
       "name": "datadog_metrics",
       "options": {
@@ -3086,6 +3122,7 @@ module.exports = {
         "log",
         "metric"
       ],
+      "function_category": "test",
       "id": "blackhole_sink",
       "name": "blackhole",
       "options": {
@@ -3185,6 +3222,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "aws_s3_sink",
       "name": "aws_s3",
       "options": {
@@ -3410,10 +3448,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd53210>",
-            "#<Option:0x00007fbf6cd53008>",
-            "#<Option:0x00007fbf6cd52db0>",
-            "#<Option:0x00007fbf6cd52bf8>"
+            "#<Option:0x00007fa393c24488>",
+            "#<Option:0x00007fa393c242a8>",
+            "#<Option:0x00007fa393c240c8>",
+            "#<Option:0x00007fa393c2fec8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -3592,6 +3630,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "proxy",
       "id": "vector_sink",
       "name": "vector",
       "options": {
@@ -3692,10 +3731,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd59890>",
-            "#<Option:0x00007fbf6cd596b0>",
-            "#<Option:0x00007fbf6cd594d0>",
-            "#<Option:0x00007fbf6cd59340>"
+            "#<Option:0x00007fa393c36fe8>",
+            "#<Option:0x00007fa393c36e08>",
+            "#<Option:0x00007fa393c36c28>",
+            "#<Option:0x00007fa393c36a98>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -3714,6 +3753,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "transmit",
       "id": "statsd_sink",
       "name": "statsd",
       "options": {
@@ -3833,6 +3873,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "aws_cloudwatch_logs_sink",
       "name": "aws_cloudwatch_logs",
       "options": {
@@ -4039,10 +4080,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd6ad98>",
-            "#<Option:0x00007fbf6cd6abb8>",
-            "#<Option:0x00007fbf6cd6a9d8>",
-            "#<Option:0x00007fbf6cd6a848>"
+            "#<Option:0x00007fa393c3c470>",
+            "#<Option:0x00007fa393c3c290>",
+            "#<Option:0x00007fa393c3c0b0>",
+            "#<Option:0x00007fa393c47ed8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4221,6 +4262,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "elasticsearch_sink",
       "name": "elasticsearch",
       "options": {
@@ -4297,8 +4339,8 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd728e0>",
-            "#<Option:0x00007fbf6cd72750>"
+            "#<Option:0x00007fa393c4fe80>",
+            "#<Option:0x00007fa393c4fcf0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4318,7 +4360,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd71cd8>"
+            "#<Option:0x00007fa393c4f278>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4362,7 +4404,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd70f90>"
+            "#<Option:0x00007fa393c4e508>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4467,10 +4509,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd7a888>",
-            "#<Option:0x00007fbf6cd7a6a8>",
-            "#<Option:0x00007fbf6cd7a4c8>",
-            "#<Option:0x00007fbf6cd7a338>"
+            "#<Option:0x00007fa393c57db0>",
+            "#<Option:0x00007fa393c57bd0>",
+            "#<Option:0x00007fa393c579c8>",
+            "#<Option:0x00007fa393c57838>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4490,12 +4532,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd79578>",
-            "#<Option:0x00007fbf6cd793e8>",
-            "#<Option:0x00007fbf6cd79258>",
-            "#<Option:0x00007fbf6cd790c8>",
-            "#<Option:0x00007fbf6cd78f38>",
-            "#<Option:0x00007fbf6cd78d30>"
+            "#<Option:0x00007fa393c56a78>",
+            "#<Option:0x00007fa393c568e8>",
+            "#<Option:0x00007fa393c56758>",
+            "#<Option:0x00007fa393c565c8>",
+            "#<Option:0x00007fa393c56438>",
+            "#<Option:0x00007fa393c56230>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4674,6 +4716,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "kafka_sink",
       "name": "kafka",
       "options": {
@@ -4841,10 +4884,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd8b1b0>",
-            "#<Option:0x00007fbf6cd8afd0>",
-            "#<Option:0x00007fbf6cd8adf0>",
-            "#<Option:0x00007fbf6cd8ac60>"
+            "#<Option:0x00007fa393c5c5b8>",
+            "#<Option:0x00007fa393c5c3d8>",
+            "#<Option:0x00007fa393c5c1f8>",
+            "#<Option:0x00007fa393c5c068>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4864,11 +4907,11 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd89f18>",
-            "#<Option:0x00007fbf6cd89d10>",
-            "#<Option:0x00007fbf6cd89b80>",
-            "#<Option:0x00007fbf6cd899f0>",
-            "#<Option:0x00007fbf6cd89860>"
+            "#<Option:0x00007fa393c672b0>",
+            "#<Option:0x00007fa393c670a8>",
+            "#<Option:0x00007fa393c66f18>",
+            "#<Option:0x00007fa393c66d88>",
+            "#<Option:0x00007fa393c66bf8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4887,6 +4930,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "splunk_hec_sink",
       "name": "splunk_hec",
       "options": {
@@ -5031,10 +5075,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd92730>",
-            "#<Option:0x00007fbf6cd92550>",
-            "#<Option:0x00007fbf6cd92370>",
-            "#<Option:0x00007fbf6cd921e0>"
+            "#<Option:0x00007fa393c6fa28>",
+            "#<Option:0x00007fa393c6f820>",
+            "#<Option:0x00007fa393c6f618>",
+            "#<Option:0x00007fa393c6f488>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5054,12 +5098,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cd91420>",
-            "#<Option:0x00007fbf6cd91290>",
-            "#<Option:0x00007fbf6cd91100>",
-            "#<Option:0x00007fbf6cd90f70>",
-            "#<Option:0x00007fbf6cd90de0>",
-            "#<Option:0x00007fbf6cd90bd8>"
+            "#<Option:0x00007fa393c6e6c8>",
+            "#<Option:0x00007fa393c6e538>",
+            "#<Option:0x00007fa393c6e380>",
+            "#<Option:0x00007fa393c6e1a0>",
+            "#<Option:0x00007fa393c6dfe8>",
+            "#<Option:0x00007fa393c6dd90>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5239,6 +5283,7 @@ module.exports = {
         "log",
         "metric"
       ],
+      "function_category": "test",
       "id": "console_sink",
       "name": "console",
       "options": {
@@ -5366,6 +5411,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "aws_kinesis_streams_sink",
       "name": "aws_kinesis_streams",
       "options": {
@@ -5526,10 +5572,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cda0a88>",
-            "#<Option:0x00007fbf6cda08a8>",
-            "#<Option:0x00007fbf6cda06a0>",
-            "#<Option:0x00007fbf6cda04e8>"
+            "#<Option:0x00007fa393c7d718>",
+            "#<Option:0x00007fa393c7d538>",
+            "#<Option:0x00007fa393c7d358>",
+            "#<Option:0x00007fa393c7d1c8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5708,6 +5754,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "clickhouse_sink",
       "name": "clickhouse",
       "options": {
@@ -5783,8 +5830,8 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cda8698>",
-            "#<Option:0x00007fbf6cda8508>"
+            "#<Option:0x00007fa393c853a0>",
+            "#<Option:0x00007fa393c85210>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5891,10 +5938,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdb1d60>",
-            "#<Option:0x00007fbf6cdb1b80>",
-            "#<Option:0x00007fbf6cdb19a0>",
-            "#<Option:0x00007fbf6cdb1810>"
+            "#<Option:0x00007fa393c8ea90>",
+            "#<Option:0x00007fa393c8e8b0>",
+            "#<Option:0x00007fa393c8e6d0>",
+            "#<Option:0x00007fa393c8e540>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5914,12 +5961,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdb0a28>",
-            "#<Option:0x00007fbf6cdb0898>",
-            "#<Option:0x00007fbf6cdb0708>",
-            "#<Option:0x00007fbf6cdb0578>",
-            "#<Option:0x00007fbf6cdb03e8>",
-            "#<Option:0x00007fbf6cdb01e0>"
+            "#<Option:0x00007fa393c8d780>",
+            "#<Option:0x00007fa393c8d5f0>",
+            "#<Option:0x00007fa393c8d460>",
+            "#<Option:0x00007fa393c8d2d0>",
+            "#<Option:0x00007fa393c8d118>",
+            "#<Option:0x00007fa393c8cf10>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6098,6 +6145,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "file_sink",
       "name": "file",
       "options": {
@@ -6242,6 +6290,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "transmit",
       "id": "aws_cloudwatch_metrics_sink",
       "name": "aws_cloudwatch_metrics",
       "options": {
@@ -6381,6 +6430,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "tcp_sink",
       "name": "tcp",
       "options": {
@@ -6505,10 +6555,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdca630>",
-            "#<Option:0x00007fbf6cdca450>",
-            "#<Option:0x00007fbf6cdca270>",
-            "#<Option:0x00007fbf6cdca0b8>"
+            "#<Option:0x00007fa393ca6b68>",
+            "#<Option:0x00007fa393ca6910>",
+            "#<Option:0x00007fa393ca66b8>",
+            "#<Option:0x00007fa393ca6500>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6528,13 +6578,13 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdc9280>",
-            "#<Option:0x00007fbf6cdc9078>",
-            "#<Option:0x00007fbf6cdc8ee8>",
-            "#<Option:0x00007fbf6cdc8d58>",
-            "#<Option:0x00007fbf6cdc8ba0>",
-            "#<Option:0x00007fbf6cdc8a10>",
-            "#<Option:0x00007fbf6cdc8808>"
+            "#<Option:0x00007fa393ca5470>",
+            "#<Option:0x00007fa393ca5268>",
+            "#<Option:0x00007fa393ca50d8>",
+            "#<Option:0x00007fa393ca4f48>",
+            "#<Option:0x00007fa393ca4db8>",
+            "#<Option:0x00007fa393ca4c28>",
+            "#<Option:0x00007fa393ca4a20>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6553,6 +6603,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "function_category": "transmit",
       "id": "http_sink",
       "name": "http",
       "options": {
@@ -6568,8 +6619,8 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdd3b68>",
-            "#<Option:0x00007fbf6cdd39d8>"
+            "#<Option:0x00007fa393cafd58>",
+            "#<Option:0x00007fa393cafbc8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6589,7 +6640,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdd2f88>"
+            "#<Option:0x00007fa393caf178>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6738,10 +6789,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cddbbd8>",
-            "#<Option:0x00007fbf6cddb9f8>",
-            "#<Option:0x00007fbf6cddb818>",
-            "#<Option:0x00007fbf6cddb688>"
+            "#<Option:0x00007fa393cb7d78>",
+            "#<Option:0x00007fa393cb7b98>",
+            "#<Option:0x00007fa393cb79b8>",
+            "#<Option:0x00007fa393cb7828>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6761,12 +6812,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fbf6cdda8a0>",
-            "#<Option:0x00007fbf6cdda710>",
-            "#<Option:0x00007fbf6cdda580>",
-            "#<Option:0x00007fbf6cdda3f0>",
-            "#<Option:0x00007fbf6cdda260>",
-            "#<Option:0x00007fbf6cdda058>"
+            "#<Option:0x00007fa393cb6a68>",
+            "#<Option:0x00007fa393cb68d8>",
+            "#<Option:0x00007fa393cb6720>",
+            "#<Option:0x00007fa393cb6590>",
+            "#<Option:0x00007fa393cb63d8>",
+            "#<Option:0x00007fa393cb61d0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6935,7 +6986,7 @@ module.exports = {
           "unit": "seconds"
         }
       },
-      "service_provider": "Elastic",
+      "service_provider": null,
       "status": "prod-ready",
       "type": "sink"
     },
@@ -6945,6 +6996,7 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "function_category": "transmit",
       "id": "prometheus_sink",
       "name": "prometheus",
       "options": {

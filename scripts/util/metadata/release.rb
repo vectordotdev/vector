@@ -4,6 +4,13 @@ require_relative "../../util/version"
 class Release
   include Comparable
 
+  DOWNLOAD_NAMES = [
+    "vector-amd64.deb",
+    "vector-x86_64-apple-darwin.tar.gz",
+    "vector-x86_64-unknown-linux-musl.tar.gz",
+    "vector-x86_64.rpm"
+  ]
+
   attr_reader :commits, :date, :last_version, :version
 
   def initialize(release_hash, last_version)
@@ -47,6 +54,13 @@ class Release
 
   def doc_updates
     @doc_updates ||= commits.select(&:doc_update?)
+  end
+
+  def downloads
+    @downloads ||= DOWNLOAD_NAMES.inject({}) do |hash, name|
+      hash[name] = "https://github.com/timberio/vector/releases/download/v#{version}/#{name}"
+      hash
+    end
   end
 
   def enhancements
@@ -95,6 +109,15 @@ class Release
 
   def pre?
     type == "pre"
+  end
+
+  def to_h
+    {
+      date: date,
+      downloads: downloads,
+      last_version: last_version,
+      version: version,
+    }
   end
 
   def type

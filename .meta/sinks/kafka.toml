@@ -1,8 +1,10 @@
 [sinks.kafka]
 buffer = true
+common = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
 encodings = ["json", "text"]
+function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 service_provider = "Confluent"

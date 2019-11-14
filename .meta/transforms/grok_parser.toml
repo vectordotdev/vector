@@ -1,6 +1,7 @@
 [transforms.grok_parser]
 allow_you_to_description = "parse a log field value with [Grok][urls.grok]"
-function_categories = ["parse"]
+common = false
+function_category = "parse"
 guides = []
 input_types = ["log"]
 output_types = ["log"]

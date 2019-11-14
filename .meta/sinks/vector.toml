@@ -1,7 +1,9 @@
 [sinks.vector]
 buffer = true
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+function_category = "proxy"
 healthcheck = true
 input_types = ["log"]
 write_to_description = "another downstream [`vector` source][docs.sources.vector]"

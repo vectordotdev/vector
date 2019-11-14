@@ -2,7 +2,8 @@
 allow_you_to_description = """\
 parse a log field's value with a [Regular Expression][urls.regex]\
 """
-function_categories = ["parse"]
+common = true
+function_category = "parse"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
