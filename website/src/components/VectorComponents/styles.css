@@ -1,3 +1,7 @@
+.vector-components--cols {
+  margin: var(--ifm-spacing-vertical) 0;
+}
+
 .vector-components h2,
 .vector-components h3 {
   margin-top: calc( var(--ifm-spacing-vertical) * 2 );
@@ -35,6 +39,7 @@
 
 .vector-components--filters--section {
   display: flex;
+  overflow: auto;
 }
 
 .vector-components--filters--section--title {
@@ -89,6 +94,8 @@
 
 .vector-component--name {
   font-size: 1.1em;
+  line-height: 1;
+  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
 }
 
 .vector-component--badges {
@@ -102,6 +109,10 @@
 }
 
 @media (min-width: 996px) {
+  .vector-components {
+    margin: 0;
+  }
+
   .vector-components--cols {
     display: flex;
   }
@@ -109,6 +120,7 @@
   .vector-components--cols .vector-components--filters {
     border-right: 1px solid var(--ifm-hr-border-color);
     flex: 0 0 25%;
+    margin-left: calc( var(--ifm-spacing-horizontal) * -1 );
     max-width: calc(250px - var(--ifm-spacing-horizontal));
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
   }
@@ -148,6 +160,7 @@
 
   .vector-components--cols .vector-components--results {
     flex: 1 0;
+    margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
     max-width: 100%;
     padding: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 3 );
   }

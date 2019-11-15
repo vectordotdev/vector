@@ -33,7 +33,7 @@ function Components(props) {
           </div>
         </div>
       </header>
-      <main>
+      <main className="container container--fluid">
         <VectorComponents filterColumn={true} headingLevel={2} location={props.location} />
       </main>
     </Layout>
