@@ -16,9 +16,10 @@
   background-position: center center;
   border-bottom: 0px none;
   margin-top: 0;
+  margin-bottom: 0;
   min-height: auto;
   padding-top: 0;
-  padding-bottom: 0;
+  padding-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
 .downloadHeroBanner svg {

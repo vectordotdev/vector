@@ -22,7 +22,7 @@ function Download() {
     <Layout title="Download Vector">
       <header className={classnames('hero', styles.downloadHeroBanner)}>
         <div className="container">
-          <SVG src="/img/download.svg" />
+          <SVG src="/img/download.svg" height="200px" />
           <h1>Download Vector</h1>
         </div>
       </header>
