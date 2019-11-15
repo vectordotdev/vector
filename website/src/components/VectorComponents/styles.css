@@ -14,7 +14,7 @@
 }
 
 .vector-components--filters {
-  color: var(--ifm-color-content-secondary);  
+  color: var(--ifm-menu-color);  
   padding-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
