@@ -239,6 +239,7 @@ header.hero h1 {
 }
 .hero .hero__buttons .button {
   border-radius: 2rem;
+  color: var(--ifm-background-color);
   margin-right: 1rem;
   min-width: 240px;
 }
