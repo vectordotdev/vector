@@ -38,16 +38,20 @@ module.exports = {
           title: 'About',
           items: [
             {
-              label: 'Sources',
-              to: 'docs/components/sources',
+              label: 'What is Vector?',
+              to: 'docs/about/what-is-vector',
             },
             {
-              label: 'Transforms',
-              to: 'docs/components/trasnforms',
+              label: 'Concepts',
+              to: 'docs/about/concepts',
             },
             {
-              label: 'Sinks',
-              to: 'docs/components/sinks',
+              label: 'Data Model',
+              to: 'docs/about/data-model',
+            },
+            {
+              label: 'Guarantees',
+              to: 'docs/about/guarantees',
             },
           ],
         },
