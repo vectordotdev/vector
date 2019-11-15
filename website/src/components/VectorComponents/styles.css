@@ -14,8 +14,8 @@
 }
 
 .vector-components--filters {
-  color: var(--ifm-color-content-secondary);
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+  color: var(--ifm-color-content-secondary);  
+  padding-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
 .vector-components--filters--checkboxes {
@@ -44,6 +44,10 @@
 .vector-components--filters--section--title a {
   color: inherit;
   border-bottom: 1px solid var(--ifm-hr-border-color);
+}
+
+.vector-components--results {
+  padding-top: calc( var(--ifm-spacing-vertical) * 1 );  
 }
 
 .vector-components--grid {
@@ -99,8 +103,8 @@
   .vector-components--cols .vector-components--filters {
     border-right: 1px solid var(--ifm-hr-border-color);
     flex: 0 0 25%;
-    max-width: 250px;
-    padding: 0 var(--ifm-spacing-horizontal) 0 0;
+    max-width: calc(250px - var(--ifm-spacing-horizontal));
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
   }
 
   .vector-components--cols .vector-components--filters--search {
@@ -137,6 +141,6 @@
   .vector-components--cols .vector-components--results {
     flex: 1 0;
     max-width: 100%;
-    padding: 0 0 0 var(--ifm-spacing-horizontal);
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 3 );
   }
 }

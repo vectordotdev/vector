@@ -38,6 +38,41 @@ function Headings({headings, isChild}) {
   );
 }
 
+function Statuses({status, deliveryGuarantee}) {
+  if (!status && !deliveryGuarantee)
+    return null;
+
+  return (
+    <div className="section">
+      <div className="title">Status</div>
+      {status == "beta" &&
+        <div>
+          <Link to="/docs/about/guarantees#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
+            <i className="feather icon-alert-triangle"></i> beta
+          </Link>
+        </div>}
+      {status == "prod-ready" &&
+        <div>
+          <Link to="/docs/about/guarantees#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
+            <i className="feather icon-award"></i> prod-ready
+          </Link>
+        </div>}
+      {deliveryGuarantee == "best_effort" &&
+        <div>
+          <Link to="/docs/about/guarantees#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
+            <i className="feather icon-shield-off"></i> best-effort
+          </Link>
+        </div>}
+      {deliveryGuarantee == "at_least_once" &&
+        <div>
+          <Link to="/docs/about/guarantees#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
+            <i className="feather icon-shield"></i> at-least-once
+          </Link>
+        </div>}
+    </div>
+  );
+}
+
 function DocItem(props) {
   const {siteConfig = {}} = useDocusaurusContext();
   const {url: siteUrl} = siteConfig;
@@ -107,32 +142,7 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className={styles.tableOfContents}>
-                  {(status || delivery_guarantee) &&
-                    <div className="section">
-                      <div className="title">Status</div>
-                      {status == "beta" ?
-                        <div>
-                          <Link to="/docs/about/guarantees#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
-                            <i className="feather icon-alert-triangle"></i> beta
-                          </Link>
-                        </div> :
-                        <div>
-                          <Link to="/docs/about/guarantees#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
-                            <i className="feather icon-award"></i> prod-ready
-                          </Link>
-                        </div>}
-                      {delivery_guarantee == "best_effort" ?
-                        <div>
-                          <Link to="/docs/about/guarantees#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
-                            <i className="feather icon-shield-off"></i> best-effort
-                          </Link>
-                        </div> :
-                        <div>
-                          <Link to="/docs/about/guarantees#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
-                            <i className="feather icon-shield"></i> at-least-once
-                          </Link>
-                        </div>}
-                    </div>}
+                  <Statuses status={status} deliveryGuarantee={delivery_guarantee} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>

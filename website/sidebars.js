@@ -88,6 +88,15 @@ module.exports = {
             "setup/deployment/topologies",
           ]
         },
+        {
+          type: 'category',
+          label: 'Guides',
+          items: [
+            "setup/guides",
+            "setup/guides/getting-started",
+            "setup/guides/troubleshooting",
+          ]
+        },
       ],
     },
     {

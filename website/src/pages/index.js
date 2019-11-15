@@ -59,7 +59,7 @@ const features = [
     icon: 'shuffle',
     description: (
       <>
-        Vector unifies <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link> at the source, making it collect and ship all observability data.
+        Vector unifies <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link> at the source, making it easy to collect and ship all observability data.
       </>
     ),
   },
@@ -361,8 +361,8 @@ function Home() {
             collecting, transforming, and routing logs, metrics, and events.
           </p>
           <div className="hero__buttons">
-            <button className="button button--primary">Get Started</button>
-            <button className="button button--primary">Download v{latest_release.version}</button>
+            <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
+            <Link to="/download" className="button button--primary">Download v{latest_release.version}</Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
         </div>

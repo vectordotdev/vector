@@ -2,6 +2,8 @@
 title: Glossary
 ---
 
+The gloassary contains common terms and their definitions.
+
 ## Batch
 
 "Batch" refers to a [batched payload][docs.data-model.log] within a sink. It is a batch of events encoded into a payload that the downstream service understands.
@@ -144,7 +146,7 @@ reducing cost, etc.
 [docs.data-model.log]: /docs/about/data-model/log
 [docs.data-model.metric]: /docs/about/data-model/metric
 [docs.data_model]: /docs/about/data-model
-[docs.guides]: /docs/guides
+[docs.guides]: /docs/setup/guides
 [docs.performance]: /docs/about/performance
 [docs.roles]: /docs/setup/deployment/roles
 [docs.sinks]: /docs/components/sinks

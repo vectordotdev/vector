@@ -79,7 +79,7 @@ function NavLink(props) {
           })}>
       {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
       {props.label}
-      {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'default'}`)}>{attributes.badge}</span>}
+      {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
 }

@@ -1,14 +1,10 @@
 .componentsHero {
   padding: 0;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+  margin: 0;
   overflow: hidden;
 }
 
-.componentsHero canvas {
-
-}
-
 .componentsHeroOverlay {
-  margin-top: -250px;
-  margin-bottom: 50px;
+  margin-top: -15.25em;
+  margin-bottom: 4em;
 }

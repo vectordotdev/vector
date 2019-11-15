@@ -209,7 +209,7 @@ the License.
 [docs.from-archives]: https://vector.dev/docs/setup/installation/manual/from-archives
 [docs.from-source]: https://vector.dev/docs/setup/installation/manual/from-source
 [docs.guarantees]: https://vector.dev/docs/about/guarantees
-[docs.guides]: https://vector.dev/docs/guides
+[docs.guides]: https://vector.dev/docs/setup/guides
 [docs.installation]: https://vector.dev/docs/setup/installation
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems

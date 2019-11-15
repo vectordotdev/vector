@@ -113,7 +113,7 @@ module.exports = {
       ],
       logo: {
         alt: 'Timber.io',
-        src: '/img/timber-logo.png',
+        src: '/img/timber-logo.svg',
         href: 'https://timber.io/',
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,

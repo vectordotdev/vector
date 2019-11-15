@@ -114,8 +114,8 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
             {processedLabel}
             {eventTypes.length > 0 &&
               <span className="badges">
-                {eventTypes.includes("log") && <span className="badge" title="This component works with log events.">L</span>}
-                {eventTypes.includes("metric") && <span className="badge" title="This component works with metric events.">M</span>}
+                {eventTypes.includes("log") && <span className="badge badge--secondary" title="This component works with log events.">L</span>}
+                {eventTypes.includes("metric") && <span className="badge badge--secondary" title="This component works with metric events.">M</span>}
               </span>}
           </Link>
         </li>

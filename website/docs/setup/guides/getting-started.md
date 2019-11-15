@@ -1,6 +1,7 @@
 ---
-title: Sending Your First Event
-description: A "Hello World" getting started guide
+title: Getting Started Guide
+sidebar_label: Getting Started
+description: Quickly and easily get started with Vector
 ---
 
 This is a "Hello World" style guide that walks through sending your first
@@ -14,15 +15,17 @@ via the [`console` sink][docs.sinks.console].
 If you haven't already, [install Vector][docs.installation]:
 
 ```bash
-<%= install_command %>
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 ```
 
-Or view [platform specific installation instructions][docs.installation].
+Or [choose your preferred installation method][docs.installation].
 
 ## 2. Send Your Event
 
 Start by creating a temporary [Vector configuration file][docs.configuration]
 in your home directory:
+
+import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" />
 
@@ -106,14 +109,13 @@ of Vector. From here, you can start to think about the various
 you'll need to combine to create your pipelines.
 
 
-[assets.getting-started-guide]: ../../assets/getting-started-guide.svg
-[docs.concepts]: ../../about/concepts
-[docs.configuration]: ../../usage/configuration
-[docs.data-model#event]: ../../setup/getting-started/sending-your-first-event
-[docs.installation]: ../../setup/installation
-[docs.sinks.console]: ../../usage/configuration/sinks/console
-[docs.sinks]: ../../usage/configuration/sinks
-[docs.sources.stdin]: ../../usage/configuration/sources/stdin
-[docs.sources]: ../../usage/configuration/sources
-[docs.transforms.regex_parser]: ../../usage/configuration/transforms/regex_parser
-[docs.transforms]: ../../usage/configuration/transforms
+[docs.concepts]: /docs/about/concepts
+[docs.configuration]: /docs/setup/configuration
+[docs.data-model#event]: /docs/about/data-model#event
+[docs.installation]: /docs/setup/installation
+[docs.sinks.console]: /docs/components/sinks/console
+[docs.sinks]: /docs/components/sinks
+[docs.sources.stdin]: /docs/components/sources/stdin
+[docs.sources]: /docs/components/sources
+[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
+[docs.transforms]: /docs/components/transforms

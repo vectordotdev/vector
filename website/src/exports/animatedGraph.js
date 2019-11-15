@@ -25,7 +25,7 @@ export default function animatedGraph(canvas) {
     };
   }
 
-  d3.timer(function(elapsed) {
+  return d3.timer(function(elapsed) {
     context.save();
     context.clearRect(0, 0, width, height);
 
@@ -37,7 +37,7 @@ export default function animatedGraph(canvas) {
       p.vy += 0.2 * (Math.random() - .5) - 0.01 * p.vy;
       context.beginPath();
       context.arc(p.x, p.y, radius, 0, tau);
-      context.fillStyle = "rgba(40,217,242,0.3)";
+      context.fillStyle = "rgba(40,217,242,0.4)";
       context.fill();
     }
 

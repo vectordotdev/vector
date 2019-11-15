@@ -177,7 +177,6 @@ blockquote {
 
 .footer {
   --ifm-heading-margin-bottom: var(--ifm-spacing-vertical);
-  margin-top: var(--ifm-footer-padding-vertical);
   border-top: 1px solid var(--ifm-hr-border-color);
 }
 
@@ -217,10 +216,11 @@ header.hero h1 {
   margin-bottom: 0.3rem !important;
 }
 .hero {
-  padding: 5vw 0;
+  padding: 4em 0;
   text-align: center;
 }
 .hero .hero__subtitle {
+  color: var(--ifm-color-emphasis-600);
   font-size: 1.1rem;
 }
 .hero .hero__subtitle a {
@@ -243,6 +243,9 @@ header.hero h1 {
   margin-right: 0;
 }
 @media (max-width: 996px) {
+  .hero {
+    padding: 2em 0;
+  }
   .hero .hero__buttons .button {
     --ifm-button-padding-horizontal: 2rem;
     min-width: 180px;
@@ -486,11 +489,9 @@ input[type="text"]:focus {
   margin-top: -1px;
 }
 .menu .menu__link .badge {
-  background: var(--ifm-color-emphasis-50);
   background-clip: padding-box;
   border: 1px solid var(--ifm-color-emphasis-50);
   border-radius: 0.25em;
-  color: var(--ifm-color-emphasis-500);
   display: inline-block;
   font-family: monospace;
   font-size: 0.5rem;
@@ -518,16 +519,23 @@ input[type="text"]:focus {
   display: block;
   float: right;
   font-size: 0.6em;
+  line-height: 1;
   margin-top: -0.7em;
   margin-right: -1.5em;
   margin-left: -0.5em;
-  padding: 0.25em 0.5em;
+  padding: 0.3em 0.5em;
   position: relative;
   z-index: 1;
 }
-.navbar .navbar__item .badge--default {
-  background: var(--ifm-navbar-link-color);
-  color: var(--ifm-background-color);
+.navbar-sidebar__items .menu .menu__link {
+  display: block;
+}
+.navbar-sidebar__items .menu .menu__link .badge {
+  border-color: var(--ifm-background-color);
+  border-radius: 1em;
+  font-size: 0.6em;
+  margin-top: -1em;
+  margin-left: 0.25em;
 }
 
 .pagination-nav .pagination-nav__link {
@@ -619,6 +627,29 @@ section .sub-title {
 }
 .section-list.section-list--lg .section {
   margin-top: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+.container svg [fill="#000000"],
+.footer svg [fill="#000000"],
+.markdown svg [fill="#000000"] {
+  fill: var(--ifm-heading-color);
+}
+.container svg [stroke="#000000"],
+.footer svg [stroke="#000000"],
+.markdown svg [stroke="#000000"] {
+  stroke: var(--ifm-heading-color);
+}
+.container svg [stop-color="#000000"],
+.markdown svg [stop-color="#000000"] {
+  stop-color: var(--ifm-heading-color);
+}
+.container svg [fill="#FFFFFF"],
+.markdown svg [fill="#FFFFFF"] {
+  fill: var(--ifm-background-color);
+}
+.container svg [stroke="#FFFFFF"],
+.markdown svg [stroke="#FFFFFF"] {
+  stroke: var(--ifm-background-color);
 }
 
 table {
@@ -713,7 +744,6 @@ main[class^='docMainContainer_'] div.container div.row div.col.col--3 {
 }
 
 div[class^='docSidebarContainer_'] {
-  background-color: var(--ifm-sidebar-background);
   border-right-color: var(--ifm-sidebar-border-color);
   max-width: 250px;
   min-width: 250px;
@@ -781,7 +811,7 @@ html[data-theme="dark"] {
   --ifm-color-emphasis-75: var(--ifm-color-gray-925);
   --ifm-contents-border-color: var(--ifm-color-emphasis-75);
   --ifm-global-shadow-md: 0 3px 8px 0px rgba(0, 0, 0, 0.2);
-  --ifm-heading-color: rgb(200, 214, 229);
+  --ifm-heading-color: rgb(224, 235, 247);
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-panel-background: var(--ifm-color-emphasis-50);
   --ifm-panel-box-shadow: none;
@@ -851,16 +881,18 @@ html[data-theme='dark'] button.button.button--secondary:hover {
 }
 
 html[data-theme='dark'] .container svg [fill="#000000"],
+html[data-theme='dark'] .footer svg [fill="#000000"],
 html[data-theme='dark'] .markdown svg [fill="#000000"] {
-  fill: var(--ifm-font-base-color);
+  fill: var(--ifm-heading-color);
 }
 html[data-theme='dark'] .container svg [stroke="#000000"],
+html[data-theme='dark'] .footer svg [stroke="#000000"],
 html[data-theme='dark'] .markdown svg [stroke="#000000"] {
-  stroke: var(--ifm-font-base-color);
+  stroke: var(--ifm-heading-color);
 }
 html[data-theme='dark'] .container svg [stop-color="#000000"],
 html[data-theme='dark'] .markdown svg [stop-color="#000000"] {
-  stop-color: var(--ifm-font-base-color);
+  stop-color: var(--ifm-heading-color);
 }
 html[data-theme='dark'] .container svg [fill="#FFFFFF"],
 html[data-theme='dark'] .markdown svg [fill="#FFFFFF"] {

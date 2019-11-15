@@ -99,5 +99,5 @@ import Jump from '@site/src/components/Jump';
 [docs.process-management#flags]: /docs/administration/process-management#flags
 [docs.sinks]: /docs/components/sinks
 [docs.sources]: /docs/components/sources
-[docs.troubleshooting]: /docs/guides/troubleshooting
+[docs.troubleshooting]: /docs/setup/guides/troubleshooting
 [urls.issue_230]: https://github.com/timberio/vector/issues/230

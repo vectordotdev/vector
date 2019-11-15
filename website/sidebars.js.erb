@@ -87,6 +87,15 @@ module.exports = {
             <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,
           ]
         },
+        {
+          type: 'category',
+          label: 'Guides',
+          items: [
+            <%= metadata.links.fetch_id("docs.guides").to_json %>,
+            <%= metadata.links.fetch_id("docs.guides.getting-started").to_json %>,
+            <%= metadata.links.fetch_id("docs.guides.troubleshooting").to_json %>,
+          ]
+        },
       ],
     },
     {

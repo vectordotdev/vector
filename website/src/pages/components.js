@@ -13,7 +13,10 @@ function Components(props) {
   useEffect(() => {
     if (typeof document !== 'undefined') {
       let canvas = document.querySelector("canvas");
-      animatedGraph(canvas);
+      let timer = animatedGraph(canvas);
+      return () => {
+        timer.stop();
+      }
     }
   }, []);
 
@@ -25,12 +28,12 @@ function Components(props) {
           <div className={styles.componentsHeroOverlay}>
             <h1>Vector Components</h1>
             <div className="hero__subtitle">
-              Components allow you to collect, transform, and route data with ease. <Link href="/docs/about/concepts">Learn more</Link>.
+              Components allow you to collect, transform, and route data with ease. <Link to="/docs/about/concepts">Learn more</Link>.
             </div>
           </div>
         </div>
       </header>
-      <main className="container container--fluid">
+      <main>
         <VectorComponents filterColumn={true} headingLevel={2} location={props.location} />
       </main>
     </Layout>

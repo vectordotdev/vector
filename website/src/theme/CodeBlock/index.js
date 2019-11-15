@@ -6,14 +6,15 @@
  */
 
 import React, {useEffect, useState, useRef} from 'react';
-import classnames from 'classnames';
 import Highlight, {defaultProps} from 'prism-react-renderer';
-import defaultTheme from 'prism-react-renderer/themes/palenight';
 import Clipboard from 'clipboard';
+import Prism from 'prism-react-renderer/prism';
+
+import classnames from 'classnames';
+import defaultTheme from 'prism-react-renderer/themes/palenight';
 import rangeParser from 'parse-numeric-range';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import styles from './styles.module.css';
-import Prism from 'prism-react-renderer/prism';
 import useTheme from '@theme/hooks/useTheme';
 
 (typeof global !== 'undefined' ? global : window).Prism = Prism;
