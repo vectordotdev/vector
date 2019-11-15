@@ -269,7 +269,7 @@ function VectorComponents(props) {
             </label>
           </span>
           <FilterList
-            label="Service Providers"
+            label="Providers"
             icon="cloud"
             values={serviceProviders}
             currentState={onlyProviders}

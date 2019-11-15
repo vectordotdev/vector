@@ -20,11 +20,13 @@
 
 .vector-components--filters--checkboxes {
   font-size: 0.9em;
-  padding: calc( var(--ifm-spacing-vertical) / 2 ) var(--ifm-spacing-horizontal);
+  padding: var(--ifm-spacing-vertical) calc( var(--ifm-spacing-horizontal) / 2 );
 }
 
 .vector-components--filters--checkboxes label {
   margin-left: 0.75em;
+  margin-top: calc( var(--ifm-spacing-vertical) / 4 );
+  white-space: nowrap;
 }
 
 .vector-components--filters--checkboxes label input {
@@ -36,7 +38,11 @@
 }
 
 .vector-components--filters--section--title {
-  flex: 0 0 15%;
+  border-right: 1px solid var(--ifm-hr-border-color) ;
+  flex: 0 0 13%;
+  min-width: 120px;
+  padding-top: calc( var(--ifm-spacing-vertical) / 4 );
+  padding-right: 1em;
   text-align: right;
   white-space: nowrap;
 }
@@ -122,8 +128,10 @@
   }
 
   .vector-components--cols .vector-components--filters--section--title {
+    border: 0px none;
     font-size: 0.9em;
     font-weight: bold;
+    margin: 0;
     margin-bottom: var(--ifm-spacing-vertical);
     text-align: left;
     text-transform: uppercase;
