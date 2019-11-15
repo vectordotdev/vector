@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.4.0-dev"
+version = "0.6.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
@@ -20,10 +20,7 @@ assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
-  ["config/examples/complete/*", "/etc/vector/examples/complex/", "644"],
-  ["config/examples/sources/*", "/etc/vector/examples/sources/", "644"],
-  ["config/examples/transforms/*", "/etc/vector/examples/transforms/", "644"],
-  ["config/examples/sinks/*", "/etc/vector/examples/sinks/", "644"],
+  ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
 
@@ -65,12 +62,12 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing" }
 hotmic = "0.8"
 
 # Aws
-rusoto_core = "0.37.0"
-rusoto_s3 = "0.37.0"
-rusoto_logs = "0.37.0"
-rusoto_cloudwatch = "0.37.0"
-rusoto_kinesis = "0.37.0"
-rusoto_credential = "0.16.0"
+rusoto_core = "0.41.0"
+rusoto_s3 = "0.41.0"
+rusoto_logs = "0.41.0"
+rusoto_cloudwatch = "0.41.0"
+rusoto_kinesis = "0.41.0"
+rusoto_credential = "0.41.1"
 
 # Tower
 tower = "0.1.1"
@@ -94,10 +91,10 @@ regex = "1.0.5"
 bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
 prometheus = "0.4.2"
-hyper = "0.12.18"
-hyper-tls = "0.3.1"
+hyper = "0.12.35"
+hyper-tls = "0.3.2"
 native-tls = "0.2.3"
-openssl = "0.10.25"
+openssl = { version = "0.10.25", features = ["vendored"] }
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
@@ -109,18 +106,18 @@ toml = "0.4"
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
-leveldb = { version = "0.8.4", optional = true }
+leveldb = { git = "https://github.com/timberio/leveldb", optional = true }
 db-key = "0.0.5"
 headers = "0.2.1"
-rdkafka = { version = "0.20.0", features = ["ssl"], optional = true }
+rdkafka = { git = "https://github.com/timberio/rust-rdkafka", features = ["ssl", "ssl_vendored"], optional = true }
 hostname = "0.1.5"
 seahash = "3.0.6"
 jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
-rlua = "0.16.3"
+rlua = { git = "https://github.com/timberio/rlua" }
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
-grok = "1.0.0"
+grok = "~1.0.1"
 nom = "5.0.0"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 exitcode = "1.1.2"
@@ -130,6 +127,7 @@ base64 = "0.10.1"
 shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
 owning_ref = "0.4.0"
 listenfd = "0.3.3"
+inventory = "0.1"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -142,7 +140,7 @@ reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
-elastic = { git = "https://github.com/elastic-rs/elastic" }
+elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
 proptest = "0.9"
@@ -171,6 +169,7 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
+nightly = []
 
 [[bench]]
 name = "bench"

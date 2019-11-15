@@ -176,6 +176,12 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model#log] events to a f
 
 ## How It Works
 
+### Dynamic file and directory creation
+
+Vector will attempt to create the entire directory structure and the file when
+emitting events to the file sink. This requires that the Vector agent have
+the correct permissions to create and write to files in the specified directories.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -195,7 +201,7 @@ event-by-event basis. It does not batch data.
 The[`path`](#path) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />

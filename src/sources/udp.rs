@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
@@ -27,6 +27,10 @@ impl UdpConfig {
     }
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<UdpConfig>("udp")
+}
+
 #[typetag::serde(name = "udp")]
 impl SourceConfig for UdpConfig {
     fn build(
@@ -41,6 +45,10 @@ impl SourceConfig for UdpConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "udp"
     }
 }
 
@@ -83,6 +91,7 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
 mod test {
     use super::UdpConfig;
     use crate::event;
+    use crate::runtime;
     use crate::test_util::{collect_n, next_addr};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
@@ -120,13 +129,13 @@ mod test {
         bind
     }
 
-    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, tokio::runtime::Runtime) {
+    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, runtime::Runtime) {
         let addr = next_addr();
 
         let server = UdpConfig::new(addr)
             .build("default", &GlobalOptions::default(), sender)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
 
         // Wait for udp to start listening

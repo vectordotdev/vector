@@ -37,17 +37,6 @@
   width: 100%;
 }
 
-@media (max-width: 996px) {
-  .downloadHeroBanner svg {
-    display: none;
-  }
-
-  .downloadHeroBanner {
-    background: none;
-    padding-top: 5vw;
-  }
-}
-
 .downloadLine {
   height: 150px;
   margin-top: -10px;

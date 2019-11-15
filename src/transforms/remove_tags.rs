@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,10 @@ pub struct RemoveTags {
     tags: Vec<Atom>,
 }
 
+inventory::submit! {
+    TransformDescription::new_without_default::<RemoveTagsConfig>("remove_tags")
+}
+
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
     fn build(&self) -> crate::Result<Box<dyn Transform>> {
@@ -28,6 +32,10 @@ impl TransformConfig for RemoveTagsConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Metric
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "remove_tags"
     }
 }
 

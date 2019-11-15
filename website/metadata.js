@@ -625,11 +625,11 @@ module.exports = {
       "id": "journald_source",
       "name": "journald",
       "options": {
-        "current_runtime_only": {
-          "name": "current_runtime_only",
+        "current_boot_only": {
+          "name": "current_boot_only",
           "category": "General",
           "default": true,
-          "description": "Include only entries from the current runtime (boot)",
+          "description": "Include only entries from the current boot.",
           "display": null,
           "enum": null,
           "examples": [
@@ -644,6 +644,26 @@ module.exports = {
           "relevant_when": null,
           "templateable": false,
           "type": "bool",
+          "unit": null
+        },
+        "batch_size": {
+          "name": "batch_size",
+          "category": "General",
+          "default": 16,
+          "description": "The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.",
+          "display": null,
+          "enum": null,
+          "examples": [
+            16
+          ],
+          "null": true,
+          "options": [
+
+          ],
+          "partition_key": false,
+          "relevant_when": null,
+          "templateable": false,
+          "type": "int",
           "unit": null
         },
         "data_dir": {
@@ -946,9 +966,9 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae641068>",
-            "#<Option:0x00007fa9ae640e60>",
-            "#<Option:0x00007fa9ae640c58>"
+            "#<Option:0x00007fdad25b32b8>",
+            "#<Option:0x00007fdad25b30d8>",
+            "#<Option:0x00007fdad25b2ed0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1360,11 +1380,11 @@ module.exports = {
           ],
           "null": false,
           "options": [
-            "#<Option:0x00007fa9ae6584e8>",
-            "#<Option:0x00007fa9ae658308>",
-            "#<Option:0x00007fa9ae658178>",
-            "#<Option:0x00007fa9ae663f28>",
-            "#<Option:0x00007fa9ae663d98>"
+            "#<Option:0x00007fdad25ca760>",
+            "#<Option:0x00007fdad25ca580>",
+            "#<Option:0x00007fdad25ca3f0>",
+            "#<Option:0x00007fdad25ca1e8>",
+            "#<Option:0x00007fdad25ca058>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1572,7 +1592,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae66bf20>"
+            "#<Option:0x00007fdad25d2140>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -1626,6 +1646,47 @@ module.exports = {
             "message"
           ],
           "null": false,
+          "options": [
+
+          ],
+          "partition_key": false,
+          "relevant_when": null,
+          "templateable": false,
+          "type": "string",
+          "unit": null
+        },
+        "overwrite_target": {
+          "name": "overwrite_target",
+          "category": "General",
+          "default": "false",
+          "description": "If `target_field` is set and the log contains a field of the same name as the target, it will only be overwritten if this is set to `true`.",
+          "display": null,
+          "enum": null,
+          "examples": [
+            true,
+            false
+          ],
+          "null": true,
+          "options": [
+
+          ],
+          "partition_key": false,
+          "relevant_when": null,
+          "templateable": false,
+          "type": "bool",
+          "unit": null
+        },
+        "target_field": {
+          "name": "target_field",
+          "category": "General",
+          "default": null,
+          "description": "If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error.",
+          "display": null,
+          "enum": null,
+          "examples": [
+            "target"
+          ],
+          "null": true,
           "options": [
 
           ],
@@ -1993,7 +2054,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae671240>"
+            "#<Option:0x00007fdad25e29a0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2028,7 +2089,7 @@ module.exports = {
           ],
           "null": false,
           "options": [
-            "#<Option:0x00007fa9ae6705e8>"
+            "#<Option:0x00007fdad25e1d48>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2151,7 +2212,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae679c10>"
+            "#<Option:0x00007fdad25eb280>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2186,7 +2247,7 @@ module.exports = {
           ],
           "null": false,
           "options": [
-            "#<Option:0x00007fa9ae678fb8>"
+            "#<Option:0x00007fdad25ea628>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2475,7 +2536,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae680218>"
+            "#<Option:0x00007fdad25f1018>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -2615,7 +2676,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6896d8>"
+            "#<Option:0x00007fdad25f9ab0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -3448,10 +3509,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6abd28>",
-            "#<Option:0x00007fa9ae6abb48>",
-            "#<Option:0x00007fa9ae6ab968>",
-            "#<Option:0x00007fa9ae6ab7d8>"
+            "#<Option:0x00007fdad261bbd8>",
+            "#<Option:0x00007fdad261b9f8>",
+            "#<Option:0x00007fdad261b818>",
+            "#<Option:0x00007fdad261b688>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -3731,10 +3792,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6b28f8>",
-            "#<Option:0x00007fa9ae6b2718>",
-            "#<Option:0x00007fa9ae6b2510>",
-            "#<Option:0x00007fa9ae6b2380>"
+            "#<Option:0x00007fdad26227f8>",
+            "#<Option:0x00007fdad2622618>",
+            "#<Option:0x00007fdad2622438>",
+            "#<Option:0x00007fdad26222a8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4080,10 +4141,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6c3d10>",
-            "#<Option:0x00007fa9ae6c3b30>",
-            "#<Option:0x00007fa9ae6c3950>",
-            "#<Option:0x00007fa9ae6c37c0>"
+            "#<Option:0x00007fdad2633d28>",
+            "#<Option:0x00007fdad2633b48>",
+            "#<Option:0x00007fdad2633968>",
+            "#<Option:0x00007fdad26337d8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4290,13 +4351,13 @@ module.exports = {
           "name": "host",
           "category": "General",
           "default": null,
-          "description": "The host of your Elasticsearch cluster. This should be the full URL as shown in the example.",
+          "description": "The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `\"aws\"`",
           "display": null,
           "enum": null,
           "examples": [
             "http://10.24.32.122:9000"
           ],
-          "null": false,
+          "null": true,
           "options": [
 
           ],
@@ -4339,8 +4400,8 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6cb768>",
-            "#<Option:0x00007fa9ae6cb5d8>"
+            "#<Option:0x00007fdad263b870>",
+            "#<Option:0x00007fdad263b6e0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4360,7 +4421,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6cab60>"
+            "#<Option:0x00007fdad263ac68>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4404,7 +4465,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6c9df0>"
+            "#<Option:0x00007fdad2639f20>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4509,10 +4570,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6d36c0>",
-            "#<Option:0x00007fa9ae6d34b8>",
-            "#<Option:0x00007fa9ae6d32d8>",
-            "#<Option:0x00007fa9ae6d3148>"
+            "#<Option:0x00007fdad2643818>",
+            "#<Option:0x00007fdad2643638>",
+            "#<Option:0x00007fdad2643458>",
+            "#<Option:0x00007fdad26432c8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4532,12 +4593,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6d2388>",
-            "#<Option:0x00007fa9ae6d21f8>",
-            "#<Option:0x00007fa9ae6d2068>",
-            "#<Option:0x00007fa9ae6d1ed8>",
-            "#<Option:0x00007fa9ae6d1d48>",
-            "#<Option:0x00007fa9ae6d1b18>"
+            "#<Option:0x00007fdad2642508>",
+            "#<Option:0x00007fdad2642378>",
+            "#<Option:0x00007fdad26421e8>",
+            "#<Option:0x00007fdad2642058>",
+            "#<Option:0x00007fdad2641ec8>",
+            "#<Option:0x00007fdad2641cc0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4884,10 +4945,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6e3e80>",
-            "#<Option:0x00007fa9ae6e3ca0>",
-            "#<Option:0x00007fa9ae6e3ac0>",
-            "#<Option:0x00007fa9ae6e3930>"
+            "#<Option:0x00007fdad2648160>",
+            "#<Option:0x00007fdad2653f38>",
+            "#<Option:0x00007fdad2653d58>",
+            "#<Option:0x00007fdad2653bc8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -4907,11 +4968,11 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6e2bc0>",
-            "#<Option:0x00007fa9ae6e29b8>",
-            "#<Option:0x00007fa9ae6e2828>",
-            "#<Option:0x00007fa9ae6e2698>",
-            "#<Option:0x00007fa9ae6e2508>"
+            "#<Option:0x00007fdad2652e80>",
+            "#<Option:0x00007fdad2652c78>",
+            "#<Option:0x00007fdad2652ae8>",
+            "#<Option:0x00007fdad2652958>",
+            "#<Option:0x00007fdad26527c8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5075,10 +5136,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6eb2c0>",
-            "#<Option:0x00007fa9ae6eb0e0>",
-            "#<Option:0x00007fa9ae6eaf00>",
-            "#<Option:0x00007fa9ae6ead70>"
+            "#<Option:0x00007fdad265b6c0>",
+            "#<Option:0x00007fdad265b4e0>",
+            "#<Option:0x00007fdad265b300>",
+            "#<Option:0x00007fdad265b170>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5098,12 +5159,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6e9fb0>",
-            "#<Option:0x00007fa9ae6e9df8>",
-            "#<Option:0x00007fa9ae6e9c18>",
-            "#<Option:0x00007fa9ae6e9a38>",
-            "#<Option:0x00007fa9ae6e9880>",
-            "#<Option:0x00007fa9ae6e9650>"
+            "#<Option:0x00007fdad265a3b0>",
+            "#<Option:0x00007fdad265a220>",
+            "#<Option:0x00007fdad265a090>",
+            "#<Option:0x00007fdad2659f00>",
+            "#<Option:0x00007fdad2659d70>",
+            "#<Option:0x00007fdad2659b68>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5572,10 +5633,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae6f9028>",
-            "#<Option:0x00007fa9ae6f8e48>",
-            "#<Option:0x00007fa9ae6f8c68>",
-            "#<Option:0x00007fa9ae6f8ad8>"
+            "#<Option:0x00007fdad2669a68>",
+            "#<Option:0x00007fdad2669888>",
+            "#<Option:0x00007fdad26696a8>",
+            "#<Option:0x00007fdad2669518>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5830,8 +5891,8 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae700cb0>",
-            "#<Option:0x00007fa9ae700b20>"
+            "#<Option:0x00007fdad2671718>",
+            "#<Option:0x00007fdad2671588>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5938,10 +5999,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae70a3a0>",
-            "#<Option:0x00007fa9ae70a1c0>",
-            "#<Option:0x00007fa9ae709fe0>",
-            "#<Option:0x00007fa9ae709e50>"
+            "#<Option:0x00007fdad267ae30>",
+            "#<Option:0x00007fdad267ac50>",
+            "#<Option:0x00007fdad267aa70>",
+            "#<Option:0x00007fdad267a8e0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -5961,12 +6022,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae709090>",
-            "#<Option:0x00007fa9ae708f00>",
-            "#<Option:0x00007fa9ae708d48>",
-            "#<Option:0x00007fa9ae708bb8>",
-            "#<Option:0x00007fa9ae708a28>",
-            "#<Option:0x00007fa9ae708820>"
+            "#<Option:0x00007fdad2679b20>",
+            "#<Option:0x00007fdad2679990>",
+            "#<Option:0x00007fdad2679800>",
+            "#<Option:0x00007fdad2679670>",
+            "#<Option:0x00007fdad26794e0>",
+            "#<Option:0x00007fdad26792d8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6555,10 +6616,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae7223d8>",
-            "#<Option:0x00007fa9ae722180>",
-            "#<Option:0x00007fa9ae721f78>",
-            "#<Option:0x00007fa9ae721d98>"
+            "#<Option:0x00007fdad26937a0>",
+            "#<Option:0x00007fdad26935c0>",
+            "#<Option:0x00007fdad26933e0>",
+            "#<Option:0x00007fdad2693250>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6578,13 +6639,13 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae720d80>",
-            "#<Option:0x00007fa9ae720b78>",
-            "#<Option:0x00007fa9ae7209e8>",
-            "#<Option:0x00007fa9ae720858>",
-            "#<Option:0x00007fa9ae7206c8>",
-            "#<Option:0x00007fa9ae720538>",
-            "#<Option:0x00007fa9ae720330>"
+            "#<Option:0x00007fdad2692418>",
+            "#<Option:0x00007fdad2692210>",
+            "#<Option:0x00007fdad2692080>",
+            "#<Option:0x00007fdad2691ef0>",
+            "#<Option:0x00007fdad2691d60>",
+            "#<Option:0x00007fdad2691bd0>",
+            "#<Option:0x00007fdad26919c8>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6619,8 +6680,8 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae72b668>",
-            "#<Option:0x00007fa9ae72b4d8>"
+            "#<Option:0x00007fdad2690d70>",
+            "#<Option:0x00007fdad2690be0>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6640,7 +6701,7 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae72aa88>"
+            "#<Option:0x00007fdad2690190>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6789,10 +6850,10 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae733688>",
-            "#<Option:0x00007fa9ae7334a8>",
-            "#<Option:0x00007fa9ae7332c8>",
-            "#<Option:0x00007fa9ae733138>"
+            "#<Option:0x00007fdad2698de0>",
+            "#<Option:0x00007fdad2698c00>",
+            "#<Option:0x00007fdad2698a20>",
+            "#<Option:0x00007fdad2698890>"
           ],
           "partition_key": false,
           "relevant_when": null,
@@ -6812,12 +6873,12 @@ module.exports = {
           ],
           "null": true,
           "options": [
-            "#<Option:0x00007fa9ae732350>",
-            "#<Option:0x00007fa9ae7321c0>",
-            "#<Option:0x00007fa9ae732008>",
-            "#<Option:0x00007fa9ae731e78>",
-            "#<Option:0x00007fa9ae731ce8>",
-            "#<Option:0x00007fa9ae731ae0>"
+            "#<Option:0x00007fdad26a3a88>",
+            "#<Option:0x00007fdad26a38f8>",
+            "#<Option:0x00007fdad26a3768>",
+            "#<Option:0x00007fdad26a35d8>",
+            "#<Option:0x00007fdad26a3448>",
+            "#<Option:0x00007fdad26a3240>"
           ],
           "partition_key": false,
           "relevant_when": null,

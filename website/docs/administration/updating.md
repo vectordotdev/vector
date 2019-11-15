@@ -6,15 +6,24 @@ description: Updating Vector to a later version
 Updating Vector depends largely on your [installation][docs.installation] 
 method. Each installation guide provides it's own "Updating" section:
 
-1. Containers
-   1. [Updating Docker][docs.containers.docker#updating]
-2. Package Managers
-   1. [Updating with DPKG][docs.dpkg#updating]
-   2. [Updating with Homebrew][docs.homebrew#updating]
-   3. [Updating with RPM][docs.rpm#updating]
-3. Manual
-   1. [Updating from archives][docs.from_archives#updating]
-   1. [Updating from source][docs.from_archives#updating]
+---
+
+**Containers**
+
+import Jump from '@site/src/components/Jump';
+
+<Jump to="[[[Docker][docs.containers.docker#updating]]]">Docker</Jump>
+
+**Package managers**
+
+<Jump to="[[[DPKG][docs.package_managers.dpkg#updating]]]">DPKG</Jump>
+<Jump to="[[[Homebrew][docs.package_managers.homebrew#updating]]]">Homebrew</Jump>
+<Jump to="[[[RPM][docs.package_managers.rpm#updating]]]">RPM</Jump>
+
+**Manual**
+
+<Jump to="/docs/setup/installation/manual/from-archives#updating">Updating from archives</Jump>
+<Jump to="/docs/setup/installation/manual/from-source#updating">Updating from source</Jump>
 
 ## Working Upstream
 
@@ -36,9 +45,8 @@ to account for spikes and updating.
 
 
 [docs.containers.docker#updating]: /docs/setup/installation/containers/docker#updating
-[docs.dpkg#updating]: /docs/setup/installation/package-managers/dpkg#updating
-[docs.from_archives#updating]: /docs/setup/installation/manual/from-archives#updating
-[docs.homebrew#updating]: /docs/setup/installation/package-managers/homebrew#updating
 [docs.installation]: /docs/setup/installation
-[docs.rpm#updating]: /docs/setup/installation/package-managers/rpm#updating
+[docs.package_managers.dpkg#updating]: /docs/setup/installation/package-managers/dpkg#updating
+[docs.package_managers.homebrew#updating]: /docs/setup/installation/package-managers/homebrew#updating
+[docs.package_managers.rpm#updating]: /docs/setup/installation/package-managers/rpm#updating
 [docs.topologies]: /docs/setup/deployment/topologies

@@ -9,5 +9,3 @@ gnu = "config"
 posix = "c"
 type = "string"
 description = "Read configuration from the specified file"
-
-[cli.commands.validate]

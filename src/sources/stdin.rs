@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -28,6 +28,10 @@ fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
+inventory::submit! {
+    SourceDescription::new::<StdinConfig>("stdin")
+}
+
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     fn build(
@@ -45,6 +49,10 @@ impl SourceConfig for StdinConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "stdin"
     }
 }
 

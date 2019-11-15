@@ -28,6 +28,10 @@ impl config::SinkConfig for PanicSink {
     fn input_type(&self) -> config::DataType {
         config::DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "panic"
+    }
 }
 
 impl Sink for PanicSink {
@@ -99,6 +103,10 @@ impl config::SinkConfig for ErrorSink {
 
     fn input_type(&self) -> config::DataType {
         config::DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "panic"
     }
 }
 
@@ -173,6 +181,10 @@ impl config::SourceConfig for ErrorSourceConfig {
     fn output_type(&self) -> config::DataType {
         config::DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "tcp"
+    }
 }
 
 #[test]
@@ -231,6 +243,10 @@ impl config::SourceConfig for PanicSourceConfig {
 
     fn output_type(&self) -> config::DataType {
         config::DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "tcp"
     }
 }
 

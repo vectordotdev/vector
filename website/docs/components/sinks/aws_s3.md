@@ -750,7 +750,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 The[`key_prefix`](#key_prefix) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />

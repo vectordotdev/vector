@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex};
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
@@ -20,6 +20,22 @@ pub struct RegexParserConfig {
     pub drop_field: bool,
     pub drop_failed: bool,
     pub types: HashMap<Atom, String>,
+}
+
+impl Default for RegexParserConfig {
+    fn default() -> Self {
+        RegexParserConfig {
+            regex: String::default(),
+            field: None,
+            drop_field: true,
+            drop_failed: false,
+            types: HashMap::default(),
+        }
+    }
+}
+
+inventory::submit! {
+    TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
 #[typetag::serde(name = "regex_parser")]
@@ -50,6 +66,10 @@ impl TransformConfig for RegexParserConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "regex"
     }
 }
 

@@ -51,7 +51,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "journald" # example, must be: "journald"
   
   # OPTIONAL
-  current_runtime_only = true # default
+  batch_size = 16 # default
+  current_boot_only = true # default
   data_dir = "/var/lib/vector" # example, no default
   local_only = true # default
   units = ["ntpd", "sysinit.target"] # default
@@ -72,10 +73,33 @@ import Field from '@site/src/components/Field';
 
 <Field
   common={false}
+  defaultValue={16}
+  enumValues={null}
+  examples={[16]}
+  name={"batch_size"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### batch_size
+
+The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
-  name={"current_runtime_only"}
+  name={"current_boot_only"}
   nullable={true}
   path={null}
   relevantWhen={null}
@@ -85,9 +109,9 @@ import Field from '@site/src/components/Field';
   unit={null}
   >
 
-### current_runtime_only
+### current_boot_only
 
-Include only entries from the current runtime (boot)
+Include only entries from the current boot.
 
 
 </Field>

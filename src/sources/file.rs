@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
 };
 use bytes::{Bytes, BytesMut};
@@ -118,6 +118,10 @@ impl Default for FileConfig {
     }
 }
 
+inventory::submit! {
+    SourceDescription::new::<FileConfig>("file")
+}
+
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     fn build(
@@ -141,6 +145,10 @@ impl SourceConfig for FileConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "file"
     }
 }
 
@@ -342,6 +350,7 @@ fn create_event(
 mod tests {
     use super::*;
     use crate::event;
+    use crate::runtime;
     use crate::sources::file;
     use crate::test_util::{block_on, shutdown_on_idle};
     use crate::topology::Config;
@@ -380,7 +389,7 @@ mod tests {
     }
 
     fn sleep() {
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
     #[test]
@@ -476,7 +485,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -537,7 +546,7 @@ mod tests {
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -606,7 +615,7 @@ mod tests {
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -678,7 +687,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -725,7 +734,7 @@ mod tests {
 
     #[test]
     fn file_file_key() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         let (trigger, tripwire) = Tripwire::new();
 
@@ -845,7 +854,7 @@ mod tests {
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -867,7 +876,7 @@ mod tests {
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -894,7 +903,7 @@ mod tests {
             };
             let (tx, rx) = futures::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -930,7 +939,7 @@ mod tests {
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -956,7 +965,7 @@ mod tests {
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -982,7 +991,7 @@ mod tests {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         let (tx, rx) = futures::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
         let dir = tempdir().unwrap();
@@ -1080,7 +1089,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -1135,7 +1144,7 @@ mod tests {
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -1220,7 +1229,7 @@ mod tests {
         sleep();
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
         sleep();
@@ -1279,7 +1288,7 @@ mod tests {
         sleep();
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
         sleep();

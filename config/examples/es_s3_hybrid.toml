@@ -31,5 +31,5 @@ data_dir = "/var/lib/vector"
   region       = "us-east-1"
   bucket       = "my_log_archives"
   batch_size   = 10000000 # 10mb uncompressed
-  gzip         = true
   encoding     = "ndjson"
+  compression  = "gzip"

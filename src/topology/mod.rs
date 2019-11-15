@@ -1,12 +1,14 @@
 pub mod builder;
 pub mod config;
 mod fanout;
+mod task;
 
 pub use self::config::Config;
 
 use crate::topology::builder::Pieces;
 
 use crate::buffers;
+use crate::runtime;
 use futures::{
     future,
     sync::{mpsc, oneshot},
@@ -33,7 +35,7 @@ pub struct RunningTopology {
 
 pub fn start(
     config: Config,
-    rt: &mut tokio::runtime::Runtime,
+    rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     validate(&config).and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
@@ -42,7 +44,7 @@ pub fn start(
 pub fn start_validated(
     config: Config,
     mut pieces: Pieces,
-    rt: &mut tokio::runtime::Runtime,
+    rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
@@ -157,7 +159,7 @@ impl RunningTopology {
     pub fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
         if self.config.global.data_dir != new_config.global.data_dir {
@@ -183,7 +185,7 @@ impl RunningTopology {
         &mut self,
         new_config: &Config,
         pieces: &mut Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
         let (_, sinks_to_change, sinks_to_add) =
@@ -212,12 +214,7 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_all(
-        &mut self,
-        new_config: Config,
-        mut new_pieces: Pieces,
-        rt: &mut tokio::runtime::Runtime,
-    ) {
+    fn spawn_all(&mut self, new_config: Config, mut new_pieces: Pieces, rt: &mut runtime::Runtime) {
         // Sources
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
@@ -318,11 +315,11 @@ impl RunningTopology {
         &mut self,
         name: &str,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("sink", %name));
+        let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
+        let task = handle_errors(task.instrument(span), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -333,11 +330,11 @@ impl RunningTopology {
         &mut self,
         name: &str,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("transform", %name));
+        let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
+        let task = handle_errors(task.instrument(span), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -348,11 +345,12 @@ impl RunningTopology {
         &mut self,
         name: &str,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(info_span!("source-pump", %name));
+        let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
+
+        let task = handle_errors(task.instrument(span.clone()), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
@@ -363,8 +361,7 @@ impl RunningTopology {
             .insert(name.to_string(), shutdown_trigger);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone());
-        let source_task = source_task.instrument(info_span!("source", %name));
+        let source_task = handle_errors(source_task.instrument(span), self.abort_tx.clone());
         self.source_tasks.insert(
             name.to_string(),
             oneshot::spawn(source_task, &rt.executor()),
@@ -510,7 +507,7 @@ where
 }
 
 fn handle_errors(
-    task: builder::Task,
+    task: impl Future<Item = (), Error = ()>,
     abort_tx: mpsc::UnboundedSender<()>,
 ) -> impl Future<Item = (), Error = ()> {
     AssertUnwindSafe(task)
@@ -526,6 +523,7 @@ fn handle_errors(
 
 #[cfg(test)]
 mod tests {
+    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
@@ -539,6 +537,14 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(next_addr().into()));
+        old_config.add_sink(
+            "out",
+            &[&"in"],
+            ConsoleSinkConfig {
+                target: Target::Stdout,
+                encoding: Encoding::Text,
+            },
+        );
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 

@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{Event, ValueKind},
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -19,6 +19,10 @@ pub struct AddFields {
     fields: IndexMap<Atom, ValueKind>,
 }
 
+inventory::submit! {
+    TransformDescription::new_without_default::<AddFieldsConfig>("add_fields")
+}
+
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
     fn build(&self) -> crate::Result<Box<dyn Transform>> {
@@ -31,6 +35,10 @@ impl TransformConfig for AddFieldsConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "add_fields"
     }
 }
 

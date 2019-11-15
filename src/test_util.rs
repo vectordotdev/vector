@@ -1,4 +1,6 @@
+use crate::runtime::Runtime;
 use crate::Event;
+
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -14,7 +16,6 @@ use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::{Builder, Runtime};
 use tokio::util::FutureExt;
 
 #[macro_export]
@@ -64,6 +65,18 @@ pub fn send_lines(
                 })
                 .map(|_| ())
         })
+}
+
+pub fn temp_file() -> std::path::PathBuf {
+    let path = std::env::temp_dir();
+    let file_name = random_string(16);
+    path.join(file_name + ".log")
+}
+
+pub fn temp_dir() -> std::path::PathBuf {
+    let path = std::env::temp_dir();
+    let dir_name = random_string(16);
+    path.join(dir_name)
 }
 
 pub fn random_lines_with_stream(
@@ -170,7 +183,7 @@ where
 }
 
 pub fn runtime() -> Runtime {
-    Builder::new().core_threads(1).build().unwrap()
+    Runtime::single_threaded().unwrap()
 }
 
 pub fn wait_for_tcp(addr: SocketAddr) {
@@ -290,7 +303,7 @@ impl CountReceiver {
 }
 
 pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
-    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = Runtime::new().unwrap();
 
     let listener = TcpListener::bind(addr).unwrap();
 

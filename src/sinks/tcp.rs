@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{
@@ -69,6 +69,10 @@ impl TcpSinkConfig {
     }
 }
 
+inventory::submit! {
+    SinkDescription::new_without_default::<TcpSinkConfig>("tcp")
+}
+
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -106,6 +110,10 @@ impl SinkConfig for TcpSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "tcp"
     }
 }
 

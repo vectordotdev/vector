@@ -1,4 +1,5 @@
 use crate::{event::Event, sinks, sources, transforms};
+use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -6,6 +7,7 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
+pub mod component;
 mod validation;
 mod vars;
 
@@ -14,7 +16,9 @@ mod vars;
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    #[serde(default)]
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
@@ -26,7 +30,7 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
 }
 
-fn default_data_dir() -> Option<PathBuf> {
+pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
@@ -113,7 +117,13 @@ pub trait SourceConfig: core::fmt::Debug {
     ) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
+
+    fn source_type(&self) -> &'static str;
 }
+
+pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
+
+inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
@@ -134,7 +144,13 @@ pub trait SinkConfig: core::fmt::Debug {
     ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
+
+    fn sink_type(&self) -> &'static str;
 }
+
+pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
+
+inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
@@ -150,7 +166,13 @@ pub trait TransformConfig: core::fmt::Debug {
     fn input_type(&self) -> DataType;
 
     fn output_type(&self) -> DataType;
+
+    fn transform_type(&self) -> &'static str;
 }
+
+pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
+
+inventory::collect!(TransformDescription);
 
 // Helper methods for programming construction during tests
 impl Config {
@@ -208,18 +230,7 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars)
-            .map_err(|e| vec![e.to_string()])
-            .and_then(|config: Config| {
-                if config.sources.is_empty() {
-                    return Err(vec!["No sources defined in the config.".to_owned()]);
-                }
-                if config.sinks.is_empty() {
-                    return Err(vec!["No sinks defined in the config.".to_owned()]);
-                }
-
-                Ok(config)
-            })
+        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn contains_cycle(&self) -> bool {

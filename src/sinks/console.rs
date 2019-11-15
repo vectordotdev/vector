@@ -2,7 +2,7 @@ use super::util::SinkExt;
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
@@ -39,6 +39,10 @@ pub enum Encoding {
     Json,
 }
 
+inventory::submit! {
+    SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
+}
+
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -59,6 +63,10 @@ impl SinkConfig for ConsoleSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Any
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "console"
     }
 }
 

@@ -13,8 +13,11 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
 pub mod event;
+pub mod generate;
+pub mod list;
 pub mod metrics;
 pub mod region;
+pub mod runtime;
 pub mod sinks;
 pub mod sources;
 pub mod template;

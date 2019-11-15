@@ -5,9 +5,9 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -45,10 +45,10 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -86,6 +86,10 @@ pub struct BasicAuth {
     password: String,
 }
 
+inventory::submit! {
+    SinkDescription::new::<HttpSinkConfig>("http")
+}
+
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -105,6 +109,10 @@ impl SinkConfig for HttpSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "http"
+    }
 }
 
 fn http(
@@ -118,8 +126,7 @@ fn http(
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(30);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
@@ -186,11 +193,7 @@ fn http(
 
     let encoding = config.encoding.clone();
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))
@@ -289,6 +292,7 @@ mod tests {
     use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches,
+        runtime::Runtime,
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkConfig,
@@ -383,10 +387,10 @@ mod tests {
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -441,10 +445,10 @@ mod tests {
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -499,10 +503,10 @@ mod tests {
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx

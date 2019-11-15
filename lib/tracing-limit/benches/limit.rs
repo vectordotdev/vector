@@ -41,7 +41,7 @@ fn bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
         "Limit 5 seconds",
         |b, n| {
-            let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());;
+            let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());
             let n = black_box(n);
             tracing::subscriber::with_default(sub, || {
                 b.iter(|| {

@@ -263,13 +263,21 @@ data_dir = "/var/lib/vector"
   # * must be: "journald"
   type = "journald"
 
-  # Include only entries from the current runtime (boot)
+  # The systemd journal is read in batches, and a checkpoint is set at the end of
+  # each batch. This option limits the size of the batch.
+  # 
+  # * optional
+  # * default: 16
+  # * type: int
+  batch_size = 16
+
+  # Include only entries from the current boot.
   # 
   # * optional
   # * default: true
   # * type: bool
-  current_runtime_only = true
-  current_runtime_only = false
+  current_boot_only = true
+  current_boot_only = false
 
   # The directory used to persist the journal checkpoint position. By default,
   # the global `data_dir` is used. Please make sure the Vector project has write
@@ -692,7 +700,7 @@ data_dir = "/var/lib/vector"
 
   [transforms.coercer.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -784,7 +792,7 @@ data_dir = "/var/lib/vector"
 
   [transforms.grok_parser.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -828,6 +836,24 @@ data_dir = "/var/lib/vector"
   # * default: "message"
   # * type: string
   field = "message"
+
+  # If `target_field` is set and the log contains a field of the same name as the
+  # target, it will only be overwritten if this is set to `true`.
+  # 
+  # * optional
+  # * default: "false"
+  # * type: bool
+  overwrite_target = true
+  overwrite_target = false
+
+  # If this setting is present, the parsed JSON will be inserted into the log as
+  # a sub-object with this name. If a field with the same name already exists,
+  # the parser will fail and produce an error.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  target_field = "target"
 
 # Accepts `log` events and allows you to convert logs into one or more metrics.
 [transforms.log_to_metric]
@@ -987,7 +1013,7 @@ end
 
   [transforms.regex_parser.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1137,7 +1163,7 @@ end
 
   [transforms.split.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1199,7 +1225,7 @@ end
 
   [transforms.tokenizer.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -2305,13 +2331,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example.
-  # 
-  # * required
-  # * type: string
-  host = "http://10.24.32.122:9000"
-
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
   # Elasticsearch has removed it.
@@ -2328,6 +2347,14 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # The host of your Elasticsearch cluster. This should be the full URL as shown
+  # in the example. This is required if the `provider` is not `"aws"`
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://10.24.32.122:9000"
 
   # Index name to write events to.
   # 

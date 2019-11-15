@@ -63,7 +63,8 @@ sudo dpkg -r vector
 
 ## Updating
 
-Follow the [install](#install) steps again.
+Follow the [install](#install) steps again, downloading the latest version of
+Vector.
 
 
 [docs.configuration]: /docs/setup/configuration

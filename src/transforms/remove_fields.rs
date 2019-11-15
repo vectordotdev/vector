@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,10 @@ pub struct RemoveFields {
     fields: Vec<Atom>,
 }
 
+inventory::submit! {
+    TransformDescription::new_without_default::<RemoveFieldsConfig>("remove_fields")
+}
+
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
     fn build(&self) -> crate::Result<Box<dyn Transform>> {
@@ -28,6 +32,10 @@ impl TransformConfig for RemoveFieldsConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "remove_fields"
     }
 }
 

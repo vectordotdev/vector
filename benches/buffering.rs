@@ -5,7 +5,7 @@ use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, sinks, sources};
+use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -35,7 +35,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -72,7 +72,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     .into();
                     config.global.data_dir = Some(data_dir.clone());
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -108,7 +108,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     };
                     config.global.data_dir = Some(data_dir2.clone());
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 

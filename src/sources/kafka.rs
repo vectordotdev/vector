@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
@@ -51,6 +51,10 @@ fn default_auto_offset_reset() -> String {
     "largest".into() // default in librdkafka
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
+}
+
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     fn build(
@@ -64,6 +68,10 @@ impl SourceConfig for KafkaSourceConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "kafka"
     }
 }
 

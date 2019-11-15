@@ -8,7 +8,7 @@ use vector::test_util::{
     block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, sinks, sources};
+use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 #[test]
 fn test_buffering() {
@@ -34,7 +34,7 @@ fn test_buffering() {
     };
     config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
@@ -62,7 +62,7 @@ fn test_buffering() {
     };
     config.global.data_dir = Some(data_dir);
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
@@ -125,7 +125,7 @@ fn test_max_size() {
     };
     config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
@@ -152,7 +152,7 @@ fn test_max_size() {
     };
     config.global.data_dir = Some(data_dir);
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
@@ -196,7 +196,7 @@ fn test_max_size_resume() {
     };
     config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     wait_for_tcp(in_addr1);
@@ -250,7 +250,7 @@ fn test_reclaim_disk_space() {
     .into();
     config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
@@ -286,7 +286,7 @@ fn test_reclaim_disk_space() {
     };
     config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 

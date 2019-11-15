@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::tls::TlsOptions,
     sinks::util::MetadataFuture,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{
     future::{self, poll_fn, IntoFuture},
@@ -65,6 +65,10 @@ pub struct KafkaSink {
     pending_acks: HashSet<usize>,
 }
 
+inventory::submit! {
+    SinkDescription::new_without_default::<KafkaSinkConfig>("kafka")
+}
+
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -75,6 +79,10 @@ impl SinkConfig for KafkaSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "kafka"
     }
 }
 
@@ -337,7 +345,7 @@ mod integration_test {
         let (input, events) = random_lines_with_stream(100, num_events);
 
         let pump = sink.send_all(events);
-        block_on(pump).unwrap();
+        let _ = block_on(pump).unwrap();
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();

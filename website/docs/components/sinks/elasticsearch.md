@@ -36,7 +36,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "elasticsearch" # example, must be: "elasticsearch"
   inputs = ["my-source-id"] # example
-  host = "http://10.24.32.122:9000" # example
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
@@ -63,11 +62,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "elasticsearch" # example, must be: "elasticsearch"
   inputs = ["my-source-id"] # example
-  host = "http://10.24.32.122:9000" # example
   
   # OPTIONAL - General
   doc_type = "_doc" # default
   healthcheck = true # default
+  host = "http://10.24.32.122:9000" # example, no default
   index = "vector-%Y-%m-%d" # default
   provider = "default" # default, enum
   region = "us-east-1" # example, no default
@@ -463,15 +462,15 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["http://10.24.32.122:9000"]}
   name={"host"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -479,7 +478,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the[`provider`](#provider) is not `"aws"`
 
 
 </Field>
@@ -1008,7 +1007,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 The[`index`](#index) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />

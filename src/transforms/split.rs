@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,10 @@ pub struct SplitConfig {
     pub field: Option<Atom>,
     pub drop_field: bool,
     pub types: HashMap<Atom, String>,
+}
+
+inventory::submit! {
+    TransformDescription::new::<SplitConfig>("split")
 }
 
 #[typetag::serde(name = "split")]
@@ -45,6 +49,10 @@ impl TransformConfig for SplitConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "split"
     }
 }
 

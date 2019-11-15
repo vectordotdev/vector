@@ -52,6 +52,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL
   field = "message" # default
+  overwrite_target = true # default
+  target_field = "target" # example, no default
 ```
 
 </TabItem>
@@ -108,6 +110,52 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
 ### field
 
 The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"false"}
+  enumValues={null}
+  examples={[true,false]}
+  name={"overwrite_target"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### overwrite_target
+
+If[`target_field`](#target_field) is set and the log contains a field of the same name as the target, it will only be overwritten if this is set to `true`.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["target"]}
+  name={"target_field"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### target_field
+
+If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error.
 
 
 </Field>
