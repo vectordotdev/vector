@@ -12,7 +12,7 @@
 
 .downloadHeroBanner {
   animation: heroPulsating 2.5s 1200ms linear infinite;
-  background-image: radial-gradient(ellipse at center calc( 50% + 80px ), rgba(var(--ifm-color-primary-rgb), 0.15), transparent 30%);
+  background-image: radial-gradient(ellipse at center calc( 50% + 30px ), rgba(var(--ifm-color-primary-rgb), 0.15), transparent 25%);
   background-position: center center;
   border-bottom: 0px none;
   margin-top: 0;
