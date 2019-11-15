@@ -1145,7 +1145,7 @@ dependencies = [
 [[package]]
 name = "leveldb"
 version = "0.8.4"
-source = "git+https://github.com/timberio/leveldb#d4c929b57d724ca789fbc64ff6f07e7ea0fbeb2e"
+source = "git+https://github.com/timberio/leveldb#64265815bcf1b69f30e6cb35bf687fbd6dd64afb"
 dependencies = [
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "leveldb-sys 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
