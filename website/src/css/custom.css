@@ -148,6 +148,10 @@ blockquote {
   padding-left: 1.5rem;
 }
 
+.button.button--primary {
+  --ifm-button-color: var(--ifm-background-color);
+}
+
 .component-statuses {
   background: black;
   margin-top: calc( -1.5 * var(--ifm-leading) );
@@ -239,7 +243,6 @@ header.hero h1 {
 }
 .hero .hero__buttons .button {
   border-radius: 2rem;
-  color: var(--ifm-background-color);
   margin-right: 1rem;
   min-width: 240px;
 }
@@ -869,16 +872,13 @@ html[data-theme='dark'] .badge.badge--warning {
   --ifm-badge-color: var(--ifm-color-warning);
 }
 
-html[data-theme='dark'] button.button.button--primary {
-  --ifm-button-color: var(--ifm-background-color);
-}
-html[data-theme='dark'] button.button.button--secondary {
+html[data-theme='dark'] .button.button--secondary {
   --ifm-button-background-color: var(--ifm-panel-background);
   --ifm-button-border-color: var(--ifm-panel-border-color);
   --ifm-button-color: var(--ifm-panel-color);
   color: var(--ifm-button-color);
 }
-html[data-theme='dark'] button.button.button--secondary:hover {
+html[data-theme='dark'] .button.button--secondary:hover {
   --ifm-button-background-color: var(--ifm-panel-background-active);
   --ifm-button-border-color: var(--ifm-panel-border-color-active);
   --ifm-button-color: var(--ifm-panel-color-active);
