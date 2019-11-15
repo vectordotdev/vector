@@ -369,16 +369,9 @@ function Home() {
       </header>
       <main>
         {features && features.length && <Features features={features} />}
-        <Performance />
         <Correctness />
-        <Configuration />
         <Integrations />
         <Installation />
-        <section>
-          <div className="container">
-            <h2>Roadmap</h2>
-          </div>
-        </section>
       </main>
     </Layout>
   );

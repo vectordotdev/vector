@@ -216,7 +216,10 @@ header.hero h1 {
   margin-bottom: 0.3rem !important;
 }
 .hero {
-  padding: 4em 0;
+  display: flex;
+  align-items: center;
+  min-height: 200px;
+  padding: 3em 0;
   text-align: center;
 }
 .hero .hero__subtitle {
@@ -244,6 +247,7 @@ header.hero h1 {
 }
 @media (max-width: 996px) {
   .hero {
+    min-height: 100px;
     padding: 2em 0;
   }
   .hero .hero__buttons .button {
