@@ -16,6 +16,7 @@ import TabItem from '@theme/TabItem';
 import Tabs from '@theme/Tabs';
 
 import classnames from 'classnames';
+import {fetchNewPost} from '@site/src/exports/newPost';
 import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
@@ -349,6 +350,7 @@ function Home() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {latest_release}} = siteConfig.customFields;
+  const newPost = fetchNewPost();
   const newRelease = fetchNewRelease();
 
   useEffect(() => {
@@ -364,7 +366,13 @@ function Home() {
           {newRelease && (
             <a href="/" className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
-              v0.5.0 has been released! Download now.
+              v{newRelease.version} has been released! Download now.
+            </a>
+          )}
+          {!newRelease && newPost && (
+            <a href="/" className={styles.indexAnnouncement}>
+              <span className="badge badge-primary">new</span>
+              {newPost.title}
             </a>
           )}
           <h1>Vector Makes Observability Data Simple</h1>
