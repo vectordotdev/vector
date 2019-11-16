@@ -20,7 +20,7 @@
 .alert.alert--info,
 .alert.alert--success,
 .alert.alert--warning {
-  background: var(--ifm-panel-background);
+  background: var(--ifm-panel-background) !important;
   border: 1px solid var(--ifm-panel-border-color);
 }
 

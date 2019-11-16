@@ -16,6 +16,7 @@ import TabItem from '@theme/TabItem';
 import Tabs from '@theme/Tabs';
 
 import classnames from 'classnames';
+import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import repoUrl from '@site/src/exports/repoUrl';
@@ -268,6 +269,8 @@ function Integrations() {
     <section className={classnames(styles.integrations, 'integrations')}>
       <div className="container">
         <h2>Integrates With Everything</h2>
+        <div className="sub-title">Sources, transforms, and sinks make it easy to compose pipelines</div>
+
         <div className={classnames(styles.components, 'components')}>
           <h3>
             <div>
@@ -299,6 +302,8 @@ function Installation() {
     <section className={styles.installation}>
       <div className="container">
         <h2>Installs Everywhere</h2>
+        <div className="sub-title">Fully static, no dependencies, no runtime, memory safe</div>
+
         <Tabs
           block={true}
           defaultValue="humans"
@@ -319,7 +324,7 @@ function Installation() {
           </TabItem>
         </Tabs>
 
-        <h3 className={styles.platformTitle}>Or choose your preferred method:</h3>
+        <h3 className={styles.installSubTitle}>Or choose your preferred method:</h3>
 
         <div className="row">
           <div className="col">
@@ -344,6 +349,7 @@ function Home() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {latest_release}} = siteConfig.customFields;
+  const newRelease = fetchNewRelease();
 
   useEffect(() => {
     cloudify();
@@ -355,6 +361,12 @@ function Home() {
       description={siteConfig.description}>
       <header className={classnames('hero', styles.indexHeroBanner)}>
         <div className="container">
+          {newRelease && (
+            <a href="/" className={styles.indexAnnouncement}>
+              <span className="badge badge-primary">new</span>
+              v0.5.0 has been released! Download now.
+            </a>
+          )}
           <h1>Vector Makes Observability Data Simple</h1>
           <p className="hero__subtitle">
             Vector is an <a href={repoUrl()}>open-source</a> utility for

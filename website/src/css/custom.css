@@ -16,6 +16,8 @@
   --ifm-code-background: var(--ifm-color-emphasis-50);
   --ifm-code-font-size: 85%;
   --ifm-color-black: rgb(0, 40, 60);
+  --ifm-color-blue: #3084ff;
+  --ifm-color-blue-rgb: 48, 132 ,255;
   --ifm-color-content: var(--ifm-color-emphasis-800);
   --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
   --ifm-color-gray-25: rgba(0, 40, 60, 0.025);
@@ -150,6 +152,15 @@ blockquote {
 
 .button.button--primary {
   --ifm-button-color: var(--ifm-background-color);
+}
+
+ul.checks {
+  list-style: none;
+}
+
+ul.checks li > i.feather:first-child {
+  margin-left: -1.8em;
+  margin-right: 0.5em;
 }
 
 .component-statuses {

@@ -11,12 +11,15 @@ import Tabs from '@theme/Tabs'
 import classnames from 'classnames';
 import styles from './download.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import {viewedNewRelease} from '@site/src/exports/newRelease';
 
 function Download() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
   const {containers, package_managers: packageManagers, operating_systems: operatingSystems} = installation;
+
+  viewedNewRelease();
 
   return (
     <Layout title="Download Vector">

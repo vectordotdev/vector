@@ -10,36 +10,35 @@ import Toggle from 'react-toggle';
 
 import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-
 import SearchBar from '@theme/SearchBar';
 
 import classnames from 'classnames';
-
+import {fetchNewPost} from '@site/src/exports/newPost';
+import {fetchNewRelease} from '@site/src/exports/newRelease';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useTheme from '@theme/hooks/useTheme';
 
 import styles from './styles.module.css';
 
 function navLinkAttributes(label) {
-  const context = useDocusaurusContext();
-  const {siteConfig = {}} = context;
-  const {metadata: {latest_release: latestRelease}} = siteConfig.customFields;
-
   switch(label) {
     case 'Blog':
-      return {
-        badge: 'new',
-        badgeStyle: 'primary',
-      };
+      const newPost = fetchNewPost();
+
+      if (newPost) {
+        return {
+          badge: 'new',
+          badgeStyle: 'primary',
+        };
+      } else {
+        return {};
+      }
 
     case 'Download':
-      const releaseDate = Date.parse(latestRelease.date);
-      const releaseNow = new Date();
-      const releaseDiffTime = Math.abs(releaseNow - releaseDate);
-      const releaseDiffDays = Math.ceil(releaseDiffTime / (1000 * 60 * 60 * 24)); 
+      const newRelease = fetchNewRelease();
 
-      if (releaseDiffDays < 30) {
+      if (newRelease) {
         return {
           badge: 'new',
           badgeStyle: 'primary',

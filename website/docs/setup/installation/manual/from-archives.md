@@ -11,6 +11,8 @@ versions as well as nightly builds.
 
 ## Installation
 
+import Alert from '@site/src/components/Alert';
+
 <Alert type="info">
 
 If you don't see your target, then we recommend [building Vector from source][docs.from_source].
@@ -24,11 +26,8 @@ your new target.
 
 ### 1. Copy the Vector archive URL
 
-import Alert from '@site/src/components/Alert';
-
-* [**Latest release**][urls.vector_downloads.latest]
-* [**Latest nightly**][urls.vector_downloads.nightly/latest]
-* [**Historical releases**][urls.vector_downloads]
+Head over to the [download page][pages.download] and copy the appropriate
+archive URL.
 
 </div>
 <div class="section">
@@ -138,7 +137,5 @@ Simply follow the same [installation instructions above](#installation).
 [docs.containers]: /docs/setup/installation/containers
 [docs.from_source]: /docs/setup/installation/manual/from-source
 [docs.operating_systems]: /docs/setup/installation/operating-systems
+[pages.download]: /download
 [urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations
-[urls.vector_downloads.latest]: https://packages.timber.io/vector/latest
-[urls.vector_downloads.nightly/latest]: https://packages.timber.io/vector/nightly/latest
-[urls.vector_downloads]: https://packages.timber.io/vector

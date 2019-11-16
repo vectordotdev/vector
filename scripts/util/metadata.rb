@@ -5,6 +5,7 @@ require_relative "metadata/batching_sink"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
 require_relative "metadata/links"
+require_relative "metadata/post"
 require_relative "metadata/release"
 require_relative "metadata/source"
 require_relative "metadata/streaming_sink"
@@ -28,12 +29,14 @@ class Metadata
     end
   end
 
-  attr_reader :companies,
+  attr_reader :blog_posts,
+    :companies,
     :installation,
     :links,
     :log_fields,
     :metric_fields,
     :options,
+    :posts,
     :releases,
     :sinks,
     :sources,
@@ -128,6 +131,13 @@ class Metadata
     # links
 
     @links = Links.new(hash.fetch("links"), docs_root, pages_root)
+
+    # posts
+
+    @posts ||=
+      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+        Post.new(path)
+      end.sort
   end
 
   def components
@@ -191,7 +201,9 @@ class Metadata
   def to_h
     {
       installation: installation.deep_to_h,
+      latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
+      posts: posts,
       sources: sources.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h

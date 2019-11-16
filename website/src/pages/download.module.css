@@ -1,4 +1,4 @@
-@keyframes heroInitial {
+@keyframes downloadHeroInitial {
   0% {
     background-size: 100% 100%;
   }
@@ -7,7 +7,7 @@
   }
 }
 
-@keyframes heroPulsating {
+@keyframes downloadHeroPulsating {
   0% {
     background-size: 750% 750%;
   }
@@ -20,7 +20,7 @@
 }
 
 .downloadHeroBanner {
-  animation: heroInitial 700ms cubic-bezier(0.000, 1.650, 0.000, 1.650), heroPulsating 2.5s linear infinite;
+  animation: downloadHeroInitial 700ms cubic-bezier(0.000, 1.650, 0.000, 1.650), downloadHeroPulsating 2.5s linear infinite;
   animation-delay: 1.5s, 2.2s;
   animation-fill-mode: forwards;
   background-image: radial-gradient(ellipse at center calc( 50% + 20px ), rgba(var(--ifm-color-primary-rgb), 0.15), transparent 5%);

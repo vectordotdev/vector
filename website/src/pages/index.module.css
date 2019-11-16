@@ -2,7 +2,7 @@
  * Hero Section
  */
 
-@keyframes heroInitial {
+@keyframes indexHeroInitial {
   0% {
     background-size: 100% 100%;
   }
@@ -14,7 +14,7 @@
   }
 }
 
-@keyframes heroPulsating {
+@keyframes indexHeroPulsating {
   0% {
     background-size: 200% 200%;
   }
@@ -26,8 +26,36 @@
   }
 }
 
+.indexAnnouncement {
+  background: var(--ifm-color-emphasis-50);
+  border-radius: 1em;
+  color: var(--ifm-color-content);
+  display: inline-block;
+  font-size: 0.9em;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding: 3px 10px 5px 10px;
+}
+
+.indexAnnouncement span {
+  background: var(--ifm-color-content);
+  border: 0px none;
+  border-radius: 1em;
+  color: var(--ifm-background-color);
+  margin-right: 0.5em;
+  text-transform: uppercase;
+}
+
+.indexAnnouncement:hover {
+  background: var(--ifm-panel-background-active);
+  text-decoration: none;
+}
+
+.indexAnnouncement:hover span {
+  background: var(--ifm-color-primary);
+}
+
 .indexHeroBanner {
-  animation: heroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), heroPulsating 2.5s linear infinite;
+  animation: indexHeroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), indexHeroPulsating 2.5s linear infinite;
   animation-delay: 650ms, 1350ms;
   animation-fill-mode: forwards;
   background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
@@ -273,9 +301,6 @@ html[data-theme="dark"] .hero {
  * Installation Section
  */
 
-.installation {
-}
-
-.platformTitle {
+.installSubTitle {
   margin-top: var(--ifm-heading-margin-bottom);
 }
