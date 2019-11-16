@@ -39,6 +39,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   host = "http://localhost:8123" # example
   table = "mytable" # example
   
+  # OPTIONAL - General
+  database = "mydatabase" # example, no default
+  
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
     password = "password" # example
@@ -374,7 +377,7 @@ The compression strategy used to compress the encoded event data before outputti
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["mydatabase"]}

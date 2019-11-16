@@ -33,10 +33,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
+  # REQUIRED
   type = "kafka" # example, must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
+  
+  # OPTIONAL
+  key_field = "user_id" # example, no default
 ```
 
 </TabItem>
@@ -142,7 +146,7 @@ The consumer group name to be used to consume events from Kafka.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}

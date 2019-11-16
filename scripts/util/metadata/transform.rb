@@ -57,6 +57,7 @@ class Transform < Component
       @options.types =
         Option.new({
           "name" => "types",
+          "common" => true,
           "description" => "Key/Value pairs representing mapped log field types.",
           "null" => true,
           "options" => {"*" => wildcard_option},

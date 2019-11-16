@@ -33,10 +33,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "datadog_metrics" # example, must be: "datadog_metrics"
   inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example
+  
+  # OPTIONAL
+  host = "https://api.datadoghq.com" # default
 ```
 
 </TabItem>
@@ -175,7 +179,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"https://api.datadoghq.com"}
   enumValues={null}
   examples={["https://api.datadoghq.com","https://api.datadoghq.eu"]}

@@ -21,7 +21,7 @@
 .alert.alert--success,
 .alert.alert--warning {
   background: var(--ifm-panel-background) !important;
-  border: 1px solid var(--ifm-panel-border-color);
+  border: 0px none;
 }
 
 .alert.alert--danger {

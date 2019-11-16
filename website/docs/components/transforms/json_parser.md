@@ -33,9 +33,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED
   type = "json_parser" # example, must be: "json_parser"
   inputs = ["my-source-id"] # example
   drop_invalid = true # example
+  
+  # OPTIONAL
+  field = "message" # default
 ```
 
 </TabItem>
@@ -93,7 +97,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}

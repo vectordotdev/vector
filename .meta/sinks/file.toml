@@ -11,6 +11,7 @@ write_to_description = "a file"
 
 [sinks.file.options.path]
 type = "string"
+common = true
 examples = [
   "vector-%Y-%m-%d.log",
   "application-{{ application_id }}-%Y-%m-%d.log"

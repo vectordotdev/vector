@@ -33,9 +33,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "statsd" # example, must be: "statsd"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
+  
+  # OPTIONAL
+  address = "127.0.0.1:8125" # default
 ```
 
 </TabItem>
@@ -69,7 +73,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"127.0.0.1:8125"}
   enumValues={null}
   examples={["127.0.0.1:8125"]}

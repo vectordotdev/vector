@@ -12,6 +12,7 @@ tls_options = ["+enabled"]
 
 [sinks.tcp.options.address]
 type = "string"
+common = true
 examples = ["92.12.333.224:5000"]
 null = false
 description = "The TCP address."

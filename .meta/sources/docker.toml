@@ -10,6 +10,7 @@ through_description = "the docker engine daemon"
 
 [sources.docker.options.include_containers]
 type = "[string]"
+common = true
 examples = ["ffd2bc2cb74a"]
 null = true
 description = """\
@@ -21,6 +22,7 @@ provided, all containers will be included.\
 
 [sources.docker.options.include_labels]
 type = "[string]"
+common = true
 examples = ["label_key=label_value"]
 null = true
 description = """ \

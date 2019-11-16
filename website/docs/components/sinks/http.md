@@ -45,11 +45,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sinks.my_sink_id.basic_auth]
     password = "password" # example
     user = "username" # example
-  
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}" # example
-    X-Powered-By = "Vector" # example
 ```
 
 </TabItem>
@@ -385,7 +380,7 @@ The encoding format used to serialize the events before outputting.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}

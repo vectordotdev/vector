@@ -12,6 +12,7 @@ resources = [
 
 [transforms.lua.options.source]
 type = "string"
+common = true
 examples = [
 """\
 require("script") # a `script.lua` file must be in your `search_dirs`

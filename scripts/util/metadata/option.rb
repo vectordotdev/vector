@@ -99,11 +99,7 @@ class Option
   end
 
   def common?
-    if options.any?
-      @common == true || common_options.any?
-    else
-      @common == true || required?
-    end
+    @common == true || required?
   end
 
   def common_options

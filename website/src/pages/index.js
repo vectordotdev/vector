@@ -389,6 +389,7 @@ function Home() {
       </header>
       <main>
         {features && features.length && <Features features={features} />}
+        <Performance />
         <Correctness />
         <Integrations />
         <Installation />

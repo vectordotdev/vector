@@ -12,47 +12,9 @@ The `tokenizer` transform accepts [`log`][docs.data-model#log] events and allows
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
-
-```toml
-[transforms.my_transform_id]
-  # REQUIRED - General
-  type = "tokenizer" # example, must be: "tokenizer"
-  inputs = ["my-source-id"] # example
-  field_names = ["timestamp", "level", "message"] # example
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
 
 ```toml
 [transforms.my_transform_id]
@@ -76,10 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
-</TabItem>
-
-</Tabs>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -90,7 +48,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -113,7 +71,7 @@ If `true` the[`field`](#field) will be dropped after parsing.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}

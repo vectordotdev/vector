@@ -39,6 +39,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - requests
   encoding = "json" # example, enum
+  
+  # OPTIONAL - General
+  target = "stdout" # default, enum
 ```
 
 </TabItem>
@@ -120,7 +123,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}

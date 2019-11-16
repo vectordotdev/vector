@@ -22,6 +22,7 @@ write_to_description = "[AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLog
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
+common = true
 examples = [
   "{{ file }}",
   "ec2/{{ instance_id }}",
@@ -34,12 +35,14 @@ description = "The [group name][urls.aws_cw_logs_group_name] of the target Cloud
 
 [sinks.aws_cloudwatch_logs.options.region]
 type = "string"
+common = true
 examples = ["us-east-1"]
 null = false
 description = "The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
 
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
+common = true
 examples = [
   "{{ instance_id }}",
   "%Y-%m-%d",
@@ -52,6 +55,7 @@ description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Clo
 
 [sinks.aws_cloudwatch_logs.options.create_missing_group]
 type = "bool"
+common = true
 default = true
 null = true
 description = """\
@@ -61,6 +65,7 @@ Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not alr
 
 [sinks.aws_cloudwatch_logs.options.create_missing_stream]
 type = "bool"
+common = true
 default = true
 null = true
 description = "Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist."

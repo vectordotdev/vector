@@ -33,23 +33,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "elasticsearch" # example, must be: "elasticsearch"
   inputs = ["my-source-id"] # example
   
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
-  
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}" # example
-    X-Powered-By = "Vector" # example
-  
-  # OPTIONAL - Query
-  [sinks.my_sink_id.query]
-    X-Powered-By = "Vector" # example
+  # OPTIONAL
+  host = "http://10.24.32.122:9000" # example, no default
+  index = "vector-%Y-%m-%d" # default
 ```
 
 </TabItem>
@@ -128,7 +118,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -389,7 +379,7 @@ The[`doc_type`](#doc_type) for your index data. This is only relevant for Elasti
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -462,7 +452,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["http://10.24.32.122:9000"]}
@@ -485,7 +475,7 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"vector-%F"}
   enumValues={null}
   examples={["vector-%Y-%m-%d","application-{{ application_id }}-%Y-%m-%d"]}
@@ -531,7 +521,7 @@ The provider of the Elasticsearch service. This is used to properly authenticate
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}

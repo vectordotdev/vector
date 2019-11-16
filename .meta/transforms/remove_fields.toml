@@ -7,6 +7,7 @@ output_types = ["log"]
 
 [transforms.remove_fields.options.fields]
 type = "[string]"
+common = true
 examples = [["field1", "field2"]]
 null = false
 description = "The log field names to drop."

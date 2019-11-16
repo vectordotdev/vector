@@ -12,34 +12,9 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
-
-```toml
-[sources.my_source_id]
-  type = "docker" # example, must be: "docker"
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
 
 ```toml
 [sources.my_source_id]
@@ -51,10 +26,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   include_labels = "label_key=label_value" # example, no default
 ```
 
-</TabItem>
-
-</Tabs>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -65,7 +36,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["ffd2bc2cb74a"]}
@@ -88,7 +59,7 @@ A list of container ids to match against when filtering running containers. This
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["label_key=label_value"]}

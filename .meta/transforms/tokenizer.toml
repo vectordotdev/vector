@@ -11,18 +11,21 @@ types_coercion = true
 
 [transforms.tokenizer.options.field]
 type = "string"
+common = true
 default = "message"
 null = false
 description = "The log field to tokenize."
 
 [transforms.tokenizer.options.field_names]
 type = "[string]"
+common = true
 examples = [["timestamp", "level", "message"]]
 null = false
 description = "The log field names assigned to the resulting tokens, in order."
 
 [transforms.tokenizer.options.drop_field]
 type = "bool"
+common = true
 default = true
 null = false
 description = "If `true` the `field` will be dropped after parsing."

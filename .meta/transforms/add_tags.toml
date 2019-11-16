@@ -9,6 +9,7 @@ resources = []
 
 [transforms.add_tags.options.tags]
 type = "table"
+common = true
 null = false
 description = """\
 A table of key/value pairs representing the tags to be added to the \

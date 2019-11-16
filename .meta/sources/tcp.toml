@@ -9,6 +9,7 @@ through_description = "the TCP protocol"
 
 [sources.tcp.options.address]
 type = "string"
+common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#3"]
 null = false
 description = """The address to listen for connections on, \

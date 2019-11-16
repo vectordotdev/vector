@@ -33,10 +33,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example
+  
+  # OPTIONAL
+  partition_key_field = "user_id" # example, no default
 ```
 
 </TabItem>
@@ -302,7 +306,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}

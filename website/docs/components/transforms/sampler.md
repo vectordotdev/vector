@@ -12,36 +12,9 @@ The `sampler` transform accepts [`log`][docs.data-model#log] events and allows y
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
-
-```toml
-[transforms.my_transform_id]
-  type = "sampler" # example, must be: "sampler"
-  inputs = ["my-source-id"] # example
-  rate = 10 # example
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
 
 ```toml
 [transforms.my_transform_id]
@@ -54,10 +27,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   pass_list = ["[error]", "field2"] # example, no default
 ```
 
-</TabItem>
-
-</Tabs>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -68,7 +37,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[["[error]","field2"]]}

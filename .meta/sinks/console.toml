@@ -11,6 +11,7 @@ write_to_description = "[standard output streams][urls.standard_streams], such a
 
 [sinks.console.options.target]
 type = "string"
+common = true
 default = "stdout"
 null = false
 description = "The [standard stream][urls.standard_streams] to write to."

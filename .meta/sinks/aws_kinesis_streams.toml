@@ -22,18 +22,21 @@ write_to_description = "[AWS Kinesis Data Stream][urls.aws_kinesis_data_streams]
 
 [sinks.aws_kinesis_streams.options.partition_key_field]
 type = "string"
+common = true
 examples = ["user_id"]
 null = true
 description = "The log field used as the Kinesis record's partition key value."
 
 [sinks.aws_kinesis_streams.options.region]
 type = "string"
+common = true
 examples = ["us-east-1"]
 null = false
 description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
+common = true
 examples = ["my-stream"]
 null = false
 description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs stream."

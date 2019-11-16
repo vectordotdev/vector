@@ -10,6 +10,7 @@ write_to_description = "another downstream [`vector` source][docs.sources.vector
 
 [sinks.vector.options.address]
 type = "string"
+common = true
 examples = ["92.12.333.224:5000"]
 null = false
 description = "The downstream Vector address."

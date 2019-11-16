@@ -10,12 +10,14 @@ resources = []
 
 [transforms.field_filter.options.field]
 type = "string"
+common = true
 examples = ["file"]
 null = false
 description = "The target log field to compare against the `value`."
 
 [transforms.field_filter.options.value]
 type = "string"
+common = true
 examples = ["/var/log/nginx.log"]
 null = false
 description = """\

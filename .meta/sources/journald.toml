@@ -10,6 +10,7 @@ through_description = "log records from journald"
 
 [sources.journald.options.current_boot_only]
 type = "bool"
+common = true
 null = true
 default = true
 description = "Include only entries from the current boot."
@@ -41,10 +42,10 @@ description = "Include only entries from the local system"
 
 [sources.journald.options.units]
 type = "[string]"
+common = true
 null = true
 default = []
 examples = [["ntpd", "sysinit.target"]]
-common = true
 description = """\
 The list of units names to monitor. \
 If empty or not present, all units are accepted. \

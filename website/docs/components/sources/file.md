@@ -38,6 +38,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   include = ["/var/log/nginx/*.log"] # example
   
   # OPTIONAL - General
+  ignore_older = 86400 # example, no default, seconds
   start_at_beginning = true # default
   
   # OPTIONAL - Priority
@@ -307,7 +308,7 @@ The key name added to each event representing the current host. See [Context](#c
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[86400]}

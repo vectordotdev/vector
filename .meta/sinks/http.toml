@@ -22,6 +22,7 @@ tls_options = []
 
 [sinks.http.options.basic_auth]
 type = "table"
+common = true
 null = true
 description = "Options for basic authentication."
 
@@ -59,6 +60,7 @@ description = "A URI that Vector can request in order to determine the service h
 
 [sinks.http.options.uri]
 type = "string"
+common = true
 examples = ["https://10.22.212.22:9000/endpoint"]
 null = false
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."

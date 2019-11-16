@@ -37,6 +37,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "journald" # example, must be: "journald"
   
   # OPTIONAL
+  current_boot_only = true # default
   units = ["ntpd", "sysinit.target"] # default
 ```
 
@@ -95,7 +96,7 @@ The systemd journal is read in batches, and a checkpoint is set at the end of ea
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}

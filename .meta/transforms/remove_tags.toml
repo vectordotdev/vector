@@ -7,6 +7,7 @@ output_types = ["metric"]
 
 [transforms.remove_tags.options.tags]
 type = "[string]"
+common = true
 examples = [["tag1", "tag2"]]
 null = false
 description = "The tag names to drop."

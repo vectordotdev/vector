@@ -20,6 +20,7 @@ sure the Vector project has write permissions to this dir.\
 
 [sources.file.options.include]
 type = "[string]"
+common = true
 examples = [["/var/log/nginx/*.log"]]
 null = false
 description = """\
@@ -68,6 +69,7 @@ The key name added to each event representing the current host.\
 
 [sources.file.options.ignore_older]
 type = "int"
+common = true
 examples = [86400]
 null = true
 unit = "seconds"

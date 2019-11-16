@@ -9,10 +9,10 @@ through_description = "the Syslog 5424 protocol"
 
 [sources.syslog.options.address]
 type = "string"
+common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
 null = true
 relevant_when = {mode = ["tcp", "udp"]}
-common = true
 description = """\
 The TCP or UDP address to listen for connections on, or "systemd#N" to use \
 the Nth socket passed by systemd socket activation. \
@@ -40,6 +40,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 
 [sources.syslog.options.mode]
 type = "string"
+common = true
 null = false
 description = "The input mode."
 
@@ -50,10 +51,10 @@ unix = "Read uncoming Syslog data through a Unix socker."
 
 [sources.syslog.options.path]
 type = "string"
+common = true
 examples = ["/path/to/socket"]
 null = true
 relevant_when = {mode = "unix"}
-common = true
 description = """\
 The unix socket path. *This should be absolute path.*
 """

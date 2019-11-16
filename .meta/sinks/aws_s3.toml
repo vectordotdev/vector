@@ -23,6 +23,7 @@ write_to_description = "[AWS S3][urls.aws_s3] via the [`PutObject` API endpoint]
 
 [sinks.aws_s3.options.bucket]
 type = "string"
+common = true
 examples = ["my-bucket"]
 null = false
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
@@ -51,6 +52,7 @@ description = "The format of the resulting object file name. [`strftime` specifi
 [sinks.aws_s3.options.key_prefix]
 type = "string"
 category = "Object Names"
+common = true
 default = "date=%F"
 examples = [
   "date=%F/",
@@ -60,12 +62,12 @@ examples = [
 ]
 null = true
 partition_key = true
-common = true
 templateable = true
 description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
 
 [sinks.aws_s3.options.region]
 type = "string"
+common = true
 examples = ["us-east-1"]
 null = false
 description = "The [AWS region][urls.aws_s3_regions] of the target S3 bucket."

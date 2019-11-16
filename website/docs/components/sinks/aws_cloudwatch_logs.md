@@ -33,11 +33,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
+  
+  # OPTIONAL
+  create_missing_group = true # default
+  create_missing_stream = true # default
 ```
 
 </TabItem>
@@ -259,7 +264,7 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -282,7 +287,7 @@ Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not alr
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}

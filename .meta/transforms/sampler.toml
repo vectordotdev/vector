@@ -8,6 +8,7 @@ output_types = ["log"]
 
 [transforms.sampler.options.pass_list]
 type = "[string]"
+common = true
 examples = [["[error]", "field2"]]
 null = true
 description = """\
@@ -18,6 +19,7 @@ _not_ be sampled.\
 
 [transforms.sampler.options.rate]
 type = "int"
+common = true
 examples = [10]
 null = false
 description = """\

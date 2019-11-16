@@ -9,6 +9,7 @@ resources = []
 
 [transforms.add_fields.options.fields]
 type = "table"
+common = true
 null = false
 description = """\
 A table of key/value pairs representing the keys to be added to the \
