@@ -216,7 +216,10 @@ impl Batch for MetricBuffer {
 mod test {
     use super::*;
     use crate::sinks::util::batch::BatchSink;
-    use crate::{event::metric::Metric, Event};
+    use crate::{
+        event::metric::{Metric, MetricValue},
+        Event,
+    };
     use futures::{future::Future, stream, Sink};
     use pretty_assertions::assert_eq;
     use std::collections::HashMap;
@@ -240,31 +243,31 @@ mod test {
 
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric::Counter {
+            let event = Event::Metric(Metric {
                 name: "counter-0".into(),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::Counter { val: i as f64 },
             });
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric::Counter {
+            let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("staging")),
+                value: MetricValue::Counter { val: i as f64 },
             });
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric::Counter {
+            let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::Counter { val: i as f64 },
             });
             events.push(event);
         }
@@ -282,41 +285,41 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::Counter {
+                Metric {
                     name: "counter-0".into(),
-                    val: 0.0,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::Counter {
-                    name: "counter-0".into(),
-                    val: 6.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 6.0 }
                 },
-                Metric::Counter {
-                    name: "counter-1".into(),
-                    val: 1.0,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                },
-                Metric::Counter {
-                    name: "counter-1".into(),
-                    val: 1.0,
+                Metric {
+                    name: "counter-0".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::Counter { val: 0.0 },
                 },
-                Metric::Counter {
+                Metric {
+                    name: "counter-1".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 1.0 },
+                },
+                Metric {
+                    name: "counter-1".into(),
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                    value: MetricValue::Counter { val: 1.0 },
+                },
+                Metric {
                     name: "counter-2".into(),
-                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::Counter { val: 2.0 },
                 },
-                Metric::Counter {
+                Metric {
                     name: "counter-3".into(),
-                    val: 3.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::Counter { val: 3.0 },
                 },
             ]
         );
@@ -324,17 +327,17 @@ mod test {
         assert_eq!(
             sorted(&buffer[1].clone().finish()),
             [
-                Metric::Counter {
+                Metric {
                     name: "counter-2".into(),
-                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 2.0 },
                 },
-                Metric::Counter {
+                Metric {
                     name: "counter-3".into(),
-                    val: 3.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 3.0 },
                 },
             ]
         );
@@ -346,21 +349,23 @@ mod test {
 
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric::AggregatedCounter {
+            let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::AggregatedCounter { val: i as f64 },
             });
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric::AggregatedCounter {
+            let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
-                val: i as f64 * 3.0,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::AggregatedCounter {
+                    val: i as f64 * 3.0,
+                },
             });
             events.push(event);
         }
@@ -377,29 +382,29 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::Counter {
+                Metric {
                     name: "counter-0".into(),
-                    val: 0.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 0.0 },
                 },
-                Metric::Counter {
+                Metric {
                     name: "counter-1".into(),
-                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 2.0 },
                 },
-                Metric::Counter {
+                Metric {
                     name: "counter-2".into(),
-                    val: 4.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 4.0 },
                 },
-                Metric::Counter {
+                Metric {
                     name: "counter-3".into(),
-                    val: 6.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::Counter { val: 6.0 },
                 },
             ]
         );
@@ -411,21 +416,21 @@ mod test {
 
         let mut events = Vec::new();
         for i in 1..5 {
-            let event = Event::Metric(Metric::Gauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("staging")),
+                value: MetricValue::Gauge { val: i as f64 },
             });
             events.push(event);
         }
 
         for i in 1..5 {
-            let event = Event::Metric(Metric::Gauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("staging")),
+                value: MetricValue::Gauge { val: i as f64 },
             });
             events.push(event);
         }
@@ -442,29 +447,29 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-1".into(),
-                    val: 2.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 2.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-2".into(),
-                    val: 4.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 4.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-3".into(),
-                    val: 6.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 6.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-4".into(),
-                    val: 8.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 8.0 },
                 },
             ]
         );
@@ -476,31 +481,35 @@ mod test {
 
         let mut events = Vec::new();
         for i in 3..6 {
-            let event = Event::Metric(Metric::AggregatedGauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
-                val: i as f64 * 10.0,
                 timestamp: None,
                 tags: Some(tag("staging")),
+                value: MetricValue::AggregatedGauge {
+                    val: i as f64 * 10.0,
+                },
             });
             events.push(event);
         }
 
         for i in 1..4 {
-            let event = Event::Metric(Metric::Gauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(tag("staging")),
+                value: MetricValue::Gauge { val: i as f64 },
             });
             events.push(event);
         }
 
         for i in 2..5 {
-            let event = Event::Metric(Metric::AggregatedGauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
-                val: i as f64 * 2.0,
                 timestamp: None,
                 tags: Some(tag("staging")),
+                value: MetricValue::AggregatedGauge {
+                    val: i as f64 * 2.0,
+                },
             });
             events.push(event);
         }
@@ -517,35 +526,35 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-1".into(),
-                    val: 1.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 1.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-2".into(),
-                    val: 4.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 4.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-3".into(),
-                    val: 6.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 6.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-4".into(),
-                    val: 8.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 8.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "gauge-5".into(),
-                    val: 50.0,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                    value: MetricValue::AggregatedGauge { val: 50.0 },
                 },
             ]
         );
@@ -557,21 +566,25 @@ mod test {
 
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric::Set {
+            let event = Event::Metric(Metric {
                 name: "set-0".into(),
-                val: format!("{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::Set {
+                    val: format!("{}", i),
+                },
             });
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric::Set {
+            let event = Event::Metric(Metric {
                 name: "set-0".into(),
-                val: format!("{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::Set {
+                    val: format!("{}", i),
+                },
             });
             events.push(event);
         }
@@ -586,13 +599,15 @@ mod test {
 
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
-            [Metric::AggregatedSet {
+            [Metric {
                 name: "set-0".into(),
-                values: vec!["0".into(), "1".into(), "2".into(), "3".into()]
-                    .into_iter()
-                    .collect(),
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::AggregatedSet {
+                    values: vec!["0".into(), "1".into(), "2".into(), "3".into()]
+                        .into_iter()
+                        .collect(),
+                },
             },]
         );
     }
@@ -603,23 +618,27 @@ mod test {
 
         let mut events = Vec::new();
         for _ in 2..6 {
-            let event = Event::Metric(Metric::Histogram {
+            let event = Event::Metric(Metric {
                 name: "hist-2".into(),
-                val: 2.0,
-                sample_rate: 10,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::Histogram {
+                    val: 2.0,
+                    sample_rate: 10,
+                },
             });
             events.push(event);
         }
 
         for i in 2..6 {
-            let event = Event::Metric(Metric::Histogram {
+            let event = Event::Metric(Metric {
                 name: format!("hist-{}", i),
-                val: i as f64,
-                sample_rate: 10,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::Histogram {
+                    val: i as f64,
+                    sample_rate: 10,
+                },
             });
             events.push(event);
         }
@@ -635,33 +654,41 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::AggregatedDistribution {
+                Metric {
                     name: "hist-2".into(),
-                    values: vec![2.0, 2.0, 2.0, 2.0, 2.0],
-                    sample_rates: vec![10, 10, 10, 10, 10],
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedDistribution {
+                        values: vec![2.0, 2.0, 2.0, 2.0, 2.0],
+                        sample_rates: vec![10, 10, 10, 10, 10],
+                    },
                 },
-                Metric::AggregatedDistribution {
+                Metric {
                     name: "hist-3".into(),
-                    values: vec![3.0],
-                    sample_rates: vec![10],
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedDistribution {
+                        values: vec![3.0],
+                        sample_rates: vec![10],
+                    },
                 },
-                Metric::AggregatedDistribution {
+                Metric {
                     name: "hist-4".into(),
-                    values: vec![4.0],
-                    sample_rates: vec![10],
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedDistribution {
+                        values: vec![4.0],
+                        sample_rates: vec![10],
+                    },
                 },
-                Metric::AggregatedDistribution {
+                Metric {
                     name: "hist-5".into(),
-                    values: vec![5.0],
-                    sample_rates: vec![10],
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedDistribution {
+                        values: vec![5.0],
+                        sample_rates: vec![10],
+                    }
                 },
             ]
         );
@@ -673,27 +700,31 @@ mod test {
 
         let mut events = Vec::new();
         for _ in 2..5 {
-            let event = Event::Metric(Metric::AggregatedHistogram {
+            let event = Event::Metric(Metric {
                 name: "buckets-2".into(),
-                buckets: vec![1.0, 2.0, 4.0],
-                counts: vec![1, 2, 4],
-                count: 6,
-                sum: 10.0,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![1, 2, 4],
+                    count: 6,
+                    sum: 10.0,
+                },
             });
             events.push(event);
         }
 
         for i in 2..5 {
-            let event = Event::Metric(Metric::AggregatedHistogram {
+            let event = Event::Metric(Metric {
                 name: format!("buckets-{}", i),
-                buckets: vec![1.0, 2.0, 4.0],
-                counts: vec![1 * i, 2 * i, 4 * i],
-                count: 6 * i,
-                sum: 10.0,
                 timestamp: None,
                 tags: Some(tag("production")),
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![1 * i, 2 * i, 4 * i],
+                    count: 6 * i,
+                    sum: 10.0,
+                },
             });
             events.push(event);
         }
@@ -709,32 +740,38 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::AggregatedHistogram {
+                Metric {
                     name: "buckets-2".into(),
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![2, 4, 8],
-                    count: 12,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 2.0, 4.0],
+                        counts: vec![2, 4, 8],
+                        count: 12,
+                        sum: 10.0,
+                    },
                 },
-                Metric::AggregatedHistogram {
+                Metric {
                     name: "buckets-3".into(),
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![3, 6, 12],
-                    count: 6 * 3,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 2.0, 4.0],
+                        counts: vec![3, 6, 12],
+                        count: 6 * 3,
+                        sum: 10.0,
+                    },
                 },
-                Metric::AggregatedHistogram {
+                Metric {
                     name: "buckets-4".into(),
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![4, 8, 16],
-                    count: 6 * 4,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 2.0, 4.0],
+                        counts: vec![4, 8, 16],
+                        count: 6 * 4,
+                        sum: 10.0,
+                    },
                 }
             ]
         );
@@ -747,14 +784,16 @@ mod test {
         let mut events = Vec::new();
         for _ in 0..10 {
             for i in 2..5 {
-                let event = Event::Metric(Metric::AggregatedSummary {
+                let event = Event::Metric(Metric {
                     name: format!("quantiles-{}", i),
-                    quantiles: vec![1.0, 2.0, 4.0],
-                    values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
-                    count: 6 * i,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![1.0, 2.0, 4.0],
+                        values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
+                        count: 6 * i,
+                        sum: 10.0,
+                    },
                 });
                 events.push(event);
             }
@@ -771,32 +810,38 @@ mod test {
         assert_eq!(
             sorted(&buffer[0].clone().finish()),
             [
-                Metric::AggregatedSummary {
+                Metric {
                     name: "quantiles-2".into(),
-                    quantiles: vec![1.0, 2.0, 4.0],
-                    values: vec![2.0, 4.0, 8.0],
-                    count: 6 * 2,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![1.0, 2.0, 4.0],
+                        values: vec![2.0, 4.0, 8.0],
+                        count: 6 * 2,
+                        sum: 10.0,
+                    },
                 },
-                Metric::AggregatedSummary {
+                Metric {
                     name: "quantiles-3".into(),
-                    quantiles: vec![1.0, 2.0, 4.0],
-                    values: vec![3.0, 6.0, 12.0],
-                    count: 6 * 3,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![1.0, 2.0, 4.0],
+                        values: vec![3.0, 6.0, 12.0],
+                        count: 6 * 3,
+                        sum: 10.0,
+                    },
                 },
-                Metric::AggregatedSummary {
+                Metric {
                     name: "quantiles-4".into(),
-                    quantiles: vec![1.0, 2.0, 4.0],
-                    values: vec![4.0, 8.0, 16.0],
-                    count: 6 * 4,
-                    sum: 10.0,
                     timestamp: None,
                     tags: Some(tag("production")),
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![1.0, 2.0, 4.0],
+                        values: vec![4.0, 8.0, 16.0],
+                        count: 6 * 4,
+                        sum: 10.0,
+                    },
                 }
             ]
         );

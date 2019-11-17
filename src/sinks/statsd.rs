@@ -208,6 +208,7 @@ mod test {
     use super::*;
     use crate::{
         buffers::Acker,
+        event::{metric::MetricValue, Metric},
         sources::statsd::parser::parse,
         test_util::{collect_n, runtime},
         Event,
@@ -241,11 +242,11 @@ mod test {
 
     #[test]
     fn test_encode_counter() {
-        let metric1 = Metric::Counter {
+        let metric1 = Metric {
             name: "counter".to_owned(),
-            val: 1.5,
             timestamp: None,
             tags: Some(tags()),
+            value: MetricValue::Counter { val: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
@@ -255,11 +256,11 @@ mod test {
 
     #[test]
     fn test_encode_gauge() {
-        let metric1 = Metric::Gauge {
+        let metric1 = Metric {
             name: "gauge".to_owned(),
-            val: -1.5,
             timestamp: None,
             tags: Some(tags()),
+            value: MetricValue::Gauge { val: -1.5 },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
@@ -269,12 +270,14 @@ mod test {
 
     #[test]
     fn test_encode_histogram() {
-        let metric1 = Metric::Histogram {
+        let metric1 = Metric {
             name: "histogram".to_owned(),
-            val: 1.5,
-            sample_rate: 1,
             timestamp: None,
             tags: Some(tags()),
+            value: MetricValue::Histogram {
+                val: 1.5,
+                sample_rate: 1,
+            },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
@@ -284,11 +287,13 @@ mod test {
 
     #[test]
     fn test_encode_set() {
-        let metric1 = Metric::Set {
+        let metric1 = Metric {
             name: "set".to_owned(),
-            val: "abc".to_owned(),
             timestamp: None,
             tags: Some(tags()),
+            value: MetricValue::Set {
+                val: "abc".to_owned(),
+            },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
@@ -309,20 +314,22 @@ mod test {
         let sink = StatsdSvc::new(config, Acker::Null).unwrap();
 
         let mut events = Vec::new();
-        let event = Event::Metric(Metric::Counter {
+        let event = Event::Metric(Metric {
             name: "counter".to_owned(),
-            val: 1.5,
             timestamp: None,
             tags: Some(tags()),
+            value: MetricValue::Counter { val: 1.5 },
         });
         events.push(event);
 
-        let event = Event::Metric(Metric::Histogram {
+        let event = Event::Metric(Metric {
             name: "histogram".to_owned(),
-            val: 2.0,
-            sample_rate: 100,
             timestamp: None,
             tags: None,
+            value: MetricValue::Histogram {
+                val: 2.0,
+                sample_rate: 100,
+            },
         });
         events.push(event);
 

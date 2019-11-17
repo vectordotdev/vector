@@ -65,17 +65,20 @@ impl Transform for AddTags {
 #[cfg(test)]
 mod tests {
     use super::AddTags;
-    use crate::{event::Event, event::Metric, transforms::Transform};
+    use crate::{
+        event::{metric::MetricValue, Event, Metric},
+        transforms::Transform,
+    };
     use indexmap::IndexMap;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn add_tags() {
-        let event = Event::Metric(Metric::AggregatedGauge {
+        let event = Event::Metric(Metric {
             name: "bar".into(),
-            val: 10.0,
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedGauge { val: 10.0 },
         });
 
         let map: IndexMap<Atom, String> = vec![
@@ -87,7 +90,7 @@ mod tests {
 
         let mut transform = AddTags::new(map);
         let metric = transform.transform(event).unwrap().into_metric();
-        let tags = metric.tags().as_ref().unwrap();
+        let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 2);
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));

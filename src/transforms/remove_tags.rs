@@ -63,13 +63,15 @@ impl Transform for RemoveTags {
 #[cfg(test)]
 mod tests {
     use super::RemoveTags;
-    use crate::{event::Event, event::Metric, transforms::Transform};
+    use crate::{
+        event::{metric::MetricValue, Event, Metric},
+        transforms::Transform,
+    };
 
     #[test]
     fn remove_tags() {
-        let event = Event::Metric(Metric::Counter {
+        let event = Event::Metric(Metric {
             name: "foo".into(),
-            val: 10.0,
             timestamp: None,
             tags: Some(
                 vec![
@@ -80,11 +82,12 @@ mod tests {
                 .into_iter()
                 .collect(),
             ),
+            value: MetricValue::Counter { val: 10.0 },
         });
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform.transform(event).unwrap().into_metric();
-        let tags = metric.tags().as_ref().unwrap();
+        let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 1);
         assert!(tags.contains_key("env"));
@@ -94,35 +97,35 @@ mod tests {
 
     #[test]
     fn remove_all_tags() {
-        let event = Event::Metric(Metric::Counter {
+        let event = Event::Metric(Metric {
             name: "foo".into(),
-            val: 10.0,
             timestamp: None,
             tags: Some(
                 vec![("env".to_owned(), "production".to_owned())]
                     .into_iter()
                     .collect(),
             ),
+            value: MetricValue::Counter { val: 10.0 },
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform(event).unwrap().into_metric();
 
-        assert!(metric.tags().is_none());
+        assert!(metric.tags.is_none());
     }
 
     #[test]
     fn remove_tags_from_none() {
-        let event = Event::Metric(Metric::Set {
+        let event = Event::Metric(Metric {
             name: "foo".into(),
-            val: "bar".into(),
             timestamp: None,
             tags: None,
+            value: MetricValue::Set { val: "bar".into() },
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform(event).unwrap().into_metric();
 
-        assert!(metric.tags().is_none());
+        assert!(metric.tags.is_none());
     }
 }

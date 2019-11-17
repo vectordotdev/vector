@@ -255,7 +255,7 @@ fn tags_to_dimensions(tags: HashMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::Metric;
+    use crate::event::metric::{Metric, MetricValue};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -279,27 +279,27 @@ mod tests {
     #[test]
     fn encode_events_basic_counter() {
         let events = vec![
-            Metric::Counter {
+            Metric {
                 name: "exception_total".into(),
-                val: 1.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             },
-            Metric::Counter {
+            Metric {
                 name: "bytes_out".into(),
-                val: 2.5,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
+                value: MetricValue::Counter { val: 2.5 },
             },
-            Metric::Counter {
+            Metric {
                 name: "healthcheck".into(),
-                val: 1.0,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: Some(
                     vec![("region".to_owned(), "local".to_owned())]
                         .into_iter()
                         .collect(),
                 ),
+                value: MetricValue::Counter { val: 1.0 },
             },
         ];
 
@@ -336,11 +336,11 @@ mod tests {
 
     #[test]
     fn encode_events_absolute_gauge() {
-        let events = vec![Metric::AggregatedGauge {
+        let events = vec![Metric {
             name: "temperature".into(),
-            val: 10.0,
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedGauge { val: 10.0 },
         }];
 
         assert_eq!(
@@ -358,12 +358,14 @@ mod tests {
 
     #[test]
     fn encode_events_distribution() {
-        let events = vec![Metric::AggregatedDistribution {
+        let events = vec![Metric {
             name: "latency".into(),
-            values: vec![11.0, 12.0],
-            sample_rates: vec![100, 50],
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedDistribution {
+                values: vec![11.0, 12.0],
+                sample_rates: vec![100, 50],
+            },
         }];
 
         assert_eq!(
@@ -382,11 +384,13 @@ mod tests {
 
     #[test]
     fn encode_events_set() {
-        let events = vec![Metric::AggregatedSet {
+        let events = vec![Metric {
             name: "users".into(),
-            values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedSet {
+                values: vec!["alice".into(), "bob".into()].into_iter().collect(),
+            },
         }];
 
         assert_eq!(
@@ -437,9 +441,8 @@ mod integration_tests {
         let mut events = Vec::new();
 
         for i in 0..100 {
-            let event = Event::Metric(Metric::Counter {
+            let event = Event::Metric(Metric {
                 name: format!("counter-{}", 0),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -450,29 +453,32 @@ mod integration_tests {
                     .into_iter()
                     .collect(),
                 ),
+                value: MetricValue::Counter { val: i as f64 },
             });
             events.push(event);
         }
 
         let gauge_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::AggregatedGauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", gauge_name),
-                val: i as f64,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: i as f64 },
             });
             events.push(event);
         }
 
         let distribution_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::AggregatedDistribution {
+            let event = Event::Metric(Metric {
                 name: format!("distribution-{}", distribution_name),
-                values: vec![i as f64],
-                sample_rates: vec![100],
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
+                value: MetricValue::AggregatedDistribution {
+                    values: vec![i as f64],
+                    sample_rates: vec![100],
+                },
             });
             events.push(event);
         }

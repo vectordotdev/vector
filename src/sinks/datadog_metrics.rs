@@ -221,7 +221,7 @@ fn encode_tags(tags: HashMap<String, String>) -> Vec<String> {
     pairs
 }
 
-fn encode_timestamp(timestamp: &Option<DateTime<Utc>>) -> i64 {
+fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
         ts.timestamp()
     } else {
@@ -277,7 +277,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
         .into_iter()
         .filter_map(|event| {
             let fullname = encode_namespace(namespace, &event.name);
-            let ts = encode_timestamp(&event.timestamp);
+            let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.value {
                 MetricValue::Counter { val } => Some(vec![DatadogMetric {
@@ -368,7 +368,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::Metric;
+    use crate::event::metric::{Metric, MetricValue};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
 
@@ -405,23 +405,23 @@ mod tests {
         let now = Utc::now().timestamp();
         let interval = 60;
         let events = vec![
-            Metric::Counter {
+            Metric {
                 name: "total".into(),
-                val: 1.5,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Counter { val: 1.5 },
             },
-            Metric::Counter {
+            Metric {
                 name: "check".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
+                value: MetricValue::Counter { val: 1.0 },
             },
-            Metric::AggregatedCounter {
+            Metric {
                 name: "unsupported".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
+                value: MetricValue::AggregatedCounter { val: 1.0 },
             },
         ];
         let input = encode_events(events, interval, "ns");
@@ -436,17 +436,17 @@ mod tests {
     #[test]
     fn encode_gauge() {
         let events = vec![
-            Metric::Gauge {
+            Metric {
                 name: "unsupported".into(),
-                val: 0.1,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Gauge { val: 0.1 },
             },
-            Metric::AggregatedGauge {
+            Metric {
                 name: "volume".into(),
-                val: -1.1,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: -1.1 },
             },
         ];
         let input = encode_events(events, 60, "");
@@ -460,11 +460,13 @@ mod tests {
 
     #[test]
     fn encode_set() {
-        let events = vec![Metric::AggregatedSet {
+        let events = vec![Metric {
             name: "users".into(),
-            values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             timestamp: Some(ts()),
             tags: None,
+            value: MetricValue::AggregatedSet {
+                values: vec!["alice".into(), "bob".into()].into_iter().collect(),
+            },
         }];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();
@@ -517,12 +519,14 @@ mod tests {
     #[test]
     fn encode_distribution() {
         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
-        let events = vec![Metric::AggregatedDistribution {
+        let events = vec![Metric {
             name: "requests".into(),
-            values: vec![1.0, 2.0, 3.0],
-            sample_rates: vec![3, 3, 2],
             timestamp: Some(ts()),
             tags: None,
+            value: MetricValue::AggregatedDistribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+            },
         }];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();

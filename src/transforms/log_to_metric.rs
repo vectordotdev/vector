@@ -255,7 +255,7 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
-        event::{self, Metric},
+        event::{self, metric::MetricValue, Metric},
         transforms::Transform,
         Event,
     };
@@ -293,11 +293,11 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "status".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             }
         );
     }
@@ -327,9 +327,8 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "http_requests_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: Some(
                     vec![
@@ -340,6 +339,7 @@ mod tests {
                     .into_iter()
                     .collect(),
                 ),
+                value: MetricValue::Counter { val: 1.0 },
             }
         );
     }
@@ -361,11 +361,11 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "exception_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             }
         );
     }
@@ -406,11 +406,11 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "amount_total".into(),
-                val: 33.99,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Counter { val: 33.99 },
             }
         );
     }
@@ -432,11 +432,11 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::AggregatedGauge {
+            Metric {
                 name: "memory_rss_bytes".into(),
-                val: 123.0,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: 123.0 },
             }
         );
     }
@@ -509,20 +509,20 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "exception_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             }
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "status".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             }
         );
     }
@@ -570,20 +570,20 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "xyz_exception_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             }
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Set {
+            Metric {
                 name: "local_abc_status_set".into(),
-                val: "42".into(),
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Set { val: "42".into() },
             }
         );
     }
@@ -605,11 +605,13 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Set {
+            Metric {
                 name: "unique_user_ip".into(),
-                val: "1.2.3.4".into(),
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Set {
+                    val: "1.2.3.4".into()
+                },
             }
         );
     }
@@ -630,12 +632,14 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Histogram {
+            Metric {
                 name: "response_time".into(),
-                val: 2.5,
-                sample_rate: 1,
                 timestamp: Some(ts()),
                 tags: None,
+                value: MetricValue::Histogram {
+                    val: 2.5,
+                    sample_rate: 1,
+                },
             }
         );
     }

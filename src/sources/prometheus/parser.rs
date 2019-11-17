@@ -510,7 +510,7 @@ impl From<ParseFloatError> for ParserError {
 #[cfg(test)]
 mod test {
     use super::parse;
-    use crate::event::Metric;
+    use crate::event::{metric::MetricValue, Metric};
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
 
@@ -524,11 +524,11 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::AggregatedCounter {
+            Ok(vec![Metric {
                 name: "uptime".into(),
-                val: 123.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedCounter { val: 123.0 },
             }]),
         );
     }
@@ -555,9 +555,8 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedCounter {
+                Metric {
                     name: "http_requests_total".into(),
-                    val: 1027.0,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(
                         vec![
@@ -567,10 +566,10 @@ mod test {
                         .into_iter()
                         .collect()
                     ),
+                    value: MetricValue::AggregatedCounter { val: 1027.0 },
                 },
-                Metric::AggregatedCounter {
+                Metric {
                     name: "http_requests_total".into(),
-                    val: 3.0,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(
                         vec![
@@ -580,6 +579,7 @@ mod test {
                         .into_iter()
                         .collect()
                     ),
+                    value: MetricValue::AggregatedCounter { val: 3.0 },
                 }
             ]),
         );
@@ -595,11 +595,11 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::AggregatedGauge {
+            Ok(vec![Metric {
                 name: "latency".into(),
-                val: 123.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: 123.0 },
             }]),
         );
     }
@@ -612,11 +612,11 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::AggregatedGauge {
+            Ok(vec![Metric {
                 name: "metric_without_timestamp_and_labels".into(),
-                val: 12.47,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: 12.47 },
             }]),
         );
     }
@@ -629,9 +629,8 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::AggregatedGauge {
+            Ok(vec![Metric {
                 name: "msdos_file_access_time_seconds".into(),
-                val: 1458255915.0,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -641,6 +640,7 @@ mod test {
                     .into_iter()
                     .collect()
                 ),
+                value: MetricValue::AggregatedGauge { val: 1458255915.0 },
             }]),
         );
     }
@@ -653,15 +653,17 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::AggregatedGauge {
+            Ok(vec![Metric {
                 name: "something_weird".into(),
-                val: std::f64::INFINITY,
                 timestamp: Some(Utc.ymd(1969, 11, 15).and_hms_nano(21, 52, 35, 0)),
                 tags: Some(
                     vec![("problem".into(), "division by zero".into())]
                         .into_iter()
                         .collect()
                 ),
+                value: MetricValue::AggregatedGauge {
+                    val: std::f64::INFINITY
+                },
             }]),
         );
     }
@@ -677,21 +679,21 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedGauge {
+                Metric {
                     name: "latency".into(),
-                    val: 1.0,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(
                         vec![("env".into(), "production".into())]
                             .into_iter()
                             .collect()
                     ),
+                    value: MetricValue::AggregatedGauge { val: 1.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "latency".into(),
-                    val: 2.0,
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(vec![("env".into(), "testing".into())].into_iter().collect()),
+                    value: MetricValue::AggregatedGauge { val: 2.0 },
                 }
             ]),
         );
@@ -711,23 +713,23 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedCounter {
+                Metric {
                     name: "uptime".into(),
-                    val: 123.0,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedCounter { val: 123.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "temperature".into(),
-                    val: -1.5,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedGauge { val: -1.5 },
                 },
-                Metric::AggregatedCounter {
+                Metric {
                     name: "launch_count".into(),
-                    val: 10.0,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedCounter { val: 10.0 },
                 }
             ]),
         );
@@ -768,17 +770,17 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedCounter {
+                Metric {
                     name: "uptime".into(),
-                    val: 123.0,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedCounter { val: 123.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "temperature".into(),
-                    val: -1.5,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedGauge { val: -1.5 },
                 }
             ]),
         );
@@ -798,29 +800,29 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedCounter {
+                Metric {
                     name: "uptime".into(),
-                    val: 123.0,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedCounter { val: 123.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "last_downtime".into(),
-                    val: 4.0,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedGauge { val: 4.0 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "temperature".into(),
-                    val: -1.5,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedGauge { val: -1.5 },
                 },
-                Metric::AggregatedGauge {
+                Metric {
                     name: "temperature_7_days_average".into(),
-                    val: 0.1,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedGauge { val: 0.1 },
                 }
             ]),
         );
@@ -843,14 +845,16 @@ mod test {
 
         assert_eq!(
             parse(exp),
-            Ok(vec![Metric::AggregatedHistogram {
+            Ok(vec![Metric {
                 name: "http_request_duration_seconds".into(),
-                buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
-                counts: vec![24054, 33444, 100392, 129389, 133988],
-                count: 144320,
-                sum: 53423.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
+                    counts: vec![24054, 33444, 100392, 129389, 133988],
+                    count: 144320,
+                    sum: 53423.0,
+                },
             }]),
         );
     }
@@ -904,38 +908,47 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedHistogram {
+                Metric {
                     name: "gitlab_runner_job_duration_seconds".into(),
-                    buckets: vec![
-                        30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
-                    ],
-                    counts: vec![327, 474, 535, 536, 536, 536, 536, 536, 536, 536],
-                    count: 536,
-                    sum: 19690.129384881966,
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "z".into())].into_iter().collect()),
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![
+                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
+                            36000.0
+                        ],
+                        counts: vec![327, 474, 535, 536, 536, 536, 536, 536, 536, 536],
+                        count: 536,
+                        sum: 19690.129384881966,
+                    },
                 },
-                Metric::AggregatedHistogram {
+                Metric {
                     name: "gitlab_runner_job_duration_seconds".into(),
-                    buckets: vec![
-                        30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
-                    ],
-                    counts: vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    count: 1,
-                    sum: 28.975436316,
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "x".into())].into_iter().collect()),
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![
+                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
+                            36000.0
+                        ],
+                        counts: vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                        count: 1,
+                        sum: 28.975436316,
+                    },
                 },
-                Metric::AggregatedHistogram {
+                Metric {
                     name: "gitlab_runner_job_duration_seconds".into(),
-                    buckets: vec![
-                        30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0, 36000.0
-                    ],
-                    counts: vec![285, 1165, 3071, 3151, 3252, 3255, 3255, 3255, 3255, 3255],
-                    count: 3255,
-                    sum: 381111.7498891335,
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "y".into())].into_iter().collect()),
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![
+                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
+                            36000.0
+                        ],
+                        counts: vec![285, 1165, 3071, 3151, 3252, 3255, 3255, 3255, 3255, 3255],
+                        count: 3255,
+                        sum: 381111.7498891335,
+                    },
                 }
             ]),
         );
@@ -967,29 +980,33 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![
-                Metric::AggregatedSummary {
+                Metric {
                     name: "rpc_duration_seconds".into(),
-                    quantiles: vec![0.01, 0.05, 0.5, 0.9, 0.99],
-                    values: vec![3102.0, 3272.0, 4773.0, 9001.0, 76656.0],
-                    count: 2693,
-                    sum: 1.7560473e+07,
                     timestamp: None,
                     tags: Some(vec![("service".into(), "a".into())].into_iter().collect()),
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![0.01, 0.05, 0.5, 0.9, 0.99],
+                        values: vec![3102.0, 3272.0, 4773.0, 9001.0, 76656.0],
+                        count: 2693,
+                        sum: 1.7560473e+07,
+                    },
                 },
-                Metric::AggregatedSummary {
+                Metric {
                     name: "go_gc_duration_seconds".into(),
-                    quantiles: vec![0.0, 0.25, 0.5, 0.75, 1.0],
-                    values: vec![
-                        0.009460965,
-                        0.009793382,
-                        0.009870205,
-                        0.01001838,
-                        0.018827136
-                    ],
-                    count: 602767,
-                    sum: 4668.551713715,
                     timestamp: None,
                     tags: None,
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![0.0, 0.25, 0.5, 0.75, 1.0],
+                        values: vec![
+                            0.009460965,
+                            0.009793382,
+                            0.009870205,
+                            0.01001838,
+                            0.018827136
+                        ],
+                        count: 602767,
+                        sum: 4668.551713715,
+                    },
                 },
             ]),
         );

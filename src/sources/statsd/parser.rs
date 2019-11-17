@@ -223,17 +223,17 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
-    use crate::event::Metric;
+    use crate::event::{metric::MetricValue, Metric};
 
     #[test]
     fn basic_counter() {
         assert_eq!(
             parse("foo:1|c"),
-            Ok(Metric::Counter {
+            Ok(Metric {
                 name: "foo".into(),
-                val: 1.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Counter { val: 1.0 },
             }),
         );
     }
@@ -242,9 +242,8 @@ mod test {
     fn tagged_counter() {
         assert_eq!(
             parse("foo:1|c|#tag1,tag2:value"),
-            Ok(Metric::Counter {
+            Ok(Metric {
                 name: "foo".into(),
-                val: 1.0,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -254,6 +253,7 @@ mod test {
                     .into_iter()
                     .collect(),
                 ),
+                value: MetricValue::Counter { val: 1.0 },
             }),
         );
     }
@@ -262,11 +262,11 @@ mod test {
     fn sampled_counter() {
         assert_eq!(
             parse("bar:2|c|@0.1"),
-            Ok(Metric::Counter {
+            Ok(Metric {
                 name: "bar".into(),
-                val: 20.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Counter { val: 20.0 },
             }),
         );
     }
@@ -275,11 +275,11 @@ mod test {
     fn zero_sampled_counter() {
         assert_eq!(
             parse("bar:2|c|@0"),
-            Ok(Metric::Counter {
+            Ok(Metric {
                 name: "bar".into(),
-                val: 2.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Counter { val: 2.0 },
             }),
         );
     }
@@ -288,12 +288,14 @@ mod test {
     fn sampled_timer() {
         assert_eq!(
             parse("glork:320|ms|@0.1"),
-            Ok(Metric::Histogram {
+            Ok(Metric {
                 name: "glork".into(),
-                val: 0.320,
-                sample_rate: 10,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Histogram {
+                    val: 0.320,
+                    sample_rate: 10,
+                },
             }),
         );
     }
@@ -302,10 +304,8 @@ mod test {
     fn sampled_tagged_histogram() {
         assert_eq!(
             parse("glork:320|h|@0.1|#region:us-west1,production,e:"),
-            Ok(Metric::Histogram {
+            Ok(Metric {
                 name: "glork".into(),
-                val: 320.0,
-                sample_rate: 10,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -316,6 +316,10 @@ mod test {
                     .into_iter()
                     .collect(),
                 ),
+                value: MetricValue::Histogram {
+                    val: 320.0,
+                    sample_rate: 10,
+                },
             }),
         );
     }
@@ -324,11 +328,11 @@ mod test {
     fn simple_gauge() {
         assert_eq!(
             parse("gaugor:333|g"),
-            Ok(Metric::AggregatedGauge {
+            Ok(Metric {
                 name: "gaugor".into(),
-                val: 333.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: 333.0 },
             }),
         );
     }
@@ -337,20 +341,20 @@ mod test {
     fn signed_gauge() {
         assert_eq!(
             parse("gaugor:-4|g"),
-            Ok(Metric::Gauge {
+            Ok(Metric {
                 name: "gaugor".into(),
-                val: -4.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Gauge { val: -4.0 },
             }),
         );
         assert_eq!(
             parse("gaugor:+10|g"),
-            Ok(Metric::Gauge {
+            Ok(Metric {
                 name: "gaugor".into(),
-                val: 10.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Gauge { val: 10.0 },
             }),
         );
     }
@@ -359,11 +363,11 @@ mod test {
     fn sets() {
         assert_eq!(
             parse("uniques:765|s"),
-            Ok(Metric::Set {
+            Ok(Metric {
                 name: "uniques".into(),
-                val: "765".into(),
                 timestamp: None,
                 tags: None,
+                value: MetricValue::Set { val: "765".into() },
             }),
         );
     }

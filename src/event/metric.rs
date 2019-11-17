@@ -12,7 +12,7 @@ pub struct Metric {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, is_enum_variant)]
-#[serde(tag = "value", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricValue {
     Counter {
         val: f64,
@@ -161,115 +161,125 @@ mod test {
 
     #[test]
     fn merge_counters() {
-        let mut counter = Metric::AggregatedCounter {
+        let mut counter = Metric {
             name: "counter".into(),
-            val: 1.0,
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedCounter { val: 1.0 },
         };
 
-        let delta = Metric::Counter {
+        let delta = Metric {
             name: "counter".into(),
-            val: 2.0,
             timestamp: Some(ts()),
             tags: Some(tags()),
+            value: MetricValue::Counter { val: 2.0 },
         };
 
         counter.add(&delta);
         assert_eq!(
             counter,
-            Metric::AggregatedCounter {
+            Metric {
                 name: "counter".into(),
-                val: 3.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedCounter { val: 3.0 },
             }
         )
     }
 
     #[test]
     fn merge_gauges() {
-        let mut gauge = Metric::AggregatedGauge {
+        let mut gauge = Metric {
             name: "gauge".into(),
-            val: 1.0,
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedGauge { val: 1.0 },
         };
 
-        let delta = Metric::Gauge {
+        let delta = Metric {
             name: "gauge".into(),
-            val: -2.0,
             timestamp: Some(ts()),
             tags: Some(tags()),
+            value: MetricValue::Gauge { val: -2.0 },
         };
 
         gauge.add(&delta);
         assert_eq!(
             gauge,
-            Metric::AggregatedGauge {
+            Metric {
                 name: "gauge".into(),
-                val: -1.0,
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedGauge { val: -1.0 },
             }
         )
     }
 
     #[test]
     fn merge_sets() {
-        let mut set = Metric::AggregatedSet {
+        let mut set = Metric {
             name: "set".into(),
-            values: vec!["old".into()].into_iter().collect(),
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedSet {
+                values: vec!["old".into()].into_iter().collect(),
+            },
         };
 
-        let delta = Metric::Set {
+        let delta = Metric {
             name: "set".into(),
-            val: "new".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
+            value: MetricValue::Set { val: "new".into() },
         };
 
         set.add(&delta);
         assert_eq!(
             set,
-            Metric::AggregatedSet {
+            Metric {
                 name: "set".into(),
-                values: vec!["old".into(), "new".into()].into_iter().collect(),
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedSet {
+                    values: vec!["old".into(), "new".into()].into_iter().collect()
+                },
             }
         )
     }
 
     #[test]
     fn merge_histograms() {
-        let mut dist = Metric::AggregatedDistribution {
+        let mut dist = Metric {
             name: "hist".into(),
-            values: vec![1.0],
-            sample_rates: vec![10],
             timestamp: None,
             tags: None,
+            value: MetricValue::AggregatedDistribution {
+                values: vec![1.0],
+                sample_rates: vec![10],
+            },
         };
 
-        let delta = Metric::Histogram {
+        let delta = Metric {
             name: "hist".into(),
-            val: 1.0,
-            sample_rate: 20,
             timestamp: Some(ts()),
             tags: Some(tags()),
+            value: MetricValue::Histogram {
+                val: 1.0,
+                sample_rate: 20,
+            },
         };
 
         dist.add(&delta);
         assert_eq!(
             dist,
-            Metric::AggregatedDistribution {
+            Metric {
                 name: "hist".into(),
-                values: vec![1.0, 1.0],
-                sample_rates: vec![10, 20],
                 timestamp: None,
                 tags: None,
+                value: MetricValue::AggregatedDistribution {
+                    values: vec![1.0, 1.0],
+                    sample_rates: vec![10, 20],
+                },
             }
         )
     }
