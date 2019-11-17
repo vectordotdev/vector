@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{Event, Metric},
+    event::{metric::MetricValue, Event},
     sinks::util::{BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig},
 };
@@ -123,65 +123,50 @@ fn encode_tags(tags: &HashMap<String, String>) -> String {
 fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
     let mut buf = Vec::new();
 
-    match event.as_metric() {
-        Metric::Counter {
-            name, val, tags, ..
-        } => {
-            buf.push(format!("{}:{}", name, val));
+    let metric = event.as_metric();
+    match &metric.value {
+        MetricValue::Counter { val } => {
+            buf.push(format!("{}:{}", metric.name, val));
             buf.push("c".to_string());
-            if let Some(t) = tags {
+            if let Some(t) = &metric.tags {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        Metric::AggregatedCounter {
-            name, val, tags, ..
-        } => {
-            buf.push(format!("{}:{}", name, val));
+        MetricValue::AggregatedCounter { val } => {
+            buf.push(format!("{}:{}", metric.name, val));
             buf.push("c".to_string());
-            if let Some(t) = tags {
+            if let Some(t) = &metric.tags {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        Metric::Gauge {
-            name, val, tags, ..
-        } => {
-            buf.push(format!("{}:{:+}", name, val));
+        MetricValue::Gauge { val } => {
+            buf.push(format!("{}:{:+}", metric.name, val));
             buf.push("g".to_string());
-            if let Some(t) = tags {
+            if let Some(t) = &metric.tags {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        Metric::AggregatedGauge {
-            name, val, tags, ..
-        } => {
-            buf.push(format!("{}:{}", name, val));
+        MetricValue::AggregatedGauge { val } => {
+            buf.push(format!("{}:{}", metric.name, val));
             buf.push("g".to_string());
-            if let Some(t) = tags {
+            if let Some(t) = &metric.tags {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        Metric::Histogram {
-            name,
-            val,
-            sample_rate,
-            tags,
-            ..
-        } => {
-            buf.push(format!("{}:{}", name, val));
+        MetricValue::Histogram { val, sample_rate } => {
+            buf.push(format!("{}:{}", metric.name, val));
             buf.push("h".to_string());
             if *sample_rate != 1 {
                 buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
             };
-            if let Some(t) = tags {
+            if let Some(t) = &metric.tags {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        Metric::Set {
-            name, val, tags, ..
-        } => {
-            buf.push(format!("{}:{}", name, val));
+        MetricValue::Set { val } => {
+            buf.push(format!("{}:{}", metric.name, val));
             buf.push("s".to_string());
-            if let Some(t) = tags {
+            if let Some(t) = &metric.tags {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }

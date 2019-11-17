@@ -3,218 +3,132 @@ use derive_is_enum_variant::is_enum_variant;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Metric {
+    pub name: String,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub tags: Option<HashMap<String, String>>,
+    pub value: MetricValue,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, is_enum_variant)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Metric {
+#[serde(tag = "value", rename_all = "snake_case")]
+pub enum MetricValue {
     Counter {
-        name: String,
         val: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     Histogram {
-        name: String,
         val: f64,
         sample_rate: u32,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     Gauge {
-        name: String,
         val: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     Set {
-        name: String,
         val: String,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     AggregatedCounter {
-        name: String,
         val: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     AggregatedGauge {
-        name: String,
         val: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     AggregatedSet {
-        name: String,
         values: HashSet<String>,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     AggregatedDistribution {
-        name: String,
         values: Vec<f64>,
         sample_rates: Vec<u32>,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     AggregatedHistogram {
-        name: String,
         buckets: Vec<f64>,
         counts: Vec<u32>,
         count: u32,
         sum: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
     AggregatedSummary {
-        name: String,
         quantiles: Vec<f64>,
         values: Vec<f64>,
         count: u32,
         sum: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
     },
 }
 
-impl Metric {
-    pub fn tags(&self) -> &Option<HashMap<String, String>> {
-        match self {
-            Metric::Counter { tags, .. } => tags,
-            Metric::Gauge { tags, .. } => tags,
-            Metric::Histogram { tags, .. } => tags,
-            Metric::Set { tags, .. } => tags,
-            Metric::AggregatedCounter { tags, .. } => tags,
-            Metric::AggregatedGauge { tags, .. } => tags,
-            Metric::AggregatedSet { tags, .. } => tags,
-            Metric::AggregatedDistribution { tags, .. } => tags,
-            Metric::AggregatedHistogram { tags, .. } => tags,
-            Metric::AggregatedSummary { tags, .. } => tags,
-        }
-    }
-
-    pub fn tags_mut(&mut self) -> &mut Option<HashMap<String, String>> {
-        match self {
-            Metric::Counter { tags, .. } => tags,
-            Metric::Gauge { tags, .. } => tags,
-            Metric::Histogram { tags, .. } => tags,
-            Metric::Set { tags, .. } => tags,
-            Metric::AggregatedCounter { tags, .. } => tags,
-            Metric::AggregatedGauge { tags, .. } => tags,
-            Metric::AggregatedSet { tags, .. } => tags,
-            Metric::AggregatedDistribution { tags, .. } => tags,
-            Metric::AggregatedHistogram { tags, .. } => tags,
-            Metric::AggregatedSummary { tags, .. } => tags,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        match self {
-            Metric::Counter { name, .. } => name,
-            Metric::Gauge { name, .. } => name,
-            Metric::Histogram { name, .. } => name,
-            Metric::Set { name, .. } => name,
-            Metric::AggregatedCounter { name, .. } => name,
-            Metric::AggregatedGauge { name, .. } => name,
-            Metric::AggregatedSet { name, .. } => name,
-            Metric::AggregatedDistribution { name, .. } => name,
-            Metric::AggregatedHistogram { name, .. } => name,
-            Metric::AggregatedSummary { name, .. } => name,
-        }
-    }
-
+impl MetricValue {
     pub fn is_aggregated(&self) -> bool {
         match self {
-            Metric::Counter { .. } => false,
-            Metric::Gauge { .. } => false,
-            Metric::Histogram { .. } => false,
-            Metric::Set { .. } => false,
-            Metric::AggregatedCounter { .. } => true,
-            Metric::AggregatedGauge { .. } => true,
-            Metric::AggregatedSet { .. } => true,
-            Metric::AggregatedDistribution { .. } => true,
-            Metric::AggregatedHistogram { .. } => true,
-            Metric::AggregatedSummary { .. } => true,
+            MetricValue::Counter { .. } => false,
+            MetricValue::Gauge { .. } => false,
+            MetricValue::Histogram { .. } => false,
+            MetricValue::Set { .. } => false,
+            MetricValue::AggregatedCounter { .. } => true,
+            MetricValue::AggregatedGauge { .. } => true,
+            MetricValue::AggregatedSet { .. } => true,
+            MetricValue::AggregatedDistribution { .. } => true,
+            MetricValue::AggregatedHistogram { .. } => true,
+            MetricValue::AggregatedSummary { .. } => true,
         }
     }
+}
 
+impl Metric {
     pub fn into_aggregated(self) -> Metric {
-        match self {
-            Metric::Counter {
-                name,
-                val,
-                timestamp,
-                tags,
-            } => Metric::AggregatedCounter {
-                name,
-                val,
-                timestamp,
-                tags,
-            },
-            Metric::Gauge {
-                name,
-                val,
-                timestamp,
-                tags,
-            } => Metric::AggregatedGauge {
-                name,
-                val,
-                timestamp,
-                tags,
-            },
-            Metric::Histogram {
-                name,
-                val,
-                sample_rate,
-                timestamp,
-                tags,
-            } => Metric::AggregatedDistribution {
-                name,
+        let value = match self.value {
+            MetricValue::Counter { val } => MetricValue::AggregatedCounter { val },
+            MetricValue::Gauge { val } => MetricValue::AggregatedGauge { val },
+            MetricValue::Histogram { val, sample_rate } => MetricValue::AggregatedDistribution {
                 values: vec![val],
                 sample_rates: vec![sample_rate],
-                timestamp,
-                tags,
             },
-            Metric::Set {
-                name,
-                val,
-                timestamp,
-                tags,
-            } => Metric::AggregatedSet {
-                name,
+            MetricValue::Set { val } => MetricValue::AggregatedSet {
                 values: vec![val].into_iter().collect(),
-                timestamp,
-                tags,
             },
-            m @ Metric::AggregatedCounter { .. } => m,
-            m @ Metric::AggregatedGauge { .. } => m,
-            m @ Metric::AggregatedSet { .. } => m,
-            m @ Metric::AggregatedDistribution { .. } => m,
-            m @ Metric::AggregatedHistogram { .. } => m,
-            m @ Metric::AggregatedSummary { .. } => m,
+            m @ MetricValue::AggregatedCounter { .. } => m,
+            m @ MetricValue::AggregatedGauge { .. } => m,
+            m @ MetricValue::AggregatedSet { .. } => m,
+            m @ MetricValue::AggregatedDistribution { .. } => m,
+            m @ MetricValue::AggregatedHistogram { .. } => m,
+            m @ MetricValue::AggregatedSummary { .. } => m,
+        };
+
+        Metric {
+            name: self.name,
+            timestamp: self.timestamp,
+            tags: self.tags,
+            value,
         }
     }
 
     pub fn add(&mut self, other: &Self) {
-        match (self, other) {
-            (Metric::Counter { ref mut val, .. }, Metric::Counter { val: inc, .. }) => {
-                *val += *inc;
+        match (&mut self.value, &other.value) {
+            (MetricValue::Counter { ref mut val, .. }, MetricValue::Counter { val: inc, .. }) => {
+                *val += inc;
             }
-            (Metric::AggregatedCounter { ref mut val, .. }, Metric::Counter { val: inc, .. }) => {
-                *val += *inc;
+            (
+                MetricValue::AggregatedCounter { ref mut val, .. },
+                MetricValue::Counter { val: inc, .. },
+            ) => {
+                *val += inc;
             }
-            (Metric::AggregatedGauge { ref mut val, .. }, Metric::Gauge { val: inc, .. }) => {
-                *val += *inc;
+            (
+                MetricValue::AggregatedGauge { ref mut val, .. },
+                MetricValue::Gauge { val: inc, .. },
+            ) => {
+                *val += inc;
             }
-            (Metric::AggregatedSet { ref mut values, .. }, Metric::Set { val, .. }) => {
+            (
+                MetricValue::AggregatedSet { ref mut values, .. },
+                MetricValue::Set { ref val, .. },
+            ) => {
                 values.insert(val.to_owned());
             }
             (
-                Metric::AggregatedDistribution {
+                MetricValue::AggregatedDistribution {
                     ref mut values,
                     ref mut sample_rates,
                     ..
                 },
-                Metric::Histogram {
+                MetricValue::Histogram {
                     val, sample_rate, ..
                 },
             ) => {

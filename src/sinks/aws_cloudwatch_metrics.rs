@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::Metric,
+    event::{metric::MetricValue, Metric},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -143,58 +143,45 @@ impl CloudWatchMetricsSvc {
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
         let metric_data: Vec<_> = events
             .into_iter()
-            .filter_map(|event| match event {
-                Metric::Counter {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    value: Some(val),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                Metric::AggregatedGauge {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    value: Some(val),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                Metric::AggregatedDistribution {
-                    name,
-                    values,
-                    sample_rates,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    values: Some(values),
-                    counts: Some(sample_rates.into_iter().map(f64::from).collect()),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                Metric::AggregatedSet {
-                    name,
-                    values,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    value: Some(values.len() as f64),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                _ => None,
+            .filter_map(|event| {
+                let metric_name = event.name.to_string();
+                let timestamp = event.timestamp.map(timestamp_to_string);
+                let dimensions = event.tags.clone().map(tags_to_dimensions);
+                match event.value {
+                    MetricValue::Counter { val } => Some(MetricDatum {
+                        metric_name,
+                        value: Some(val),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    MetricValue::AggregatedGauge { val } => Some(MetricDatum {
+                        metric_name,
+                        value: Some(val),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    MetricValue::AggregatedDistribution {
+                        values,
+                        sample_rates,
+                    } => Some(MetricDatum {
+                        metric_name,
+                        values: Some(values.to_vec()),
+                        counts: Some(sample_rates.iter().cloned().map(f64::from).collect()),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    MetricValue::AggregatedSet { values } => Some(MetricDatum {
+                        metric_name,
+                        value: Some(values.len() as f64),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    _ => None,
+                }
             })
             .collect();
 

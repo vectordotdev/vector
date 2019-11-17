@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::metric::Metric,
+    event::metric::{Metric, MetricValue},
     event::{self, ValueKind},
     template::Template,
     topology::config::{DataType, TransformConfig},
@@ -158,11 +158,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&counter.tags, &event);
 
-            Ok(Metric::Counter {
+            Ok(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                value: MetricValue::Counter { val },
             })
         }
         MetricConfig::Histogram(hist) => {
@@ -177,12 +177,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&hist.tags, &event);
 
-            Ok(Metric::Histogram {
+            Ok(Metric {
                 name,
-                val,
-                sample_rate: 1,
                 timestamp,
                 tags,
+                value: MetricValue::Histogram {
+                    val,
+                    sample_rate: 1,
+                },
             })
         }
         MetricConfig::Gauge(gauge) => {
@@ -197,11 +199,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&gauge.tags, &event);
 
-            Ok(Metric::AggregatedGauge {
+            Ok(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                value: MetricValue::AggregatedGauge { val },
             })
         }
         MetricConfig::Set(set) => {
@@ -213,11 +215,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&set.tags, &event);
 
-            Ok(Metric::Set {
+            Ok(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                value: MetricValue::Set { val },
             })
         }
     }

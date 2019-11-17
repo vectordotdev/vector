@@ -46,7 +46,7 @@ impl AddTags {
 impl Transform for AddTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         if !self.tags.is_empty() {
-            let tags = event.as_mut_metric().tags_mut();
+            let ref mut tags = event.as_mut_metric().tags;
 
             if tags.is_none() {
                 *tags = Some(HashMap::new());

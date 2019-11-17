@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::Metric,
+    event::{metric::MetricValue, Metric},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         retries::FixedRetryPolicy,
@@ -221,7 +221,7 @@ fn encode_tags(tags: HashMap<String, String>) -> Vec<String> {
     pairs
 }
 
-fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
+fn encode_timestamp(timestamp: &Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
         ts.timestamp()
     } else {
@@ -229,11 +229,11 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: String) -> String {
+fn encode_namespace(namespace: &str, name: &str) -> String {
     if !namespace.is_empty() {
         format!("{}.{}", namespace, name)
     } else {
-        name
+        name.to_string()
     }
 }
 
@@ -275,108 +275,89 @@ fn stats(values: &Vec<f64>, counts: &Vec<u32>) -> Option<DatadogStats> {
 fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
     let series: Vec<_> = events
         .into_iter()
-        .filter_map(|event| match event {
-            Metric::Counter {
-                name,
-                val,
-                timestamp,
-                tags,
-            } => Some(vec![DatadogMetric {
-                metric: encode_namespace(namespace, name),
-                r#type: DatadogMetricType::Count,
-                interval: Some(interval),
-                points: vec![DatadogPoint(encode_timestamp(timestamp), val)],
-                tags: tags.map(encode_tags),
-            }]),
-            Metric::AggregatedGauge {
-                name,
-                val,
-                timestamp,
-                tags,
-            } => Some(vec![DatadogMetric {
-                metric: encode_namespace(namespace, name),
-                r#type: DatadogMetricType::Gauge,
-                interval: None,
-                points: vec![DatadogPoint(encode_timestamp(timestamp), val)],
-                tags: tags.map(encode_tags),
-            }]),
-            Metric::AggregatedDistribution {
-                name,
-                values,
-                sample_rates,
-                timestamp,
-                tags,
-            } => {
-                // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
-                // <name>.avg
-                // <name>.count
-                // <name>.median
-                // <name>.95percentile
-                // <name>.max
-                let fullname = encode_namespace(namespace, name);
-                let ts = encode_timestamp(timestamp);
-                let tags = tags.map(encode_tags);
-                if let Some(s) = stats(&values, &sample_rates) {
-                    let mut result = vec![
-                        DatadogMetric {
-                            metric: format!("{}.avg", &fullname),
-                            r#type: DatadogMetricType::Gauge,
-                            interval: Some(interval),
-                            points: vec![DatadogPoint(ts, s.avg)],
-                            tags: tags.clone(),
-                        },
-                        DatadogMetric {
-                            metric: format!("{}.count", &fullname),
-                            r#type: DatadogMetricType::Rate,
-                            interval: Some(interval),
-                            points: vec![DatadogPoint(ts, s.count)],
-                            tags: tags.clone(),
-                        },
-                        DatadogMetric {
-                            metric: format!("{}.median", &fullname),
-                            r#type: DatadogMetricType::Gauge,
-                            interval: Some(interval),
-                            points: vec![DatadogPoint(ts, s.median)],
-                            tags: tags.clone(),
-                        },
-                        DatadogMetric {
-                            metric: format!("{}.max", &fullname),
-                            r#type: DatadogMetricType::Gauge,
-                            interval: Some(interval),
-                            points: vec![DatadogPoint(ts, s.max)],
-                            tags: tags.clone(),
-                        },
-                    ];
-                    for (q, v) in s.quantiles {
-                        result.push(DatadogMetric {
-                            metric: format!("{}.{}percentile", &fullname, (q * 100.0) as u32),
-                            r#type: DatadogMetricType::Gauge,
-                            interval: Some(interval),
-                            points: vec![DatadogPoint(ts, v)],
-                            tags: tags.clone(),
-                        })
+        .filter_map(|event| {
+            let fullname = encode_namespace(namespace, &event.name);
+            let ts = encode_timestamp(&event.timestamp);
+            let tags = event.tags.clone().map(encode_tags);
+            match event.value {
+                MetricValue::Counter { val } => Some(vec![DatadogMetric {
+                    metric: fullname,
+                    r#type: DatadogMetricType::Count,
+                    interval: Some(interval),
+                    points: vec![DatadogPoint(ts, val)],
+                    tags,
+                }]),
+                MetricValue::AggregatedGauge { val } => Some(vec![DatadogMetric {
+                    metric: fullname,
+                    r#type: DatadogMetricType::Gauge,
+                    interval: None,
+                    points: vec![DatadogPoint(ts, val)],
+                    tags,
+                }]),
+                MetricValue::AggregatedDistribution {
+                    values,
+                    sample_rates,
+                } => {
+                    // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
+                    // <name>.avg
+                    // <name>.count
+                    // <name>.median
+                    // <name>.95percentile
+                    // <name>.max
+                    if let Some(s) = stats(&values, &sample_rates) {
+                        let mut result = vec![
+                            DatadogMetric {
+                                metric: format!("{}.avg", &fullname),
+                                r#type: DatadogMetricType::Gauge,
+                                interval: Some(interval),
+                                points: vec![DatadogPoint(ts, s.avg)],
+                                tags: tags.clone(),
+                            },
+                            DatadogMetric {
+                                metric: format!("{}.count", &fullname),
+                                r#type: DatadogMetricType::Rate,
+                                interval: Some(interval),
+                                points: vec![DatadogPoint(ts, s.count)],
+                                tags: tags.clone(),
+                            },
+                            DatadogMetric {
+                                metric: format!("{}.median", &fullname),
+                                r#type: DatadogMetricType::Gauge,
+                                interval: Some(interval),
+                                points: vec![DatadogPoint(ts, s.median)],
+                                tags: tags.clone(),
+                            },
+                            DatadogMetric {
+                                metric: format!("{}.max", &fullname),
+                                r#type: DatadogMetricType::Gauge,
+                                interval: Some(interval),
+                                points: vec![DatadogPoint(ts, s.max)],
+                                tags: tags.clone(),
+                            },
+                        ];
+                        for (q, v) in s.quantiles {
+                            result.push(DatadogMetric {
+                                metric: format!("{}.{}percentile", &fullname, (q * 100.0) as u32),
+                                r#type: DatadogMetricType::Gauge,
+                                interval: Some(interval),
+                                points: vec![DatadogPoint(ts, v)],
+                                tags: tags.clone(),
+                            })
+                        }
+                        Some(result)
+                    } else {
+                        None
                     }
-                    Some(result)
-                } else {
-                    None
                 }
+                MetricValue::AggregatedSet { values } => Some(vec![DatadogMetric {
+                    metric: fullname,
+                    r#type: DatadogMetricType::Gauge,
+                    interval: None,
+                    points: vec![DatadogPoint(ts, values.len() as f64)],
+                    tags: tags.clone(),
+                }]),
+                _ => None,
             }
-            Metric::AggregatedSet {
-                name,
-                values,
-                timestamp,
-                tags,
-            } => Some(vec![DatadogMetric {
-                metric: encode_namespace(namespace, name),
-                r#type: DatadogMetricType::Gauge,
-                interval: None,
-                points: vec![DatadogPoint(
-                    encode_timestamp(timestamp),
-                    values.len() as f64,
-                )],
-                tags: tags.map(encode_tags),
-            }]),
-            _ => None,
         })
         .flatten()
         .collect();

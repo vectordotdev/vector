@@ -1,4 +1,4 @@
-use crate::event::Metric;
+use crate::event::metric::{Metric, MetricValue};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -56,21 +56,25 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     let metric = match metric_type {
         "c" => {
             let val: f64 = parts[0].parse()?;
-            Metric::Counter {
+            Metric {
                 name,
-                val: val * sample_rate,
                 timestamp: None,
                 tags,
+                value: MetricValue::Counter {
+                    val: val * sample_rate,
+                },
             }
         }
         unit @ "h" | unit @ "ms" => {
             let val: f64 = parts[0].parse()?;
-            Metric::Histogram {
+            Metric {
                 name,
-                val: convert_to_base_units(unit, val),
-                sample_rate: sample_rate as u32,
                 timestamp: None,
                 tags,
+                value: MetricValue::Histogram {
+                    val: convert_to_base_units(unit, val),
+                    sample_rate: sample_rate as u32,
+                },
             }
         }
         "g" => {
@@ -86,25 +90,27 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             };
 
             match parse_direction(parts[0])? {
-                None => Metric::AggregatedGauge {
+                None => Metric {
                     name,
-                    val,
                     timestamp: None,
                     tags,
+                    value: MetricValue::AggregatedGauge { val },
                 },
-                Some(sign) => Metric::Gauge {
+                Some(sign) => Metric {
                     name,
-                    val: val * sign,
                     timestamp: None,
                     tags,
+                    value: MetricValue::Gauge { val: val * sign },
                 },
             }
         }
-        "s" => Metric::Set {
+        "s" => Metric {
             name,
-            val: parts[0].into(),
             timestamp: None,
             tags,
+            value: MetricValue::Set {
+                val: parts[0].into(),
+            },
         },
         other => return Err(ParseError::UnknownMetricType(other.into())),
     };

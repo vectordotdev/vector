@@ -1,4 +1,4 @@
-use crate::event::Metric;
+use crate::event::metric::{Metric, MetricValue};
 use chrono::{offset::TimeZone, DateTime, Utc};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
@@ -290,11 +290,11 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         } else {
                             None
                         };
-                        let counter = Metric::AggregatedCounter {
+                        let counter = Metric {
                             name: metric.name,
-                            val: metric.value,
                             timestamp: metric.timestamp,
                             tags,
+                            value: MetricValue::AggregatedCounter { val: metric.value },
                         };
                         result.push(counter);
                         processed_metrics.insert(metric.id);
@@ -310,11 +310,11 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         } else {
                             None
                         };
-                        let gauge = Metric::AggregatedGauge {
+                        let gauge = Metric {
                             name: metric.name,
-                            val: metric.value,
                             timestamp: metric.timestamp,
                             tags,
+                            value: MetricValue::AggregatedGauge { val: metric.value },
                         };
                         result.push(gauge);
                         processed_metrics.insert(metric.id);
@@ -380,14 +380,16 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         } else {
                             None
                         };
-                        let hist = Metric::AggregatedHistogram {
+                        let hist = Metric {
                             name: aggregate.name,
-                            buckets: aggregate.bounds,
-                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
-                            count: aggregate.count,
-                            sum: aggregate.sum,
                             timestamp: None,
                             tags,
+                            value: MetricValue::AggregatedHistogram {
+                                buckets: aggregate.bounds,
+                                counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
+                                count: aggregate.count,
+                                sum: aggregate.sum,
+                            },
                         };
                         result.push(hist);
                         processed_metrics.insert(id);
@@ -453,14 +455,16 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         } else {
                             None
                         };
-                        let summary = Metric::AggregatedSummary {
+                        let summary = Metric {
                             name: aggregate.name,
-                            quantiles: aggregate.bounds,
-                            values: aggregate.values,
-                            count: aggregate.count,
-                            sum: aggregate.sum,
                             timestamp: None,
                             tags,
+                            value: MetricValue::AggregatedSummary {
+                                quantiles: aggregate.bounds,
+                                values: aggregate.values,
+                                count: aggregate.count,
+                                sum: aggregate.sum,
+                            },
                         };
                         result.push(summary);
                         processed_metrics.insert(id);

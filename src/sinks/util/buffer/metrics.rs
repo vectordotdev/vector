@@ -1,4 +1,4 @@
-use crate::event::{Event, Metric};
+use crate::event::{metric::MetricValue, Event, Metric};
 use crate::sinks::util::Batch;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -10,32 +10,27 @@ impl Eq for MetricEntry {}
 
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(&self.0).hash(state);
+        let metric = &self.0;
+        std::mem::discriminant(metric).hash(state);
+        metric.name.hash(state);
+        metric
+            .tags
+            .as_ref()
+            .map(|ts| ts.iter().for_each(|t| t.hash(state)));
 
-        match &self.0 {
-            Metric::AggregatedHistogram { name, buckets, .. } => {
-                name.hash(state);
+        match &metric.value {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
                 for bucket in buckets {
                     bucket.to_bits().hash(state);
                 }
             }
-            Metric::AggregatedSummary {
-                name, quantiles, ..
-            } => {
-                name.hash(state);
+            MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
                     quantile.to_bits().hash(state);
                 }
             }
-            other => {
-                other.name().hash(state);
-            }
+            _ => {}
         }
-
-        self.0
-            .tags()
-            .as_ref()
-            .map(|ts| ts.iter().for_each(|t| t.hash(state)));
     }
 }
 
@@ -112,8 +107,8 @@ impl Batch for MetricBuffer {
     fn push(&mut self, item: Self::Input) {
         let item = item.into_metric();
 
-        match &item {
-            Metric::Counter { .. } => {
+        match &item.value {
+            MetricValue::Counter { .. } => {
                 let new = MetricEntry(item.clone());
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.add(&item);
@@ -122,23 +117,20 @@ impl Batch for MetricBuffer {
                     self.metrics.insert(new);
                 }
             }
-            Metric::AggregatedCounter {
-                ref name,
-                ref val,
-                ref timestamp,
-                ref tags,
-            } => {
+            MetricValue::AggregatedCounter { val } => {
                 let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(Metric::AggregatedCounter { val: val0, .. })) =
-                    self.state.get(&new)
+                if let Some(MetricEntry(Metric {
+                    value: MetricValue::AggregatedCounter { val: val0, .. },
+                    ..
+                })) = self.state.get(&new)
                 {
                     // Counters are disaggregated. We take the previoud value from the state
                     // and emit the difference between previous and current as a Counter
-                    let delta = MetricEntry(Metric::Counter {
-                        name: name.clone(),
-                        val: val - val0,
-                        timestamp: timestamp.clone(),
-                        tags: tags.clone(),
+                    let delta = MetricEntry(Metric {
+                        name: item.name.to_string(),
+                        timestamp: item.timestamp.clone(),
+                        tags: item.tags.clone(),
+                        value: MetricValue::Counter { val: val - val0 },
                     });
 
                     // The resulting Counters could be added up normally
@@ -153,12 +145,7 @@ impl Batch for MetricBuffer {
                     self.state.insert(new);
                 }
             }
-            Metric::Gauge {
-                ref name,
-                ref timestamp,
-                ref tags,
-                ..
-            } => {
+            MetricValue::Gauge { .. } => {
                 let new = MetricEntry(item.clone().into_aggregated());
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.add(&item);
@@ -171,11 +158,11 @@ impl Batch for MetricBuffer {
                         default.0.clone()
                     } else {
                         // Otherwise we start from zero value
-                        Metric::AggregatedGauge {
-                            name: name.clone(),
-                            val: 0.0,
-                            timestamp: timestamp.clone(),
-                            tags: tags.clone(),
+                        Metric {
+                            name: item.name.to_string(),
+                            timestamp: item.timestamp.clone(),
+                            tags: item.tags.clone(),
+                            value: MetricValue::AggregatedGauge { val: 0.0 },
                         }
                     };
                     initial.add(&item);
@@ -205,7 +192,7 @@ impl Batch for MetricBuffer {
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {
-            if entry.0.is_aggregated_gauge() || entry.0.is_aggregated_counter() {
+            if entry.0.value.is_aggregated_gauge() || entry.0.value.is_aggregated_counter() {
                 state.replace(entry.clone());
             }
         }
