@@ -192,32 +192,10 @@ where
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
+        self.seek_checkpoint();
+
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
-
-        // Retrieve the saved checkpoint, and seek forward in the journald log
-        match self.checkpointer.get() {
-            Ok(Some(cursor)) => {
-                if let Err(err) = self.journal.seek_cursor(&cursor) {
-                    error!(
-                        message = "Could not seek journald to stored cursor",
-                        error = field::display(&err)
-                    );
-                // The cursor now points to the last successfully read
-                // record, so skip past it to any newer records.
-                } else if let Some(Err(err)) = self.journal.next() {
-                    error!(
-                        message = "Could not fetch next record after seeking to cursor",
-                        error = field::display(&err)
-                    );
-                }
-            }
-            Ok(None) => {}
-            Err(err) => error!(
-                message = "Could not retrieve saved journald checkpoint",
-                error = field::display(&err)
-            ),
-        }
 
         loop {
             let mut saw_record = false;
@@ -279,6 +257,32 @@ where
                     Err(RecvTimeoutError::Disconnected) => return,
                 }
             }
+        }
+    }
+
+    fn seek_checkpoint(&mut self) {
+        // Retrieve the saved checkpoint, and seek forward in the journald log
+        match self.checkpointer.get() {
+            Ok(Some(cursor)) => {
+                if let Err(err) = self.journal.seek_cursor(&cursor) {
+                    error!(
+                        message = "Could not seek journald to stored cursor",
+                        error = field::display(&err)
+                    );
+                // The cursor now points to the last successfully read
+                // record, so skip past it to any newer records.
+                } else if let Some(Err(err)) = self.journal.next() {
+                    error!(
+                        message = "Could not fetch next record after seeking to cursor",
+                        error = field::display(&err)
+                    );
+                }
+            }
+            Ok(None) => {}
+            Err(err) => error!(
+                message = "Could not retrieve saved journald checkpoint",
+                error = field::display(&err)
+            ),
         }
     }
 }
