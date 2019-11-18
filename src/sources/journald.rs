@@ -220,13 +220,13 @@ where
         }
 
         loop {
-            use LoopState::*;
-            let mut state = NoOp;
+            let mut saw_record = false;
+            let mut at_end = false;
 
             for _ in 0..self.batch_size {
                 let record = match self.journal.next() {
                     None => {
-                        state = AtEnd;
+                        at_end = true;
                         break;
                     }
                     Some(Ok(record)) => record,
@@ -238,7 +238,7 @@ where
                         break;
                     }
                 };
-                state = SawRecord;
+                saw_record = true;
                 if !self.units.is_empty() {
                     // Make sure the systemd unit is exactly one of the specified units
                     if let Some(unit) = record.get("_SYSTEMD_UNIT") {
@@ -255,7 +255,7 @@ where
                 }
             }
 
-            if state != NoOp {
+            if saw_record {
                 match self.journal.cursor() {
                     Ok(cursor) => {
                         if let Err(err) = self.checkpointer.set(&cursor) {
@@ -272,7 +272,7 @@ where
                 }
             }
 
-            if state == AtEnd {
+            if at_end {
                 match self.shutdown.recv_timeout(timeout) {
                     Ok(()) => unreachable!(), // The sender should never actually send
                     Err(RecvTimeoutError::Timeout) => {}
@@ -281,13 +281,6 @@ where
             }
         }
     }
-}
-
-#[derive(PartialEq)]
-enum LoopState {
-    NoOp,
-    AtEnd,
-    SawRecord,
 }
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
