@@ -46,7 +46,7 @@ struct LibSystemd {
 }
 
 fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
-    unsafe { Container::load("libsystemd.so") }
+    unsafe { Container::load("libsystemd.so.0") }
 }
 
 /// A minimal systemd journald reader.
