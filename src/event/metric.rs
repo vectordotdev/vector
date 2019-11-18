@@ -8,35 +8,30 @@ pub struct Metric {
     pub name: String,
     pub timestamp: Option<DateTime<Utc>>,
     pub tags: Option<HashMap<String, String>>,
+    pub kind: MetricKind,
     pub value: MetricValue,
+}
+
+#[derive(Debug, Hash, Clone, PartialEq, Serialize, is_enum_variant)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricKind {
+    Incremental,
+    Absolute,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, is_enum_variant)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricValue {
     Counter {
-        val: f64,
-    },
-    Histogram {
-        val: f64,
-        sample_rate: u32,
+        value: f64,
     },
     Gauge {
-        val: f64,
+        value: f64,
     },
     Set {
-        val: String,
-    },
-    AggregatedCounter {
-        val: f64,
-    },
-    AggregatedGauge {
-        val: f64,
-    },
-    AggregatedSet {
         values: HashSet<String>,
     },
-    AggregatedDistribution {
+    Distribution {
         values: Vec<f64>,
         sample_rates: Vec<u32>,
     },
@@ -54,86 +49,59 @@ pub enum MetricValue {
     },
 }
 
-impl MetricValue {
-    pub fn is_aggregated(&self) -> bool {
-        match self {
-            MetricValue::Counter { .. } => false,
-            MetricValue::Gauge { .. } => false,
-            MetricValue::Histogram { .. } => false,
-            MetricValue::Set { .. } => false,
-            MetricValue::AggregatedCounter { .. } => true,
-            MetricValue::AggregatedGauge { .. } => true,
-            MetricValue::AggregatedSet { .. } => true,
-            MetricValue::AggregatedDistribution { .. } => true,
-            MetricValue::AggregatedHistogram { .. } => true,
-            MetricValue::AggregatedSummary { .. } => true,
-        }
-    }
-}
-
 impl Metric {
-    pub fn into_aggregated(self) -> Metric {
-        let value = match self.value {
-            MetricValue::Counter { val } => MetricValue::AggregatedCounter { val },
-            MetricValue::Gauge { val } => MetricValue::AggregatedGauge { val },
-            MetricValue::Histogram { val, sample_rate } => MetricValue::AggregatedDistribution {
-                values: vec![val],
-                sample_rates: vec![sample_rate],
-            },
-            MetricValue::Set { val } => MetricValue::AggregatedSet {
-                values: vec![val].into_iter().collect(),
-            },
-            m @ MetricValue::AggregatedCounter { .. } => m,
-            m @ MetricValue::AggregatedGauge { .. } => m,
-            m @ MetricValue::AggregatedSet { .. } => m,
-            m @ MetricValue::AggregatedDistribution { .. } => m,
-            m @ MetricValue::AggregatedHistogram { .. } => m,
-            m @ MetricValue::AggregatedSummary { .. } => m,
-        };
-
-        Metric {
-            name: self.name,
+    pub fn into_absolute(&self) -> Self {
+        Self {
+            name: self.name.clone(),
             timestamp: self.timestamp,
-            tags: self.tags,
-            value,
+            tags: self.tags.clone(),
+            kind: MetricKind::Absolute,
+            value: self.value.clone(),
         }
     }
 
     pub fn add(&mut self, other: &Self) {
+        if other.kind.is_absolute() {
+            return;
+        }
+
         match (&mut self.value, &other.value) {
-            (MetricValue::Counter { ref mut val, .. }, MetricValue::Counter { val: inc, .. }) => {
-                *val += inc;
-            }
             (
-                MetricValue::AggregatedCounter { ref mut val, .. },
-                MetricValue::Counter { val: inc, .. },
+                MetricValue::Counter { ref mut value, .. },
+                MetricValue::Counter { value: value2, .. },
             ) => {
-                *val += inc;
+                *value += value2;
             }
             (
-                MetricValue::AggregatedGauge { ref mut val, .. },
-                MetricValue::Gauge { val: inc, .. },
+                MetricValue::Gauge { ref mut value, .. },
+                MetricValue::Gauge { value: value2, .. },
             ) => {
-                *val += inc;
+                *value += value2;
             }
             (
-                MetricValue::AggregatedSet { ref mut values, .. },
-                MetricValue::Set { ref val, .. },
+                MetricValue::Set { ref mut values, .. },
+                MetricValue::Set {
+                    values: values2, ..
+                },
             ) => {
-                values.insert(val.to_owned());
+                for val in values2 {
+                    values.insert(val.to_string());
+                }
             }
             (
-                MetricValue::AggregatedDistribution {
+                MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
                     ..
                 },
-                MetricValue::Histogram {
-                    val, sample_rate, ..
+                MetricValue::Distribution {
+                    values: values2,
+                    sample_rates: sample_rates2,
+                    ..
                 },
             ) => {
-                values.push(*val);
-                sample_rates.push(*sample_rate);
+                values.extend_from_slice(&values2);
+                sample_rates.extend_from_slice(&sample_rates2);
             }
             _ => {}
         }
@@ -165,14 +133,16 @@ mod test {
             name: "counter".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedCounter { val: 1.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 1.0 },
         };
 
         let delta = Metric {
             name: "counter".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
-            value: MetricValue::Counter { val: 2.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 2.0 },
         };
 
         counter.add(&delta);
@@ -182,7 +152,8 @@ mod test {
                 name: "counter".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedCounter { val: 3.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 3.0 },
             }
         )
     }
@@ -193,14 +164,16 @@ mod test {
             name: "gauge".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedGauge { val: 1.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Gauge { value: 1.0 },
         };
 
         let delta = Metric {
             name: "gauge".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
-            value: MetricValue::Gauge { val: -2.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Gauge { value: -2.0 },
         };
 
         gauge.add(&delta);
@@ -210,7 +183,8 @@ mod test {
                 name: "gauge".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedGauge { val: -1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: -1.0 },
             }
         )
     }
@@ -221,7 +195,8 @@ mod test {
             name: "set".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedSet {
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
                 values: vec!["old".into()].into_iter().collect(),
             },
         };
@@ -230,7 +205,10 @@ mod test {
             name: "set".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
-            value: MetricValue::Set { val: "new".into() },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["new".into()].into_iter().collect(),
+            },
         };
 
         set.add(&delta);
@@ -240,7 +218,8 @@ mod test {
                 name: "set".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedSet {
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
                     values: vec!["old".into(), "new".into()].into_iter().collect()
                 },
             }
@@ -253,7 +232,8 @@ mod test {
             name: "hist".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedDistribution {
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![10],
             },
@@ -263,9 +243,10 @@ mod test {
             name: "hist".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
-            value: MetricValue::Histogram {
-                val: 1.0,
-                sample_rate: 20,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0],
+                sample_rates: vec![20],
             },
         };
 
@@ -276,7 +257,8 @@ mod test {
                 name: "hist".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedDistribution {
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
                     values: vec![1.0, 1.0],
                     sample_rates: vec![10, 20],
                 },

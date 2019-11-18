@@ -96,16 +96,10 @@ impl Transform for MockTransform {
                 log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
             }
             Event::Metric(metric) => match metric.value {
-                MetricValue::Counter { ref mut val } => {
-                    *val += self.increase;
+                MetricValue::Counter { ref mut value } => {
+                    *value += self.increase;
                 }
-                MetricValue::AggregatedCounter { ref mut val } => {
-                    *val += self.increase;
-                }
-                MetricValue::Histogram { ref mut val, .. } => {
-                    *val += self.increase;
-                }
-                MetricValue::AggregatedDistribution {
+                MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
                 } => {
@@ -128,16 +122,10 @@ impl Transform for MockTransform {
                     *count += 1;
                     *sum += self.increase;
                 }
-                MetricValue::Gauge { ref mut val, .. } => {
-                    *val += self.increase;
+                MetricValue::Gauge { ref mut value, .. } => {
+                    *value += self.increase;
                 }
-                MetricValue::AggregatedGauge { ref mut val, .. } => {
-                    *val += self.increase;
-                }
-                MetricValue::Set { ref mut val, .. } => {
-                    val.push_str(&self.suffix);
-                }
-                MetricValue::AggregatedSet { ref mut values, .. } => {
+                MetricValue::Set { ref mut values, .. } => {
                     values.insert(self.suffix.clone());
                 }
             },

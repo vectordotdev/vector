@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
-    event::{metric::MetricValue, Event},
+    event::metric::{MetricKind, MetricValue},
+    event::Event,
     sinks::util::{BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig},
 };
@@ -124,54 +125,61 @@ fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
-    match &metric.value {
-        MetricValue::Counter { val } => {
-            buf.push(format!("{}:{}", metric.name, val));
-            buf.push("c".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
+    match metric.kind {
+        MetricKind::Incremental => match &metric.value {
+            MetricValue::Counter { value } => {
+                buf.push(format!("{}:{}", metric.name, value));
+                buf.push("c".to_string());
+                if let Some(t) = &metric.tags {
+                    buf.push(format!("#{}", encode_tags(t)));
+                };
+            }
+            MetricValue::Gauge { value } => {
+                buf.push(format!("{}:{:+}", metric.name, value));
+                buf.push("g".to_string());
+                if let Some(t) = &metric.tags {
+                    buf.push(format!("#{}", encode_tags(t)));
+                };
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+            } => {
+                for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
+                    buf.push(format!("{}:{}", metric.name, val));
+                    buf.push("h".to_string());
+                    if *sample_rate != 1 {
+                        buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
+                    };
+                    if let Some(t) = &metric.tags {
+                        buf.push(format!("#{}", encode_tags(t)));
+                    };
+                }
+            }
+            MetricValue::Set { values } => {
+                for val in values {
+                    buf.push(format!("{}:{}", metric.name, val));
+                    buf.push("s".to_string());
+                    if let Some(t) = &metric.tags {
+                        buf.push(format!("#{}", encode_tags(t)));
+                    };
+                }
+            }
+            _ => {}
+        },
+        MetricKind::Absolute => {
+            match &metric.value {
+                MetricValue::Gauge { value } => {
+                    buf.push(format!("{}:{}", metric.name, value));
+                    buf.push("g".to_string());
+                    if let Some(t) = &metric.tags {
+                        buf.push(format!("#{}", encode_tags(t)));
+                    };
+                }
+                _ => {}
             };
         }
-        MetricValue::AggregatedCounter { val } => {
-            buf.push(format!("{}:{}", metric.name, val));
-            buf.push("c".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
-        }
-        MetricValue::Gauge { val } => {
-            buf.push(format!("{}:{:+}", metric.name, val));
-            buf.push("g".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
-        }
-        MetricValue::AggregatedGauge { val } => {
-            buf.push(format!("{}:{}", metric.name, val));
-            buf.push("g".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
-        }
-        MetricValue::Histogram { val, sample_rate } => {
-            buf.push(format!("{}:{}", metric.name, val));
-            buf.push("h".to_string());
-            if *sample_rate != 1 {
-                buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
-            };
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
-        }
-        MetricValue::Set { val } => {
-            buf.push(format!("{}:{}", metric.name, val));
-            buf.push("s".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
-        }
-        _ => {}
-    };
+    }
 
     let mut message: String = buf.join("|");
     if !namespace.is_empty() {
@@ -208,7 +216,7 @@ mod test {
     use super::*;
     use crate::{
         buffers::Acker,
-        event::{metric::MetricValue, Metric},
+        event::{metric::MetricKind, metric::MetricValue, Metric},
         sources::statsd::parser::parse,
         test_util::{collect_n, runtime},
         Event,
@@ -246,7 +254,8 @@ mod test {
             name: "counter".to_owned(),
             timestamp: None,
             tags: Some(tags()),
-            value: MetricValue::Counter { val: 1.5 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
@@ -260,7 +269,8 @@ mod test {
             name: "gauge".to_owned(),
             timestamp: None,
             tags: Some(tags()),
-            value: MetricValue::Gauge { val: -1.5 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Gauge { value: -1.5 },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
@@ -269,14 +279,15 @@ mod test {
     }
 
     #[test]
-    fn test_encode_histogram() {
+    fn test_encode_distribution() {
         let metric1 = Metric {
-            name: "histogram".to_owned(),
+            name: "distribution".to_owned(),
             timestamp: None,
             tags: Some(tags()),
-            value: MetricValue::Histogram {
-                val: 1.5,
-                sample_rate: 1,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.5],
+                sample_rates: vec![1],
             },
         };
         let event = Event::Metric(metric1.clone());
@@ -291,8 +302,9 @@ mod test {
             name: "set".to_owned(),
             timestamp: None,
             tags: Some(tags()),
+            kind: MetricKind::Incremental,
             value: MetricValue::Set {
-                val: "abc".to_owned(),
+                values: vec!["abc".to_owned()].into_iter().collect(),
             },
         };
         let event = Event::Metric(metric1.clone());
@@ -318,7 +330,8 @@ mod test {
             name: "counter".to_owned(),
             timestamp: None,
             tags: Some(tags()),
-            value: MetricValue::Counter { val: 1.5 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 1.5 },
         });
         events.push(event);
 
@@ -326,9 +339,10 @@ mod test {
             name: "histogram".to_owned(),
             timestamp: None,
             tags: None,
-            value: MetricValue::Histogram {
-                val: 2.0,
-                sample_rate: 100,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![2.0],
+                sample_rates: vec![100],
             },
         });
         events.push(event);

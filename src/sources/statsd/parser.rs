@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricValue};
+use crate::event::metric::{Metric, MetricKind, MetricValue};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -60,8 +60,9 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 name,
                 timestamp: None,
                 tags,
+                kind: MetricKind::Incremental,
                 value: MetricValue::Counter {
-                    val: val * sample_rate,
+                    value: val * sample_rate,
                 },
             }
         }
@@ -71,14 +72,15 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 name,
                 timestamp: None,
                 tags,
-                value: MetricValue::Histogram {
-                    val: convert_to_base_units(unit, val),
-                    sample_rate: sample_rate as u32,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![convert_to_base_units(unit, val)],
+                    sample_rates: vec![sample_rate as u32],
                 },
             }
         }
         "g" => {
-            let val = if parts[0]
+            let value = if parts[0]
                 .chars()
                 .next()
                 .map(|c| c.is_ascii_digit())
@@ -94,13 +96,17 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                     name,
                     timestamp: None,
                     tags,
-                    value: MetricValue::AggregatedGauge { val },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value },
                 },
                 Some(sign) => Metric {
                     name,
                     timestamp: None,
                     tags,
-                    value: MetricValue::Gauge { val: val * sign },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Gauge {
+                        value: value * sign,
+                    },
                 },
             }
         }
@@ -108,8 +114,9 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             name,
             timestamp: None,
             tags,
+            kind: MetricKind::Incremental,
             value: MetricValue::Set {
-                val: parts[0].into(),
+                values: vec![parts[0].into()].into_iter().collect(),
             },
         },
         other => return Err(ParseError::UnknownMetricType(other.into())),
@@ -223,7 +230,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
-    use crate::event::{metric::MetricValue, Metric};
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
 
     #[test]
     fn basic_counter() {
@@ -233,7 +240,8 @@ mod test {
                 name: "foo".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }),
         );
     }
@@ -253,7 +261,8 @@ mod test {
                     .into_iter()
                     .collect(),
                 ),
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }),
         );
     }
@@ -266,7 +275,8 @@ mod test {
                 name: "bar".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Counter { val: 20.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 20.0 },
             }),
         );
     }
@@ -279,7 +289,8 @@ mod test {
                 name: "bar".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Counter { val: 2.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 2.0 },
             }),
         );
     }
@@ -292,9 +303,10 @@ mod test {
                 name: "glork".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Histogram {
-                    val: 0.320,
-                    sample_rate: 10,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![0.320],
+                    sample_rates: vec![10],
                 },
             }),
         );
@@ -316,9 +328,10 @@ mod test {
                     .into_iter()
                     .collect(),
                 ),
-                value: MetricValue::Histogram {
-                    val: 320.0,
-                    sample_rate: 10,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![320.0],
+                    sample_rates: vec![10],
                 },
             }),
         );
@@ -332,7 +345,8 @@ mod test {
                 name: "gaugor".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedGauge { val: 333.0 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 333.0 },
             }),
         );
     }
@@ -345,7 +359,8 @@ mod test {
                 name: "gaugor".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Gauge { val: -4.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: -4.0 },
             }),
         );
         assert_eq!(
@@ -354,7 +369,8 @@ mod test {
                 name: "gaugor".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Gauge { val: 10.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: 10.0 },
             }),
         );
     }
@@ -367,7 +383,10 @@ mod test {
                 name: "uniques".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Set { val: "765".into() },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec!["765".into()].into_iter().collect()
+                },
             }),
         );
     }

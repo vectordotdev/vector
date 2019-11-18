@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{metric::MetricValue, Metric},
+    event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -147,40 +147,45 @@ impl CloudWatchMetricsSvc {
                 let metric_name = event.name.to_string();
                 let timestamp = event.timestamp.map(timestamp_to_string);
                 let dimensions = event.tags.clone().map(tags_to_dimensions);
-                match event.value {
-                    MetricValue::Counter { val } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(val),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::AggregatedGauge { val } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(val),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::AggregatedDistribution {
-                        values,
-                        sample_rates,
-                    } => Some(MetricDatum {
-                        metric_name,
-                        values: Some(values.to_vec()),
-                        counts: Some(sample_rates.iter().cloned().map(f64::from).collect()),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::AggregatedSet { values } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(values.len() as f64),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    _ => None,
+                match event.kind {
+                    MetricKind::Incremental => match event.value {
+                        MetricValue::Counter { value } => Some(MetricDatum {
+                            metric_name,
+                            value: Some(value),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        MetricValue::Distribution {
+                            values,
+                            sample_rates,
+                        } => Some(MetricDatum {
+                            metric_name,
+                            values: Some(values.to_vec()),
+                            counts: Some(sample_rates.iter().cloned().map(f64::from).collect()),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        MetricValue::Set { values } => Some(MetricDatum {
+                            metric_name,
+                            value: Some(values.len() as f64),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        _ => None,
+                    },
+                    MetricKind::Absolute => match event.value {
+                        MetricValue::Gauge { value } => Some(MetricDatum {
+                            metric_name,
+                            value: Some(value),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        _ => None,
+                    },
                 }
             })
             .collect();
@@ -255,7 +260,7 @@ fn tags_to_dimensions(tags: HashMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -283,13 +288,15 @@ mod tests {
                 name: "exception_total".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             },
             Metric {
                 name: "bytes_out".into(),
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
-                value: MetricValue::Counter { val: 2.5 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 2.5 },
             },
             Metric {
                 name: "healthcheck".into(),
@@ -299,7 +306,8 @@ mod tests {
                         .into_iter()
                         .collect(),
                 ),
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             },
         ];
 
@@ -340,7 +348,8 @@ mod tests {
             name: "temperature".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedGauge { val: 10.0 },
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: 10.0 },
         }];
 
         assert_eq!(
@@ -362,7 +371,8 @@ mod tests {
             name: "latency".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedDistribution {
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
                 values: vec![11.0, 12.0],
                 sample_rates: vec![100, 50],
             },
@@ -388,7 +398,8 @@ mod tests {
             name: "users".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedSet {
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
         }];
@@ -453,7 +464,8 @@ mod integration_tests {
                     .into_iter()
                     .collect(),
                 ),
-                value: MetricValue::Counter { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: i as f64 },
             });
             events.push(event);
         }
@@ -464,7 +476,8 @@ mod integration_tests {
                 name: format!("gauge-{}", gauge_name),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedGauge { val: i as f64 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: i as f64 },
             });
             events.push(event);
         }
@@ -475,7 +488,8 @@ mod integration_tests {
                 name: format!("distribution-{}", distribution_name),
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
-                value: MetricValue::AggregatedDistribution {
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![100],
                 },

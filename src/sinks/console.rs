@@ -87,7 +87,8 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
 #[cfg(test)]
 mod test {
     use super::{encode_event, Encoding};
-    use crate::{event::metric::MetricValue, event::Metric, Event};
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::Event;
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
@@ -106,10 +107,11 @@ mod test {
                     .into_iter()
                     .collect(),
             ),
-            value: MetricValue::Counter { val: 100.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"value":{"type":"counter","val":100.0}}"#.to_string()),
+            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
             encode_event(event, &Encoding::Text)
         );
     }
@@ -120,13 +122,14 @@ mod test {
             name: "glork".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::Histogram {
-                val: 10.0,
-                sample_rate: 1,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![10.0],
+                sample_rates: vec![1],
             },
         });
         assert_eq!(
-            Ok(r#"{"name":"glork","timestamp":null,"tags":null,"value":{"type":"histogram","val":10.0,"sample_rate":1}}"#.to_string()),
+            Ok(r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#.to_string()),
             encode_event(event, &Encoding::Text)
         );
     }

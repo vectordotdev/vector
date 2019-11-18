@@ -2,7 +2,7 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricPr
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
-use metric::MetricValue;
+use metric::{MetricKind, MetricValue};
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -352,6 +352,11 @@ impl From<proto::EventWrapper> for Event {
                 Event::Log(LogEvent { fields })
             }
             EventProto::Metric(proto) => {
+                let kind = match proto.kind() {
+                    proto::metric::Kind::Incremental => MetricKind::Incremental,
+                    proto::metric::Kind::Absolute => MetricKind::Absolute,
+                };
+
                 let name = proto.name;
 
                 let timestamp = proto
@@ -365,23 +370,17 @@ impl From<proto::EventWrapper> for Event {
                 };
 
                 let value = match proto.metric.unwrap() {
-                    MetricProto::Counter(counter) => MetricValue::Counter { val: counter.val },
-                    MetricProto::AggregatedCounter(counter) => {
-                        MetricValue::AggregatedCounter { val: counter.val }
-                    }
-                    MetricProto::Histogram(hist) => MetricValue::Histogram {
-                        val: hist.val,
-                        sample_rate: hist.sample_rate,
+                    MetricProto::Counter(counter) => MetricValue::Counter {
+                        value: counter.value,
                     },
-                    MetricProto::AggregatedSet(set) => MetricValue::AggregatedSet {
+                    MetricProto::Gauge(gauge) => MetricValue::Gauge { value: gauge.value },
+                    MetricProto::Set(set) => MetricValue::Set {
                         values: set.values.into_iter().collect(),
                     },
-                    MetricProto::AggregatedDistribution(dist) => {
-                        MetricValue::AggregatedDistribution {
-                            values: dist.values,
-                            sample_rates: dist.sample_rates,
-                        }
-                    }
+                    MetricProto::Distribution(dist) => MetricValue::Distribution {
+                        values: dist.values,
+                        sample_rates: dist.sample_rates,
+                    },
                     MetricProto::AggregatedHistogram(hist) => MetricValue::AggregatedHistogram {
                         buckets: hist.buckets,
                         counts: hist.counts,
@@ -394,17 +393,13 @@ impl From<proto::EventWrapper> for Event {
                         count: summary.count,
                         sum: summary.sum,
                     },
-                    MetricProto::Gauge(gauge) => MetricValue::Gauge { val: gauge.val },
-                    MetricProto::AggregatedGauge(gauge) => {
-                        MetricValue::AggregatedGauge { val: gauge.val }
-                    }
-                    MetricProto::Set(set) => MetricValue::Set { val: set.val },
                 };
 
                 Event::Metric(Metric {
                     name,
                     timestamp,
                     tags,
+                    kind,
                     value,
                 })
             }
@@ -452,6 +447,7 @@ impl From<Event> for proto::EventWrapper {
                 name,
                 timestamp,
                 tags,
+                kind,
                 value,
             }) => {
                 let timestamp = timestamp.map(|ts| prost_types::Timestamp {
@@ -461,23 +457,24 @@ impl From<Event> for proto::EventWrapper {
 
                 let tags = tags.unwrap_or_default();
 
+                let kind = match kind {
+                    MetricKind::Incremental => proto::metric::Kind::Incremental,
+                    MetricKind::Absolute => proto::metric::Kind::Absolute,
+                }
+                .into();
+
                 let metric = match value {
-                    MetricValue::Counter { val } => MetricProto::Counter(proto::Counter { val }),
-                    MetricValue::AggregatedCounter { val } => {
-                        MetricProto::AggregatedCounter(proto::AggregatedCounter { val })
+                    MetricValue::Counter { value } => {
+                        MetricProto::Counter(proto::Counter { value })
                     }
-                    MetricValue::Histogram { val, sample_rate } => {
-                        MetricProto::Histogram(proto::Histogram { val, sample_rate })
-                    }
-                    MetricValue::AggregatedSet { values } => {
-                        MetricProto::AggregatedSet(proto::AggregatedSet {
-                            values: values.into_iter().collect(),
-                        })
-                    }
-                    MetricValue::AggregatedDistribution {
+                    MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
+                    MetricValue::Set { values } => MetricProto::Set(proto::Set {
+                        values: values.into_iter().collect(),
+                    }),
+                    MetricValue::Distribution {
                         values,
                         sample_rates,
-                    } => MetricProto::AggregatedDistribution(proto::AggregatedDistribution {
+                    } => MetricProto::Distribution(proto::Distribution {
                         values,
                         sample_rates,
                     }),
@@ -503,17 +500,13 @@ impl From<Event> for proto::EventWrapper {
                         count,
                         sum,
                     }),
-                    MetricValue::Gauge { val } => MetricProto::Gauge(proto::Gauge { val }),
-                    MetricValue::AggregatedGauge { val } => {
-                        MetricProto::AggregatedGauge(proto::AggregatedGauge { val })
-                    }
-                    MetricValue::Set { val } => MetricProto::Set(proto::Set { val }),
                 };
 
                 let event = EventProto::Metric(proto::Metric {
                     name,
                     timestamp,
                     tags,
+                    kind,
                     metric: Some(metric),
                 });
 

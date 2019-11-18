@@ -64,7 +64,8 @@ impl Transform for RemoveTags {
 mod tests {
     use super::RemoveTags;
     use crate::{
-        event::{metric::MetricValue, Event, Metric},
+        event::metric::{Metric, MetricKind, MetricValue},
+        event::Event,
         transforms::Transform,
     };
 
@@ -82,7 +83,8 @@ mod tests {
                 .into_iter()
                 .collect(),
             ),
-            value: MetricValue::Counter { val: 10.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 10.0 },
         });
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
@@ -105,7 +107,8 @@ mod tests {
                     .into_iter()
                     .collect(),
             ),
-            value: MetricValue::Counter { val: 10.0 },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 10.0 },
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
@@ -120,7 +123,10 @@ mod tests {
             name: "foo".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::Set { val: "bar".into() },
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bar".into()].into_iter().collect(),
+            },
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);

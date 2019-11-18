@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::metric::{Metric, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue},
     event::{self, ValueKind},
     template::Template,
     topology::config::{DataType, TransformConfig},
@@ -142,11 +142,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
     match config {
         MetricConfig::Counter(counter) => {
-            let val = log
+            let value = log
                 .get(&counter.field)
                 .ok_or(TransformError::FieldNotFound)?;
-            let val = if counter.increment_by_value {
-                val.to_string_lossy()
+            let value = if counter.increment_by_value {
+                value
+                    .to_string_lossy()
                     .parse()
                     .map_err(|_| TransformError::ParseError("counter value"))?
             } else {
@@ -162,12 +163,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 timestamp,
                 tags,
-                value: MetricValue::Counter { val },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value },
             })
         }
         MetricConfig::Histogram(hist) => {
-            let val = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
-            let val = val
+            let value = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
+            let value = value
                 .to_string_lossy()
                 .parse()
                 .map_err(|_| TransformError::ParseError("histogram value"))?;
@@ -181,15 +183,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 timestamp,
                 tags,
-                value: MetricValue::Histogram {
-                    val,
-                    sample_rate: 1,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![value],
+                    sample_rates: vec![1],
                 },
             })
         }
         MetricConfig::Gauge(gauge) => {
-            let val = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
-            let val = val
+            let value = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
+            let value = value
                 .to_string_lossy()
                 .parse()
                 .map_err(|_| TransformError::ParseError("gauge value"))?;
@@ -203,12 +206,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 timestamp,
                 tags,
-                value: MetricValue::AggregatedGauge { val },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value },
             })
         }
         MetricConfig::Set(set) => {
-            let val = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
-            let val = val.to_string_lossy();
+            let value = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
+            let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
@@ -219,7 +223,10 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 timestamp,
                 tags,
-                value: MetricValue::Set { val },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec![value].into_iter().collect(),
+                },
             })
         }
     }
@@ -255,9 +262,9 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
-        event::{self, metric::MetricValue, Metric},
+        event::metric::{Metric, MetricKind, MetricValue},
+        event::{self, Event},
         transforms::Transform,
-        Event,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
 
@@ -297,7 +304,8 @@ mod tests {
                 name: "status".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -339,7 +347,8 @@ mod tests {
                     .into_iter()
                     .collect(),
                 ),
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -365,7 +374,8 @@ mod tests {
                 name: "exception_total".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -410,7 +420,8 @@ mod tests {
                 name: "amount_total".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Counter { val: 33.99 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 33.99 },
             }
         );
     }
@@ -436,7 +447,8 @@ mod tests {
                 name: "memory_rss_bytes".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::AggregatedGauge { val: 123.0 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 123.0 },
             }
         );
     }
@@ -513,7 +525,8 @@ mod tests {
                 name: "exception_total".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
         assert_eq!(
@@ -522,7 +535,8 @@ mod tests {
                 name: "status".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -574,7 +588,8 @@ mod tests {
                 name: "xyz_exception_total".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Counter { val: 1.0 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
         assert_eq!(
@@ -583,7 +598,10 @@ mod tests {
                 name: "local_abc_status_set".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Set { val: "42".into() },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec!["42".into()].into_iter().collect()
+                },
             }
         );
     }
@@ -609,8 +627,9 @@ mod tests {
                 name: "unique_user_ip".into(),
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
                 value: MetricValue::Set {
-                    val: "1.2.3.4".into()
+                    values: vec!["1.2.3.4".into()].into_iter().collect()
                 },
             }
         );
@@ -636,9 +655,10 @@ mod tests {
                 name: "response_time".into(),
                 timestamp: Some(ts()),
                 tags: None,
-                value: MetricValue::Histogram {
-                    val: 2.5,
-                    sample_rate: 1,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.5],
+                    sample_rates: vec![1],
                 },
             }
         );

@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricValue};
+use crate::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{offset::TimeZone, DateTime, Utc};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
@@ -294,7 +294,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             name: metric.name,
                             timestamp: metric.timestamp,
                             tags,
-                            value: MetricValue::AggregatedCounter { val: metric.value },
+                            kind: MetricKind::Absolute,
+                            value: MetricValue::Counter {
+                                value: metric.value,
+                            },
                         };
                         result.push(counter);
                         processed_metrics.insert(metric.id);
@@ -314,7 +317,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             name: metric.name,
                             timestamp: metric.timestamp,
                             tags,
-                            value: MetricValue::AggregatedGauge { val: metric.value },
+                            kind: MetricKind::Absolute,
+                            value: MetricValue::Gauge {
+                                value: metric.value,
+                            },
                         };
                         result.push(gauge);
                         processed_metrics.insert(metric.id);
@@ -384,6 +390,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             name: aggregate.name,
                             timestamp: None,
                             tags,
+                            kind: MetricKind::Absolute,
                             value: MetricValue::AggregatedHistogram {
                                 buckets: aggregate.bounds,
                                 counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
@@ -459,6 +466,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             name: aggregate.name,
                             timestamp: None,
                             tags,
+                            kind: MetricKind::Absolute,
                             value: MetricValue::AggregatedSummary {
                                 quantiles: aggregate.bounds,
                                 values: aggregate.values,
@@ -510,7 +518,7 @@ impl From<ParseFloatError> for ParserError {
 #[cfg(test)]
 mod test {
     use super::parse;
-    use crate::event::{metric::MetricValue, Metric};
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
 
@@ -528,7 +536,8 @@ mod test {
                 name: "uptime".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedCounter { val: 123.0 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 123.0 },
             }]),
         );
     }
@@ -566,7 +575,8 @@ mod test {
                         .into_iter()
                         .collect()
                     ),
-                    value: MetricValue::AggregatedCounter { val: 1027.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1027.0 },
                 },
                 Metric {
                     name: "http_requests_total".into(),
@@ -579,7 +589,8 @@ mod test {
                         .into_iter()
                         .collect()
                     ),
-                    value: MetricValue::AggregatedCounter { val: 3.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 3.0 },
                 }
             ]),
         );
@@ -599,7 +610,8 @@ mod test {
                 name: "latency".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedGauge { val: 123.0 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 123.0 },
             }]),
         );
     }
@@ -616,7 +628,8 @@ mod test {
                 name: "metric_without_timestamp_and_labels".into(),
                 timestamp: None,
                 tags: None,
-                value: MetricValue::AggregatedGauge { val: 12.47 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 12.47 },
             }]),
         );
     }
@@ -640,7 +653,10 @@ mod test {
                     .into_iter()
                     .collect()
                 ),
-                value: MetricValue::AggregatedGauge { val: 1458255915.0 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge {
+                    value: 1458255915.0
+                },
             }]),
         );
     }
@@ -661,8 +677,9 @@ mod test {
                         .into_iter()
                         .collect()
                 ),
-                value: MetricValue::AggregatedGauge {
-                    val: std::f64::INFINITY
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge {
+                    value: std::f64::INFINITY
                 },
             }]),
         );
@@ -687,13 +704,15 @@ mod test {
                             .into_iter()
                             .collect()
                     ),
-                    value: MetricValue::AggregatedGauge { val: 1.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 1.0 },
                 },
                 Metric {
                     name: "latency".into(),
                     timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
                     tags: Some(vec![("env".into(), "testing".into())].into_iter().collect()),
-                    value: MetricValue::AggregatedGauge { val: 2.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 2.0 },
                 }
             ]),
         );
@@ -717,19 +736,22 @@ mod test {
                     name: "uptime".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedCounter { val: 123.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 123.0 },
                 },
                 Metric {
                     name: "temperature".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedGauge { val: -1.5 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: -1.5 },
                 },
                 Metric {
                     name: "launch_count".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedCounter { val: 10.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 10.0 },
                 }
             ]),
         );
@@ -774,13 +796,15 @@ mod test {
                     name: "uptime".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedCounter { val: 123.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 123.0 },
                 },
                 Metric {
                     name: "temperature".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedGauge { val: -1.5 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: -1.5 },
                 }
             ]),
         );
@@ -804,25 +828,29 @@ mod test {
                     name: "uptime".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedCounter { val: 123.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 123.0 },
                 },
                 Metric {
                     name: "last_downtime".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedGauge { val: 4.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 4.0 },
                 },
                 Metric {
                     name: "temperature".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedGauge { val: -1.5 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: -1.5 },
                 },
                 Metric {
                     name: "temperature_7_days_average".into(),
                     timestamp: None,
                     tags: None,
-                    value: MetricValue::AggregatedGauge { val: 0.1 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 0.1 },
                 }
             ]),
         );
@@ -849,6 +877,7 @@ mod test {
                 name: "http_request_duration_seconds".into(),
                 timestamp: None,
                 tags: None,
+                kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
                     counts: vec![24054, 33444, 100392, 129389, 133988],
@@ -912,6 +941,7 @@ mod test {
                     name: "gitlab_runner_job_duration_seconds".into(),
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "z".into())].into_iter().collect()),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
                         buckets: vec![
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
@@ -926,6 +956,7 @@ mod test {
                     name: "gitlab_runner_job_duration_seconds".into(),
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "x".into())].into_iter().collect()),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
                         buckets: vec![
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
@@ -940,6 +971,7 @@ mod test {
                     name: "gitlab_runner_job_duration_seconds".into(),
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "y".into())].into_iter().collect()),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
                         buckets: vec![
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
@@ -984,6 +1016,7 @@ mod test {
                     name: "rpc_duration_seconds".into(),
                     timestamp: None,
                     tags: Some(vec![("service".into(), "a".into())].into_iter().collect()),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![0.01, 0.05, 0.5, 0.9, 0.99],
                         values: vec![3102.0, 3272.0, 4773.0, 9001.0, 76656.0],
@@ -995,6 +1028,7 @@ mod test {
                     name: "go_gc_duration_seconds".into(),
                     timestamp: None,
                     tags: None,
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![0.0, 0.25, 0.5, 0.75, 1.0],
                         values: vec![

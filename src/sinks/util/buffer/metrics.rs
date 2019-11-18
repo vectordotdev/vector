@@ -1,4 +1,5 @@
-use crate::event::{metric::MetricValue, Event, Metric};
+use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::event::Event;
 use crate::sinks::util::Batch;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -13,6 +14,7 @@ impl Hash for MetricEntry {
         let metric = &self.0;
         std::mem::discriminant(metric).hash(state);
         metric.name.hash(state);
+        metric.kind.hash(state);
         metric
             .tags
             .as_ref()
@@ -76,18 +78,19 @@ impl MetricBuffer {
     // This table will summarise how metrics are transforming inside the buffer:
     //
     // Normalised and accumulated metrics
-    //   Counter                  => Counter
-    //   AggregatedCounter        => Counter
-    //   Gauge                    => AggregatedGauge
+    //   Counter                      => Counter
+    //   Absolute Counter             => Counter
+    //   Gauge                        => Absolute Gauge
+    //   Distribution                 => Distribution
+    //   Set                          => Set
     //
     // Deduplicated metrics
-    //   AggregatedGauge          => AggregatedGauge
-    //   AggregatedDistribution   => AggregatedDistribution
-    //   AggregatedSet            => AggregatedSet
+    //   Absolute Gauge               => Absolute Gauge
+    //   AggregatedHistogram          => AggregatedHistogram
+    //   AggregatedSummary            => AggregatedSummary
+    //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
+    //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    // Metrics put into collections
-    //   Histogram                => AggregatedDistribution
-    //   Set                      => AggregatedSet
     pub fn new() -> Self {
         Self {
             state: HashSet::new(),
@@ -108,19 +111,10 @@ impl Batch for MetricBuffer {
         let item = item.into_metric();
 
         match &item.value {
-            MetricValue::Counter { .. } => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    self.metrics.insert(new);
-                }
-            }
-            MetricValue::AggregatedCounter { val } => {
+            MetricValue::Counter { value } if item.kind.is_absolute() => {
                 let new = MetricEntry(item.clone());
                 if let Some(MetricEntry(Metric {
-                    value: MetricValue::AggregatedCounter { val: val0, .. },
+                    value: MetricValue::Counter { value: value0, .. },
                     ..
                 })) = self.state.get(&new)
                 {
@@ -130,7 +124,10 @@ impl Batch for MetricBuffer {
                         name: item.name.to_string(),
                         timestamp: item.timestamp.clone(),
                         tags: item.tags.clone(),
-                        value: MetricValue::Counter { val: val - val0 },
+                        kind: MetricKind::Incremental,
+                        value: MetricValue::Counter {
+                            value: value - value0,
+                        },
                     });
 
                     // The resulting Counters could be added up normally
@@ -145,8 +142,8 @@ impl Batch for MetricBuffer {
                     self.state.insert(new);
                 }
             }
-            MetricValue::Gauge { .. } => {
-                let new = MetricEntry(item.clone().into_aggregated());
+            MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                let new = MetricEntry(item.clone().into_absolute());
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.add(&item);
                     self.metrics.insert(MetricEntry(existing));
@@ -162,19 +159,20 @@ impl Batch for MetricBuffer {
                             name: item.name.to_string(),
                             timestamp: item.timestamp.clone(),
                             tags: item.tags.clone(),
-                            value: MetricValue::AggregatedGauge { val: 0.0 },
+                            kind: MetricKind::Absolute,
+                            value: MetricValue::Gauge { value: 0.0 },
                         }
                     };
                     initial.add(&item);
                     self.metrics.insert(MetricEntry(initial));
                 }
             }
-            metric if metric.is_aggregated() => {
+            _metric if item.kind.is_absolute() => {
                 let new = MetricEntry(item);
                 self.metrics.replace(new);
             }
             _ => {
-                let new = MetricEntry(item.clone().into_aggregated());
+                let new = MetricEntry(item.clone());
                 if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                     existing.add(&item);
                     self.metrics.insert(MetricEntry(existing));
@@ -192,7 +190,9 @@ impl Batch for MetricBuffer {
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {
-            if entry.0.value.is_aggregated_gauge() || entry.0.value.is_aggregated_counter() {
+            if (entry.0.value.is_gauge() || entry.0.value.is_counter())
+                && entry.0.kind.is_absolute()
+            {
                 state.replace(entry.clone());
             }
         }
@@ -247,7 +247,8 @@ mod test {
                 name: "counter-0".into(),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::Counter { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: i as f64 },
             });
             events.push(event);
         }
@@ -257,7 +258,8 @@ mod test {
                 name: format!("counter-{}", i),
                 timestamp: None,
                 tags: Some(tag("staging")),
-                value: MetricValue::Counter { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: i as f64 },
             });
             events.push(event);
         }
@@ -267,7 +269,8 @@ mod test {
                 name: format!("counter-{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::Counter { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: i as f64 },
             });
             events.push(event);
         }
@@ -289,37 +292,43 @@ mod test {
                     name: "counter-0".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 6.0 }
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 6.0 }
                 },
                 Metric {
                     name: "counter-0".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::Counter { val: 0.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 0.0 },
                 },
                 Metric {
                     name: "counter-1".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 1.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 1.0 },
                 },
                 Metric {
                     name: "counter-1".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::Counter { val: 1.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 1.0 },
                 },
                 Metric {
                     name: "counter-2".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::Counter { val: 2.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 2.0 },
                 },
                 Metric {
                     name: "counter-3".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::Counter { val: 3.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 3.0 },
                 },
             ]
         );
@@ -331,13 +340,15 @@ mod test {
                     name: "counter-2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 2.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 2.0 },
                 },
                 Metric {
                     name: "counter-3".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 3.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 3.0 },
                 },
             ]
         );
@@ -353,7 +364,8 @@ mod test {
                 name: format!("counter-{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::AggregatedCounter { val: i as f64 },
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: i as f64 },
             });
             events.push(event);
         }
@@ -363,8 +375,9 @@ mod test {
                 name: format!("counter-{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::AggregatedCounter {
-                    val: i as f64 * 3.0,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter {
+                    value: i as f64 * 3.0,
                 },
             });
             events.push(event);
@@ -386,25 +399,29 @@ mod test {
                     name: "counter-0".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 0.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 0.0 },
                 },
                 Metric {
                     name: "counter-1".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 2.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 2.0 },
                 },
                 Metric {
                     name: "counter-2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 4.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 4.0 },
                 },
                 Metric {
                     name: "counter-3".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::Counter { val: 6.0 },
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 6.0 },
                 },
             ]
         );
@@ -420,7 +437,8 @@ mod test {
                 name: format!("gauge-{}", i),
                 timestamp: None,
                 tags: Some(tag("staging")),
-                value: MetricValue::Gauge { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: i as f64 },
             });
             events.push(event);
         }
@@ -430,7 +448,8 @@ mod test {
                 name: format!("gauge-{}", i),
                 timestamp: None,
                 tags: Some(tag("staging")),
-                value: MetricValue::Gauge { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: i as f64 },
             });
             events.push(event);
         }
@@ -451,25 +470,29 @@ mod test {
                     name: "gauge-1".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 2.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 2.0 },
                 },
                 Metric {
                     name: "gauge-2".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 4.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 4.0 },
                 },
                 Metric {
                     name: "gauge-3".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 6.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 6.0 },
                 },
                 Metric {
                     name: "gauge-4".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 8.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 8.0 },
                 },
             ]
         );
@@ -485,8 +508,9 @@ mod test {
                 name: format!("gauge-{}", i),
                 timestamp: None,
                 tags: Some(tag("staging")),
-                value: MetricValue::AggregatedGauge {
-                    val: i as f64 * 10.0,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge {
+                    value: i as f64 * 10.0,
                 },
             });
             events.push(event);
@@ -497,7 +521,8 @@ mod test {
                 name: format!("gauge-{}", i),
                 timestamp: None,
                 tags: Some(tag("staging")),
-                value: MetricValue::Gauge { val: i as f64 },
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: i as f64 },
             });
             events.push(event);
         }
@@ -507,8 +532,9 @@ mod test {
                 name: format!("gauge-{}", i),
                 timestamp: None,
                 tags: Some(tag("staging")),
-                value: MetricValue::AggregatedGauge {
-                    val: i as f64 * 2.0,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge {
+                    value: i as f64 * 2.0,
                 },
             });
             events.push(event);
@@ -530,31 +556,36 @@ mod test {
                     name: "gauge-1".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 1.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 1.0 },
                 },
                 Metric {
                     name: "gauge-2".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 4.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 4.0 },
                 },
                 Metric {
                     name: "gauge-3".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 6.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 6.0 },
                 },
                 Metric {
                     name: "gauge-4".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 8.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 8.0 },
                 },
                 Metric {
                     name: "gauge-5".into(),
                     timestamp: None,
                     tags: Some(tag("staging")),
-                    value: MetricValue::AggregatedGauge { val: 50.0 },
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge { value: 50.0 },
                 },
             ]
         );
@@ -570,8 +601,9 @@ mod test {
                 name: "set-0".into(),
                 timestamp: None,
                 tags: Some(tag("production")),
+                kind: MetricKind::Incremental,
                 value: MetricValue::Set {
-                    val: format!("{}", i),
+                    values: vec![format!("{}", i)].into_iter().collect(),
                 },
             });
             events.push(event);
@@ -582,8 +614,9 @@ mod test {
                 name: "set-0".into(),
                 timestamp: None,
                 tags: Some(tag("production")),
+                kind: MetricKind::Incremental,
                 value: MetricValue::Set {
-                    val: format!("{}", i),
+                    values: vec![format!("{}", i)].into_iter().collect(),
                 },
             });
             events.push(event);
@@ -603,7 +636,8 @@ mod test {
                 name: "set-0".into(),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::AggregatedSet {
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
                     values: vec!["0".into(), "1".into(), "2".into(), "3".into()]
                         .into_iter()
                         .collect(),
@@ -613,18 +647,19 @@ mod test {
     }
 
     #[test]
-    fn metric_buffer_histograms() {
+    fn metric_buffer_distributions() {
         let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
         for _ in 2..6 {
             let event = Event::Metric(Metric {
-                name: "hist-2".into(),
+                name: "dist-2".into(),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::Histogram {
-                    val: 2.0,
-                    sample_rate: 10,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.0],
+                    sample_rates: vec![10],
                 },
             });
             events.push(event);
@@ -632,12 +667,13 @@ mod test {
 
         for i in 2..6 {
             let event = Event::Metric(Metric {
-                name: format!("hist-{}", i),
+                name: format!("dist-{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
-                value: MetricValue::Histogram {
-                    val: i as f64,
-                    sample_rate: 10,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![i as f64],
+                    sample_rates: vec![10],
                 },
             });
             events.push(event);
@@ -655,37 +691,41 @@ mod test {
             sorted(&buffer[0].clone().finish()),
             [
                 Metric {
-                    name: "hist-2".into(),
+                    name: "dist-2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::AggregatedDistribution {
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Distribution {
                         values: vec![2.0, 2.0, 2.0, 2.0, 2.0],
                         sample_rates: vec![10, 10, 10, 10, 10],
                     },
                 },
                 Metric {
-                    name: "hist-3".into(),
+                    name: "dist-3".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::AggregatedDistribution {
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Distribution {
                         values: vec![3.0],
                         sample_rates: vec![10],
                     },
                 },
                 Metric {
-                    name: "hist-4".into(),
+                    name: "dist-4".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::AggregatedDistribution {
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Distribution {
                         values: vec![4.0],
                         sample_rates: vec![10],
                     },
                 },
                 Metric {
-                    name: "hist-5".into(),
+                    name: "dist-5".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
-                    value: MetricValue::AggregatedDistribution {
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Distribution {
                         values: vec![5.0],
                         sample_rates: vec![10],
                     }
@@ -704,6 +744,7 @@ mod test {
                 name: "buckets-2".into(),
                 timestamp: None,
                 tags: Some(tag("production")),
+                kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![1.0, 2.0, 4.0],
                     counts: vec![1, 2, 4],
@@ -719,6 +760,7 @@ mod test {
                 name: format!("buckets-{}", i),
                 timestamp: None,
                 tags: Some(tag("production")),
+                kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![1.0, 2.0, 4.0],
                     counts: vec![1 * i, 2 * i, 4 * i],
@@ -744,6 +786,7 @@ mod test {
                     name: "buckets-2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
                         buckets: vec![1.0, 2.0, 4.0],
                         counts: vec![2, 4, 8],
@@ -755,6 +798,7 @@ mod test {
                     name: "buckets-3".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
                         buckets: vec![1.0, 2.0, 4.0],
                         counts: vec![3, 6, 12],
@@ -766,6 +810,7 @@ mod test {
                     name: "buckets-4".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
                         buckets: vec![1.0, 2.0, 4.0],
                         counts: vec![4, 8, 16],
@@ -788,6 +833,7 @@ mod test {
                     name: format!("quantiles-{}", i),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![1.0, 2.0, 4.0],
                         values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
@@ -814,6 +860,7 @@ mod test {
                     name: "quantiles-2".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![1.0, 2.0, 4.0],
                         values: vec![2.0, 4.0, 8.0],
@@ -825,6 +872,7 @@ mod test {
                     name: "quantiles-3".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![1.0, 2.0, 4.0],
                         values: vec![3.0, 6.0, 12.0],
@@ -836,6 +884,7 @@ mod test {
                     name: "quantiles-4".into(),
                     timestamp: None,
                     tags: Some(tag("production")),
+                    kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![1.0, 2.0, 4.0],
                         values: vec![4.0, 8.0, 16.0],

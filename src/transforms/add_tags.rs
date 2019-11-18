@@ -66,7 +66,8 @@ impl Transform for AddTags {
 mod tests {
     use super::AddTags;
     use crate::{
-        event::{metric::MetricValue, Event, Metric},
+        event::metric::{Metric, MetricKind, MetricValue},
+        event::Event,
         transforms::Transform,
     };
     use indexmap::IndexMap;
@@ -78,7 +79,8 @@ mod tests {
             name: "bar".into(),
             timestamp: None,
             tags: None,
-            value: MetricValue::AggregatedGauge { val: 10.0 },
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: 10.0 },
         });
 
         let map: IndexMap<Atom, String> = vec![
