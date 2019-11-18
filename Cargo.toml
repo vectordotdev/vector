@@ -37,10 +37,10 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
-file-source = { path = "lib/file-source" }
 journald = { path = "lib/journald" }
 tracing-metrics = { path = "lib/tracing-metrics" }
 tracing-limit = { path = "lib/tracing-limit" }
+file-source = { path = "lib/file-source" }
 
 # Tokio / Futures
 futures = "0.1.25"
@@ -85,7 +85,7 @@ prost-types = "0.5"
 # External libs
 atty = "0.2"
 derivative = "1.0"
-chrono = "0.4.6"
+chrono = "0.4.9"
 rand = "0.5.5"
 regex = "1.0.5"
 bytes = { version = "0.4.10", features = ["serde"] }
@@ -103,7 +103,6 @@ indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
-syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
@@ -124,10 +123,11 @@ exitcode = "1.1.2"
 snafu = "0.4.3"
 url = "1.7"
 base64 = "0.10.1"
-shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
 owning_ref = "0.4.0"
 listenfd = "0.3.3"
 inventory = "0.1"
+syslog_rfc5424 = "0.6.1"
+shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber", default-features = false }
 
 [build-dependencies]
 prost-build = "0.4.0"

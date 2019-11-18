@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
+#[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
@@ -285,6 +286,8 @@ fn main() {
         std::process::exit(exitcode::OK);
     }
 
+    #[cfg(unix)]
+    {
     let sigint = Signal::new(SIGINT).flatten_stream();
     let sigterm = Signal::new(SIGTERM).flatten_stream();
     let sigquit = Signal::new(SIGQUIT).flatten_stream();
@@ -356,6 +359,7 @@ fn main() {
         drop(topology);
     } else {
         unreachable!();
+    }
     }
 
     rt.shutdown_now().wait().unwrap();

@@ -5,6 +5,7 @@ use serde::Deserialize;
 use sinks::tcp::{self, TcpSinkConfig};
 use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
+#[cfg(unix)]
 use tokio_uds::UnixStream;
 use vector::test_util::{
     block_on, next_addr, random_maps, random_string, receive, send_lines, shutdown_on_idle,
@@ -120,6 +121,7 @@ fn test_udp_syslog() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn test_unix_stream_syslog() {
     let num_messages: usize = 10000;

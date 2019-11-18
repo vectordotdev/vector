@@ -1,8 +1,10 @@
+#![cfg_attr(windows, feature(windows_by_handle))]
 #[macro_use]
 extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
 
+mod metadata_ext;
 mod file_server;
 mod file_watcher;
 
