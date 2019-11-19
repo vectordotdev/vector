@@ -263,7 +263,7 @@ table.comparison tr td.bar:hover {
   background: var(--ifm-panel-background);
 }
 table.comparison tr td.bar .bar {
-  background: var(--ifm-panel-background);
+  background: var(--ifm-color-emphasis-100);
   margin: 0 auto;
 }
 table.comparison tr td.bar .bar.passed {
