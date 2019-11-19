@@ -325,6 +325,7 @@ mod test {
     }
 
     #[cfg(unix)]
+    #[test]
     fn config_unix() {
         let config: SyslogConfig = toml::from_str(
             r#"
