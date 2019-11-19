@@ -225,7 +225,7 @@ table.comparison tr:hover td.failed {
 }
 table.comparison tr td.lost {
   background: var(--ifm-color-emphasis-1000);
-  color: var(--ifm-background-color);
+  color: var(--ifm-background-color);  
 }
 table.comparison tr:hover td.lost {
   background: var(--ifm-color-emphasis-900);
@@ -917,31 +917,32 @@ html[data-theme="dark"] {
   --ifm-background-color: #191927;
   --ifm-background-color-rgb: 25, 25, 39;
   --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
-  --ifm-color-gray-25: rgba(255, 255, 255, calc( 1 - 0.025 ));
-  --ifm-color-gray-40: rgba(255, 255, 255, calc( 1 - 0.04 ));
-  --ifm-color-gray-50: rgba(255, 255, 255, calc( 1 - 0.05 ));
-  --ifm-color-gray-75: rgba(255, 255, 255, calc( 1 - 0.075 ));
-  --ifm-color-gray-100: rgba(255, 255, 255, calc( 1 - 0.1 ));
-  --ifm-color-gray-150: rgba(255, 255, 255, calc( 1 - 0.15 ));
-  --ifm-color-gray-200: rgba(255, 255, 255, calc( 1 - 0.2 ));
-  --ifm-color-gray-300: rgba(255, 255, 255, calc( 1 - 0.3 ));
-  --ifm-color-gray-400: rgba(255, 255, 255, calc( 1 - 0.4 ));
-  --ifm-color-gray-500: rgba(255, 255, 255, calc( 1 - 0.5 ));
-  --ifm-color-gray-600: rgba(255, 255, 255, calc( 1 - 0.6 ));
-  --ifm-color-gray-700: rgba(255, 255, 255, calc( 1 - 0.7 ));
-  --ifm-color-gray-800: rgba(255, 255, 255, calc( 1 - 0.8 ));
-  --ifm-color-gray-900: rgba(255, 255, 255, calc( 1 - 0.9 ));
-  --ifm-color-gray-925: rgba(255, 255, 255, calc( 1 - 0.925 ));
-  --ifm-color-gray-950: rgba(255, 255, 255, calc( 1 - 0.95 ));
-  --ifm-color-gray-960: rgba(255, 255, 255, calc( 1 - 0.96 ));
-  --ifm-color-gray-975: rgba(255, 255, 255, calc( 1 - 0.975 ));
+  --ifm-color-gray-25: rgba(224, 235, 247, calc( 1 - 0.025 ));
+  --ifm-color-gray-40: rgba(224, 235, 247, calc( 1 - 0.04 ));
+  --ifm-color-gray-50: rgba(224, 235, 247, calc( 1 - 0.05 ));
+  --ifm-color-gray-75: rgba(224, 235, 247, calc( 1 - 0.075 ));
+  --ifm-color-gray-100: rgba(224, 235, 247, calc( 1 - 0.1 ));
+  --ifm-color-gray-150: rgba(224, 235, 247, calc( 1 - 0.15 ));
+  --ifm-color-gray-200: rgba(224, 235, 247, calc( 1 - 0.2 ));
+  --ifm-color-gray-300: rgba(224, 235, 247, calc( 1 - 0.3 ));
+  --ifm-color-gray-400: rgba(224, 235, 247, calc( 1 - 0.4 ));
+  --ifm-color-gray-500: rgba(224, 235, 247, calc( 1 - 0.5 ));
+  --ifm-color-gray-600: rgba(224, 235, 247, calc( 1 - 0.6 ));
+  --ifm-color-gray-700: rgba(224, 235, 247, calc( 1 - 0.7 ));
+  --ifm-color-gray-800: rgba(224, 235, 247, calc( 1 - 0.8 ));
+  --ifm-color-gray-900: rgba(224, 235, 247, calc( 1 - 0.9 ));
+  --ifm-color-gray-925: rgba(224, 235, 247, calc( 1 - 0.925 ));
+  --ifm-color-gray-950: rgba(224, 235, 247, calc( 1 - 0.95 ));
+  --ifm-color-gray-960: rgba(224, 235, 247, calc( 1 - 0.96 ));
+  --ifm-color-gray-975: rgba(224, 235, 247, calc( 1 - 0.975 ));
+  --ifm-color-gray-1000: rgb(224, 235, 247);
   --ifm-color-emphasis-25: var(--ifm-color-gray-975);
   --ifm-color-emphasis-40: var(--ifm-color-gray-960);
   --ifm-color-emphasis-50: var(--ifm-color-gray-950);
   --ifm-color-emphasis-75: var(--ifm-color-gray-925);
   --ifm-contents-border-color: var(--ifm-color-emphasis-75);
   --ifm-global-shadow-md: 0 3px 8px 0px rgba(0, 0, 0, 0.2);
-  --ifm-heading-color: rgb(224, 235, 247);
+  --ifm-heading-color: var(--ifm-color-gray-1000);
   --ifm-panel-background: var(--ifm-color-emphasis-50);
   --ifm-panel-background-rgb: 37, 37, 50;
   --ifm-panel-background-solid: #252532;
