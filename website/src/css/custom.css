@@ -229,7 +229,15 @@ table.comparison tr td.lost div.bar {
   background: var(--ifm-panel-background);
 }
 table.comparison tr:hover td.lost {
-  background: rgba( var(--ifm-panel-background-rgb), 0.8 );
+  background: rgba( var(--ifm-panel-background-rgb), 0.5 );
+}
+table.comparison tr td.not-applicable {
+  background: var(--ifm-panel-background);
+  color: var(--ifm-color-warning);
+}
+table.comparison tr:hover td.not-applicable {
+  background: rgba( var(--ifm-panel-background-rgb), 0.5 );
+  color: var(--ifm-color-warning);
 }
 table.comparison tr td.passed {
   background: rgba( var(--ifm-color-primary-rgb), 1 );
@@ -239,7 +247,7 @@ table.comparison tr td.passed div.bar {
   background: var(--ifm-color-primary);
 }
 table.comparison tr:hover td.passed {
-  background: rgba( var(--ifm-color-primary-rgb), 0.9 );
+  background: rgba( var(--ifm-color-primary-rgb), 0.8 );
 }
 table.comparison tr td.warning {
   background: rgba( var(--ifm-color-warning-rgb), 1 );

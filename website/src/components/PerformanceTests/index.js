@@ -195,7 +195,7 @@ function MeasurementValue({columnChart, value: measurement}) {
     }
   } else {
     return (
-      <td className="warning" title="This subject lacked the features neecssary to be involved in this test."><i className="feather icon-alert-triangle"></i></td>
+      <td className="not-applicable" title="This subject lacked the features neecssary to be involved in this test."><i className="feather icon-alert-triangle"></i></td>
     );
   }
 }
