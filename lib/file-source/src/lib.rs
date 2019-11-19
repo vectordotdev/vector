@@ -4,9 +4,9 @@ extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
 
-mod metadata_ext;
 mod file_server;
 mod file_watcher;
+mod metadata_ext;
 
 pub use self::file_server::{FileServer, Fingerprinter};
 

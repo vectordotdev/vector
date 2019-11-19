@@ -288,78 +288,79 @@ fn main() {
 
     #[cfg(unix)]
     {
-    let sigint = Signal::new(SIGINT).flatten_stream();
-    let sigterm = Signal::new(SIGTERM).flatten_stream();
-    let sigquit = Signal::new(SIGQUIT).flatten_stream();
-    let sighup = Signal::new(SIGHUP).flatten_stream();
+        let sigint = Signal::new(SIGINT).flatten_stream();
+        let sigterm = Signal::new(SIGTERM).flatten_stream();
+        let sigquit = Signal::new(SIGQUIT).flatten_stream();
+        let sighup = Signal::new(SIGHUP).flatten_stream();
 
-    let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
+        let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
 
-    let signal = loop {
-        let signal = future::poll_fn(|| signals.poll());
-        let crash = future::poll_fn(|| graceful_crash.poll());
+        let signal = loop {
+            let signal = future::poll_fn(|| signals.poll());
+            let crash = future::poll_fn(|| graceful_crash.poll());
 
-        let next = signal
-            .select2(crash)
-            .wait()
-            .map_err(|_| ())
-            .expect("Neither stream errors");
+            let next = signal
+                .select2(crash)
+                .wait()
+                .map_err(|_| ())
+                .expect("Neither stream errors");
 
-        let signal = match next {
-            future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
-            future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
+            let signal = match next {
+                future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
+                future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
+            };
+
+            if signal != SIGHUP {
+                break signal;
+            }
+
+            // Reload config
+            info!(
+                message = "Reloading config.",
+                path = ?opts.config_path
+            );
+
+            let file = if let Some(file) = open_config(&opts.config_path) {
+                file
+            } else {
+                continue;
+            };
+
+            trace!("Parsing config");
+            let config = vector::topology::Config::load(file);
+            let config = handle_config_errors(config);
+            if let Some(config) = config {
+                let success =
+                    topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
+                if !success {
+                    error!("Reload was not successful.");
+                }
+            } else {
+                error!("Reload aborted.");
+            }
         };
 
-        if signal != SIGHUP {
-            break signal;
-        }
+        if signal == SIGINT || signal == SIGTERM {
+            use futures::future::Either;
 
-        // Reload config
-        info!(
-            message = "Reloading config.",
-            path = ?opts.config_path
-        );
+            info!("Shutting down.");
+            let shutdown = topology.stop();
+            metrics_trigger.cancel();
 
-        let file = if let Some(file) = open_config(&opts.config_path) {
-            file
-        } else {
-            continue;
-        };
-
-        trace!("Parsing config");
-        let config = vector::topology::Config::load(file);
-        let config = handle_config_errors(config);
-        if let Some(config) = config {
-            let success = topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
-            if !success {
-                error!("Reload was not successful.");
+            match rt.block_on(shutdown.select2(signals.into_future())) {
+                Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
+                Ok(Either::B(_)) => {
+                    info!("Shutting down immediately.");
+                    // Dropping the shutdown future will immediately shut the server down
+                }
+                Err(_) => unreachable!(),
             }
+        } else if signal == SIGQUIT {
+            info!("Shutting down immediately");
+            drop(topology);
         } else {
-            error!("Reload aborted.");
+            unreachable!();
         }
-    };
-
-    if signal == SIGINT || signal == SIGTERM {
-        use futures::future::Either;
-
-        info!("Shutting down.");
-        let shutdown = topology.stop();
-        metrics_trigger.cancel();
-
-        match rt.block_on(shutdown.select2(signals.into_future())) {
-            Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
-            Ok(Either::B(_)) => {
-                info!("Shutting down immediately.");
-                // Dropping the shutdown future will immediately shut the server down
-            }
-            Err(_) => unreachable!(),
-        }
-    } else if signal == SIGQUIT {
-        info!("Shutting down immediately");
-        drop(topology);
-    } else {
-        unreachable!();
-    }
     }
 
     rt.shutdown_now().wait().unwrap();

@@ -34,10 +34,16 @@ pub struct SyslogConfig {
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp { address: SocketListenAddr },
-    Udp { address: SocketAddr },
+    Tcp {
+        address: SocketListenAddr,
+    },
+    Udp {
+        address: SocketAddr,
+    },
     #[cfg(unix)]
-    Unix { path: PathBuf },
+    Unix {
+        path: PathBuf,
+    },
 }
 
 fn default_max_length() -> usize {
