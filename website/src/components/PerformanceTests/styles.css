@@ -10,7 +10,7 @@
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
-.performance-tests--switcher .react-select-container {
+.performance-tests--switcher > div {
   border-right: 3px solid var(--ifm-background-color);
   flex-basis: 0;
   flex-grow: 1;
@@ -24,6 +24,7 @@
   background: transparent;
   border-color: transparent;
   cursor: pointer !important;
+  padding: calc( var(--ifm-spacing-vertical) / 3 ) calc( var(--ifm-spacing-horizontal) / 2 );
 }
 
 .performance-tests--switcher .react-select__control:hover {

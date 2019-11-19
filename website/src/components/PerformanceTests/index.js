@@ -11,6 +11,11 @@ import './styles.css';
 const COLUMN_CHART_HEIGHT = 205;
 const DEFAULT_METRIC_SLUG = 'throughput_avg';
 const DEFAULT_TEST_SLUG = 'file_to_tcp_performance';
+const WHITE_LISTED_METRICS = [
+  'load_avg_1m',
+  'mem_used_max',
+  'throughput_avg'
+];
 
 function buildMetricOptions(metrics) {
   return metrics.map(metric => ({value: metric.slug, label: metric.name}));
@@ -77,7 +82,7 @@ function fetchMeasurement(measurements, row, column, metric) {
 }
 
 function filterMetrics(metrics, {subjectSlug, testSlug}) {
-  let filteredMetrics = metrics;
+  let filteredMetrics = metrics.filter(metric => WHITE_LISTED_METRICS.includes(metric.slug));
 
   if (subjectSlug) {
     filteredMetrics = filteredMetrics.filter(metric => metric.subjects.includes(subjectSlug));
@@ -131,13 +136,15 @@ function Column({obj, onClick}) {
     case 'subject':
       return (
         <th title={`version ${obj.versions.reverse()[0].name}`}>
-          <span class="link" onClick={onClick}>{obj.name}</span>
+          {obj.name}
         </th>
       );
 
     case 'version':
       return (
-        <th>{obj.name}</th>
+        <th>
+          {obj.name}
+        </th>
       )
 
     default:
@@ -330,14 +337,7 @@ function PerformanceTests({}) {
             value={testOptions.find(option => option.value == testSlug)}
             onChange={(selectedOption) => setTestSlug(selectedOption ? selectedOption.value : null)} />
 
-          <Select
-            className="react-select-container"
-            classNamePrefix="react-select"
-            options={subjectOptions}
-            isClearable={true}
-            placeholder="Select a subject..."
-            value={subjectOptions.find(option => option.value == subjectSlug)}
-            onChange={(selectedOption) => setSubjectSlug(selectedOption ? selectedOption.value : null)} />
+          <div></div>
           
           <Select
             className="react-select-container"
