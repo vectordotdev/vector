@@ -706,7 +706,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 The[`group_name`](#group_name) and[`stream_name`](#stream_name) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strptime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -739,4 +739,4 @@ You can read more about the complete syntax in the
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
-[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

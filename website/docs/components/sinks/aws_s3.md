@@ -373,7 +373,7 @@ The extension to use in the object name.
 
 ### filename_time_format
 
-The format of the resulting object file name. [`strftime` specifiers][urls.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.
+The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported. See [Object Naming](#object-naming) for more info.
 
 
 </Field>
@@ -750,7 +750,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 The[`key_prefix`](#key_prefix) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strptime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -782,6 +782,6 @@ You can read more about the complete syntax in the
 [urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
-[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open

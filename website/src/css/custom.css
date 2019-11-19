@@ -73,6 +73,8 @@
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-navbar-link-color: var(--ifm-heading-color);
   --ifm-panel-background: var(--ifm-color-emphasis-25);
+  --ifm-panel-background-rgb: 249, 249, 250;
+  --ifm-panel-background-solid: #f9f9fa;
   --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
   --ifm-panel-border-color: var(--ifm-hr-border-color);
   --ifm-panel-border-color-active: var(--ifm-color-primary);
@@ -162,6 +164,103 @@ ul.checks {
 ul.checks li > i.feather:first-child {
   margin-left: -1.8em;
   margin-right: 0.5em;
+}
+
+table.comparison {
+  width: 100%;
+}
+table.comparison th,
+table.comparison td,
+table.comparison tr {
+  border: 0px none;
+  white-space: nowrap;
+}
+table.comparison th {
+  padding-left: 0;
+  padding-right: 0;
+}
+table.comparison tr td {
+  border-left: 10px solid var(--ifm-background-color);
+  min-width: 90px;
+  text-align: center;
+}
+table.comparison tr td[title] {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+table.comparison tr td:first-child {
+  font-weight: bold;
+  padding-left: 0;
+  text-align: left;
+  white-space: nowrap;
+  width: 25%;
+}
+table.comparison tr td.bar {
+  vertical-align: bottom;
+}
+table.comparison tr td.description {
+  font-weight: normal;
+  vertical-align: top;
+  white-space: normal;
+}
+table.comparison tr td.description .label {
+  color: var(--ifm-heading-color);
+  font-weight: bold;
+}
+table.comparison tr td.description .text {
+  color: var(--ifm-color-emphasis-600);
+}
+table.comparison tr td.description .links {
+  font-size: 0.9em;
+  margin-top: var(--ifm-spacing-vertical);
+}
+table.comparison tr td.failed {
+  background: rgba( var(--ifm-color-pink-rgb), 1 );
+  color: var(--ifm-background-color);
+}
+table.comparison tr:hover td.failed {
+  background: rgba( var(--ifm-color-pink-rgb), 0.7 );
+}
+table.comparison tr td.lost {
+  background: var(--ifm-panel-background);
+  color: var(--ifm-color-emphasis-500);
+}
+table.comparison tr td.lost div.bar {
+  background: var(--ifm-panel-background);
+}
+table.comparison tr:hover td.lost {
+  background: rgba( var(--ifm-panel-background-rgb), 0.8 );
+}
+table.comparison tr td.passed {
+  background: rgba( var(--ifm-color-primary-rgb), 1 );
+  color: var(--ifm-background-color);
+}
+table.comparison tr td.passed div.bar {
+  background: var(--ifm-color-primary);
+}
+table.comparison tr:hover td.passed {
+  background: rgba( var(--ifm-color-primary-rgb), 0.9 );
+}
+table.comparison tr td.warning {
+  background: rgba( var(--ifm-color-warning-rgb), 1 );
+  color: var(--ifm-background-color);
+}
+table.comparison tr:hover td.warning {
+  background: rgba( var(--ifm-color-warning-rgb), 0.9 );
+}
+table.comparison tr td.bar {
+  padding: 0;
+}
+table.comparison tr td.bar:hover {
+  background: var(--ifm-panel-background);
+}
+table.comparison tr td.bar .bar {
+  background: var(--ifm-panel-background);
+  margin: 0 auto;
+  max-width: 100px;
+}
+table.comparison tr td.bar .bar.passed {
+  background: var(--ifm-color-primary);
 }
 
 .component-statuses {
@@ -324,6 +423,14 @@ input[type="text"]:focus {
   border-bottom: 1px solid var(--ifm-color-warning);
   padding-bottom: 5px;
   font-size: 0.8rem;
+}
+
+span.link {
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+}
+span.link:hover {
+  text-decoration: underline;
 }
 
 .markdown {
@@ -578,7 +685,7 @@ section {
   padding: calc( 1.5 * var(--ifm-leading) ) 0;
 }
 section .sub-title {
-  color: var(--ifm-color-emphasis-400);
+  color: var(--ifm-color-emphasis-600);
   margin-top: calc( var(--ifm-heading-margin-bottom) * -1 );
   margin-bottom: var(--ifm-heading-margin-bottom);
 }
@@ -833,6 +940,8 @@ html[data-theme="dark"] {
   --ifm-global-shadow-md: 0 3px 8px 0px rgba(0, 0, 0, 0.2);
   --ifm-heading-color: rgb(224, 235, 247);
   --ifm-panel-background: var(--ifm-color-emphasis-50);
+  --ifm-panel-background-rgb: 37, 37, 50;
+  --ifm-panel-background-solid: #252532;
   --ifm-panel-box-shadow: none;
   --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.5 );
 }

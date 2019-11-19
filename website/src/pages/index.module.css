@@ -131,67 +131,6 @@ html[data-theme="dark"] .hero {
 }
 
 /*
- * Correctness Section
- */
-
-.correctness {
-  
-}
-
-.correctnessResults {
-  width: 100%;
-}
-
-.correctnessResults th,
-.correctnessResults td,
-.correctnessResults tr {
-  border: 0px none;
-}
-
-.correctnessResults th {
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.correctnessResults tr td {
-  border-left: 10px solid var(--ifm-background-color);
-  color: var(--ifm-background-color);
-  min-width: 90px;
-  text-align: center;
-}
-
-.correctnessResults tr td:first-child {
-  font-weight: bold;
-  padding-left: 0;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.correctnessResultsFailed {
-  background: rgba( var(--ifm-color-pink-rgb), 0.7 );
-}
-
-.correctnessResultsPassed {
-  background: rgba( var(--ifm-color-primary-rgb), 0.7 );
-}
-
-.correctnessResultsWarning {
-  background: rgba( var(--ifm-color-warning-rgb), 0.7 )
-}
-
-.correctnessResults tr:hover .correctnessResultsWarning {
-  background: rgba( var(--ifm-color-warning-rgb), 1 );
-}
-
-.correctnessResults tr:hover .correctnessResultsFailed {
-  background: rgba( var(--ifm-color-pink-rgb), 1 );
-}
-
-.correctnessResults tr:hover .correctnessResultsPassed {
-  background: rgba( var(--ifm-color-primary-rgb), 1 );
-}
-
-/*
  * Integrations Section
  */
 

@@ -201,7 +201,7 @@ event-by-event basis. It does not batch data.
 The[`path`](#path) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strptime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -221,4 +221,4 @@ You can read more about the complete syntax in the
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.configuration#template-syntax]: /docs/setup/configuration#template-syntax
 [docs.data-model#log]: /docs/about/data-model#log
-[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

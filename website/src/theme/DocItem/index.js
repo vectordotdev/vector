@@ -28,9 +28,11 @@ function Headings({headings, isChild}) {
     <ul className={isChild ? '' : 'contents'}>
       {headings.map(heading => (
         <li key={heading.id}>
-          <a href={`#${heading.id}`} className={LINK_CLASS_NAME}>
-            {heading.value}
-          </a>
+          <a
+            href={`#${heading.id}`}
+            className={LINK_CLASS_NAME}
+            dangerouslySetInnerHTML={{__html: heading.value}}
+          />
           <Headings isChild headings={heading.children} />
         </li>
       ))}

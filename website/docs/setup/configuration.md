@@ -95,6 +95,10 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
 
 </Fields>
 
+## Specification
+
+
+
 ## How It Works
 
 ### Composition
@@ -162,15 +166,15 @@ please refer to the excellent [TOML documentation][urls.toml].
 Select configuration options support Vector's template syntax to produce
 dynamic values derived from the event's data. There are 2 special syntaxes:
 
-1. Strftime specifiers. Ex: `date=%Y/%m/%d`
+1. Strptime specifiers. Ex: `date=%Y/%m/%d`
 2. Event fields. Ex: `{{ field_name }}`
 
 Each are described in more detail below.
 
-#### Strftime specifiers
+#### Strptime specifiers
 
-For simplicity, Vector allows you to supply [strftime \
-specifiers][urls.strftime_specifiers] directly as part of the value to produce
+For simplicity, Vector allows you to supply [strptime \
+specifiers][urls.strptime_specifiers] directly as part of the value to produce
 formatted timestamp values based off of the event's `timestamp` field.
 
 For example, given the following [`log` event][docs.data-model.log]:
@@ -258,5 +262,5 @@ All TOML values types are supported. For convenience this includes:
 [docs.sinks]: /docs/components/sinks
 [docs.sources]: /docs/components/sources
 [docs.transforms]: /docs/components/transforms
-[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.toml]: https://github.com/toml-lang/toml

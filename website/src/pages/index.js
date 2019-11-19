@@ -12,6 +12,7 @@ import Diagram from '@site/src/components/Diagram';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import PerformanceTests from '@site/src/components/PerformanceTests';
 import TabItem from '@theme/TabItem';
 import Tabs from '@theme/Tabs';
 
@@ -128,8 +129,9 @@ function Performance() {
     <section className={styles.performance}>
       <div className="container">
         <h2>Performance</h2>
+        <div className="sub-title">Outperforms while using 80% less memory</div>
 
-
+        <PerformanceTests />
       </div>
     </section>
   );
@@ -141,8 +143,9 @@ function Correctness() {
       <div className="container">
         <h2>Correctness</h2>
         <div className="sub-title">Obsessed with the details</div>
+
         <div className="table-responsive">
-          <table className={styles.correctnessResults}>
+          <table className="comparison">
             <thead>
               <tr>
                 <th></th>
@@ -158,73 +161,73 @@ function Correctness() {
             <tbody>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness">Disk buffer persistence</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsWarning}><i className="feather icon-alert-triangle"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="warning"><i className="feather icon-alert-triangle"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness">File rotate (create)</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness">File rotate (copytruncate)</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness">File truncation</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness">Process (SIGHUP)</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsWarning}><i className="feather icon-alert-triangle"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="warning"><i className="feather icon-alert-triangle"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_stream_correctness">TCP Streaming</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
                 <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness">JSON (wrapped)</a></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsFailed}><i className="feather icon-x"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
-                <td className={styles.correctnessResultsPassed}><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="failed"><i className="feather icon-x"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
+                <td className="passed"><i className="feather icon-check"></i></td>
               </tr>
             </tbody>
           </table>

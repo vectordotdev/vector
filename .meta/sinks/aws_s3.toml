@@ -47,7 +47,7 @@ type = "string"
 category = "Object Names"
 default = "%s"
 null = false
-description = "The format of the resulting object file name. [`strftime` specifiers][urls.strftime_specifiers] are supported."
+description = "The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported."
 
 [sinks.aws_s3.options.key_prefix]
 type = "string"

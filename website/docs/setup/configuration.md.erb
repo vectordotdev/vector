@@ -63,6 +63,10 @@ data_dir = "/var/lib/vector"
 
 <%= options(metadata.options.to_h.values.sort, heading_depth: 3) %>
 
+## Specification
+
+
+
 ## How It Works [[sort]]
 
 ### Composition
@@ -128,15 +132,15 @@ please refer to the excellent [TOML documentation][urls.toml].
 Select configuration options support Vector's template syntax to produce
 dynamic values derived from the event's data. There are 2 special syntaxes:
 
-1. Strftime specifiers. Ex: `date=%Y/%m/%d`
+1. Strptime specifiers. Ex: `date=%Y/%m/%d`
 2. Event fields. Ex: `{{ field_name }}`
 
 Each are described in more detail below.
 
-#### Strftime specifiers
+#### Strptime specifiers
 
-For simplicity, Vector allows you to supply [strftime \
-specifiers][urls.strftime_specifiers] directly as part of the value to produce
+For simplicity, Vector allows you to supply [strptime \
+specifiers][urls.strptime_specifiers] directly as part of the value to produce
 formatted timestamp values based off of the event's `timestamp` field.
 
 For example, given the following [`log` event][docs.data-model.log]:

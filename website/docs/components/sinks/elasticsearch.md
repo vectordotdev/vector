@@ -997,7 +997,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 The[`index`](#index) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strptime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -1024,4 +1024,4 @@ You can read more about the complete syntax in the
 [urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
-[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

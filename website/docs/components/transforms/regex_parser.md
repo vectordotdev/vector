@@ -141,7 +141,7 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strftime_specifiers] must be used to parse the string."}}
+  enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"name":"status","value":"int"},{"name":"duration","value":"float"},{"name":"success","value":"bool"},{"name":"timestamp","value":"timestamp|%s","comment":"unix"},{"name":"timestamp","value":"timestamp|%+","comment":"iso8601 (date and time)"},{"name":"timestamp","value":"timestamp|%F","comment":"iso8601 (date)"},{"name":"timestamp","value":"timestamp|%a %b %e %T %Y","comment":"custom strptime format"}]}
   name={"*"}
   nullable={false}
@@ -155,7 +155,7 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
 
 #### *
 
-A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
 
 
 </Field>
@@ -302,4 +302,4 @@ documentation][urls.regex_grouping_and_flags].
 [urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [urls.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
-[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
