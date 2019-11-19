@@ -109,6 +109,8 @@ jobs:
             RUSTFLAGS=-Ctarget-feature=+crt-static
             FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
             PATH="$HOME/.cargo/bin:$PATH"
+            # see https://github.com/rust-lang/cargo/issues/2078
+            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
             rm rust-toolchain # to use nightly
             cargo test --no-default-features --features "$FEATURES"
 
