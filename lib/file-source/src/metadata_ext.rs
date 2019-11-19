@@ -10,7 +10,7 @@ pub trait PortableMetadataExt {
 }
 
 #[cfg(unix)]
-impl MetadataExt for Metadata {
+impl PortableMetadataExt for Metadata {
     fn portable_dev(&self) -> u64 {
         self.dev()
     }

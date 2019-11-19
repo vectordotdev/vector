@@ -181,7 +181,7 @@ impl AsRef<path::Path> for BytesPath {
     #[cfg(unix)]
     fn as_ref(&self) -> &path::Path {
         use std::os::unix::ffi::OsStrExt;
-        let os_str = ffi::OsStr::from_bytes(&self.0[..]);
+        let os_str = ffi::OsStr::from_bytes(&self.path);
         &path::Path::new(os_str)
     }
     #[cfg(windows)]
