@@ -196,7 +196,7 @@ jobs:
           paths:
             - "*-x86_64-unknown-linux-musl.tar.gz"
 
-  build-armv7-unknown-linux-musleabihf-archive:
+  build-aarch64-unknown-linux-musl-archive:
     machine:
       docker_layer_caching: true
     resource_class: large # xlarge is not supported with "machine" executor
@@ -208,16 +208,16 @@ jobs:
             docker run \
               --privileged \
               -e RUST_LTO="lto" \
-              -e TARGET="armv7-unknown-linux-musleabihf" \
-              -e FEATURES="default rdkafka/cmake_build" \
+              -e TARGET="aarch64-unknown-linux-musl" \
+              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
-              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
+              -t timberiodev/vector-builder-aarch64-unknown-linux-musl:latest \
               make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
-            - "*-armv7-unknown-linux-musleabihf.tar.gz"
+            - "*-aarch64-unknown-linux-musl.tar.gz"
 
   #
   # Checks
@@ -603,7 +603,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-generate
     - test-stable
     - build-x86_64-unknown-linux-musl-archive
-    - build-armv7-unknown-linux-musleabihf-archive
+    - build-aarch64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
@@ -638,7 +638,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
-      - build-armv7-unknown-linux-musleabihf-archive
+      - build-aarch64-unknown-linux-musl-archive
       - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:
@@ -698,7 +698,7 @@ workflows:
           <<: *release-filters
       - build-x86_64-unknown-linux-musl-archive:
           <<: *release-filters
-      - build-armv7-unknown-linux-musleabihf-archive:
+      - build-aarch64-unknown-linux-musl-archive:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
@@ -789,7 +789,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
-      - build-armv7-unknown-linux-musleabihf-archive
+      - build-aarch64-unknown-linux-musl-archive
       - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:
