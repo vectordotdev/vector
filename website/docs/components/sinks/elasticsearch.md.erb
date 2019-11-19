@@ -1,0 +1,28 @@
+<% component = metadata.sinks.elasticsearch %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= sink_output(component) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Nested Documents
+
+Vector will explode events into nested documents before writing them to
+Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read
+more about how Vector handles nested documents in the [Data Model
+document][docs.data_model].
+
+

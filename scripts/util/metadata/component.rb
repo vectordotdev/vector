@@ -9,17 +9,16 @@ class Component
   include Comparable
 
   attr_reader :beta,
+    :function_category,
     :id,
     :name,
     :options,
     :resources,
     :type
 
-  attr_accessor :alternatives
-
   def initialize(hash)
-    @alternatives = []
     @beta = hash["beta"] == true
+    @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
@@ -76,6 +75,20 @@ class Component
     options_list.select(&:context?)
   end
 
+  def event_types
+    types = []
+
+    if respond_to?(:input_types)
+      types += input_types
+    end
+
+    if respond_to?(:output_types)
+      types += output_types
+    end
+
+    types.uniq
+  end
+
   def options_list
     @options_list ||= options.to_h.values.sort
   end
@@ -98,8 +111,26 @@ class Component
     end
   end
 
+  def status
+    beta? ? "beta" : "prod-ready"
+  end
+
   def templateable_options
     options_list.select(&:templateable?)
+  end
+
+  def to_h
+    {
+      beta: beta?,
+      delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
+      event_types: event_types,
+      function_category: (respond_to?(:function_category, true) ? function_category : nil),
+      id: id,
+      name: name,
+      service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
+      status: status,
+      type: type
+    }
   end
 
   def transform?

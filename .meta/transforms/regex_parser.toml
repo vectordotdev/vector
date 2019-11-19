@@ -2,7 +2,8 @@
 allow_you_to_description = """\
 parse a log field's value with a [Regular Expression][urls.regex]\
 """
-function_categories = ["parse"]
+common = true
+function_category = "parse"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -11,20 +12,22 @@ types_coercion = true
 
 [transforms.regex_parser.options.drop_field]
 type = "bool"
+common = true
 default = true
 null = false
 description = "If the specified `field` should be dropped (removed) after parsing."
 
 [transforms.regex_parser.options.field]
 type = "string"
+common = true
 default = "message"
 null = false
 description = "The log field to parse."
 
 [transforms.regex_parser.options.regex]
 type = "string"
+common = true
 examples = [
-
 """\
 ^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$\
 """

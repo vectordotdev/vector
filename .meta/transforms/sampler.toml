@@ -1,12 +1,14 @@
 [transforms.sampler]
 allow_you_to_description = "sample events with a configurable rate"
 beta = true
-function_categories = ["sample"]
+common = false
+function_category = "filter"
 input_types = ["log"]
 output_types = ["log"]
 
 [transforms.sampler.options.pass_list]
 type = "[string]"
+common = true
 examples = [["[error]", "field2"]]
 null = true
 description = """\
@@ -17,6 +19,7 @@ _not_ be sampled.\
 
 [transforms.sampler.options.rate]
 type = "int"
+common = true
 examples = [10]
 null = false
 description = """\

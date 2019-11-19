@@ -39,7 +39,7 @@ GEM
       loofah (~> 2.2, >= 2.2.2)
     semantic (1.6.1)
     thread_safe (0.3.6)
-    toml-rb (1.1.2)
+    toml-rb (2.0.0)
       citrus (~> 3.0, > 3.0)
     tzinfo (1.2.5)
       thread_safe (~> 0.1)
@@ -59,7 +59,7 @@ DEPENDENCIES
   paint (~> 2.1)
   parallel (~> 1.17.0)
   semantic (~> 1.6.1)
-  toml-rb (~> 1.1)
+  toml-rb (~> 2.0)
   unindent (~> 1.0)
   word_wrap (~> 1.0)
 

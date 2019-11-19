@@ -42,14 +42,14 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * *[config][docs.configuration]*: Default data_dir to /var/lib/vector ([#995][urls.pr_995])
 
 
-[docs.configuration]: https://docs.vector.dev/usage/configuration
-[docs.installation.manual]: https://docs.vector.dev/setup/installation/manual
-[docs.installation]: https://docs.vector.dev/setup/installation
-[docs.monitoring]: https://docs.vector.dev/usage/administration/monitoring
-[docs.sinks.clickhouse]: https://docs.vector.dev/usage/configuration/sinks/clickhouse
-[docs.sinks.elasticsearch]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
-[docs.sinks.kafka]: https://docs.vector.dev/usage/configuration/sinks/kafka
-[docs.sources.docker]: https://docs.vector.dev/usage/configuration/sources/docker
+[docs.configuration]: https://vector.dev/docs/setup/configuration
+[docs.installation.manual]: https://vector.dev/docs/setup/installation/manual
+[docs.installation]: https://vector.dev/docs/setup/installation
+[docs.monitoring]: https://vector.dev/docs/administration/monitoring
+[docs.sinks.clickhouse]: https://vector.dev/docs/components/sinks/clickhouse
+[docs.sinks.elasticsearch]: https://vector.dev/docs/components/sinks/elasticsearch
+[docs.sinks.kafka]: https://vector.dev/docs/components/sinks/kafka
+[docs.sources.docker]: https://vector.dev/docs/components/sources/docker
 [urls.compare_v0.4.0...v0.5.0]: https://github.com/timberio/vector/compare/v0.4.0...v0.5.0
 [urls.compare_v0.5.0...master]: https://github.com/timberio/vector/compare/v0.5.0...master
 [urls.conventional_commits]: https://www.conventionalcommits.org

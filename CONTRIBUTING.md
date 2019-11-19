@@ -54,9 +54,9 @@ expanding into more specifics.
 
 ### Git Branches
 
-_All_ changes must be made in a branch and submitted as [pull \
-requests](#pull-requests). Vector does not adopt any type of branch naming
-style, but please use something descriptive of your changes.
+_All_ changes must be made in a branch and submitted as [pull requests](#pull-requests).
+Vector does not adopt any type of branch naming style, but please use something
+descriptive of your changes.
 
 ### Git Commits
 
@@ -130,7 +130,7 @@ updated versions of Vector through various channels.
 1. Install Rust via [`rustup`](https://rustup.rs/):
 
    ```bash
-   curl https://sh.rustup.rs -sSf | sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 2. [Install Docker](https://docs.docker.com/install/). Docker

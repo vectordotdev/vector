@@ -1,6 +1,7 @@
 [transforms.add_fields]
 allow_you_to_description = "add one or more log fields"
-function_categories = ["change_fields"]
+common = false
+function_category = "shape"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -8,6 +9,7 @@ resources = []
 
 [transforms.add_fields.options.fields]
 type = "table"
+common = true
 null = false
 description = """\
 A table of key/value pairs representing the keys to be added to the \

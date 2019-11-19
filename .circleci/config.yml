@@ -6,7 +6,7 @@ install-rust: &install-rust
   run:
     name: Install Rust
     command: |
-      curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+      curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
 install-vector: &install-vector
   run:
@@ -228,7 +228,7 @@ jobs:
     steps:
       - run:
           name: Install vector
-          command: curl https://sh.vector.dev -sSf | sh -s -- -y
+          command: curl -sSf https://sh.vector.dev | sh -s -- -y
       - run:
           name: Verify installation
           command: vector --version

@@ -1,6 +1,7 @@
 [transforms.coercer]
 allow_you_to_description = "coerce log fields into fixed types"
-function_categories = ["coerce"]
+common = false
+function_category = "parse"
 guides = []
 input_types = ["log"]
 output_types = ["log"]

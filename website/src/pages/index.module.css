@@ -1,0 +1,245 @@
+/*
+ * Hero Section
+ */
+
+@keyframes indexHeroInitial {
+  0% {
+    background-size: 100% 100%;
+  }
+  90% {
+    background-size: 250% 250%;
+  }
+  100% {
+    background-size: 200% 200%;
+  }
+}
+
+@keyframes indexHeroPulsating {
+  0% {
+    background-size: 200% 200%;
+  }
+  50% {
+    background-size: 150% 150%;
+  }
+  100% {
+    background-size: 200% 200%;
+  }
+}
+
+.indexAnnouncement {
+  background: var(--ifm-color-emphasis-50);
+  border-radius: 1em;
+  color: var(--ifm-color-content);
+  display: inline-block;
+  font-size: 0.9em;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding: 3px 10px 5px 10px;
+}
+
+.indexAnnouncement span {
+  background: var(--ifm-color-content);
+  border: 0px none;
+  border-radius: 1em;
+  color: var(--ifm-background-color);
+  margin-right: 0.5em;
+  text-transform: uppercase;
+}
+
+.indexAnnouncement:hover {
+  background: var(--ifm-panel-background-active);
+  text-decoration: none;
+}
+
+.indexAnnouncement:hover span {
+  background: var(--ifm-color-primary);
+}
+
+.indexHeroBanner {
+  animation: indexHeroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), indexHeroPulsating 2.5s linear infinite;
+  animation-delay: 650ms, 1350ms;
+  animation-fill-mode: forwards;
+  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
+  background-position: center center;
+  border-bottom: 0px none;
+  min-height: calc( 100vh - var(--ifm-navbar-height) );
+}
+
+.indexHeroDiagram {
+  margin: calc( var(--ifm-spacing-vertical) * 4 ) 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  max-height: 325px;
+  width: 100%;
+}
+
+html[data-theme="dark"] .hero {
+  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.2), transparent 30%);
+}
+
+@media (max-width: 480px) {
+  html[data-theme="dark"] .indexHeroBanner,
+  .indexHeroBanner {
+    animation: none;
+    background-image: none;
+    min-height: auto;
+  }
+
+  .indexHeroDiagram {
+    display: none;
+  }
+}
+
+/*
+ * Features Section
+ */
+
+.features {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.features h3 {
+  text-align: center;
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.feature p {
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 3 );
+}
+
+.featureIcon {
+  border-top: 1px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  font-size: 1.5em;
+  margin-bottom: -0.5em;
+  margin-top: 1em;
+  text-align: center;
+}
+
+.featureIcon i {
+  background: var(--ifm-background-color);
+  padding: 0 var(--ifm-spacing-horizontal);
+  position: relative;
+  top: -1em;
+}
+
+/*
+ * Performance Section
+ */
+
+.performance {
+
+}
+
+/*
+ * Integrations Section
+ */
+
+.components {
+  position: relative;
+  height: 1000px;
+  margin-top: calc( var(--ifm-spacing-vertical) * -8 );
+  width: 100%;
+}
+
+.components h3 {
+  align-items: center;
+  display: flex;
+  font-size: 3.5rem;
+  height: 100%;
+  justify-content: center;
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+.components h3 span {
+  display: block;
+}
+
+.components ul {
+  display: none;
+}
+
+.componentsCanvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+
+.componentsCanvas circle,
+.componentsCanvas text {
+  cursor: pointer;
+}
+
+@media screen and (max-width: 999px) {
+  .components {
+    height: 900px;
+  }
+
+  .components h3 {
+    font-size: 2.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .componentsCanvas {
+    display: none;
+  }
+
+  .components {
+    position: static;
+    height: auto;
+    margin-top: 0;
+  }
+
+  .components h3 {
+    display: none;
+  }
+
+  .components ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-gap: 1rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .components ul li {
+    display: grid;
+  }
+
+  .components ul li a {
+    background: var(--ifm-panel-background);
+    border: 1px solid var(--ifm-panel-border-color);
+    border-radius: 0.25em;
+    box-shadow: var(--ifm-panel-box-shadow);
+    color: var(--ifm-panel-color);
+    display: block;
+    font-size: 1em;
+    margin: 0;
+    overflow: hidden;
+    padding: 0.2em;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .components ul li a:hover {
+    background: var(--ifm-panel-background-active);
+    border-color: var(--ifm-panel-border-color-active);
+    box-shadow: var(--ifm-panel-box-shadow-active);
+    color: var(--ifm-panel-color-active);
+    text-decoration: none;
+  }
+}
+
+/*
+ * Installation Section
+ */
+
+.installSubTitle {
+  margin-top: var(--ifm-heading-margin-bottom);
+}

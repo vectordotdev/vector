@@ -1,0 +1,30 @@
+<% component = metadata.sinks.http %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= sink_output(component) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Authentication
+
+HTTP authentication is controlled via the `Authorization` header which you can
+set with the `headers` option. For convenience, Vector also supports the
+`basic_auth.username` and `basic_auth.password` options which handle setting the
+`Authorization` header for the [base access authentication
+scheme][urls.basic_auth].
+
+
+

@@ -8,8 +8,6 @@ module PostProcessors
   #
   # See the `Links` class for more info on how links are resoolved.
   class LinkDefiner
-    VECTOR_DOCS_HOST = "https://docs.vector.dev"
-    
     class << self
       def define!(*args)
         new(*args).define!
@@ -21,44 +19,32 @@ module PostProcessors
       end
     end
 
-    attr_reader :content, :docs_root, :links, :file_path, :opts
+    attr_reader :content, :links, :file_path, :opts
 
     def initialize(content, file_path, links, opts = {})
       @content = self.class.remove_link_footers(content)
       @links = links
       @file_path = file_path
       @opts = opts
-
-      if in_docs?
-        @docs_root = @file_path.gsub(DOCS_ROOT + "/", "").split("/")[1..-1].collect { |_| ".." }.join("/")
-
-        if @docs_root == ""
-          @docs_root = "."
-        end
-      end
     end
 
     def define!
-      if !file_path.end_with?("SUMMARY.md") && !file_path.end_with?("conventions.md")
-        verify_no_direct_links!
+      verify_no_direct_links!
+
+      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/# ]*)\]\]\]/).flatten.uniq
+
+      link_ids.each do |link_id|
+        definition = get_path_or_url(link_id)
+        content.gsub!("[[[#{link_id}]]]", definition)
       end
 
-      link_names = content.scan(/\]\[([a-zA-Z0-9_\-\.\/# ]*)\]/).flatten.uniq
+      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/# ]*)\]/).flatten.uniq
 
       footer_links = []
 
-      link_names.each do |link_name|
-        definition = links.fetch(link_name)
-
-        if definition.start_with?("/")
-          if in_docs?
-            definition = docs_root + definition
-          else
-            definition = VECTOR_DOCS_HOST + definition.gsub(/\.md$/, "")
-          end
-        end
-
-        footer_links << "[#{link_name}]: #{definition}"
+      link_ids.each do |link_id|
+        definition = get_path_or_url(link_id)
+        footer_links << "[#{link_id}]: #{definition}"
       end
 
       <<~EOF
@@ -70,8 +56,20 @@ module PostProcessors
     end
 
     private
-      def in_docs?
-        @file_path.start_with?(DOCS_ROOT)
+      def get_path_or_url(link_id)
+        definition = links.fetch(link_id)
+
+        if definition.start_with?("/")
+          if !in_website?
+            definition = HOST + definition.gsub(/\.md$/, "")
+          end
+        end
+
+        definition
+      end
+
+      def in_website?
+        @file_path.start_with?(WEBSITE_ROOT)
       end
 
       def verify_no_direct_links!

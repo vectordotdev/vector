@@ -25,6 +25,7 @@ require 'net/http'
 # implement dynamic readers that can be found in the `#fetch_dynamic_url`
 # method.
 class Links
+  CATEGORIES = ["assets", "docs", "pages", "urls"]
   VECTOR_ROOT = "https://github.com/timberio/vector"
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"
@@ -33,14 +34,21 @@ class Links
 
   attr_reader :values
 
-  def initialize(links, docs_root)    
+  def initialize(links, docs_root, pages_root)    
     @links = links
     @values = {}
 
     @docs =
-      Dir.glob("#{docs_root}/**/*").
+      Dir.glob("#{docs_root}/**/*.md").
       to_a.
-      collect { |f| f.gsub(docs_root, "") }
+      reject { |p| File.directory?(p) }.
+      collect { |f| f.gsub(docs_root, "").split(".").first }
+
+    @pages = 
+      Dir.glob("#{pages_root}/**/*.js").
+      to_a.
+      reject { |p| File.directory?(p) }.
+      collect { |f| f.gsub(pages_root, "").split(".").first }
   end
 
   def []=(id)
@@ -70,6 +78,8 @@ class Links
         fetch_asset(name)
       when "docs"
         fetch_doc(name)
+      when "pages"
+        fetch_page(name)
       when "urls"
         fetch_url(name)
       else
@@ -79,7 +89,7 @@ class Links
 
             #{category.inspect}
 
-          Links must start with `docs.`, `images.`, or `urls.`
+          Links must start with `docs.`, `assets.`, `.pages`, or `urls.`
           EOF
         )
       end
@@ -89,71 +99,28 @@ class Links
     value
   end
 
+  def fetch_id(id)
+    # Docusaurus does not allow a leading `/`
+    fetch(id).gsub(/^#{DOCS_BASE_PATH}\//, "")
+  end
+
   private
-    def fetch_asset(name)
-      normalized_name = name.downcase.gsub(".", "/").gsub("-", "_")
-
-      assets =
-        @docs.
-          select { |doc| doc.start_with?("/assets/") }.
-          select do |doc|
-            basename = File.basename(doc, ".*").downcase.gsub("-", "_")
-            basename == normalized_name
-          end
-
-      if assets.length == 1
-        assets.first
-      elsif assets.length == 0
-        raise KeyError.new(
-          <<~EOF
-          Unkknown asset name!
-
-            assets.#{name}
-
-          This link does not match any assets.
-          EOF
-        )
-      else
-        raise KeyError.new(
-          <<~EOF
-          Ambiguous asset name!
-
-            assets.#{name}
-
-          This link matches more than 1 asset:
-
-            * #{assets.join("\n  * ")}
-
-          Please use something more specific that will match only a single asset.
-          EOF
-        )
-      end 
-    end
-
-    def fetch_doc(name)
+    def fetch!(namespace, items, name)
       normalized_name = name.downcase.gsub(".", "/").gsub("-", "_").split("#", 2).first
-      available_docs = @docs.select { |doc| !doc.start_with?("/assets/") }
 
-      available_docs =
-        if name.end_with?(".readme")
-          available_docs
-        else
-          available_docs.select { |doc| !doc.end_with?("/README.md") }
+      found_items =
+        items.select do |item|
+          item.downcase.gsub("-", "_").end_with?(normalized_name)
         end
 
-      found_docs =
-        available_docs.select do |doc|
-          doc.downcase.gsub(/\.md$/, "").gsub("-", "_").end_with?(normalized_name)
-        end
-
-      if found_docs.length == 1
-        found_docs.first
-      elsif found_docs.length == 0
+      if found_items.length == 1
+        found_items.first
+      elsif found_items.length == 0
         raise KeyError.new(
           <<~EOF
           Unknown link name!
 
-            docs.#{name}
+            #{namespace}.#{name}
 
           This link does not match any documents.
           EOF
@@ -163,11 +130,11 @@ class Links
           <<~EOF
           Ambiguous link name!
 
-            docs.#{name}
+            #{namespace}.#{name}
 
           This link matches more than 1 doc:
 
-            * #{found_docs.join("\n  * ")}
+            * #{found_items.join("\n  * ")}
 
           Please use something more specific that will match only a single document.
           EOF
@@ -175,8 +142,31 @@ class Links
       end
     end
 
-    def fetch_url(name)
-      @links.fetch("urls")[name] || fetch_dynamic_url(name)
+    def fetch_asset(name)
+      assets =
+        @docs.
+          select { |doc| doc.start_with?("/assets/") }.
+          select do |doc|
+            basename = File.basename(doc, ".*").downcase.gsub("-", "_")
+            basename == normalized_name
+          end
+
+      fetch!("assets", assets, name)
+    end
+
+    def fetch_doc(name)
+      available_docs =
+        if name.end_with?(".readme")
+          @docs
+        else
+          @docs.select { |doc| !doc.end_with?("/README.md") }
+        end
+
+      DOCS_BASE_PATH + fetch!("docs", available_docs, name)
+    end
+
+    def fetch_page(name)
+      fetch!("pages", @pages, name)
     end
 
     def fetch_dynamic_url(name)
@@ -256,5 +246,9 @@ class Links
           EOF
         )
       end
+    end
+
+    def fetch_url(name)
+      @links.fetch("urls")[name] || fetch_dynamic_url(name)
     end
 end

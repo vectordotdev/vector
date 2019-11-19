@@ -1,0 +1,25 @@
+<% component = metadata.sources.udp %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= source_output(:log, component.output.log, heading_depth: 3) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Line Delimiters
+
+Each line is read until a new line delimiter (the `0xA` byte) is found.
+
+

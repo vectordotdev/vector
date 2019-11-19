@@ -33,16 +33,16 @@ class Option
       @options = []
     end
 
-    @name = hash.fetch("name")
+    @common = hash["common"] == true
     @default = hash["default"]
     @display = hash["display"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @name = hash.fetch("name")
     @null = hash.fetch("null")
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
-    @simple = hash["simple"] == true
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
@@ -64,6 +64,8 @@ class Option
     if @examples.empty?
       if !@enum.nil?
         @examples = @enum.keys
+      elsif @type == "bool"
+        @examples = [true, false]
       elsif !@default.nil?
         @examples = [@default]
       end
@@ -80,20 +82,28 @@ class Option
     end
   end
 
-  def <=>(other_option)
-    name <=> other_option.name
+  def <=>(other)
+    name <=> other.name
   end
 
   def advanced?
     if options.any?
       options.any?(&:advanced?)
     else
-      !simple?
+      !common?
     end
   end
 
   def array?(inner_type)
     type == "[#{inner_type}]"
+  end
+
+  def common?
+    @common == true || required?
+  end
+
+  def common_options
+    @common_options ||= options.select(&:common?)
   end
 
   def config_file_sort_token
@@ -131,6 +141,10 @@ class Option
 
   def context?
     category.downcase == "context"
+  end
+
+  def eql?(other)
+    self.<=>(other) == 0
   end
 
   def get_relevant_sections(sections)
@@ -172,24 +186,31 @@ class Option
     default.nil? && null == false
   end
 
-  def simple?
-    if options.any?
-      @simple == true || (required? && simple_options.any?)
-    else
-      @simple == true || required?
-    end
-  end
-
-  def simple_options
-    @simple_options ||= options.select(&:simple?)
-  end
-
   def table?
     type == "table"
   end
 
   def templateable?
     templateable == true
+  end
+
+  def to_h
+    {
+      name: name,
+      category: category,
+      default: default,
+      description: description,
+      display: display,
+      enum: enum,
+      examples: examples,
+      null: null,
+      options: options,
+      partition_key: partition_key,
+      relevant_when: relevant_when,
+      templateable: templateable,
+      type: type,
+      unit: unit
+    }
   end
 
   def wildcard?

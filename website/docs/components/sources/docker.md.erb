@@ -1,0 +1,26 @@
+<%- component = metadata.sources.docker -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= source_output(:log, component.output.log, heading_depth: 3) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Connecting to the Docker daemon
+
+Vector will automatically attempt to connect to the docker daemon for you. In most
+situations if your current user is able to run `docker ps` then Vector will be able to
+connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
+use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].

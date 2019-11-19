@@ -1,6 +1,8 @@
 [sources.journald]
 beta = true
+common = true
 delivery_guarantee = "best_effort"
+function_category = "collect"
 guides = []
 output_types = ["log"]
 resources = []
@@ -8,6 +10,7 @@ through_description = "log records from journald"
 
 [sources.journald.options.current_boot_only]
 type = "bool"
+common = true
 null = true
 default = true
 description = "Include only entries from the current boot."
@@ -39,12 +42,98 @@ description = "Include only entries from the local system"
 
 [sources.journald.options.units]
 type = "[string]"
+common = true
 null = true
 default = []
 examples = [["ntpd", "sysinit.target"]]
-simple = true
 description = """\
 The list of units names to monitor. \
 If empty or not present, all units are accepted. \
 Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
+"""
+
+[[sources.journald.output.log.examples]]
+label = "Generic"
+input = """\
+__REALTIME_TIMESTAMP=1564173027000443
+__MONOTONIC_TIMESTAMP=98694000446
+_BOOT_ID=124c781146e841ae8d9b4590df8b9231
+SYSLOG_FACILITY=3
+_UID=0
+_GID=0
+_CAP_EFFECTIVE=3fffffffff
+_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
+_HOSTNAME=lorien.example.com
+PRIORITY=6
+_TRANSPORT=stdout
+_STREAM_ID=92c79f4b45c4457490ebdefece29995e
+SYSLOG_IDENTIFIER=ntpd
+_PID=2156
+_COMM=ntpd
+_EXE=/usr/sbin/ntpd
+_CMDLINE=ntpd: [priv]
+_SYSTEMD_CGROUP=/system.slice/ntpd.service
+_SYSTEMD_UNIT=ntpd.service
+_SYSTEMD_SLICE=system.slice
+_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
+MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
+"""
+output = """\
+{
+  "timestamp": <2019-07-26T20:30:27.000443Z>,
+  "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
+  "host": "lorien.example.com",
+  "__REALTIME_TIMESTAMP": "1564173027000443",
+  "__MONOTONIC_TIMESTAMP": "98694000446",
+  "_BOOT_ID": "124c781146e841ae8d9b4590df8b9231",
+  "SYSLOG_FACILITY": "3",
+  "_UID": "0",
+  "_GID": "0",
+  "_CAP_EFFECTIVE": "3fffffffff",
+  "_MACHINE_ID": "c36e9ea52800a19d214cb71b53263a28",
+  "PRIORITY": "6",
+  "_TRANSPORT": "stdout",
+  "_STREAM_ID": "92c79f4b45c4457490ebdefece29995e",
+  "SYSLOG_IDENTIFIER": "ntpd",
+  "_PID": "2156",
+  "_COMM": "ntpd",
+  "_EXE": "/usr/sbin/ntpd",
+  "_CMDLINE": "ntpd: [priv]",
+  "_SYSTEMD_CGROUP": "/system.slice/ntpd.service",
+  "_SYSTEMD_UNIT": "ntpd.service",
+  "_SYSTEMD_SLICE": "system.slice",
+  "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
+}
+"""
+
+[sources.journald.output.log.fields."*"]
+type = "*"
+examples = ["my-value"]
+optional = true
+description = """\
+Additional Journald fields are passed through as log fields.
+"""
+
+[sources.journald.output.log.fields.host]
+type = "string"
+examples = ["my.host.com"]
+optional = false
+description = """\
+The value of the journald `_HOSTNAME` field.\
+"""
+
+[sources.journald.output.log.fields.message]
+type = "string"
+examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+optional = false
+description = """\
+The value of the journald `MESSAGE` field.\
+"""
+
+[sources.journald.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.\
 """
