@@ -239,7 +239,6 @@ table.comparison tr td.not-applicable {
 }
 table.comparison tr:hover td.not-applicable {
   background: rgba( var(--ifm-panel-background-rgb), 0.5 );
-  color: var(--ifm-color-warning);
 }
 table.comparison tr td.passed {
   background: rgba( var(--ifm-color-primary-rgb), 1 );

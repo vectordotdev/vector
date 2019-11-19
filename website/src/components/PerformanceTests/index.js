@@ -349,13 +349,16 @@ function PerformanceTests({}) {
             onChange={(selectedOption) => setMetricSlug(selectedOption ? selectedOption.value : null)} />
         </div>
 
-        <Compare
-          measurements={measurements}
-          metrics={metrics}
-          subjects={subjects}
-          tests={tests}
-          onColumnClick={(column) => handleColumnClick(column, setSubjectSlug)}
-          onRowClick={(row) => handleRowClick(row, setTestSlug, setMetricSlug)} />
+        {(metricSlug || testSlug) ?
+          <Compare
+            measurements={measurements}
+            metrics={metrics}
+            subjects={subjects}
+            tests={tests}
+            onColumnClick={(column) => handleColumnClick(column, setSubjectSlug)}
+            onRowClick={(row) => handleRowClick(row, setTestSlug, setMetricSlug)} /> :
+          <Prompt value="Please select a test or metric" />
+        }
       </div>
     );
   } else {
