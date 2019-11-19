@@ -103,12 +103,13 @@ jobs:
             msiexec /quiet /i perl-installer.msi
             del perl-installer.msi
       - run:
-          name: Build Vector
+          name: Build and test
           shell: bash
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
-            rm rust-toolchain # because we need nightly
-            cargo +nightly test --no-default-features --features="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build
+            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
+            rm rust-toolchain # to use nightly
+            cargo test --no-default-features --features "$FEATURES"
 
   test-stable:
     resource_class: xlarge
