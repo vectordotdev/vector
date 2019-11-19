@@ -82,6 +82,7 @@ jobs:
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
     steps:
+      - checkout
       - run:
           name: Install Rust
           shell: bash
@@ -101,7 +102,6 @@ jobs:
           command: |
             msiexec /quiet /i perl-installer.msi
             del perl-installer.msi
-      - checkout
       - run:
           name: Build Vector
           shell: bash
