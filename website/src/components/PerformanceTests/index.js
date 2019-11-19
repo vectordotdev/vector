@@ -364,7 +364,7 @@ function PerformanceTests({}) {
   } else {
     return (
       <div className="performance-tests">
-        <div className="performance-tests--loading"></div>
+        <Prompt value="Loading..." />
       </div>
     );
   }

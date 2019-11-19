@@ -183,7 +183,6 @@ table.comparison tr td {
   border-left: 10px solid var(--ifm-background-color);
   min-width: 90px;
   text-align: center;
-  width: 5%;
 }
 table.comparison tr td[title],
 table.comparison tr th[title] {
@@ -266,7 +265,6 @@ table.comparison tr td.bar:hover {
 table.comparison tr td.bar .bar {
   background: var(--ifm-panel-background);
   margin: 0 auto;
-  max-width: 100px;
 }
 table.comparison tr td.bar .bar.passed {
   background: var(--ifm-color-primary);

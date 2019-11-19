@@ -129,7 +129,7 @@ function Performance() {
     <section className={styles.performance}>
       <div className="container">
         <h2>Performance</h2>
-        <div className="sub-title">Outperforms while using 80% less memory</div>
+        <div className="sub-title">Higher throughout with the lowest memory footprint</div>
 
         <PerformanceTests />
       </div>
