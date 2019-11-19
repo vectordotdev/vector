@@ -10,6 +10,7 @@
  */
 :root {
   --ifm-background-color: white;
+  --ifm-background-color-rgb: 255, 255, 255;
   --ifm-background-surface-color: var(--ifm-panel-background);
   --ifm-badge-border-radius: 0.25em;
   --ifm-blockquote-color: var(--ifm-color-primary-lighter);
@@ -223,28 +224,22 @@ table.comparison tr:hover td.failed {
   background: rgba( var(--ifm-color-pink-rgb), 0.7 );
 }
 table.comparison tr td.lost {
-  background: var(--ifm-panel-background);
-  color: var(--ifm-color-emphasis-500);
-}
-table.comparison tr td.lost div.bar {
-  background: var(--ifm-panel-background);
+  background: var(--ifm-color-emphasis-1000);
+  color: var(--ifm-background-color);
 }
 table.comparison tr:hover td.lost {
-  background: rgba( var(--ifm-panel-background-rgb), 0.5 );
+  background: var(--ifm-color-emphasis-900);
 }
 table.comparison tr td.not-applicable {
-  background: var(--ifm-panel-background);
-  color: var(--ifm-color-emphasis-300);
+  background: var(--ifm-color-emphasis-1000);
+  color: rgba( var(--ifm-background-color-rgb), 0.5 );
 }
 table.comparison tr:hover td.not-applicable {
-  background: rgba( var(--ifm-panel-background-rgb), 0.5 );
+  background: var(--ifm-color-emphasis-900);
 }
 table.comparison tr td.passed {
   background: rgba( var(--ifm-color-primary-rgb), 1 );
   color: var(--ifm-background-color);
-}
-table.comparison tr td.passed div.bar {
-  background: var(--ifm-color-primary);
 }
 table.comparison tr:hover td.passed {
   background: rgba( var(--ifm-color-primary-rgb), 0.8 );
@@ -263,7 +258,7 @@ table.comparison tr td.bar:hover {
   background: var(--ifm-panel-background);
 }
 table.comparison tr td.bar .bar {
-  background: var(--ifm-color-emphasis-100);
+  background: var(--ifm-color-emphasis-1000);
   margin: 0 auto;
 }
 table.comparison tr td.bar .bar.passed {
@@ -920,6 +915,7 @@ div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) 
 
 html[data-theme="dark"] {
   --ifm-background-color: #191927;
+  --ifm-background-color-rgb: 25, 25, 39;
   --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
   --ifm-color-gray-25: rgba(255, 255, 255, calc( 1 - 0.025 ));
   --ifm-color-gray-40: rgba(255, 255, 255, calc( 1 - 0.04 ));
