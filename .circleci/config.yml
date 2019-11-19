@@ -86,7 +86,10 @@ jobs:
       - run:
           name: Install Rust
           shell: bash
-          command: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
+            # see https://github.com/rust-lang/cargo/issues/2078
+            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
       - run:
           name: Download Perl
           shell: bash
@@ -94,7 +97,7 @@ jobs:
             VERSION=5.30.0.1
             # we need to verify checksum because strawberryperl.com doesn't support HTTPS
             SHA256SUM=459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12
-            curl http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi &&
+            curl http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
             echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
       - run:
           name: Install Perl
@@ -104,15 +107,19 @@ jobs:
             del perl-installer.msi
       - run:
           name: Build and test
-          shell: bash
-          command: |
-            RUSTFLAGS=-Ctarget-feature=+crt-static
-            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
-            PATH="$HOME/.cargo/bin:$PATH"
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
-            rm rust-toolchain # to use nightly
-            cargo test --no-default-features --features "$FEATURES"
+          shell: cmd.exe
+          command: scripts\test-msvc.bat
+      # - run:
+      #     name: Build and test
+      #     shell: bash
+      #     command: |
+      #       RUSTFLAGS=-Ctarget-feature=+crt-static
+      #       FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
+      #       PATH="$HOME/.cargo/bin:$PATH"
+      #       # see https://github.com/rust-lang/cargo/issues/2078
+      #       printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      #       rm rust-toolchain # to use nightly
+      #       cargo test --no-default-features --features "$FEATURES"
 
   test-stable:
     resource_class: xlarge
