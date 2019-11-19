@@ -206,7 +206,7 @@ function RowDescription({test}) {
       <div className="label">Description</div>
       <div className="text">{test.description}</div>
       <div className="links">
-        <div><a href="#">Learn more&hellip;</a></div>
+        <div><a href={`https://github.com/timberio/vector-test-harness/tree/master/cases/${test.slug}`} target="_blank">Learn more&hellip;</a></div>
       </div>
     </td>
   );
@@ -338,7 +338,7 @@ function PerformanceTests({}) {
             onChange={(selectedOption) => setTestSlug(selectedOption ? selectedOption.value : null)} />
 
           <div></div>
-          
+
           <Select
             className="react-select-container"
             classNamePrefix="react-select"
