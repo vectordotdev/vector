@@ -3,6 +3,7 @@ use snafu::Snafu;
 
 pub mod add_fields;
 pub mod add_tags;
+pub mod ansi_stripper;
 pub mod coercer;
 pub mod field_filter;
 pub mod grok_parser;
