@@ -6,6 +6,7 @@ pub mod add_tags;
 pub mod ansi_stripper;
 pub mod coercer;
 pub mod field_filter;
+pub mod geoip;
 pub mod grok_parser;
 pub mod json_parser;
 pub mod log_to_metric;

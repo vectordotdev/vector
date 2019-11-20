@@ -128,6 +128,7 @@ shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" 
 owning_ref = "0.4.0"
 listenfd = "0.3.3"
 inventory = "0.1"
+maxminddb = "0.13.0"
 strip-ansi-escapes = "0.1.0"
 
 [build-dependencies]
