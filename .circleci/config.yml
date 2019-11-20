@@ -106,11 +106,23 @@ jobs:
             msiexec /quiet /i perl-installer.msi
             del perl-installer.msi
       - run:
+          name: Download CMake
+          shell: bash
+          command: |
+            VERSION=3.15.5
+            curl -L https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
+      - run:
+          name: Install CMake
+          shell: cmd.exe
+          command: |
+            msiexec /quiet /i cmake-installer.msi
+            del cmake-installer.msi
+      - run:
           name: Build and test
           shell: bash
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
-            PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:$PATH"
+            PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
             rm rust-toolchain
             cargo test --no-default-features --features "$FEATURES"
