@@ -55,6 +55,7 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
+                  "setup/installation/operating-systems/raspberry-pi",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
               ],

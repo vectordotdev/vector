@@ -24,6 +24,10 @@ module.exports = {
         "id": "macos"
       },
       {
+        "name": "Raspberry Pi",
+        "id": "raspberry-pi"
+      },
+      {
         "name": "RHEL",
         "id": "rhel"
       },
@@ -70,7 +74,7 @@ module.exports = {
     "version": "0.5.0"
   },
   "posts": [
-    "#<Post:0x00007fd533f407a8>"
+    "#<Post:0x00007fb83138f608>"
   ],
   "sources": {
     "udp": {

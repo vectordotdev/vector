@@ -23,7 +23,7 @@ module.exports = {
         {to: 'download', label: 'Download', position: 'right'},
         {
           href: 'https://github.com/timberio/vector',
-          label: "Github",
+          label: "GitHub",
           position: 'right',
         },
       ],
