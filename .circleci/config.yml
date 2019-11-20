@@ -101,14 +101,19 @@ jobs:
             echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
       - run:
           name: Install Perl
-          shell: cmd.exe
+          shell: cmd.exe # installation times out with bash shell
           command: |
             msiexec /quiet /i perl-installer.msi
             del perl-installer.msi
       - run:
           name: Build and test
-          shell: cmd.exe
-          command: scripts\test-msvc.bat
+          shell: bash
+          command: |
+            RUSTFLAGS=-Ctarget-feature=+crt-static
+            PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:$PATH"
+            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
+            rm rust-toolchain
+            cargo test --no-default-features --features "$FEATURES"
       # - run:
       #     name: Build and test
       #     shell: bash
