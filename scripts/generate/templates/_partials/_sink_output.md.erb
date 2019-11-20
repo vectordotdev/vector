@@ -1,0 +1,39 @@
+The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
+<% if component.batching? -%>
+Batches are flushed via the [`batch_size`](#batch_size) or
+[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
+batches](#buffers--batches) section.
+<%- end -%>
+<%- if component.output.examples.any? -%>
+For example:
+<%- end -%>
+<%- if examples.size > 1 -%>
+
+<Tabs
+  block={true}
+  defaultValue="<%= examples.first.label.parameterize %>"
+  values={<%= examples.collect { |e| {label: e.label, value: e.label.parameterize} }.to_json %>}>
+<%- end -%>
+<%- examples.each do |example| -%>
+
+<TabItem value="<%= example.label.parameterize %>">
+<%- if example.input -%>
+
+Given the following input:
+
+```<%= example.input.type %>
+<%= example.input.body %>
+```
+
+The following output will be produced:
+<%- end -%>
+
+```<%= example.output.type %>
+<%= example.output.body %>
+```
+
+</TabItem>
+<%- end -%>
+<%- if examples.size > 1 -%>
+</Tabs>
+<%- end -%>

@@ -1,8 +1,10 @@
 [sinks.aws_cloudwatch_metrics]
 beta = true
 buffer = false
+common = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
+function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
 service_limits_short_link = "aws_cw_metrics_service_limits"
@@ -11,12 +13,14 @@ write_to_description = "[AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`
 
 [sinks.aws_cloudwatch_metrics.options.namespace]
 type = "string"
+common = true
 examples = ["service"]
 null = false
 description = "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
 
 [sinks.aws_cloudwatch_metrics.options.region]
 type = "string"
+common = true
 examples = ["us-east-1"]
 null = false
 description = "The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides."

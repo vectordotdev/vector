@@ -1,0 +1,210 @@
+---
+
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
+sidebar_label: "grok_parser|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
+status: "prod-ready"
+title: "grok_parser transform" 
+---
+
+The `grok_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value with [Grok][urls.grok].
+
+## Configuration
+
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = "grok_parser" # example, must be: "grok_parser"
+  inputs = ["my-source-id"] # example
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # example
+  
+  # OPTIONAL - General
+  drop_field = true # default
+  field = "message" # default
+  
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
+```
+
+## Options
+
+import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"drop_field"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### drop_field
+
+If `true` will drop the specified[`field`](#field) after parsing.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={"message"}
+  enumValues={null}
+  examples={["message"]}
+  name={"field"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### field
+
+The log field to execute the[`pattern`](#pattern) against. Must be a `string` value.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]}
+  name={"pattern"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### pattern
+
+The [Grok pattern][urls.grok_patterns]
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"types"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### types
+
+Key/Value pairs representing mapped log field types.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
+  examples={[{"name":"status","value":"int"},{"name":"duration","value":"float"},{"name":"success","value":"bool"},{"name":"timestamp","value":"timestamp|%s","comment":"unix"},{"name":"timestamp","value":"timestamp|%+","comment":"iso8601 (date and time)"},{"name":"timestamp","value":"timestamp|%F","comment":"iso8601 (date)"},{"name":"timestamp","value":"timestamp|%a %b %e %T %Y","comment":"custom strptime format"}]}
+  name={"*"}
+  nullable={false}
+  path={"types"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### *
+
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+</Fields>
+
+## How It Works
+
+### Available Patterns
+
+Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
+[listed here][urls.grok_patterns] are supported. It is recommended to use
+maintained patterns when possible since they can be improved over time by
+the community.
+
+### Debugging
+
+We recommend the [Grok debugger][urls.grok_debugger] for Grok testing.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+### Performance
+
+Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
+We plan to add a [performance test][docs.performance] for this in the future.
+While this is still plenty fast for most use cases we recommend using the
+[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
+performance issues.
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.performance]: /docs/about/performance
+[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
+[urls.grok]: http://grokdebug.herokuapp.com/
+[urls.grok_debugger]: http://grokdebug.herokuapp.com/
+[urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
+[urls.rust_grok_library]: https://github.com/daschl/grok
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

@@ -1,6 +1,8 @@
 [sources.statsd]
 beta = true
+common = false
 delivery_guarantee = "best_effort"
+function_category = "receive"
 guides = []
 output_types = ["metric"]
 resources = []
@@ -8,6 +10,67 @@ through_description = "the StatsD UDP protocol"
 
 [sources.statsd.options.address]
 type = "string"
+common = true
 null = false
 examples = ["127.0.0.1:8126"]
 description = "UDP socket address to bind to."
+
+[[sources.statsd.output.metric.examples]]
+label = "Counter"
+input = """\
+login.invocations:1|c\
+"""
+output = """\
+{
+  "counter": {
+    "name": "login.invocations",
+    "val": 1,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  }
+}\
+"""
+
+[[sources.statsd.output.metric.examples]]
+label = "Gauge"
+input = """\
+gas_tank:0.50|g\
+"""
+output = """\
+{
+  "gauge": {
+    "name": "gas_tank",
+    "val": 0.5,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  }
+}\
+"""
+
+[[sources.statsd.output.metric.examples]]
+label = "Set"
+input = """\
+unique_users:foo|s\
+"""
+output = """\
+{
+  "set": {
+    "name": "unique_users",
+    "val": 1,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  }
+}\
+"""
+
+[[sources.statsd.output.metric.examples]]
+label = "Timer/Histogram"
+input = """\
+login.time:22|ms\
+"""
+output = """\
+{
+  "timer": {
+    "name": "login.time",
+    "val": 22,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  }
+}\
+"""

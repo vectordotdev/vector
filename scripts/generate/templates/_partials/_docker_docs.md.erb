@@ -1,4 +1,4 @@
-## Usage
+## Running
 
 ```bash
 docker run timberio/vector:latest-alpine
@@ -25,26 +25,51 @@ To use your own configuration file:
 
 ## Image Variants
 
-### timberio/vector:&lt;version&gt;-alpine
+### alpine
 
 This image is based on the [`alpine` Docker image][urls.docker_alpine], which is
 a Linux distribution built around musl libc and BusyBox. It is considerably
 smaller in size than other Docker images and statically links libraries. This
 is the image we recommend due to it's small size and reliability.
 
-### timberio/vector:&lt;version&gt;-debian
+```bash
+docker run timberio/vector:latest-alpine
+```
+
+### debian
 
 This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
+```bash
+docker run timberio/vector:latest-debian
+```
+
 ## Versions
 
+### Latest Version
+
 Vector's Docker images include a special `latest` version that will be updated
-whenever Vector is [released][urls.vector_releases]. All other
-[releases][urls.vector_releases] are available via the `X.X.X` tag:
+whenever Vector is [released][urls.vector_releases]:
 
 ```bash
-docker run timberio/vector:X.X.X-alpine
+docker run timberio/vector:latest-alpine
+```
+
+### Previous Versions
+
+Previous versions can be accessed by their direct tag:
+
+```bash
+docker run timberio/vector:<X.X.X>-alpine
+```
+
+### Nightlies
+
+Vector's releases nightly versions that contain the latest changes.
+
+```bash
+docker run timberio/vector:nightly-alpine
 ```
 
 ## Updating
@@ -59,4 +84,10 @@ Or specify the exact version:
 
 ```bash
 docker run timberio/vector:X.X.X-alpine
+```
+
+Or specify the nigtly version:
+
+```bash
+docker run timberio/vector:nightly-alpine
 ```

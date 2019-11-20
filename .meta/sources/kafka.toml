@@ -1,6 +1,8 @@
 [sources.kafka]
 beta = true
+common = true
 delivery_guarantee = "at_least_once"
+function_category = "collect"
 guides = []
 output_types = ["log"]
 resources = []
@@ -8,6 +10,7 @@ through_description = "Kafka 0.9 or later"
 
 [sources.kafka.options.bootstrap_servers]
 type = "string"
+common = true
 examples = ["10.14.22.123:9092,10.14.23.332:9092"]
 null = false
 description = """\
@@ -18,8 +21,9 @@ to initially to bootstrap itself.\
 
 [sources.kafka.options.topics]
 type = "[string]"
+common = true
 examples = [
-  ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 ]
 null = false
 description = """\
@@ -29,6 +33,7 @@ begins with `^`.
 
 [sources.kafka.options.group_id]
 type = "string"
+common = true
 examples = ["consumer-group-name"]
 null = false
 description = """\
@@ -37,6 +42,7 @@ The consumer group name to be used to consume events from Kafka.
 
 [sources.kafka.options.key_field]
 type = "string"
+common = true
 examples = ["user_id"]
 null = true
 description = """\
@@ -64,4 +70,20 @@ default = 10000
 unit = "milliseconds"
 description = """\
 The Kafka session timeout in milliseconds.
+"""
+
+[sources.kafka.output.log.fields.message]
+type = "string"
+examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+optional = false
+description = """\
+The raw event message, unaltered.
+"""
+
+[sources.kafka.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The exact time the event was ingested.
 """

@@ -1,8 +1,10 @@
 [sinks.tcp]
 buffer = true
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
 encodings = ["json", "text"]
+function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 write_to_description = "a TCP connection"
@@ -10,6 +12,7 @@ tls_options = ["+enabled"]
 
 [sinks.tcp.options.address]
 type = "string"
+common = true
 examples = ["92.12.333.224:5000"]
 null = false
 description = "The TCP address."

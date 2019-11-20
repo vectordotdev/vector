@@ -6,13 +6,12 @@ require "action_view/helpers/number_helper"
 require_relative "templates/config_example"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
-require_relative "templates/options_table"
 
 # Renders teampltes in the templates sub-dir
 #
 # ==== Partials
 #
-# Partials are contained within the `templates/_partials` folder. Partials
+# Partials are contained within the provided `partials_path` folder. Partials
 # can be rendered directly via #render_partial or call from a custom method,
 # as is the case for `#components_table`. Notice that custom methods capture
 # the binding in the method directy, this ensures variables within the
@@ -22,8 +21,8 @@ require_relative "templates/options_table"
 #
 # There are times whewre it makes sense to represent logic in a sub-object.
 # This is usually true for complicated partials. For example, the
-# `options_table` partial also instantiates an `Templates::OptionsTable` object
-# that is made available to the `options_table` partial. This reduces the
+# `config_schema` partial also instantiates an `Templates::ConfigSchema` object
+# that is made available to the `config_schema` partial. This reduces the
 # noise and complexity for the global `Templates` object.
 #
 # ==== Keep It Simple
@@ -34,15 +33,16 @@ require_relative "templates/options_table"
 class Templates
   include ActionView::Helpers::NumberHelper
 
-  attr_reader :metadata, :dir
+  attr_reader :metadata, :partials_path, :root_dir
 
-  def initialize(dir, metadata)
-    @dir = dir
+  def initialize(root_dir, metadata)
+    @root_dir = root_dir
+    @partials_path = "scripts/generate/templates/_partials"
     @metadata = metadata
   end
 
   def commit(commit)
-    render("_partials/_commit.md", binding).gsub("\n", "")
+    render("#{partials_path}/_commit.md", binding).gsub("\n", "")
   end
 
   def commit_scope(commit)
@@ -82,35 +82,35 @@ class Templates
         [commit.scope.name, commit.date]
       end
 
-    render("_partials/_commit_type_commits.md", binding)
+    render("#{partials_path}/_commit_type_commits.md", binding)
   end
 
   def commit_type_toc_item(type_name, commits)
-    render("_partials/_commit_type_toc_item.md", binding).gsub(/,$/, "")
+    render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
   end
 
   def component_config_example(component)
-    render("_partials/_component_config_example.md", binding).strip
+    render("#{partials_path}/_component_config_example.md", binding).strip
   end
 
   def component_default(component)
-    render("_partials/_component_default.md.erb", binding).strip
+    render("#{partials_path}/_component_default.md.erb", binding).strip
   end
 
   def component_description(component)
     send("#{component.type}_description", component)
   end
 
-  def component_header(component)
-    render("_partials/_component_header.md", binding).strip
+  def component_guides(component)
+
   end
 
-  def component_resources(component)
-    render("_partials/_component_resources.md", binding).strip
+  def component_header(component)
+    render("#{partials_path}/_component_header.md", binding).strip
   end
 
   def component_sections(component)
-    render("_partials/_component_sections.md", binding).strip
+    render("#{partials_path}/_component_sections.md", binding).strip
   end
 
   def components_table(components)
@@ -118,25 +118,21 @@ class Templates
       raise ArgumentError.new("Options must be an Array")
     end
 
-    render("_partials/_components_table.md", binding).strip
+    render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def component_troubleshooting(component)
-    render("_partials/_component_troubleshooting.md", binding).strip
-  end
-
-  def config_example(options, array: false, path: nil, simple: false, titles: true)
+  def config_example(options, array: false, common: false, path: nil, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    if simple
-      options = options.select(&:simple?)
+    if common
+      options = options.select(&:common?)
     end
 
     options = options.sort_by(&:config_file_sort_token)
     example = ConfigExample.new(options)
-    render("_partials/_config_example.toml", binding).strip
+    render("#{partials_path}/_config_example.toml", binding).strip
   end
 
   def config_schema(options, opts = {})
@@ -148,7 +144,7 @@ class Templates
 
     options = options.sort_by(&:config_file_sort_token)
     schema = ConfigSchema.new(options)
-    render("_partials/_config_schema.toml", binding).strip
+    render("#{partials_path}/_config_schema.toml", binding).strip
   end
 
   def config_spec(options, opts = {})
@@ -160,7 +156,7 @@ class Templates
 
     options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
-    content = render("_partials/_config_spec.toml", binding).strip
+    content = render("#{partials_path}/_config_spec.toml", binding).strip
 
     if opts[:path]
       content
@@ -170,7 +166,7 @@ class Templates
   end
 
   def docker_docs
-    render("_partials/_docker_docs.md")
+    render("#{partials_path}/_docker_docs.md")
   end
 
   def encoding_description(encoding)
@@ -190,12 +186,42 @@ class Templates
 
   def event_type_links(types)
     types.collect do |type|
-      "[`#{type}`][docs.data-model.#{type}]"
+      "[`#{type}`][docs.data-model##{type}]"
     end
   end
 
+  def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
+    if !fields.is_a?(Array)
+      raise ArgumentError.new("Fields must be an Array")
+    end
+
+    render("#{partials_path}/_fields.md", binding).strip
+  end
+
+  def fields_example(fields, breakout_top_keys: false)
+    if !fields.is_a?(Array)
+      raise ArgumentError.new("Fields must be an Array")
+    end
+
+    render("#{partials_path}/_fields_example.md", binding).strip
+  end
+
+  def fields_hash(fields)
+    hash = {}
+
+    fields.each do |field|
+      if field.fields_list.any?
+        hash[field.name] = fields_hash(field.fields_list)
+      else
+        hash[field.name] = field.examples.first
+      end
+    end
+
+    hash
+  end
+
   def full_config_spec
-    render("_partials/_full_config_spec.toml", binding).strip
+    render("#{partials_path}/_full_config_spec.toml", binding).strip
   end
 
   def option_description(option)
@@ -212,7 +238,7 @@ class Templates
     description
   end
 
-  def option_tags(option, default: true, enum: true, example: true, optionality: true, relevant_when: true, type: true, unit: true)
+  def option_tags(option, default: true, enum: true, example: false, optionality: true, relevant_when: true, type: true, short: false, unit: true)
     tags = []
 
     if optionality
@@ -223,9 +249,15 @@ class Templates
       end
     end
 
+    if example
+      if option.default.nil?
+        tags << "example"
+      end
+    end
+
     if default
       if !option.default.nil?
-        if default == :short
+        if short
           tags << "default"
         else
           tags << "default: #{option.default.inspect}"
@@ -236,37 +268,35 @@ class Templates
     end
 
     if type
-      tags << "type: #{option.type}"
+      if short
+        tags << option.type
+      else
+        tags << "type: #{option.type}"
+      end
     end
 
     if unit && !option.unit.nil?
-      if unit == :short
+      if short
         tags << option.unit
       else
         tags << "unit: #{option.unit}"
       end
     end
 
-    if example && option.default.nil? && option.enum.nil? && option.examples.any?
-      value = option.examples.first
-
-      if value.is_a?(Hash)
-        tags << "example: #{value.fetch("name")} = #{value.fetch("value").to_toml}"
-      else
-        tags << "example: #{value.to_toml}"
-      end
-    end
-
     if enum && option.enum
-      escaped_values = option.enum.keys.collect { |enum| enum.to_toml }
-      if escaped_values.length > 1
-        tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+      if short && option.enum.keys.length > 1
+        tags << "enum"
       else
-        tag = "must be: #{escaped_values.first}"
-        if option.optional?
-          tag << " (if supplied)"
+        escaped_values = option.enum.keys.collect { |enum| enum.to_toml }
+        if escaped_values.length > 1
+          tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+        else
+          tag = "must be: #{escaped_values.first}"
+          if option.optional?
+            tag << " (if supplied)"
+          end
+          tags << tag
         end
-        tags << tag
       end
     end
 
@@ -282,31 +312,21 @@ class Templates
     options.collect { |option| "`#{option.name}`" }
   end
 
-  def options_sections(options, depth: 1, path: nil)
-    if !options.is_a?(Array)
-      raise options.class.inspect
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-
-    render("_partials/_options_sections.md", binding).strip
-  end
-
-  def options_table(options, opts = {})
+  def options(options, filters: true, heading_depth: 1, level: 1, path: nil)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    opts[:header] = true unless opts.key?(:header)
-    opts[:titles] = true unless opts.key?(:titles)
-
-    table = OptionsTable.new(options)
-    render("_partials/_options_table.md", binding).strip
+    render("#{partials_path}/_options.md", binding).strip
   end
 
   def partial?(template_path)
     basename = File.basename(template_path)
     basename.start_with?("_")
+  end
+
+  def install_command(prompts: true)
+    "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh#{prompts ? "" : " -s -- -y"}"
   end
 
   def installation_target_links(targets)
@@ -320,11 +340,11 @@ class Templates
   end
 
   def release_changes(release, grouped: false)
-    render("_partials/_release_changes.md", binding)
+    render("#{partials_path}/_release_changes.md", binding)
   end
 
   def release_notes(release)
-    render("_partials/_release_notes.md", binding)
+    render("#{partials_path}/_release_notes.md", binding)
   end
 
   def release_summary(release)
@@ -346,18 +366,20 @@ class Templates
   end
 
   def render(template_path, template_binding = nil)
+    old_template_path = @_template_path
     template_binding = binding if template_binding.nil?
-    content = File.read("#{dir}/#{template_path}.erb")
+    content = File.read("#{root_dir}/#{template_path}.erb")
     renderer = ERB.new(content, nil, '-')
     content =
       begin
+        @_template_path = "#{root_dir}/#{template_path}"
         renderer.result(template_binding)
       rescue Exception => e
         raise(
           <<~EOF
           Error rendering template!
 
-            #{dir.gsub(/#{ROOT_DIR}/, "")}/#{template_path}.erb
+            #{root_dir.gsub(/#{ROOT_DIR}/, "")}/#{template_path}.erb
 
           Error:
 
@@ -366,23 +388,27 @@ class Templates
           #{e.backtrace.join("\n").indent(2)}
           EOF
         )
+      ensure
+        @_template_path = old_template_path
       end
 
-    if template_path.end_with?(".md") && !partial?(template_path)
-      notice =
-        <<~EOF
-
-        <!--
-             THIS FILE IS AUTOGENERATED!
-
-             To make changes please edit the template located at:
-
-             scripts/generate/templates/#{template_path}.erb
-        -->
-        EOF
-
-      content.sub!(/\n# /, "#{notice}\n# ")
-    end
+    # Disabled since Docusaurus does not allow HTML comments :(
+    #
+    # if template_path.end_with?(".md") && !partial?(template_path)
+    #   notice =
+    #     <<~EOF
+    #
+    #     <!--
+    #          THIS FILE IS AUTOGENERATED!
+    #
+    #          To make changes please edit the template located at:
+    #
+    #          scripts/generate/templates/#{template_path}.erb
+    #     -->
+    #     EOF
+    #
+    #   notice + content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
+    # end
 
     content
   end
@@ -393,10 +419,37 @@ class Templates
     EOF
   end
 
+  def sink_output(component)
+    examples = component.output.examples
+    render("#{partials_path}/_sink_output.md", binding).strip
+  end
+
   def source_description(source)
     strip <<~EOF
     Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.
     EOF
+  end
+
+  def source_output(type, output, breakout_top_keys: false, heading_depth: 1)
+    examples = output.examples
+    fields = output.fields.to_h.values.sort
+    render("#{partials_path}/_source_output.md", binding).strip
+  end
+
+  def subpages
+    dirname = File.basename(@_template_path).split(".").first
+    dir = @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+
+    Dir.glob("#{dir}/*.md").
+      to_a.
+      sort.
+      collect do |f|
+        path = DOCS_BASE_PATH + f.gsub(DOCS_ROOT, '').split(".").first
+        name = File.basename(f).split(".").first.gsub("-", " ").humanize
+
+        "<Jump to=\"#{path}\">#{name}</Jump>"
+      end.
+      join("\n")
   end
 
   def tags(tags)

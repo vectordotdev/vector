@@ -1,0 +1,147 @@
+<% component = metadata.transforms.json_parser %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<Tabs
+  block={true}
+  defaultValue="simple"
+  values={[
+    { label: 'Simple', value: 'simple', },
+    { label: 'Wrapped', value: 'wrapped', },
+  ]
+}>
+
+<TabItem value="simple">
+
+Given the following log event:
+
+```
+{
+  "message": "{"key": "value"}"
+}
+```
+
+You can parse the JSON with:
+
+```toml
+[transforms.json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "key": "value"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+
+</TabItem>
+<TabItem value="wrapped">
+
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this log event:
+
+```
+{
+  "message": "{"parent": "{\"child\": \"value2\"}"}"
+}
+```
+
+You could unwrap the JSON with the following transforms:
+
+```toml
+[transforms.root_json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+
+[transforms.parent_json]
+  inputs = ["root_json"]
+  type   = "json_parser"
+  field  = "parent"
+
+[transforms.child_json]
+  inputs = ["parent_json"]
+  type   = "json_parser"
+  field  = "child"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "child": "value2"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+
+</TabItem>
+</Tabs>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Chaining / Unwrapping
+
+Please see the [I/O section](#i-o) for an example of chaining and unwrapping JSON.
+
+### Correctness
+
+The `json_parser` source has been involved in the following correctness tests:
+
+* [`wrapped_json_correctness`][urls.wrapped_json_correctness_test]
+
+Learn more in the [Correctness][docs.correctness] sections.
+
+### Invalid JSON
+
+If the value for the specified `field` is not valid JSON you can control keep or discard the event with the `drop_invalid` option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
+
+### Key Conflicts
+
+Any key present in the decoded JSON will override existin keys in the event.
+
+### Nested Fields
+
+If the decoded JSON includes nested fields it will be _deep_ merged into the event. For example, given the following event:
+
+```javascript
+{
+  "message": "{"parent": {"child2": "value2"}}",
+  "parent": {
+    "child1": "value1"
+  }
+}
+```
+
+Parsing the `"message"` field would result the following structure:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+

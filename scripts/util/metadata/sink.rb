@@ -10,6 +10,7 @@ class Sink < Component
     :egress_method,
     :input_types,
     :healthcheck,
+    :output,
     :service_limits_short_link,
     :service_provider,
     :tls,
@@ -26,6 +27,7 @@ class Sink < Component
     encodings = hash["encodings"]
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
+    @output = OpenStruct.new
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
     tls_options = hash["tls_options"]
@@ -43,15 +45,26 @@ class Sink < Component
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end
 
+    # output
+
+    output = hash["output"] || {}
+    @output.examples = (output["examples"] || []).collect do |e|
+      s = OpenStruct.new(e)
+      s.input = OpenStruct.new(s.input) if s.input
+      s.output = OpenStruct.new(s.output) if s.output
+      s
+    end
+
     # Healthcheck option
 
-    @options.healthcheck = Option.new({
-      "name" => "healthcheck",
-      "default" => true,
-      "description" => "Enables/disables the sink healthcheck upon start.",
-      "null" => false,
-      "type" => "bool"
-    })
+    @options.healthcheck =
+      Option.new({
+        "name" => "healthcheck",
+        "default" => true,
+        "description" => "Enables/disables the sink healthcheck upon start.",
+        "null" => false,
+        "type" => "bool"
+      })
 
     # Compression option
 
@@ -150,7 +163,7 @@ class Sink < Component
 
       buffer_options["num_items"] =
         {
-          "description" => "The maximum number of [events][docs.event] allowed in the buffer.",
+          "description" => "The maximum number of [events][docs.data-model#event] allowed in the buffer.",
           "default" => 500,
           "null" => true,
           "relevant_when" => {"type" => "memory"},

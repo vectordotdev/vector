@@ -1,5 +1,9 @@
 [installation]
-platforms = [
+downloads = [
+  {name = "vector-amd64.deb"},
+  {name = "vector-amd64.deb"}
+]
+containers = [
   {name = "Docker", id = "docker"}
 ]
 operating_systems = [

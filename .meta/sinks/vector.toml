@@ -1,13 +1,16 @@
 [sinks.vector]
 buffer = true
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+function_category = "proxy"
 healthcheck = true
 input_types = ["log"]
-write_to_description = "another downstream Vector instance"
+write_to_description = "another downstream [`vector` source][docs.sources.vector]"
 
 [sinks.vector.options.address]
 type = "string"
+common = true
 examples = ["92.12.333.224:5000"]
 null = false
 description = "The downstream Vector address."

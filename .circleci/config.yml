@@ -6,7 +6,7 @@ install-rust: &install-rust
   run:
     name: Install Rust
     command: |
-      curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+      curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
 install-vector: &install-vector
   run:
@@ -196,6 +196,29 @@ jobs:
           paths:
             - "*-x86_64-unknown-linux-musl.tar.gz"
 
+  build-aarch64-unknown-linux-musl-archive:
+    machine:
+      docker_layer_caching: true
+    resource_class: large # xlarge is not supported with "machine" executor
+    steps:
+      - checkout
+      - run:
+          name: Build archive
+          command: |
+            docker run \
+              --privileged \
+              -e RUST_LTO="lto" \
+              -e TARGET="aarch64-unknown-linux-musl" \
+              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3" \
+              -w "$PWD" \
+              -v "$PWD":"$PWD" \
+              -t timberiodev/vector-builder-aarch64-unknown-linux-musl:latest \
+              make build-archive
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*-aarch64-unknown-linux-musl.tar.gz"
+
   #
   # Checks
   #
@@ -205,7 +228,7 @@ jobs:
     steps:
       - run:
           name: Install vector
-          command: curl https://sh.vector.dev -sSf | sh -s -- -y
+          command: curl -sSf https://sh.vector.dev | sh -s -- -y
       - run:
           name: Verify installation
           command: vector --version
@@ -580,6 +603,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-generate
     - test-stable
     - build-x86_64-unknown-linux-musl-archive
+    - build-aarch64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
@@ -614,6 +638,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
+      - build-aarch64-unknown-linux-musl-archive
       - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:
@@ -672,6 +697,8 @@ workflows:
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
           <<: *release-filters
       - build-x86_64-unknown-linux-musl-archive:
+          <<: *release-filters
+      - build-aarch64-unknown-linux-musl-archive:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
@@ -762,6 +789,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
+      - build-aarch64-unknown-linux-musl-archive
       - build-x86_64-apple-darwin-archive
       - package-rpm:
           requires:

@@ -1,0 +1,240 @@
+---
+
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
+sidebar_label: "add_fields|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
+status: "prod-ready"
+title: "add_fields transform" 
+---
+
+The `add_fields` transform accepts [`log`][docs.data-model#log] events and allows you to add one or more log fields.
+
+## Configuration
+
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED - General
+  type = "add_fields" # example, must be: "add_fields"
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Fields
+  [transforms.my_transform_id.fields]
+    my_string_field = "string value" # example
+    my_env_var_field = "${ENV_VAR}" # example
+    my_int_field = 1 # example
+    my_float_field = 1.2 # example
+    my_bool_field = true # example
+    my_timestamp_field = 1979-05-27T00:32:00Z # example
+    my_nested_fields = {key1 = "value1", key2 = "value2"} # example
+    my_list = ["first", "second", "third"] # example
+```
+
+## Options
+
+import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"fields"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### fields
+
+A table of key/value pairs representing the keys to be added to the event.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"name":"my_string_field","value":"string value"},{"name":"my_env_var_field","value":"${ENV_VAR}"},{"name":"my_int_field","value":1},{"name":"my_float_field","value":1.2},{"name":"my_bool_field","value":true},{"name":"my_timestamp_field","value":"1979-05-27 00:32:00 -0700"},{"name":"my_nested_fields","value":{"key1":"value1","key2":"value2"}},{"name":"my_list","value":["first","second","third"]}]}
+  name={"*"}
+  nullable={false}
+  path={"fields"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  >
+
+#### *
+
+A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+</Fields>
+
+## Output
+
+Given the following configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+
+A [`log` event][docs.data-model.log] will be output with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6.0": "item1",
+  "field6.1": "item2",
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+
+While unrealistic, this example demonstrates the various accepted
+[types][docs.configuration#value-types] and how they're repsented in Vector's
+internal [log structure][docs.data-model.log].
+
+## How It Works
+
+### Arrays
+
+The `add_fields` transform will support [TOML arrays][urls.toml_array]. Keep in
+mind that the values must be simple type (not tables), and each value must the
+same type. You cannot mix types:
+
+```toml
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    my_array = ["first", "second", "third"]
+```
+
+Results in:
+
+```json
+{
+  "my_array.0": "first",
+  "my_array.1": "second",
+  "my_array.2": "third"
+}
+```
+
+Learn more about how [`log` events][docs.data-model.log] are structured.
+
+### Complex Transforming
+
+The `add_fields` transform is designed for simple key additions. If you need
+more complex transforming then we recommend using a more versatile transform
+like the [`lua` transform][docs.transforms.lua].
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+### Nested Fields
+
+The `add_fields` transform will support dotted keys or [TOML
+tables][urls.toml_table]. We recommend the dotted key syntax since it is less
+verbose for this usecase:
+
+```
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    parent.child.grandchild = "my_value"
+```
+
+Results in:
+
+```json
+{
+  "parent.child.grandchild": "my_value"
+}
+```
+
+Learn more about how [`log` events][docs.data-model.log] are structured.
+
+### Removing Fields
+
+See the [`remove_fields` transform][docs.transforms.remove_fields].
+
+### Special Characters
+
+Aside from the [special characters][docs.data-model.log#special-characters]
+listed in the [Data Model][docs.data-model] doc, Vector does not restrict the
+characters allowed in keys. You can wrap key names in `" "` quote to preserve
+spaces and use `\` to escape quotes.
+
+### Types
+
+All supported [configuration value types][docs.configuration#value-types] are accepted.
+This includes primitivate types (`string`, `int`, `float`, `boolean`) and
+special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.configuration#value-types]: /docs/setup/configuration#value-types
+[docs.configuration#value_types]: /docs/setup/configuration#value_types
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log#special-characters]: /docs/about/data-model/log#special-characters
+[docs.data-model.log]: /docs/about/data-model/log
+[docs.data-model]: /docs/about/data-model
+[docs.transforms.lua]: /docs/components/transforms/lua
+[docs.transforms.remove_fields]: /docs/components/transforms/remove_fields
+[urls.toml_array]: https://github.com/toml-lang/toml#array
+[urls.toml_table]: https://github.com/toml-lang/toml#table

@@ -1,0 +1,25 @@
+.integrations g.item circle {
+  fill: var(--ifm-background-color);
+  stroke: var(--ifm-heading-color);
+}
+
+.integrations g.item text {
+  fill: var(--ifm-color-content);
+}
+
+.integrations g.item.large circle {
+  stroke: var(--ifm-panel-border-color-active);
+}
+
+.integrations g.item.large text {
+  fill: var(--ifm-color-primary);
+}
+
+.integrations g.item:hover circle {
+  fill: var(--ifm-panel-background-active);
+  stroke: var(--ifm-panel-border-color-active);
+}
+
+.integrations g.item:hover text {
+  fill: var(--ifm-color-primary);
+}

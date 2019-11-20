@@ -3,9 +3,11 @@ batch_size = 1049000
 batch_timeout = 1
 beta = true
 buffer = true
+common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
 encodings = ["json", "text"]
+function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
@@ -20,18 +22,50 @@ write_to_description = "[AWS Kinesis Data Stream][urls.aws_kinesis_data_streams]
 
 [sinks.aws_kinesis_streams.options.partition_key_field]
 type = "string"
+common = true
 examples = ["user_id"]
 null = true
 description = "The log field used as the Kinesis record's partition key value."
 
 [sinks.aws_kinesis_streams.options.region]
 type = "string"
+common = true
 examples = ["us-east-1"]
 null = false
 description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
+common = true
 examples = ["my-stream"]
 null = false
 description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
+
+[[sinks.aws_kinesis_streams.output.examples]]
+label = "Generic"
+output.type = "http"
+output.body = """\
+POST / HTTP/1.1
+Host: kinesis.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive 
+X-Amz-Target: Kinesis_20131202.PutRecords
+{
+    "Records": [
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+    ],
+    "StreamName": "<stream_name>"
+}\
+"""

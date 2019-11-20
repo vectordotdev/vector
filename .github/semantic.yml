@@ -68,6 +68,3 @@ scopes:
   - statsd sink
   - tcp sink
   - vector sink
-
-
-
