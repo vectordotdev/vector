@@ -7,7 +7,7 @@
 ---
 
 <p align="center">
-  <img src="./docs/assets/readme_diagram.svg" alt="Vector">
+  <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
 Vector is a [high-performance][docs.performance] observability data router. It
