@@ -66,7 +66,7 @@ pub struct SplunkConfig {
 }
 
 fn default_socket_address() -> SocketAddr {
-    SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8088)
+    SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8088)
 }
 
 #[typetag::serde(name = "splunk_hec")]
@@ -444,7 +444,6 @@ impl<R: Read> Stream for EventStream<R> {
                     log.insert_explicit(event::MESSAGE.clone(), string.into())
                 }
                 Value::Object(object) => {
-                    trace!("Inserting json event");
                     if object.is_empty() {
                         return Err(event_error("Event field cannot be blank", 13, self.events));
                     }
