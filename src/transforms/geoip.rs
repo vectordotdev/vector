@@ -73,19 +73,15 @@ impl Transform for Geoip {
         if let Some(ipaddress) = &ipaddress {
             if let Ok(ip) = FromStr::from_str(ipaddress) {
                 if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
-                    let city = data.city;
-                    if let Some(city) = city {
-                        let city_names = city.names;
-                        if let Some(city_names) = city_names {
-                            let city_name_en = city_names.get("en");
-                            if let Some(city_name_en) = city_name_en {
-                                event.as_mut_log().insert_explicit(
-                                    Atom::from(format!("{}.city_name", target_field)),
-                                    ValueKind::from(city_name_en.to_string()),
-                                );
-                            }
+                    if let Some(city_names) = data.city.and_then(|c| c.names) {
+                        if let Some(city_name_en) = city_names.get("en") {
+                            event.as_mut_log().insert_explicit(
+                                Atom::from(format!("{}.city_name", target_field)),
+                                ValueKind::from(city_name_en.to_string()),
+                            );
                         }
                     }
+
                     let continent_code = data.continent.and_then(|c| c.code);
                     if let Some(continent_code) = continent_code {
                         event.as_mut_log().insert_explicit(
