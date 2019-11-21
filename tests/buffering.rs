@@ -161,7 +161,7 @@ fn test_max_size() {
 
     wait_for_tcp(in_addr);
 
-    block_on(topology.stop()).unwrap();
+    rt.block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
