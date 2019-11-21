@@ -245,7 +245,13 @@ jobs:
             msiexec /quiet /i cmake-installer.msi
             del cmake-installer.msi
       - run:
+          name: Install ZIP
+          shell: bash
+          command: |
+            which zip
+      - run:
           name: Build archive
+          shell: bash
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             export RUSTFLAGS=-Ctarget-feature=+crt-static
