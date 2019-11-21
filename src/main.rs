@@ -362,6 +362,33 @@ fn main() {
             unreachable!();
         }
     }
+    #[cfg(windows)]
+    {
+        let mut ctrl_c_stream = tokio_signal::ctrl_c().flatten_stream();
+        let ctrl_c = future::poll_fn(move || ctrl_c_stream.poll());
+        let crash = future::poll_fn(move || graceful_crash.poll());
+
+        let interruptions = ctrl_c.select2(crash);
+        rt.block_on(interruptions)
+            .map_err(|_| ())
+            .expect("Neither stream errors");
+
+        use futures::future::Either;
+
+        info!("Shutting down.");
+        let shutdown = topology.stop();
+        metrics_trigger.cancel();
+
+        let ctrl_c_stream = tokio_signal::ctrl_c().flatten_stream();
+        match rt.block_on(shutdown.select2(ctrl_c_stream.into_future())) {
+            Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
+            Ok(Either::B(_)) => {
+                info!("Shutting down immediately.");
+                // Dropping the shutdown future will immediately shut the server down
+            }
+            Err(_) => unreachable!(),
+        }
+    }
 
     rt.shutdown_now().wait().unwrap();
 }
