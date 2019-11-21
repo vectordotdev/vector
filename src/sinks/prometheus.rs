@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{metric::Direction, Metric},
+    event::metric::{MetricKind, MetricValue},
     topology::config::{DataType, SinkConfig, SinkDescription},
     Event,
 };
@@ -155,11 +155,11 @@ impl PrometheusSink {
 
     fn with_counter(
         &mut self,
-        name: String,
+        name: &str,
         labels: &HashMap<&str, &str>,
         f: impl Fn(&prometheus::CounterVec),
     ) {
-        if let Some(counter) = self.counters.get(&name) {
+        if let Some(counter) = self.counters.get(name) {
             f(counter);
         } else {
             let namespace = &self.config.namespace;
@@ -170,17 +170,17 @@ impl PrometheusSink {
                 error!("Error registering Prometheus counter: {}", e);
             };
             f(&counter);
-            self.counters.insert(name, counter);
+            self.counters.insert(name.to_string(), counter);
         }
     }
 
     fn with_gauge(
         &mut self,
-        name: String,
+        name: &str,
         labels: &HashMap<&str, &str>,
         f: impl Fn(&prometheus::GaugeVec),
     ) {
-        if let Some(gauge) = self.gauges.get(&name) {
+        if let Some(gauge) = self.gauges.get(name) {
             f(gauge);
         } else {
             let namespace = &self.config.namespace;
@@ -191,17 +191,17 @@ impl PrometheusSink {
                 error!("Error registering Prometheus gauge: {}", e);
             };
             f(&gauge);
-            self.gauges.insert(name.clone(), gauge);
+            self.gauges.insert(name.to_string(), gauge);
         }
     }
 
     fn with_histogram(
         &mut self,
-        name: String,
+        name: &str,
         labels: &HashMap<&str, &str>,
         f: impl Fn(&prometheus::HistogramVec),
     ) {
-        if let Some(hist) = self.histograms.get(&name) {
+        if let Some(hist) = self.histograms.get(name) {
             f(hist);
         } else {
             let buckets = self.config.buckets.clone();
@@ -215,18 +215,18 @@ impl PrometheusSink {
                 error!("Error registering Prometheus histogram: {}", e);
             };
             f(&hist);
-            self.histograms.insert(name, hist);
+            self.histograms.insert(name.to_string(), hist);
         }
     }
 
     /// Calls f with entry corresponding to name. Creates entry if needed.
     fn with_set(
         &mut self,
-        name: String,
+        name: &str,
         labels: &HashMap<&str, &str>,
         f: impl FnOnce(&mut (prometheus::IntGaugeVec, HashSet<String>)),
     ) {
-        if let Some(set) = self.sets.get_mut(&name) {
+        if let Some(set) = self.sets.get_mut(name) {
             f(set);
         } else {
             let namespace = &self.config.namespace;
@@ -247,7 +247,7 @@ impl PrometheusSink {
 
             let mut set = (counter, HashSet::new());
             f(&mut set);
-            self.sets.insert(name, set);
+            self.sets.insert(name.to_string(), set);
         }
     }
 
@@ -326,107 +326,105 @@ impl Sink for PrometheusSink {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        match event.into_metric() {
-            Metric::Counter {
-                name, val, tags, ..
-            } => {
-                let tags = tags.unwrap_or_default();
-                let labels = tags_to_labels(&tags);
-                self.with_counter(name, &labels, |counter| {
-                    if let Ok(c) = counter.get_metric_with(&labels) {
-                        c.inc_by(val);
-                    } else {
-                        error!(
-                            "Error getting Prometheus counter with labels: {:?}",
-                            &labels
-                        );
+        let metric = event.into_metric();
+        let name = metric.name;
+        let labels = if let Some(ref tags) = metric.tags {
+            tags.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+        } else {
+            HashMap::new()
+        };
+
+        match metric.kind {
+            MetricKind::Incremental => {
+                match metric.value {
+                    MetricValue::Counter { value } => {
+                        self.with_counter(&name, &labels, |counter| {
+                            if let Ok(c) = counter.get_metric_with(&labels) {
+                                c.inc_by(value);
+                            } else {
+                                error!(
+                                    "Error getting Prometheus counter with labels: {:?}",
+                                    &labels
+                                );
+                            }
+                        })
                     }
-                })
-            }
-            Metric::Gauge {
-                name,
-                val,
-                direction,
-                tags,
-                ..
-            } => {
-                let tags = tags.unwrap_or_default();
-                let labels = tags_to_labels(&tags);
-                self.with_gauge(name, &labels, |gauge| {
-                    if let Ok(g) = gauge.get_metric_with(&labels) {
-                        match direction {
-                            None => g.set(val),
-                            Some(Direction::Plus) => g.add(val),
-                            Some(Direction::Minus) => g.sub(val),
+                    MetricValue::Gauge { value } => self.with_gauge(&name, &labels, |gauge| {
+                        if let Ok(g) = gauge.get_metric_with(&labels) {
+                            g.add(value);
+                        } else {
+                            error!("Error getting Prometheus gauge with labels: {:?}", &labels);
                         }
+                    }),
+                    MetricValue::Distribution {
+                        values,
+                        sample_rates,
+                    } => self.with_histogram(&name, &labels, |hist| {
+                        if let Ok(h) = hist.get_metric_with(&labels) {
+                            for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
+                                for _ in 0..*sample_rate {
+                                    h.observe(*val);
+                                }
+                            }
+                        } else {
+                            error!(
+                                "Error getting Prometheus histogram with labels: {:?}",
+                                &labels
+                            );
+                        }
+                    }),
+                    MetricValue::Set { values } => {
+                        // Sets are implemented using prometheus integer gauges
+                        self.with_set(&name, &labels, |&mut (ref mut counter, ref mut set)| {
+                            if let Ok(c) = counter.get_metric_with(&labels) {
+                                // Check if counter was reset
+                                if c.get() < set.len() as i64 {
+                                    // Counter was reset
+                                    set.clear();
+                                }
+                                for val in values {
+                                    // Check for uniques of value
+                                    if set.insert(val.to_string()) {
+                                        // Val is a new unique value, therefore gauge should be incremented
+                                        c.add(1);
+                                        // There is a possiblity that counter was reset between get() and add()
+                                        // so that needs to be checked
+                                        match c.get() {
+                                            // Reset after c.add
+                                            0 => set.clear(),
+                                            // Reset between first get() and add()
+                                            1 if set.len() > 1 => {
+                                                // Outside world could see metric as 1, if they so happen to
+                                                // request metrics between add() and following set()
+                                                // But this glitch is ok since either way flushes are scheduled
+                                                // to happen in periods with best effort basis.
+                                                c.set(0);
+                                                set.clear();
+                                            }
+                                            // Everything is fine
+                                            _ => (),
+                                        }
+                                    }
+                                }
+                            } else {
+                                error!("Error getting Prometheus set with labels: {:?}", &labels);
+                            }
+                        });
+                    }
+                    _ => {}
+                }
+            }
+            MetricKind::Absolute => match metric.value {
+                MetricValue::Gauge { value } => self.with_gauge(&name, &labels, |gauge| {
+                    if let Ok(g) = gauge.get_metric_with(&labels) {
+                        g.set(value);
                     } else {
                         error!("Error getting Prometheus gauge with labels: {:?}", &labels);
                     }
-                })
-            }
-            Metric::Histogram {
-                name,
-                val,
-                sample_rate,
-                tags,
-                ..
-            } => {
-                let tags = tags.unwrap_or_default();
-                let labels = tags_to_labels(&tags);
-                self.with_histogram(name, &labels, |hist| {
-                    if let Ok(h) = hist.get_metric_with(&labels) {
-                        for _ in 0..sample_rate {
-                            h.observe(val);
-                        }
-                    } else {
-                        error!(
-                            "Error getting Prometheus histogram with labels: {:?}",
-                            &labels
-                        );
-                    }
-                })
-            }
-            Metric::Set {
-                name, val, tags, ..
-            } => {
-                let tags = tags.unwrap_or_default();
-                let labels = tags_to_labels(&tags);
-                // Sets are implemented using prometheus integer gauges
-                self.with_set(name, &labels, |&mut (ref mut counter, ref mut set)| {
-                    if let Ok(c) = counter.get_metric_with(&labels) {
-                        // Check if counter was reset
-                        if c.get() < set.len() as i64 {
-                            // Counter was reset
-                            set.clear();
-                        }
-                        // Check for uniques of value
-                        if set.insert(val) {
-                            // Val is a new unique value, therefore gauge should be incremented
-                            c.add(1);
-                            // There is a possiblity that counter was reset between get() and add()
-                            // so that needs to be checked
-                            match c.get() {
-                                // Reset after c.add
-                                0 => set.clear(),
-                                // Reset between first get() and add()
-                                1 if set.len() > 1 => {
-                                    // Outside world could see metric as 1, if they so happen to
-                                    // request metrics between add() and following set()
-                                    // But this glitch is ok since either way flushes are scheduled
-                                    // to happen in periods with best effort basis.
-                                    c.set(0);
-                                    set.clear();
-                                }
-                                // Everything is fine
-                                _ => (),
-                            }
-                        }
-                    } else {
-                        error!("Error getting Prometheus set with labels: {:?}", &labels);
-                    }
-                });
-            }
-        }
+                }),
+                _ => {}
+            },
+        };
 
         self.acker.ack(1);
 
@@ -438,8 +436,4 @@ impl Sink for PrometheusSink {
 
         Ok(Async::Ready(()))
     }
-}
-
-fn tags_to_labels<'a>(tags: &'a HashMap<String, String>) -> HashMap<&'a str, &'a str> {
-    tags.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
 }

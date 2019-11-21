@@ -27,45 +27,51 @@ message Value {
 }
 
 message Metric {
+  string name = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  map<string, string> tags = 3;
+  enum Kind {
+    Incremental = 0;
+    Absolute = 1;
+  }
+  Kind kind = 4;
   oneof metric {
-    Counter counter = 1;
-    Histogram histogram = 2;
-    Gauge gauge = 3;
-    Set set = 4;
+    Counter counter = 5;
+    Gauge gauge = 6;
+    Set set = 7;
+    Distribution distribution = 8;
+    AggregatedHistogram aggregated_histogram = 9;
+    AggregatedSummary aggregated_summary = 10;
   }
 }
 
 message Counter {
-  string name = 1;
-  double val = 2;
-  google.protobuf.Timestamp timestamp = 3;
-  map<string, string> tags = 4;
-}
-
-message Histogram {
-  string name = 1;
-  double val = 2;
-  uint32 sample_rate = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  map<string, string> tags = 5;
+  double value = 1;
 }
 
 message Gauge {
-  string name = 1;
-  double val = 2;
-  enum Direction {
-    None = 0;
-    Plus = 1;
-    Minus = 2;
-  }
-  Direction direction = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  map<string, string> tags = 5;
+  double value = 1;
 }
 
 message Set {
-  string name = 1;
-  string val = 2;
-  google.protobuf.Timestamp timestamp = 3;
-  map<string, string> tags = 4;
+  repeated string values = 1;
+}
+
+message Distribution {
+  repeated double values = 1;
+  repeated uint32 sample_rates = 2;
+}
+
+message AggregatedHistogram {
+  repeated double buckets = 1;
+  repeated uint32 counts = 2;
+  uint32 count = 3;
+  double sum = 4;
+}
+
+message AggregatedSummary {
+  repeated double quantiles = 1;
+  repeated double values = 2;
+  uint32 count = 3;
+  double sum = 4;
 }

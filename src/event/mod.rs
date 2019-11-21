@@ -2,6 +2,7 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricPr
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
+use metric::{MetricKind, MetricValue};
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -359,89 +360,56 @@ impl From<proto::EventWrapper> for Event {
                 Event::Log(LogEvent { fields })
             }
             EventProto::Metric(proto) => {
-                let metric = proto.metric.unwrap();
-                match metric {
-                    MetricProto::Counter(counter) => {
-                        let timestamp = counter
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+                let kind = match proto.kind() {
+                    proto::metric::Kind::Incremental => MetricKind::Incremental,
+                    proto::metric::Kind::Absolute => MetricKind::Absolute,
+                };
 
-                        let tags = if !counter.tags.is_empty() {
-                            Some(counter.tags)
-                        } else {
-                            None
-                        };
+                let name = proto.name;
 
-                        Event::Metric(Metric::Counter {
-                            name: counter.name,
-                            val: counter.val,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                    MetricProto::Histogram(hist) => {
-                        let timestamp = hist
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+                let timestamp = proto
+                    .timestamp
+                    .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                        let tags = if !hist.tags.is_empty() {
-                            Some(hist.tags)
-                        } else {
-                            None
-                        };
+                let tags = if !proto.tags.is_empty() {
+                    Some(proto.tags)
+                } else {
+                    None
+                };
 
-                        Event::Metric(Metric::Histogram {
-                            name: hist.name,
-                            val: hist.val,
-                            sample_rate: hist.sample_rate,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                    MetricProto::Gauge(gauge) => {
-                        let direction = match gauge.direction() {
-                            proto::gauge::Direction::None => None,
-                            proto::gauge::Direction::Plus => Some(metric::Direction::Plus),
-                            proto::gauge::Direction::Minus => Some(metric::Direction::Minus),
-                        };
+                let value = match proto.metric.unwrap() {
+                    MetricProto::Counter(counter) => MetricValue::Counter {
+                        value: counter.value,
+                    },
+                    MetricProto::Gauge(gauge) => MetricValue::Gauge { value: gauge.value },
+                    MetricProto::Set(set) => MetricValue::Set {
+                        values: set.values.into_iter().collect(),
+                    },
+                    MetricProto::Distribution(dist) => MetricValue::Distribution {
+                        values: dist.values,
+                        sample_rates: dist.sample_rates,
+                    },
+                    MetricProto::AggregatedHistogram(hist) => MetricValue::AggregatedHistogram {
+                        buckets: hist.buckets,
+                        counts: hist.counts,
+                        count: hist.count,
+                        sum: hist.sum,
+                    },
+                    MetricProto::AggregatedSummary(summary) => MetricValue::AggregatedSummary {
+                        quantiles: summary.quantiles,
+                        values: summary.values,
+                        count: summary.count,
+                        sum: summary.sum,
+                    },
+                };
 
-                        let tags = if !gauge.tags.is_empty() {
-                            Some(gauge.tags)
-                        } else {
-                            None
-                        };
-
-                        let timestamp = gauge
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
-
-                        Event::Metric(Metric::Gauge {
-                            name: gauge.name,
-                            val: gauge.val,
-                            direction,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                    MetricProto::Set(set) => {
-                        let timestamp = set
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
-
-                        let tags = if !set.tags.is_empty() {
-                            Some(set.tags)
-                        } else {
-                            None
-                        };
-
-                        Event::Metric(Metric::Set {
-                            name: set.name,
-                            val: set.val,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                }
+                Event::Metric(Metric {
+                    name,
+                    timestamp,
+                    tags,
+                    kind,
+                    value,
+                })
             }
         }
     }
@@ -483,11 +451,12 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric::Counter {
+            Event::Metric(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                kind,
+                value,
             }) => {
                 let timestamp = timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
@@ -496,98 +465,59 @@ impl From<Event> for proto::EventWrapper {
 
                 let tags = tags.unwrap_or_default();
 
-                let counter = proto::Counter {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Counter(counter)),
-                });
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(Metric::Histogram {
-                name,
-                val,
-                sample_rate,
-                timestamp,
-                tags,
-            }) => {
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
-                });
-
-                let tags = tags.unwrap_or_default();
-
-                let hist = proto::Histogram {
-                    name,
-                    val,
-                    sample_rate,
-                    timestamp,
-                    tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Histogram(hist)),
-                });
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(Metric::Gauge {
-                name,
-                val,
-                direction,
-                timestamp,
-                tags,
-            }) => {
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
-                });
-
-                let direction = match direction {
-                    None => proto::gauge::Direction::None,
-                    Some(metric::Direction::Plus) => proto::gauge::Direction::Plus,
-                    Some(metric::Direction::Minus) => proto::gauge::Direction::Minus,
+                let kind = match kind {
+                    MetricKind::Incremental => proto::metric::Kind::Incremental,
+                    MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let tags = tags.unwrap_or_default();
+                let metric = match value {
+                    MetricValue::Counter { value } => {
+                        MetricProto::Counter(proto::Counter { value })
+                    }
+                    MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
+                    MetricValue::Set { values } => MetricProto::Set(proto::Set {
+                        values: values.into_iter().collect(),
+                    }),
+                    MetricValue::Distribution {
+                        values,
+                        sample_rates,
+                    } => MetricProto::Distribution(proto::Distribution {
+                        values,
+                        sample_rates,
+                    }),
+                    MetricValue::AggregatedHistogram {
+                        buckets,
+                        counts,
+                        count,
+                        sum,
+                    } => MetricProto::AggregatedHistogram(proto::AggregatedHistogram {
+                        buckets,
+                        counts,
+                        count,
+                        sum,
+                    }),
+                    MetricValue::AggregatedSummary {
+                        quantiles,
+                        values,
+                        count,
+                        sum,
+                    } => MetricProto::AggregatedSummary(proto::AggregatedSummary {
+                        quantiles,
+                        values,
+                        count,
+                        sum,
+                    }),
+                };
 
-                let gauge = proto::Gauge {
+                let event = EventProto::Metric(proto::Metric {
                     name,
-                    val,
-                    direction,
                     timestamp,
                     tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Gauge(gauge)),
-                });
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(Metric::Set {
-                name,
-                val,
-                timestamp,
-                tags,
-            }) => {
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
+                    kind,
+                    metric: Some(metric),
                 });
 
-                let tags = tags.unwrap_or_default();
-
-                let set = proto::Set {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Set(set)),
-                });
                 proto::EventWrapper { event: Some(event) }
             }
         }
