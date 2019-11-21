@@ -243,3 +243,54 @@ html[data-theme="dark"] .hero {
 .installSubTitle {
   margin-top: var(--ifm-heading-margin-bottom);
 }
+
+.installationPlatforms {
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  text-align: center;
+}
+
+.installationPlatforms a svg {
+  margin: 0 var(--ifm-spacing-horizontal);
+  width: 10vw;
+  min-height: 75px;
+  max-height: 100px;
+  min-width: 75px;
+  max-width: 100px;
+}
+
+.installationPlatforms a:hover svg [fill="#10E7FF"] {
+  fill: var(--ifm-heading-color);
+}
+
+.installationChecks {
+  color: var(--ifm-color-primary);
+  display: flex;
+  justify-content: center;
+  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
+  vertical-align: center;
+}
+
+.installationChecks > div {
+  flex-grow: 1;
+  flex-basis: 0;
+  margin: 0 var(--ifm-spacing-horizontal);
+  text-align: center;
+}
+
+.installationChecks > div:first-child {
+  text-align: right;
+}
+
+.installationChecks > div:last-child {
+  text-align: left;
+}
+
+@media (max-width: 996px) {
+  .installationChecks {
+    display: block;
+  }
+
+  .installationChecks > div {
+    text-align: center !important;
+  }
+}

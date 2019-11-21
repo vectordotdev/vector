@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
 
 import axios from 'axios';
+import buildRows from './data'
 import classnames from 'classnames';
 import sortBy from 'lodash/sortBy';
 
@@ -17,8 +18,19 @@ const WHITE_LISTED_METRICS = [
   'throughput_avg'
 ];
 
-function buildMetricOptions(metrics) {
-  return metrics.map(metric => ({value: metric.slug, label: metric.name}));
+/*
+ * Utility functions
+ */
+
+
+function getNumberWithOrdinal(n) {
+  var s=["th","st","nd","rd"],
+  v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
+
+function buildMetricOptions(metrics, {categories}) {
+  return metrics.map(metric => ({value: metric.slug, label: (categories ? metric.category : metric.name)}));
 }
 
 function buildSubjectOptions(subjects) {
@@ -27,58 +39,6 @@ function buildSubjectOptions(subjects) {
 
 function buildTestOptions(tests) {
   return tests.map(test => ({value: test.slug, label: test.name}));
-}
-
-function fetchMeasurements(columns, row, metrics, allMeasurements) {
-  let metric = row.__type == "metric" ? row : metrics[0];
-  let measurements = columns.map(column => fetchMeasurement(allMeasurements, row, column, metric));
-
-  let sortedValues = measurements.
-    filter(measurement => measurement !== null).
-    map(measurement => measurement.value).
-    sort((a, b) => (a - b));
-
-  if (metric.sort == "desc")
-    sortedValues = sortedValues.reverse();
-
-  let winningValue = sortedValues[0];
-
-  return measurements.map(measurement => {
-    if (measurement) {
-      let percent = measurement.value > winningValue ?
-        ((measurement.value / winningValue) * 100) :
-        ((1 - (measurement.value / winningValue)) * 100)
-
-      measurement.minValue = Math.min(...sortedValues);
-      measurement.maxValue = Math.max(...sortedValues);
-      measurement.percent = Math.round(percent);
-      measurement.percentWord = measurement.value > winningValue ? 'more' : 'less';
-      measurement.place = sortedValues.indexOf(measurement.value) + 1;
-    }
-
-    return measurement;
-  });
-}
-
-function fetchMeasurement(measurements, row, column, metric) {
-  let test = row.__type == "test" ? row : null;
-  let subject = column.__type == "subject" ? column : null;
-  let versions = column.__type == "version" ? [column] : column.versions.reverse();
-
-  for(let version of versions) {
-    let measurement =
-      measurements.find(measurement => (
-        (!test || measurement.test == test.slug) &&
-        (!subject || measurement.subject == subject.slug) &&
-        measurement.metric == metric.slug &&
-        measurement.version == version.slug
-      ));
-
-    if (measurement)
-      return measurement;
-  }
-
-  return null;
 }
 
 function filterMetrics(metrics, {subjectSlug, testSlug}) {
@@ -123,6 +83,10 @@ function filterTests(tests, {metricSlug, subjectSlug}) {
   return tests;
 }
 
+/*
+ * Components
+ */
+
 function Prompt({value}) {
   return (
     <div className="performance-tests__prompt">
@@ -152,22 +116,30 @@ function Column({obj, onClick}) {
   }
 }
 
-function MeasurementBar({value: measurement}) {
-  if (measurement) {
-    let height = Math.round(COLUMN_CHART_HEIGHT * (measurement.value / measurement.maxValue));
+function MeasurementBar({cell}) {
+  if (cell.measurement) {
+    let height = Math.round(COLUMN_CHART_HEIGHT * cell.percent);
 
-    if (measurement.place == 1) {
+    const barClassNames = classnames('bar', (cell.measurement && cell.measurement.subject), {winner: cell.place == 1});
+
+    if (cell.place == 1) {
       return (
-        <td className="bar" title="Winner">
-          <div>{measurement.human_value}</div>
-          <div className="bar passed" style={{height: `${height}px`}}></div>
+        <td className={barClassNames}>
+          <div className={classnames('place', `place-${cell.place}`)} title="Winner">
+            <i className="feather icon-award"></i>{getNumberWithOrdinal(cell.place)}
+          </div>
+          <div className="measurement">{cell.measurement.human_value}</div>
+          <div className="bar" style={{height: `${height}px`}}></div>
         </td>
       );
     } else {
       return (
-        <td className="bar" title={`This subject lost, it was ${measurement.percent}% worse than the winner.`}>
-          <div>{measurement.human_value}</div>
-          <div className="bar lost" style={{height: `${height}px`}}></div>
+        <td className={barClassNames}>
+          <div className={classnames('place', `place-${cell.place}`)}>
+            {getNumberWithOrdinal(cell.place)}
+          </div>
+          <div className="measurement">{cell.measurement.human_value}</div>
+          <div className="bar" style={{height: `${height}px`}}></div>
         </td>
       );
     }
@@ -180,14 +152,14 @@ function MeasurementValue({columnChart, value: measurement}) {
   if (measurement) {
     if (measurement.place == 1) {
       return (
-        <td className="passed" title="Winner">
+        <td className="measurement passed" title="Winner">
           <i className="feather icon-award"></i>{measurement.human_value}
         </td>
       );
     } else {
       return (
         <td
-          className={classnames('lost', `place-${measurement.place}`)}
+          className={classnames('measurement', 'lost', `place-${measurement.place}`)}
           title={`This subject lost, it was ${measurement.percent}% worse than the winner.`}>
           {measurement.human_value}
         </td>
@@ -203,10 +175,14 @@ function MeasurementValue({columnChart, value: measurement}) {
 function RowDescription({test}) {
   return (
     <td className="description">
-      <div className="label">Description</div>
+      <div className="label">Test Description</div>
       <div className="text">{test.description}</div>
       <div className="links">
-        <div><a href={`https://github.com/timberio/vector-test-harness/tree/master/cases/${test.slug}`} target="_blank">Learn more&hellip;</a></div>
+        <div>
+          <a href={`https://github.com/timberio/vector-test-harness/tree/master/cases/${test.slug}`} target="_blank">
+            Try it yourself&hellip;
+          </a>
+        </div>
       </div>
     </td>
   );
@@ -221,40 +197,61 @@ function RowLink({value: row, onClick}) {
 }
 
 function Compare({measurements, metrics, onColumnClick, onRowClick, subjects, tests}) {
-  let columns = subjects.length > 1 ? subjects : subjects[0].versions;
-  let rows = tests.length > 1 ? tests : metrics;
+  let xAxis = subjects.length > 1 ? subjects : subjects[0].versions;
+  let yAxis = tests.length > 1 ? tests : metrics;
+  let rows = buildRows(xAxis, yAxis, metrics, measurements);
 
-  return (
-    <div className="table-responsive">
-      <table className="comparison">
-        <thead>
-          <tr>
-            <th></th>
-            {columns.map((column, columnIdx) => (
-              <Column key={columnIdx} obj={column} onClick={() => onColumnClick(column)} />
+  if (rows.length == 1) {
+    rows[0] = rows[0].sort((a, b) => (a.place > b.place));
+
+    return (
+      <div className="table-responsive">
+        <table className="comparison">
+          <tbody>
+            {rows.map((row, rowIdx) => (
+              <tr key={rowIdx}>
+                <RowDescription test={tests[0]} />
+                {row.map((cell, cellIdx) => (
+                  <MeasurementBar key={cellIdx} cell={cell} />
+                ))}
+              </tr>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIdx) => (
-            <tr key={rowIdx}>
-              {rows.length == 1 ?
-                <RowDescription test={tests[0]} /> :
-                <RowLink value={row} onClick={onRowClick} />
-              }
-              {fetchMeasurements(columns, row, metrics, measurements).map((measurement, measurementIdx) => {
-                if (rows.length == 1) {
-                  return <MeasurementBar key={measurementIdx} value={measurement} />
-                } else {
-                  return <MeasurementValue key={measurementIdx} value={measurement} />
-                }
-              })}
+            <tr>
+              <td className="description"></td>
+              {rows[0].map((cell, columnIdx) => (
+                <Column key={columnIdx} obj={cell.xAxisItem} onClick={() => onColumnClick(cell.xAxisItem)} />
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+          </tbody>
+        </table>
+      </div>
+    );
+  } else {
+    return (
+      <div className="table-responsive">
+        <table className="comparison">
+          <thead>
+            <tr>
+              <th></th>
+              {rows[0].map((cell, columnIdx) => (
+                <Column key={columnIdx} obj={cell.xAxisItem} onClick={() => onColumnClick(cell.xAxisItem)} />
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIdx) => (
+              <tr key={rowIdx}>
+                <RowLink value={row} onClick={onRowClick} />
+                {row.map((cell, cellIdx) => (
+                  <MeasurementValue key={cellIdx} value={cell.measurement} />
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 }
 
 function handleColumnClick(column, setSubjectSlug) {
@@ -308,7 +305,7 @@ function PerformanceTests({}) {
 
     const testOptions = buildTestOptions(tests);
     const subjectOptions = buildSubjectOptions(subjects);
-    const metricOptions = buildMetricOptions(metrics);
+    const metricOptions = buildMetricOptions(metrics, {categories: true});
 
     if (testSlug) {
       tests = tests.filter(testObj => testObj.slug == testSlug);
@@ -332,21 +329,23 @@ function PerformanceTests({}) {
             className="react-select-container"
             classNamePrefix="react-select"
             options={testOptions}
-            isClearable={true}
+            isClearable={false}
             placeholder="Select a test..."
             value={testOptions.find(option => option.value == testSlug)}
             onChange={(selectedOption) => setTestSlug(selectedOption ? selectedOption.value : null)} />
 
-          <div></div>
-
-          <Select
-            className="react-select-container"
-            classNamePrefix="react-select"
-            options={metricOptions}
-            isClearable={true}
-            placeholder="Select a metric..."
-            value={metricOptions.find(option => option.value == metricSlug)}
-            onChange={(selectedOption) => setMetricSlug(selectedOption ? selectedOption.value : null)} />
+          <div>
+            <ul className="pills">
+              {metricOptions.map((option, idx) => (
+                <li
+                  key={idx}
+                  className={classnames('pill-item', {'pill-item--active': option.value == metricSlug})}
+                  onClick={() => setMetricSlug(option.value)}>
+                  {option.label}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         {(metricSlug || testSlug) ?

@@ -11,6 +11,7 @@ operating_systems = [
   {name = "CentOS", id = "centos"},
   {name = "Debian", id = "debian"},
   {name = "MacOS", id = "macos"},
+  {name = "Raspberry Pi", id = "raspberry-pi"},
   {name = "RHEL", id = "rhel"},
   {name = "Ubuntu", id = "ubuntu"}
 ]

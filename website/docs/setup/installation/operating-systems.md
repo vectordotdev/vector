@@ -10,6 +10,7 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/installation/operating-systems/centos">Centos</Jump>
 <Jump to="/docs/setup/installation/operating-systems/debian">Debian</Jump>
 <Jump to="/docs/setup/installation/operating-systems/macos">Macos</Jump>
+<Jump to="/docs/setup/installation/operating-systems/raspberry-pi">Raspberry pi</Jump>
 <Jump to="/docs/setup/installation/operating-systems/rhel">Rhel</Jump>
 <Jump to="/docs/setup/installation/operating-systems/ubuntu">Ubuntu</Jump>
 

@@ -4,16 +4,24 @@
 }
 
 .performance-tests--switcher {
-  background: var(--ifm-panel-background);
+  --vector-switcher-color: var(--ifm-background-color);
+  --vector-switcher-color-inverted: var(--ifm-color-emphasis-1000);
+
+  background: linear-gradient(to right, var(--ifm-color-primary), var(--ifm-color-pink));
   border-radius: var(--ifm-global-radius);
   display: flex;
+  justify-content: space-between;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  padding: calc( var(--ifm-spacing-vertical) / 3 ) calc( var(--ifm-spacing-horizontal) / 2 );
 }
 
-.performance-tests--switcher > div {
-  border-right: 3px solid var(--ifm-background-color);
-  flex-basis: 0;
-  flex-grow: 1;
+.performance-tests--switcher > * {
+
+}
+
+.performance-tests--switcher .react-select-container {
+  --react-select-color: var(--vector-switcher-color);
+  flex-basis: 33.33%;
 }
 
 .performance-tests--switcher .react-select-container:last-child {
@@ -24,7 +32,6 @@
   background: transparent;
   border-color: transparent;
   cursor: pointer !important;
-  padding: calc( var(--ifm-spacing-vertical) / 3 ) calc( var(--ifm-spacing-horizontal) / 2 );
 }
 
 .performance-tests--switcher .react-select__control:hover {
@@ -32,7 +39,7 @@
 }
 
 .performance-tests--switcher .react-select__input {
-  color: var(--ifm-color-content);
+  color: var(--react-select-color);
 }
 
 .performance-tests--switcher .react-select__input input {
@@ -40,12 +47,12 @@
 }
 
 .performance-tests--switcher .react-select__single-value {
-  color: var(--ifm-content-color);
+  color: var(--react-select-color);
   font-weight: 600;
 }
 
 .performance-tests--switcher .react-select__placeholder {
-  color: var(--ifm-content-color);
+  color: var(--react-select-color);
   font-weight: 600;
   opacity: 0.5;
 }
@@ -56,7 +63,7 @@
 }
 
 .performance-tests--switcher .react-select__indicator svg {
-  color: var(--ifm-content-color);
+  color: var(--react-select-color);
 }
 
 .performance-tests--switcher .react-select__menu {
@@ -80,7 +87,29 @@
   color: var(--ifm-color-content);
 }
 
+.performance-tests--switcher .pills {
+  color: var(--vector-switcher-color);
+  margin: 3px 0 0 0;
+}
 
-.performance-tests--column-chart {
+.performance-tests--switcher .pills .pill-item--active {
+  background: var(--vector-switcher-color);
+  color: var(--vector-switcher-color-inverted);
+}
 
+@media (max-width: 480px) {
+  .performance-tests--switcher {
+    display: block;
+  }
+
+  .performance-tests--switcher .pills {
+    border-top: 1px dotted rgba( var(--ifm-background-color-rgb), 0.5 );
+    display: flex;
+    padding-top: calc( var(--ifm-spacing-vertical) / 2 );
+  }
+
+  .performance-tests--switcher .pills li {
+    flex-grow: 1;
+    text-align: center;
+  }
 }

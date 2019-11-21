@@ -7,43 +7,43 @@ import './styles.css';
 const sources = [
   {
     label: 'Docker',
-    fontSize: 20,
+    fontSize: 18,
     yPosition: 44,
     url: '/docs/components/sources/docker',
   },
   {
     label: 'File',
-    fontSize: 35,
+    fontSize: 34,
     yPosition: 49,
     url: '/docs/components/sources/file',
   },
   {
     label: 'Journald',
-    fontSize: 20,
+    fontSize: 15,
     yPosition: 44,
     url: '/docs/components/sources/journald',
   },
   {
     label: 'Kafka',
-    fontSize: 25,
+    fontSize: 22,
     yPosition: 44,
     url: '/docs/components/sources/kafka',
   },
   {
     label: 'Syslog',
-    fontSize: 25,
+    fontSize: 20,
     yPosition: 45,
     url: '/docs/components/sources/syslog',
   },
   {
     label: 'Statsd',
-    fontSize: 22,
+    fontSize: 20,
     yPosition: 45,
     url: '/docs/components/sources/statsd',
   },
   {
     label: 'TCP',
-    fontSize: 35,
+    fontSize: 33,
     yPosition: 50,
     url: '/docs/components/sources/tcp',
   },
@@ -52,51 +52,52 @@ const sources = [
 const sinks = [
   {
     label: 'S3',
-    fontSize: 50,
+    fontSize: 48,
     yPosition: 55,
+    xPosition: 12,
     url: '/docs/components/sinks/aws_s3',
   },
   {
     label: 'Elastic',
-    fontSize: 20,
+    fontSize: 19,
     yPosition: 45,
     url: '/docs/components/sinks/elasticsearch',
   },
   {
     label: 'File',
-    fontSize: 35,
+    fontSize: 34,
     yPosition: 50,
     url: '/docs/components/sinks/file',
   },
   {
     label: 'HTTP',
-    fontSize: 25,
-    yPosition: 44,
+    fontSize: 23,
+    yPosition: 45,
     url: '/docs/components/sinks/http',
   },
   {
     label: 'Kafka',
-    fontSize: 25,
+    fontSize: 22,
     yPosition: 44,
     url: '/docs/components/sinks/kafka',
   },
   {
     label: 'Kinesis',
-    fontSize: 25,
+    fontSize: 18,
     yPosition: 44,
     url: '/docs/components/sinks/aws_kinesis_streams',
   },
   {
-    label: 'TCP',
-    fontSize: 35,
-    yPosition: 50,
-    url: '/docs/components/sinks/tcp',
+    label: 'Prometheus',
+    fontSize: 11,
+    yPosition: 43,
+    url: '/docs/components/sinks/prometheus',
   },
   {
-    label: 'Prometheus',
-    fontSize: 13,
-    yPosition: 45,
-    url: '/docs/components/sinks/prometheus',
+    label: 'TCP',
+    fontSize: 33,
+    yPosition: 50,
+    url: '/docs/components/sinks/tcp',
   },
 ]
 
@@ -108,6 +109,8 @@ function Diagram({className, height, width}) {
   let selectedSinks = shuffledSinks.slice(0, 3);
 
   const [, updateState] = useState();
+  const defaulyXPosition = 7;
+  const defaultTextLength = 60;
 
   // useEffect(() => {
   //   const interval = setInterval(() => {
@@ -162,24 +165,24 @@ function Diagram({className, height, width}) {
             <Link to={selectedSinks[2].url}>
               <g id="Sink-3" transform="translate(0.000000, 184.000000)">
                 <circle id="Oval-Copy" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
-                <text textLength={selectedSinks[2].textLength || 65} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[2].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x="5" y={selectedSinks[2].yPosition}>{selectedSinks[2].label}</tspan>
+                <text textLength={selectedSinks[2].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[2].fontSize} fontWeight="bold" fill="#FFFFFF">
+                  <tspan x={selectedSinks[2].xPosition || defaulyXPosition} y={selectedSinks[2].yPosition}>{selectedSinks[2].label}</tspan>
                 </text>
               </g>
             </Link>
             <Link to={selectedSinks[1].url}>
               <g id="Sink-2" transform="translate(81.000000, 124.000000)">
                 <circle id="Oval-Copy" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
-                <text textLength={selectedSinks[1].textLength || 65} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[1].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x="5" y={selectedSinks[1].yPosition}>{selectedSinks[1].label}</tspan>
+                <text textLength={selectedSinks[1].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[1].fontSize} fontWeight="bold" fill="#FFFFFF">
+                  <tspan x={selectedSinks[1].xPosition || defaulyXPosition} y={selectedSinks[1].yPosition}>{selectedSinks[1].label}</tspan>
                 </text>
               </g>
             </Link>
             <Link to={selectedSinks[0].url}>
               <g id="Sink-1" transform="translate(1.000000, 58.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
-                <text textLength={selectedSinks[0].textLength || 65} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[0].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x="5" y={selectedSinks[0].yPosition}>{selectedSinks[0].label}</tspan>
+                <text textLength={selectedSinks[0].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[0].fontSize} fontWeight="bold" fill="#FFFFFF">
+                  <tspan x={selectedSinks[0].xPosition || defaulyXPosition} y={selectedSinks[0].yPosition}>{selectedSinks[0].label}</tspan>
                 </text>
               </g>
             </Link>
@@ -191,24 +194,24 @@ function Diagram({className, height, width}) {
             <Link to={selectedSources[2].url}>
               <g id="Source-3" transform="translate(82.000000, 182.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
-                <text textLength={selectedSources[2].textLength || 65} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[2].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x="5" y={selectedSources[2].yPosition}>{selectedSources[2].label}</tspan>
+                <text textLength={selectedSources[2].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[2].fontSize} fontWeight="bold" fill="#FFFFFF">
+                  <tspan x={selectedSources[2].xPosition || defaulyXPosition} y={selectedSources[2].yPosition}>{selectedSources[2].label}</tspan>
                 </text>
               </g>
             </Link>
             <Link to={selectedSources[1].url}>
               <g id="Source-2" transform="translate(0.000000, 122.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
-                <text textLength={selectedSources[1].textLength || 65} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[1].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x="5" y={selectedSources[1].yPosition}>{selectedSources[1].label}</tspan>
+                <text textLength={selectedSources[1].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[1].fontSize} fontWeight="bold" fill="#FFFFFF">
+                  <tspan x={selectedSources[1].xPosition || defaulyXPosition} y={selectedSources[1].yPosition}>{selectedSources[1].label}</tspan>
                 </text>
               </g>
             </Link>
             <Link to={selectedSources[0].url}>
               <g id="Source-1" transform="translate(82.000000, 56.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
-                <text textLength={selectedSources[0].textLength || 65} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[0].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x="5" y={selectedSources[0].yPosition}>{selectedSources[0].label}</tspan>
+                <text textLength={selectedSources[0].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[0].fontSize} fontWeight="bold" fill="#FFFFFF">
+                  <tspan x={selectedSources[0].xPosition || defaulyXPosition} y={selectedSources[0].yPosition}>{selectedSources[0].label}</tspan>
                 </text>
               </g>
             </Link>

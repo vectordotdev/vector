@@ -52,7 +52,7 @@ import Jump from '@site/src/components/Jump';
 </div>
 <div class="section">
 
-### <i className="feather icon-shield-off"></i> Best-Effort
+### Best-Effort
 
 A `best-effort` delivery guarantee means that Vector will make a best effort to
 deliver each event, but cannot guarantee delivery. While rare, this means it is

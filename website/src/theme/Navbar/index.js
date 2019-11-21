@@ -11,6 +11,7 @@ import Toggle from 'react-toggle';
 import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
 import SearchBar from '@theme/SearchBar';
+import SVG from 'react-inlinesvg';
 
 import classnames from 'classnames';
 import {fetchNewPost} from '@site/src/exports/newPost';
@@ -22,8 +23,8 @@ import useTheme from '@theme/hooks/useTheme';
 import styles from './styles.module.css';
 
 function navLinkAttributes(label) {
-  switch(label) {
-    case 'Blog':
+  switch(label.toLowerCase()) {
+    case 'blog':
       const newPost = fetchNewPost();
 
       if (newPost) {
@@ -35,7 +36,7 @@ function navLinkAttributes(label) {
         return {};
       }
 
-    case 'Download':
+    case 'download':
       const newRelease = fetchNewRelease();
 
       if (newRelease) {
@@ -47,7 +48,7 @@ function navLinkAttributes(label) {
         return {};
       }
 
-    case 'Github':
+    case 'github':
       return {
         badge: '3k',
         icon: 'github'
@@ -147,7 +148,7 @@ function Navbar() {
             </div>
             <Link className="navbar__brand" to={baseUrl}>
               {logo != null && (
-                <img className="navbar__logo" src={logoUrl} alt={logo.alt} />
+                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} width="155px" />
               )}
               {title != null && (
                 <strong
