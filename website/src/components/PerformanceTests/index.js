@@ -217,7 +217,7 @@ function Compare({measurements, metrics, onColumnClick, onRowClick, subjects, te
               </tr>
             ))}
             <tr>
-              <td></td>
+              <td className="description"></td>
               {rows[0].map((cell, columnIdx) => (
                 <Column key={columnIdx} obj={cell.xAxisItem} onClick={() => onColumnClick(cell.xAxisItem)} />
               ))}

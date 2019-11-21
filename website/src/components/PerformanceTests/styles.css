@@ -96,3 +96,20 @@
   background: var(--vector-switcher-color);
   color: var(--vector-switcher-color-inverted);
 }
+
+@media (max-width: 480px) {
+  .performance-tests--switcher {
+    display: block;
+  }
+
+  .performance-tests--switcher .pills {
+    border-top: 1px dotted rgba( var(--ifm-background-color-rgb), 0.5 );
+    display: flex;
+    padding-top: calc( var(--ifm-spacing-vertical) / 2 );
+  }
+
+  .performance-tests--switcher .pills li {
+    flex-grow: 1;
+    text-align: center;
+  }
+}

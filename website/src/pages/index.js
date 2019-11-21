@@ -292,12 +292,12 @@ function Integrations() {
 
 function Configuration() {
   return (
-    <section className={styles.configuration}>
+    <section className="configuration">
       <div className="container">
         <h2>Simple To Configure</h2>
         <div className="sub-title">A simple composable format lets you build flexible pipelines</div>
 
-        <div className={styles.configurationDiagram}>
+        <div className="configuration__diagram">
           <SVG src="/img/configuration.svg" />
         </div>
       </div>

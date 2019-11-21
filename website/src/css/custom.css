@@ -277,6 +277,12 @@ table.comparison tr td.bar.vector .bar {
   background: var(--ifm-color-primary);
 }
 
+@media (max-width: 996px) {
+  table.comparison td.description {
+    display: none;
+  }
+}
+
 .component-statuses {
   background: black;
   margin-top: calc( -1.5 * var(--ifm-leading) );

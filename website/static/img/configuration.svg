@@ -28,27 +28,27 @@
                 <polygon id="Line-6" fill="#000000" fill-rule="nonzero" points="685 49 685 50 288 50 288 49"></polygon>
                 <polygon id="Line-6" fill="#000000" fill-rule="nonzero" transform="translate(457.000000, 490.500000) scale(1, -1) translate(-457.000000, -490.500000) " points="685 490 685 491 229 491 229 490"></polygon>
                 <polygon id="Line-6" fill="#000000" fill-rule="nonzero" points="685 622 685 623 229 623 229 622"></polygon>
-                <text id="Define-One-Or-More-D" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
+                <text id="Define-One-Or-More-D" class="config-section-description" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
                     <tspan x="711" y="51">Define One Or More Data Sources</tspan>
                     <tspan x="711" y="75" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">This can be a file, journald, STDIn, TCP, and more.</tspan>
                     <tspan x="711" y="99" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">Vector collects data in any shape from many sources.</tspan>
                 </text>
-                <text id="Parse-&amp;-Transform-Co" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
+                <text id="Parse-&amp;-Transform-Co" class="config-section-description" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
                     <tspan x="711" y="206">Parse &amp; Transform</tspan>
                     <tspan x="711" y="230" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">Common parsers are included out of the box with </tspan>
                     <tspan x="711" y="254" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">support for custom Regex and LUA scripting.</tspan>
                 </text>
-                <text id="Sample-&amp;-Reduce-Volu" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
+                <text id="Sample-&amp;-Reduce-Volu" class="config-section-description" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
                     <tspan x="711" y="334">Sample &amp; Reduce Volumne</tspan>
                     <tspan x="711" y="358" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">Reduce volume by sampling data and removing </tspan>
                     <tspan x="711" y="382" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">superflous events.</tspan>
                 </text>
-                <text id="Aggregate-&amp;-Search-S" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
+                <text id="Aggregate-&amp;-Search-S" class="config-section-description" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
                     <tspan x="711" y="492">Aggregate &amp; Search</tspan>
                     <tspan x="711" y="516" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">Stream your data to Elasticsearch (or the storage of your </tspan>
                     <tspan x="711" y="540" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">choice) to aggregate, search, and analyze.</tspan>
                 </text>
-                <text id="Archive-Archive-ever" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
+                <text id="Archive-Archive-ever" class="config-section-description" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24" fill="#000000">
                     <tspan x="711" y="624">Archive</tspan>
                     <tspan x="711" y="648" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">Archive everything in a compressed format in a cheap </tspan>
                     <tspan x="711" y="672" font-family="SFProText-Regular, SF Pro Text" font-weight="normal">durable storage like S3.</tspan>

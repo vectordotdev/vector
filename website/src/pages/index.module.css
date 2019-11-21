@@ -131,18 +131,6 @@ html[data-theme="dark"] .hero {
 }
 
 /*
- * Configuration Section
- */
-
-.configurationDiagram {
-}
-
-.configurationDiagram svg {
-  margin-left: -52px;
-  width: calc( 100% + 50px );
-}
-
-/*
  * Integrations Section
  */
 
@@ -257,9 +245,8 @@ html[data-theme="dark"] .hero {
 }
 
 .installationPlatforms {
-  display: flex;
-  justify-content: center;
   margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  text-align: center;
 }
 
 .installationPlatforms a svg {
@@ -274,7 +261,6 @@ html[data-theme="dark"] .hero {
 .installationPlatforms a:hover svg [fill="#10E7FF"] {
   fill: var(--ifm-heading-color);
 }
-
 
 .installationChecks {
   color: var(--ifm-color-primary);
