@@ -30,9 +30,11 @@ use string_cache::DefaultAtom as Atom;
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct KubernetesConfig {}
+pub struct KubernetesConfig {
+    pod_uid_regex: Option<String>,
+}
 
 #[typetag::serde(name = "kubernetes")]
 impl SourceConfig for KubernetesConfig {
@@ -54,11 +56,13 @@ impl SourceConfig for KubernetesConfig {
         let (file_recv, file_source) = file_source(name, globals)?;
 
         let mut transform_file = transform_file()?;
+        let mut transform_pod_uid = transform_pod_uid(self.pod_uid_regex.clone())?;
         let mut parse_message = parse_message()?;
 
         // Kubernetes source
         let source = file_recv
             .filter_map(move |event| transform_file.transform(event))
+            .filter_map(move |event| transform_pod_uid.transform(event))
             .filter_map(move |event| parse_message(event))
             .filter_map(move |event| now.filter(event))
             .forward(out.sink_map_err(drop))
@@ -79,6 +83,8 @@ impl SourceConfig for KubernetesConfig {
 }
 
 /// In what format are logs
+/// This exists because Docker is still a special entity in Kubernetes as it can write in Json
+/// despite CRI defining it's own format.
 #[derive(Clone, Copy, Debug)]
 enum LogFormat {
     /// As defined by Docker
@@ -87,14 +93,6 @@ enum LogFormat {
     CRI,
     /// None of the above
     Unknown,
-}
-
-/// Data known about Kubernetes Pod
-#[derive(Default)]
-struct PodData {
-    /// This exists because Docker is still a special entity in Kubernetes as it can write in Json
-    /// despite CRI defining it's own format.
-    log_format: Option<LogFormat>,
 }
 
 struct TimeFilter {
@@ -172,42 +170,32 @@ fn parse_message() -> crate::Result<impl FnMut(Event) -> Option<Event> + Send> {
     let mut transform_cri_message = transform_cri_message()?;
 
     // Kubernetes source
-    let atom_pod_uid = Atom::from("pod_uid");
-    let mut pod_data = HashMap::<Bytes, PodData>::new();
+    let mut log_format: Option<LogFormat> = None;
     Ok(move |event: Event| {
         let log = event.as_log();
-        if let Some(ValueKind::Bytes(pod_uid)) = log.get(&atom_pod_uid) {
-            // Fetch pod data
-            let data = pod_data.entry(pod_uid.clone()).or_default();
 
-            // Get/determine log format
-            let log_format = if let Some(log_format) = data.log_format {
-                log_format
+        // Get/determine log format
+        let log_format = *log_format.get_or_insert_with(|| {
+            // Detect log format
+            let log_format = if transform_json_message(event.clone()).is_some() {
+                LogFormat::Json
+            } else if transform_cri_message.transform(event.clone()).is_some() {
+                LogFormat::CRI
             } else {
-                // Detect log format
-                let log_format = if transform_json_message(event.clone()).is_some() {
-                    LogFormat::Json
-                } else if transform_cri_message.transform(event.clone()).is_some() {
-                    LogFormat::CRI
-                } else {
-                    error!(message = "Unknown message format");
-                    // Return untouched message so that user has some options
-                    // in how to deal with it.
-                    LogFormat::Unknown
-                };
-                // Save log format
-                data.log_format = Some(log_format);
-                log_format
+                error!(message = "Unknown message format");
+                // Return untouched message so that user has some options
+                // in how to deal with it.
+                LogFormat::Unknown
             };
+            // Save log format
+            log_format
+        });
 
-            // Parse message
-            match log_format {
-                LogFormat::Json => transform_json_message(event),
-                LogFormat::CRI => transform_cri_message.transform(event),
-                LogFormat::Unknown => Some(event),
-            }
-        } else {
-            None
+        // Parse message
+        match log_format {
+            LogFormat::Json => transform_json_message(event),
+            LogFormat::CRI => transform_cri_message.transform(event),
+            LogFormat::Unknown => Some(event),
         }
     })
 }
@@ -298,6 +286,85 @@ fn transform_file() -> crate::Result<Box<dyn Transform>> {
         )
         .into()
     })
+}
+
+/// Contains several regexes that can parse common forms of pod_uid.
+/// On first message, regexes are tryed out one after the other until
+/// first succesfull one has been found. After that that regex will be
+/// always used.
+///
+/// Users can specify their own regex which will be tryed out first.
+///
+/// If nothing succeds the message is still passed.
+fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform> {
+    let mut regexes = Vec::new();
+    regex.map(|s| regexes.push(s));
+
+    let namespace_regex = r"(?P<pod_namespace>[0-9a-z.\-]*)";
+    let name_regex = r"(?P<pod_name>[0-9a-z.\-]*)";
+    let uid_regex = r"(?P<object_uid>[0-9A-Fa-f\-]*)";
+
+    // Minikube 1.5.2
+    // format: namespace_name_UID
+    regexes.push(format!(
+        "^{}_{}_{}$",
+        namespace_regex, name_regex, uid_regex
+    ));
+    // TODO Common regexes
+
+    let mut transforms = Vec::new();
+    for regex in regexes {
+        let mut config = RegexParserConfig::default();
+
+        config.field = Some("pod_uid".into());
+        config.regex = regex;
+        // Remove pod_uid as it isn't useable anywhere else.
+        config.drop_field = true;
+        config.drop_failed = true;
+
+        let transform = config.build().map_err(|e| {
+            format!(
+                "Failed in creating pod_uid regex transform with error: {:?}",
+                e
+            )
+        })?;
+        transforms.push(transform);
+    }
+
+    Ok(ApplicableTransform::Candidates(transforms))
+}
+
+/// Contains several transforms. On first message, transforms are tryed
+/// out one after the other until first succesfull one has been found.
+/// After that that transform will always be used.
+///
+/// If nothing succeds the message is still passed.
+enum ApplicableTransform {
+    Candidates(Vec<Box<dyn Transform>>),
+    Transform(Option<Box<dyn Transform>>),
+}
+
+impl Transform for ApplicableTransform {
+    fn transform(&mut self, event: Event) -> Option<Event> {
+        match self {
+            Self::Candidates(candidates) => {
+                let candidate = candidates
+                    .iter_mut()
+                    .enumerate()
+                    .find_map(|(i, t)| t.transform(event.clone()).map(|event| (i, event)));
+                if let Some((i, event)) = candidate {
+                    let candidate = candidates.remove(i);
+                    *self = Self::Transform(Some(candidate));
+                    Some(event)
+                } else {
+                    *self = Self::Transform(None);
+                    None
+                }
+            }
+            Self::Transform(Some(transform)) => transform.transform(event),
+            Self::Transform(None) => None,
+        }
+    }
 }
 
 #[cfg(test)]
