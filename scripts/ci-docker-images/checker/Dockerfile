@@ -10,7 +10,7 @@ RUN apt-get update && \
   ruby-full \
   zlib1g-dev
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV PATH="$PATH:/root/.cargo/bin"
 RUN rustup component add rustfmt
 

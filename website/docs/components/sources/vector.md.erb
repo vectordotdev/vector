@@ -1,0 +1,35 @@
+<% component = metadata.sources.vector %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+The `vector` source is a pass-through source and is intended to accept data
+from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
+augmented.
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Encoding
+
+Data is encoded via Vector's [event protobuf][urls.event_proto] before it is sent over the wire.
+
+### Message Acking
+
+Currently, Vector does not perform any application level message acknowledgement. While rare, this means the individual message could be lost.
+
+### TCP Protocol
+
+Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
+
+

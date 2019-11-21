@@ -1,7 +1,8 @@
 [transforms.lua]
 allow_you_to_description = "transform events with a full embedded [Lua][urls.lua] engine"
 beta = true
-function_categories = ["program"]
+common = true
+function_category = "program"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -11,6 +12,7 @@ resources = [
 
 [transforms.lua.options.source]
 type = "string"
+common = true
 examples = [
 """\
 require("script") # a `script.lua` file must be in your `search_dirs`
@@ -31,6 +33,7 @@ description = "The inline Lua source to evaluate."
 type = "[string]"
 examples = [["/etc/vector/lua"]]
 null = true
+common = true
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\

@@ -1,0 +1,109 @@
+---
+
+event_types: ["log","metric"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
+sidebar_label: "field_filter|[\"log\",\"metric\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
+status: "beta"
+title: "field_filter transform" 
+---
+
+The `field_filter` transform accepts [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events and allows you to filter events by a log field's value.
+
+## Configuration
+
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "field_filter" # example, must be: "field_filter"
+  inputs = ["my-source-id"] # example
+  field = "file" # example
+  value = "/var/log/nginx.log" # example
+```
+
+## Options
+
+import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["file"]}
+  name={"field"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### field
+
+The target log field to compare against the[`value`](#value).
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/var/log/nginx.log"]}
+  name={"value"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### value
+
+If the value of the specified[`field`](#field) matches this value then the event will be permitted, otherwise it is dropped.
+
+
+</Field>
+
+
+</Fields>
+
+## How It Works
+
+### Complex Comparisons
+
+The `field_filter` transform is designed for simple equality filtering, it is
+not designed for complex comparisons. There are plans to build a `filter`
+transform that accepts more complex filtering.
+
+We've opened [issue 479][urls.issue_479] for more complex filtering.
+
+
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model#metric]: /docs/about/data-model#metric
+[urls.issue_479]: https://github.com/timberio/vector/issues/479

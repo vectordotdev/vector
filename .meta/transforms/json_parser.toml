@@ -1,6 +1,7 @@
 [transforms.json_parser]
 allow_you_to_description = "parse a log field value as JSON"
-function_categories = ["parse_json"]
+common = true
+function_category = "parse"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -8,6 +9,7 @@ resources = []
 
 [transforms.json_parser.options.drop_invalid]
 type = "bool"
+common = true
 examples = [true]
 null = false
 description = """\
@@ -17,6 +19,7 @@ event will be kept and passed through.\
 
 [transforms.json_parser.options.field]
 type = "string"
+common = true
 default = "message"
 null = false
 description = """\

@@ -1,5 +1,5 @@
 distribution/* linguist-detectable=false
-docs/* linguist-documentation
 lib/* linguist-vendored
 scripts/* linguist-detectable=false
+website/* linguist-detectable=false
 Makefile linguist-detectable=false

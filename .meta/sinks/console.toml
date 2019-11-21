@@ -1,14 +1,17 @@
 [sinks.console]
 buffer = false
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
 encodings = ["json", "text"]
+function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = "[standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`"
 
 [sinks.console.options.target]
 type = "string"
+common = true
 default = "stdout"
 null = false
 description = "The [standard stream][urls.standard_streams] to write to."

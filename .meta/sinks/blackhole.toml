@@ -1,7 +1,9 @@
 [sinks.blackhole]
 buffer = false
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = """\
@@ -11,6 +13,7 @@ benchmarking purposes\
 
 [sinks.blackhole.options.print_amount]
 type = "int"
+common = true
 examples = [1000]
 null = false
 description = "The number of events that must be received in order to print a summary of activity."

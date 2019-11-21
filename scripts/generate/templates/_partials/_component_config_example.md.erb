@@ -1,14 +1,35 @@
-{% code-tabs %}
-{% code-tabs-item title="vector.toml<% if component.advanced_relevant? %> (simple)<% end %>" %}
-```toml
-<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", simple: true) %>
-```
-{% endcode-tabs-item %}
 <%- if component.advanced_relevant? -%>
-{% code-tabs-item title="vector.toml (advanced)" %}
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+<TabItem value="common">
+<%- end -%>
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>"/ >
+
+```toml
+<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", common: true) %>
+```
+
+<%- if component.advanced_relevant? -%>
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>" />
+
 ```toml
 <%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
 ```
-{% endcode-tabs-item %}
+
+</TabItem>
 <%- end -%>
-{% endcode-tabs %}
+
+<% if component.advanced_relevant? -%>
+</Tabs>
+<%- end -%>

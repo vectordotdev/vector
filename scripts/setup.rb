@@ -33,23 +33,17 @@ include Printer
 # Constants
 #
 
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
+HOST = "https://vector.dev"
+DOCS_BASE_PATH = "/docs"
 
-DOCS_ROOT = File.join(ROOT_DIR, "docs")
+ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s
+WEBSITE_ROOT = File.join(ROOT_DIR, "website")
+ASSETS_ROOT = File.join(ROOT_DIR, "website", "static")
+BLOG_HOST = "#{HOST}/blog"
+DOCS_ROOT = File.join(ROOT_DIR, "website", "docs")
+DOCS_HOST = "#{HOST}#{DOCS_BASE_PATH}"
 META_ROOT = File.join(ROOT_DIR, ".meta")
+PAGES_ROOT = File.join(ROOT_DIR, "website", "src", "pages")
+POSTS_ROOT = File.join(ROOT_DIR, "website", "blog")
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
-TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
-
-#
-# Functions
-#
-
-def load_templates!
-  Templates.new(TEMPLATES_DIR, metadata)
-end
-
-def load_metadata!
-  Metadata.load!(META_ROOT, DOCS_ROOT)
-rescue Exception => e
-  error!(e.message)
-end
+PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials")

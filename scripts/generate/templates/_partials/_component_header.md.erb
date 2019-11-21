@@ -1,19 +1,11 @@
 ---
-description: <%= component_description(component).remove_markdown_links %>
+<% if component.respond_to?(:delivery_guarantee) %>delivery_guarantee: <%= component.delivery_guarantee.to_json %><% end %>
+event_types: <%= component.event_types.to_json %>
+issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
+sidebar_label: <%= "#{component.name}|#{component.event_types.to_json}".to_json %>
+source_url: <%= metadata.links.fetch("urls.#{component.id}_source") %>
+status: <%= component.status.to_json %>
+title: <%= "#{component.name} #{component.type}".to_json %> 
 ---
-
-# <%= component.name %> <%= component.type %>
-
-![][assets.<%= component.id %>]
-
-<% if component.beta? -%>
-{% hint style="warning" %}
-The `<%= component.name %>` <%= component.type %> is in beta. Please see the current
-[enhancements][urls.<%= component.id %>_enhancements] and
-[bugs][urls.<%= component.id %>_bugs] for known issues.
-We kindly ask that you [add any missing issues][urls.new_<%= component.id %>_issue]
-as it will help shape the roadmap of this component.
-{% endhint %}
-<% end -%>
 
 The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>

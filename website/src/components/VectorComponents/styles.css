@@ -1,0 +1,167 @@
+.vector-components--cols {
+  margin: var(--ifm-spacing-vertical) 0;
+}
+
+.vector-components h2,
+.vector-components h3 {
+  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+.vector-components h2:first-child,
+.vector-components h3:first-child {
+  margin-top: 0;
+}
+
+.vector-components--filters--search input {
+  width: 100%;
+}
+
+.vector-components--filters {
+  color: var(--ifm-menu-color);  
+  padding-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
+.vector-components--filters--checkboxes {
+  font-size: 0.9em;
+  padding: var(--ifm-spacing-vertical) calc( var(--ifm-spacing-horizontal) / 2 );
+}
+
+.vector-components--filters--checkboxes label {
+  margin-left: 0.75em;
+  margin-top: calc( var(--ifm-spacing-vertical) / 4 );
+  white-space: nowrap;
+}
+
+.vector-components--filters--checkboxes label input {
+  margin-right: 0.5em;
+}
+
+.vector-components--filters--section {
+  display: flex;
+  overflow: auto;
+}
+
+.vector-components--filters--section--title {
+  border-right: 1px solid var(--ifm-hr-border-color) ;
+  flex: 0 0 13%;
+  min-width: 120px;
+  padding-top: calc( var(--ifm-spacing-vertical) / 4 );
+  padding-right: 1em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vector-components--filters--section--title a {
+  color: inherit;
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+}
+
+.vector-components--results {
+  padding-top: calc( var(--ifm-spacing-vertical) * 1 );  
+}
+
+.vector-components--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-gap: 1rem;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
+.vector-component {
+  background: var(--ifm-panel-background);
+  border: 1px solid var(--ifm-panel-border-color);
+  border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-panel-box-shadow);
+  color: var(--ifm-panel-color);
+  font-weight: 500;
+  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+  transition: var(--ifm-transition-fast) ease;
+}
+
+.vector-component:hover {
+  background: var(--ifm-panel-background-active);
+  border-color: var(--ifm-panel-border-color-active);
+  box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-panel-color-active);
+  text-decoration: none;
+}
+
+.vector-component .icon-info {
+  float: right;
+  margin-top: 0.35em;
+}
+
+.vector-component--name {
+  font-size: 1.1em;
+  line-height: 1;
+  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
+}
+
+.vector-component--badges {
+  margin-top: var(--ifm-badge-padding-vertical);
+}
+
+.vector-component--badges .badge {
+  font-size: 0.6em;
+  margin-right: 5px;
+  padding: calc( var(--ifm-badge-padding-vertical) / 1.5 ) calc( var(--ifm-badge-padding-horizontal) / 1.5 );
+}
+
+@media (min-width: 996px) {
+  .vector-components {
+    margin: 0;
+  }
+
+  .vector-components--cols {
+    display: flex;
+  }
+
+  .vector-components--cols .vector-components--filters {
+    border-right: 1px solid var(--ifm-hr-border-color);
+    flex: 0 0 25%;
+    margin-left: calc( var(--ifm-spacing-horizontal) * -1 );
+    max-width: calc(250px - var(--ifm-spacing-horizontal));
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
+  }
+
+  .vector-components--cols .vector-components--filters--search {
+    margin-bottom: var(--ifm-spacing-vertical);
+  }
+
+  .vector-components--cols .vector-components--filters--checkboxes {
+    padding: var(--ifm-spacing-vertical) calc( var(--ifm-spacing-horizontal) / 2 );
+    padding-top: 0;
+  }
+
+  .vector-components--cols .vector-components--filters--section {
+    display: block;
+    margin-bottom: var(--ifm-spacing-vertical);
+  }
+
+  .vector-components--cols .vector-components--filters--section--title {
+    border: 0px none;
+    font-size: 0.9em;
+    font-weight: bold;
+    margin: 0;
+    margin-bottom: var(--ifm-spacing-vertical);
+    text-align: left;
+    text-transform: uppercase;
+  } 
+
+  .vector-components--cols .vector-components--filters--section label {
+    display: block;
+    margin: 0;
+  }
+
+  .vector-components--cols .vector-components--filters--section input[type="checkbox"] {
+    margin-left: 0;
+  }
+
+  .vector-components--cols .vector-components--results {
+    flex: 1 0;
+    margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
+    max-width: 100%;
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 3 );
+  }
+}

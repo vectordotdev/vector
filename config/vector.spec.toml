@@ -16,7 +16,7 @@
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# /usage/configuration
+# /docs/setup/configuration
 
 # ------------------------------------------------------------------------------
 # Global
@@ -65,7 +65,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  include_labels = "key=value"
+  include_labels = "label_key=label_value"
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
@@ -102,7 +102,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  exclude = ["/var/log/nginx/access.log"]
+  exclude = ["/var/log/nginx/*.[0-9]*.log"]
 
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
@@ -136,6 +136,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * default: false
   # * type: bool
+  start_at_beginning = true
   start_at_beginning = false
 
   #
@@ -200,6 +201,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * default: false
   # * type: bool
+  oldest_first = true
   oldest_first = false
 
   #
@@ -224,7 +226,7 @@ data_dir = "/var/lib/vector"
     # * default: 256
     # * type: int
     # * unit: bytes
-    # * relevant when fingerprinting.strategy = "checksum"
+    # * relevant when strategy = "checksum"
     fingerprint_bytes = 256
 
     # The number of bytes to skip ahead (or ignore) when generating a unique
@@ -234,7 +236,7 @@ data_dir = "/var/lib/vector"
     # * default: 0
     # * type: int
     # * unit: bytes
-    # * relevant when fingerprinting.strategy = "checksum"
+    # * relevant when strategy = "checksum"
     ignored_header_bytes = 0
 
 # Ingests data through log records from journald and outputs `log` events.
@@ -261,6 +263,7 @@ data_dir = "/var/lib/vector"
   # * default: true
   # * type: bool
   current_boot_only = true
+  current_boot_only = false
 
   # The directory used to persist the journal checkpoint position. By default,
   # the global `data_dir` is used. Please make sure the Vector project has write
@@ -277,6 +280,7 @@ data_dir = "/var/lib/vector"
   # * default: true
   # * type: bool
   local_only = true
+  local_only = false
 
   # The list of units names to monitor. If empty or not present, all units are
   # accepted. Unit names lacking a `"."` will have `".service"` appended to make
@@ -316,7 +320,7 @@ data_dir = "/var/lib/vector"
   # 
   # * required
   # * type: [string]
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.
@@ -549,7 +553,7 @@ data_dir = "/var/lib/vector"
   # * type: string
   host_key = "host"
 
-# Ingests data through another upstream Vector instance and outputs `log` and `metric` events.
+# Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `vector`.
@@ -759,6 +763,7 @@ data_dir = "/var/lib/vector"
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The log field to execute the `pattern` against. Must be a `string` value.
   # 
@@ -824,7 +829,8 @@ data_dir = "/var/lib/vector"
   # * optional
   # * default: "false"
   # * type: bool
-  overwrite_target = "false"
+  overwrite_target = true
+  overwrite_target = false
 
   # If this setting is present, the parsed JSON will be inserted into the log as
   # a sub-object with this name. If a field with the same name already exists,
@@ -891,6 +897,7 @@ data_dir = "/var/lib/vector"
     # * default: false
     # * type: bool
     # * relevant when type = "counter"
+    increment_by_value = true
     increment_by_value = false
 
     [transforms.log_to_metric.metrics.tags]
@@ -977,6 +984,7 @@ end
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The log field to parse.
   # 
@@ -1118,6 +1126,7 @@ end
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The field to apply the split on.
   # 
@@ -1187,6 +1196,7 @@ end
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The log field to tokenize.
   # 
@@ -1272,6 +1282,7 @@ end
   # * default: true
   # * type: bool
   create_missing_group = true
+  create_missing_group = false
 
   # Dynamically create a log stream if it does not already exist.
   # 
@@ -1279,6 +1290,7 @@ end
   # * default: true
   # * type: bool
   create_missing_stream = true
+  create_missing_stream = false
 
   # Custom endpoint for use with AWS-compatible services.
   # 
@@ -1293,6 +1305,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Batching
@@ -1451,6 +1464,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
@@ -1498,6 +1512,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # The log field used as the Kinesis record's partition key value.
   # 
@@ -1667,6 +1682,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Batching
@@ -1699,13 +1715,15 @@ end
   # * default: true
   # * type: bool
   filename_append_uuid = true
+  filename_append_uuid = false
 
   # The extension to use in the object name.
   # 
   # * optional
   # * default: "log"
   # * type: bool
-  filename_extension = "log"
+  filename_extension = true
+  filename_extension = false
 
   # The format of the resulting object file name. `strftime` specifiers are
   # supported.
@@ -1852,6 +1870,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Batches `log` events to Clickhouse via the `HTTP` Interface.
 [sinks.clickhouse]
@@ -1899,6 +1918,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Batching
@@ -1996,12 +2016,55 @@ end
     # * required
     # * type: string
     password = "password"
+    password = "${PASSWORD_ENV_VAR}"
 
     # The basic authentication user name.
     # 
     # * required
     # * type: string
     user = "username"
+
+  #
+  # Buffer
+  #
+
+  [sinks.clickhouse.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Tls
@@ -2049,6 +2112,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -2058,6 +2122,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
@@ -2086,6 +2151,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # The standard stream to write to.
   # 
@@ -2147,6 +2213,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # Datadog endpoint to send metrics to.
   # 
@@ -2265,6 +2332,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
   # in the example. This is required if the `provider` is not `"aws"`
@@ -2385,6 +2453,7 @@ end
     # * required
     # * type: string
     password = "password"
+    password = "${PASSWORD_ENV_VAR}"
 
     # The basic authentication user name.
     # 
@@ -2443,6 +2512,7 @@ end
     # 
     # * required
     # * type: string
+    Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
 
   #
@@ -2502,6 +2572,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -2511,6 +2582,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` events to a file.
 [sinks.file]
@@ -2546,6 +2618,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # The amount of time a file can be idle  and stay open. After not receiving any
   # events for this timeout, the file will be flushed and closed.
@@ -2601,6 +2674,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # A URI that Vector can request in order to determine the service health.
   # 
@@ -2704,6 +2778,7 @@ end
     # * required
     # * type: string
     password = "password"
+    password = "${PASSWORD_ENV_VAR}"
 
     # The basic authentication user name.
     # 
@@ -2762,6 +2837,7 @@ end
     # 
     # * required
     # * type: string
+    Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
 
   #
@@ -2810,6 +2886,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -2819,6 +2896,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` events to Apache Kafka via the Kafka protocol.
 [sinks.kafka]
@@ -2868,6 +2946,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # requests
@@ -2950,6 +3029,7 @@ end
     # * optional
     # * default: false
     # * type: bool
+    enabled = true
     enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
@@ -3012,6 +3092,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Batches `log` events to a Splunk HTTP Event Collector.
 [sinks.splunk_hec]
@@ -3052,6 +3133,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # requests
@@ -3226,6 +3308,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -3235,6 +3318,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
@@ -3272,6 +3356,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Streams `log` events to a TCP connection.
 [sinks.tcp]
@@ -3306,6 +3391,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # requests
@@ -3388,6 +3474,7 @@ end
     # * optional
     # * default: false
     # * type: bool
+    enabled = true
     enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
@@ -3414,6 +3501,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -3423,8 +3511,9 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
-# Streams `log` events to another downstream Vector instance.
+# Streams `log` events to another downstream `vector` source.
 [sinks.vector]
   #
   # General
@@ -3457,6 +3546,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Buffer
@@ -3499,6 +3589,3 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
-
-
-

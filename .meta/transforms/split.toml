@@ -3,25 +3,29 @@ allow_you_to_description = """\
 split a field's value on a given separator \
 and zip the tokens into ordered field names\
 """
-function_categories = ["parse"]
+common = false
+function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
 types_coercion = true
 
 [transforms.split.options.field]
 type = "string"
+common = true
 default = "message"
 null = false
 description = "The field to apply the split on."
 
 [transforms.split.options.field_names]
 type = "[string]"
+common = true
 examples = [["timestamp", "level", "message"]]
 null = false
 description = "The field names assigned to the resulting tokens, in order."
 
 [transforms.split.options.separator]
 type = "[string]"
+common = true
 default = "whitespace"
 examples = [","]
 null = false
@@ -32,6 +36,7 @@ If no separator is given, it will split on whitespace.\
 
 [transforms.split.options.drop_field]
 type = "bool"
+common = true
 default = true
 null = false
 description = "If `true` the `field` will be dropped after parsing."

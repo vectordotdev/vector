@@ -22,10 +22,10 @@ how to do this.
 
 ### Buffers & Batches
 
-<%- if component.partition_options.any? -%> 
-![][assets.sink-flow-partitioned]
+<%- if component.partition_options.any? -%>
+<SVG src="/img/buffers-and-batches-partitioned.svg" />
 <%- else -%>
-![][assets.sink-flow-serial]
+<SVG src="/img/buffers-and-batches-serial.svg" />
 <%- end -%>
 
 The `<%= component.name %>` <%= component.type %> buffers & batches data as
@@ -49,19 +49,6 @@ By default, the `<%= component.name %>` <%= component.type %> will add context
 keys to your events via the <%= option_names(component.context_options).to_sentence %>
 options.
 <%- end -%>
-<% if component.respond_to?(:delivery_guarantee) -%>
-
-### Delivery Guarantee
-
-<% case component.delivery_guarantee -%>
-<% when "at_least_once" -%>
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-<% when "best_effort" -%>
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-<% end -%>
-<% end -%>
 
 ### Environment Variables
 
@@ -90,17 +77,22 @@ accept data. This check is performed upon sink initialization.
 In order to run this check you must provide a value for the `healthcheck_uri`
 option.
 <%- end -%>
-
 If the health check fails an error will be logged and Vector will proceed to
-start. If you'd like to exit immediately upon health check failure, you can
+start.
+
+#### Require Health Checks
+
+If you'd like to exit immediately upon a health check failure, you can
 pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-And finally, if you'd like to disable health checks entirely for this sink
-you can set the `healthcheck` option to `false`.
+#### Disable Health Checks
+
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 <%- end -%>
 <%- if component.partition_options.any? -%>
 
@@ -150,11 +142,11 @@ event-by-event basis. It does not batch data.
 The <%= option_names(component.templateable_options).to_sentence %> options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strptime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
@@ -164,8 +156,6 @@ enabling dynamic values derived from the event's data. This syntax accepts
   <%- end -%>
   # ...
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].

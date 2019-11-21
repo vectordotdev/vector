@@ -1,0 +1,346 @@
+---
+delivery_guarantee: "best_effort"
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
+sidebar_label: "journald|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
+status: "beta"
+title: "journald source" 
+---
+
+The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model#log] events.
+
+## Configuration
+
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+
+```toml
+[sources.my_source_id]
+  # REQUIRED
+  type = "journald" # example, must be: "journald"
+  
+  # OPTIONAL
+  current_boot_only = true # default
+  units = ["ntpd", "sysinit.target"] # default
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+
+```toml
+[sources.my_source_id]
+  # REQUIRED
+  type = "journald" # example, must be: "journald"
+  
+  # OPTIONAL
+  batch_size = 16 # default
+  current_boot_only = true # default
+  data_dir = "/var/lib/vector" # example, no default
+  local_only = true # default
+  units = ["ntpd", "sysinit.target"] # default
+```
+
+</TabItem>
+
+</Tabs>
+
+## Options
+
+import Fields from '@site/src/components/Fields';
+
+import Field from '@site/src/components/Field';
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={16}
+  enumValues={null}
+  examples={[16]}
+  name={"batch_size"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### batch_size
+
+The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"current_boot_only"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### current_boot_only
+
+Include only entries from the current boot.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/var/lib/vector"]}
+  name={"data_dir"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### data_dir
+
+The directory used to persist the journal checkpoint position. By default, the global[`data_dir`](#data_dir) is used. Please make sure the Vector project has write permissions to this dir. 
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"local_only"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### local_only
+
+Include only entries from the local system
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={[]}
+  enumValues={null}
+  examples={[["ntpd","sysinit.target"]]}
+  name={"units"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+### units
+
+The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.
+
+
+</Field>
+
+
+</Fields>
+
+## Output
+
+This component outputs [`log` events][docs.data-model.log].
+
+Given the following input:
+
+```
+__REALTIME_TIMESTAMP=1564173027000443
+__MONOTONIC_TIMESTAMP=98694000446
+_BOOT_ID=124c781146e841ae8d9b4590df8b9231
+SYSLOG_FACILITY=3
+_UID=0
+_GID=0
+_CAP_EFFECTIVE=3fffffffff
+_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
+_HOSTNAME=lorien.example.com
+PRIORITY=6
+_TRANSPORT=stdout
+_STREAM_ID=92c79f4b45c4457490ebdefece29995e
+SYSLOG_IDENTIFIER=ntpd
+_PID=2156
+_COMM=ntpd
+_EXE=/usr/sbin/ntpd
+_CMDLINE=ntpd: [priv]
+_SYSTEMD_CGROUP=/system.slice/ntpd.service
+_SYSTEMD_UNIT=ntpd.service
+_SYSTEMD_SLICE=system.slice
+_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
+MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
+
+```
+
+A [`log` event][docs.data-model.log] will be output with the
+following structure:
+
+```json
+{
+  "timestamp": <2019-07-26T20:30:27.000443Z>,
+  "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
+  "host": "lorien.example.com",
+  "__REALTIME_TIMESTAMP": "1564173027000443",
+  "__MONOTONIC_TIMESTAMP": "98694000446",
+  "_BOOT_ID": "124c781146e841ae8d9b4590df8b9231",
+  "SYSLOG_FACILITY": "3",
+  "_UID": "0",
+  "_GID": "0",
+  "_CAP_EFFECTIVE": "3fffffffff",
+  "_MACHINE_ID": "c36e9ea52800a19d214cb71b53263a28",
+  "PRIORITY": "6",
+  "_TRANSPORT": "stdout",
+  "_STREAM_ID": "92c79f4b45c4457490ebdefece29995e",
+  "SYSLOG_IDENTIFIER": "ntpd",
+  "_PID": "2156",
+  "_COMM": "ntpd",
+  "_EXE": "/usr/sbin/ntpd",
+  "_CMDLINE": "ntpd: [priv]",
+  "_SYSTEMD_CGROUP": "/system.slice/ntpd.service",
+  "_SYSTEMD_UNIT": "ntpd.service",
+  "_SYSTEMD_SLICE": "system.slice",
+  "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
+}
+
+```
+
+More detail on the output schema is below.
+
+<Fields filters={true}>
+
+
+<Field
+  enumValues={null}
+  examples={["my.host.com"]}
+  name={"host"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### host
+
+The value of the journald `_HOSTNAME` field.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  name={"message"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### message
+
+The value of the journald `MESSAGE` field.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  name={"timestamp"}
+  path={null}
+  required={true}
+  type={"timestamp"}
+  >
+
+### timestamp
+
+The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["my-value"]}
+  name={"*"}
+  path={null}
+  required={false}
+  type={"*"}
+  >
+
+### *
+
+Additional Journald fields are passed through as log fields.
+
+
+
+</Field>
+
+
+</Fields>
+
+## How It Works
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
