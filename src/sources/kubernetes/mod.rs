@@ -14,11 +14,9 @@ use crate::{
         Transform,
     },
 };
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
@@ -62,9 +60,9 @@ impl SourceConfig for KubernetesConfig {
         // Kubernetes source
         let source = file_recv
             .filter_map(move |event| transform_file.transform(event))
-            .filter_map(move |event| transform_pod_uid.transform(event))
-            .filter_map(move |event| parse_message(event))
+            .filter_map(move |event| parse_message.transform(event))
             .filter_map(move |event| now.filter(event))
+            .filter_map(move |event| transform_pod_uid.transform(event))
             .forward(out.sink_map_err(drop))
             .map(drop)
             .join(file_source)
@@ -80,19 +78,6 @@ impl SourceConfig for KubernetesConfig {
     fn source_type(&self) -> &'static str {
         "kubernetes"
     }
-}
-
-/// In what format are logs
-/// This exists because Docker is still a special entity in Kubernetes as it can write in Json
-/// despite CRI defining it's own format.
-#[derive(Clone, Copy, Debug)]
-enum LogFormat {
-    /// As defined by Docker
-    Json,
-    /// As defined by CRI
-    CRI,
-    /// None of the above
-    Unknown,
 }
 
 struct TimeFilter {
@@ -164,62 +149,32 @@ fn file_source(
     Ok((file_recv, file_source))
 }
 
-fn parse_message() -> crate::Result<impl FnMut(Event) -> Option<Event> + Send> {
-    // Transforms
-    let mut transform_json_message = transform_json_message();
-    let mut transform_cri_message = transform_cri_message()?;
-
-    // Kubernetes source
-    let mut log_format: Option<LogFormat> = None;
-    Ok(move |event: Event| {
-        let log = event.as_log();
-
-        // Get/determine log format
-        let log_format = *log_format.get_or_insert_with(|| {
-            // Detect log format
-            let log_format = if transform_json_message(event.clone()).is_some() {
-                LogFormat::Json
-            } else if transform_cri_message.transform(event.clone()).is_some() {
-                LogFormat::CRI
-            } else {
-                error!(message = "Unknown message format");
-                // Return untouched message so that user has some options
-                // in how to deal with it.
-                LogFormat::Unknown
-            };
-            // Save log format
-            log_format
-        });
-
-        // Parse message
-        match log_format {
-            LogFormat::Json => transform_json_message(event),
-            LogFormat::CRI => transform_cri_message.transform(event),
-            LogFormat::Unknown => Some(event),
-        }
-    })
+/// Determines format of message.
+/// This exists because Docker is still a special entity in Kubernetes as it can write in Json
+/// despite CRI defining it's own format.
+fn parse_message() -> crate::Result<ApplicableTransform> {
+    let transforms = vec![
+        Box::new(transform_json_message()) as Box<dyn Transform>,
+        transform_cri_message()?,
+    ];
+    Ok(ApplicableTransform::Candidates(transforms))
 }
 
-fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
-    let mut config = JsonParserConfig::default();
+struct DockerMessageTransformer {
+    json_parser: JsonParser,
+    atom_time: Atom,
+    atom_log: Atom,
+}
 
-    // Drop so that it's possible to detect if message is in json format
-    config.drop_invalid = true;
-
-    config.drop_field = true;
-
-    let mut json_parser: JsonParser = config.into();
-
-    let atom_time = Atom::from("time");
-    let atom_log = Atom::from("log");
-    move |event| {
-        let mut event = json_parser.transform(event)?;
+impl Transform for DockerMessageTransformer {
+    fn transform(&mut self, event: Event) -> Option<Event> {
+        let mut event = self.json_parser.transform(event)?;
 
         // Rename fields
         let log = event.as_mut_log();
 
         // time -> timestamp
-        if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&atom_time) {
+        if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&self.atom_time) {
             match DateTime::parse_from_rfc3339(
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
@@ -230,20 +185,37 @@ fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
                 Err(error) => warn!(message = "Non rfc3339 timestamp.", %error),
             }
         } else {
-            warn!(message = "Missing field.", field = %atom_time);
+            warn!(message = "Missing field.", field = %self.atom_time);
         }
 
         // log -> message
-        if let Some(message) = log.remove(&atom_log) {
+        if let Some(message) = log.remove(&self.atom_log) {
             log.insert_explicit(event::MESSAGE.clone(), message);
         } else {
-            warn!(message = "Missing field", field = %atom_log);
+            warn!(message = "Missing field", field = %self.atom_log);
         }
 
         Some(event)
     }
 }
 
+/// As defined by Docker
+fn transform_json_message() -> DockerMessageTransformer {
+    let mut config = JsonParserConfig::default();
+
+    // Drop so that it's possible to detect if message is in json format
+    config.drop_invalid = true;
+
+    config.drop_field = true;
+
+    DockerMessageTransformer {
+        json_parser: config.into(),
+        atom_time: Atom::from("time"),
+        atom_log: Atom::from("log"),
+    }
+}
+
+/// As defined by CRI
 fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
     let mut rp_config = RegexParserConfig::default();
     // message field
@@ -318,7 +290,7 @@ fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform
 
         config.field = Some("pod_uid".into());
         config.regex = regex;
-        // Remove pod_uid as it isn't useable anywhere else.
+        // Remove pod_uid as it isn't usable anywhere else.
         config.drop_field = true;
         config.drop_failed = true;
 
