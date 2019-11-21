@@ -1,9 +1,10 @@
 use crate::FilePosition;
 use std::fs;
 use std::io::{self, BufRead, Seek};
-use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time;
+
+use crate::metadata_ext::PortableMetadataExt;
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
 /// from a file path, transparently updating the underlying file descriptor when
@@ -56,20 +57,20 @@ impl FileWatcher {
             findable: true,
             reader: rdr,
             file_position,
-            devno: metadata.dev(),
-            inode: metadata.ino(),
+            devno: metadata.portable_dev(),
+            inode: metadata.portable_ino(),
             is_dead: false,
         })
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let metadata = fs::metadata(&path)?;
-        if (metadata.dev(), metadata.ino()) != (self.devno, self.inode) {
+        if (metadata.portable_dev(), metadata.portable_ino()) != (self.devno, self.inode) {
             let mut new_reader = io::BufReader::new(fs::File::open(&path)?);
             new_reader.seek(io::SeekFrom::Start(self.file_position))?;
             self.reader = new_reader;
-            self.devno = metadata.dev();
-            self.inode = metadata.ino();
+            self.devno = metadata.portable_dev();
+            self.inode = metadata.portable_ino();
         }
         self.path = path;
         Ok(())

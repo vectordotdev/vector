@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
+#[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
@@ -175,7 +176,10 @@ fn main() {
     };
 
     let color = match opts.color.clone().unwrap_or(Color::Auto) {
+        #[cfg(unix)]
         Color::Auto => atty::is(atty::Stream::Stdout),
+        #[cfg(windows)]
+        Color::Auto => false, // ANSI colors are not supported by cmd.exe
         Color::Always => true,
         Color::Never => false,
     };
@@ -278,65 +282,101 @@ fn main() {
         std::process::exit(exitcode::OK);
     }
 
-    let sigint = Signal::new(SIGINT).flatten_stream();
-    let sigterm = Signal::new(SIGTERM).flatten_stream();
-    let sigquit = Signal::new(SIGQUIT).flatten_stream();
-    let sighup = Signal::new(SIGHUP).flatten_stream();
+    #[cfg(unix)]
+    {
+        let sigint = Signal::new(SIGINT).flatten_stream();
+        let sigterm = Signal::new(SIGTERM).flatten_stream();
+        let sigquit = Signal::new(SIGQUIT).flatten_stream();
+        let sighup = Signal::new(SIGHUP).flatten_stream();
 
-    let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
+        let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
 
-    let signal = loop {
-        let signal = future::poll_fn(|| signals.poll());
-        let crash = future::poll_fn(|| graceful_crash.poll());
+        let signal = loop {
+            let signal = future::poll_fn(|| signals.poll());
+            let crash = future::poll_fn(|| graceful_crash.poll());
 
-        let next = signal
-            .select2(crash)
-            .wait()
+            let next = signal
+                .select2(crash)
+                .wait()
+                .map_err(|_| ())
+                .expect("Neither stream errors");
+
+            let signal = match next {
+                future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
+                future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
+            };
+
+            if signal != SIGHUP {
+                break signal;
+            }
+
+            // Reload config
+            info!(
+                message = "Reloading config.",
+                path = ?opts.config_path
+            );
+
+            let file = if let Some(file) = open_config(&opts.config_path) {
+                file
+            } else {
+                continue;
+            };
+
+            trace!("Parsing config");
+            let config = vector::topology::Config::load(file);
+            let config = handle_config_errors(config);
+            if let Some(config) = config {
+                let success =
+                    topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
+                if !success {
+                    error!("Reload was not successful.");
+                }
+            } else {
+                error!("Reload aborted.");
+            }
+        };
+
+        if signal == SIGINT || signal == SIGTERM {
+            use futures::future::Either;
+
+            info!("Shutting down.");
+            let shutdown = topology.stop();
+            metrics_trigger.cancel();
+
+            match rt.block_on(shutdown.select2(signals.into_future())) {
+                Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
+                Ok(Either::B(_)) => {
+                    info!("Shutting down immediately.");
+                    // Dropping the shutdown future will immediately shut the server down
+                }
+                Err(_) => unreachable!(),
+            }
+        } else if signal == SIGQUIT {
+            info!("Shutting down immediately");
+            drop(topology);
+        } else {
+            unreachable!();
+        }
+    }
+    #[cfg(windows)]
+    {
+        let mut ctrl_c_stream = tokio_signal::ctrl_c().flatten_stream();
+        let ctrl_c = future::poll_fn(move || ctrl_c_stream.poll());
+        let crash = future::poll_fn(move || graceful_crash.poll());
+
+        let interruptions = ctrl_c.select2(crash);
+        rt.block_on(interruptions)
             .map_err(|_| ())
             .expect("Neither stream errors");
 
-        let signal = match next {
-            future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
-            future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
-        };
-
-        if signal != SIGHUP {
-            break signal;
-        }
-
-        // Reload config
-        info!(
-            message = "Reloading config.",
-            path = ?opts.config_path
-        );
-
-        let file = if let Some(file) = open_config(&opts.config_path) {
-            file
-        } else {
-            continue;
-        };
-
-        trace!("Parsing config");
-        let config = vector::topology::Config::load(file);
-        let config = handle_config_errors(config);
-        if let Some(config) = config {
-            let success = topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
-            if !success {
-                error!("Reload was not successful.");
-            }
-        } else {
-            error!("Reload aborted.");
-        }
-    };
-
-    if signal == SIGINT || signal == SIGTERM {
         use futures::future::Either;
 
         info!("Shutting down.");
         let shutdown = topology.stop();
         metrics_trigger.cancel();
 
-        match rt.block_on(shutdown.select2(signals.into_future())) {
+        let ctrl_c_stream = tokio_signal::ctrl_c().flatten_stream();
+        match rt.block_on(shutdown.select2(ctrl_c_stream.into_future())) {
             Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
             Ok(Either::B(_)) => {
                 info!("Shutting down immediately.");
@@ -344,11 +384,6 @@ fn main() {
             }
             Err(_) => unreachable!(),
         }
-    } else if signal == SIGQUIT {
-        info!("Shutting down immediately");
-        drop(topology);
-    } else {
-        unreachable!();
     }
 
     rt.shutdown_now().wait().unwrap();

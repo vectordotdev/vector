@@ -13,11 +13,13 @@
 #   $RUST_LTO - possible values are "lto", "lto=thin", ""
 #   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
+#   $ARCHIVE_TYPE - archive type, either "tar.gz" or "zip"
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
+ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
 
 if [ -z "$FEATURES" ]; then
     FEATURES="default"
@@ -114,13 +116,17 @@ cp -av distribution/init.d/vector $archive_dir/etc/init.d
 # Build the release tar
 _old_dir=$(pwd)
 cd $target_dir
-tar -czvf vector-$TARGET.tar.gz ./$archive_dir_name
+case $ARCHIVE_TYPE in
+  tar.gz) make_archive="tar -czvf" ;;
+  zip) make_archive="zip -r" ;;
+esac
+$make_archive vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
 cd $_old_dir
 
 # Move to the artifacts dir
 mkdir -p $artifacts_dir
-mv -v $target_dir/vector-$TARGET.tar.gz $artifacts_dir
-echo "Moved $target_dir/vector-$TARGET.tar.gz to $artifacts_dir"
+mv -v $target_dir/vector-$TARGET.$ARCHIVE_TYPE $artifacts_dir
+echo "Moved $target_dir/vector-$TARGET.$ARCHIVE_TYPE to $artifacts_dir"
 
 # Cleanup
 rm -rf $archive_dir
