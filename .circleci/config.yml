@@ -209,7 +209,7 @@ jobs:
               --privileged \
               -e RUST_LTO="lto" \
               -e TARGET="aarch64-unknown-linux-musl" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix" \
+              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
               -t timberiodev/vector-builder-aarch64-unknown-linux-musl:latest \
@@ -232,7 +232,7 @@ jobs:
               --privileged \
               -e RUST_LTO="lto" \
               -e TARGET="armv7-unknown-linux-musleabihf" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix" \
+              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
               -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
