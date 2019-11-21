@@ -245,21 +245,22 @@ jobs:
             msiexec /quiet /i cmake-installer.msi
             del cmake-installer.msi
       - run:
-          name: Install ZIP
-          shell: bash
-          command: |
-            which zip
-      - run:
           name: Build archive
           shell: bash
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
+            function zip() {
+              echo "Compress-Archive $3 $2" | powershell
+            }
+            export -f zip
+
             export RUSTFLAGS=-Ctarget-feature=+crt-static
             export FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
             export ARCHIVE_TYPE="zip"
             export STRIP="false"
             export RUST_LTO="lto"
             export TARGET="x86_64-pc-windows-msvc"
+
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
