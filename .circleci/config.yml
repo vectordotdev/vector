@@ -250,7 +250,7 @@ jobs:
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             function zip() {
-              echo "Compress-Archive \"$3\" \"$2\"" | powershell
+              powershell Compress-Archive $3 $2
             }
             export -f zip
 
@@ -258,7 +258,7 @@ jobs:
             export FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
             export ARCHIVE_TYPE="zip"
             export STRIP="false"
-            export RUST_LTO="lto"
+            export RUST_LTO=""
             export TARGET="x86_64-pc-windows-msvc"
 
             ./scripts/build-archive.sh
