@@ -21,6 +21,8 @@
   --ifm-color-blue-rgb: 48, 132 ,255;
   --ifm-color-content: var(--ifm-color-emphasis-800);
   --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
+  --ifm-color-danger: #ff1178;
+  --ifm-color-danger-rgb: 255, 17, 120;
   --ifm-color-gray-25: rgba(0, 27, 61, 0.025);
   --ifm-color-gray-40: rgba(0, 27, 61, 0.04);
   --ifm-color-gray-50: rgba(0, 27, 61, 0.05);
@@ -35,7 +37,6 @@
   --ifm-color-gray-700: rgba(0, 27, 61, 0.7);
   --ifm-color-gray-800: rgba(0, 27, 61, 0.8);
   --ifm-color-gray-900: rgba(0, 27, 61, 0.9);
-  --ifm-color-danger-rgb: 250, 56, 62;
   --ifm-color-emphasis-25: var(--ifm-color-gray-25);
   --ifm-color-emphasis-40: var(--ifm-color-gray-40);
   --ifm-color-emphasis-50: var(--ifm-color-gray-50);
@@ -185,6 +186,9 @@ table.comparison th {
   padding-left: 0;
   padding-right: 0;
 }
+table.comparison tr th.vector {
+  color: var(--ifm-color-primary);
+}
 table.comparison tr td {
   border-left: 10px solid var(--ifm-background-color);
   min-width: 90px;
@@ -215,40 +219,33 @@ table.comparison tr td.description .links {
   font-size: 0.9em;
   margin-top: var(--ifm-spacing-vertical);
 }
-table.comparison tr td.result.failed {
-  background: rgba( var(--ifm-color-pink-rgb), 1 );
-  color: var(--ifm-background-color);
+table.comparison tr:hover td.row-label,
+table.comparison tr:hover td.result {
+  background: var(--ifm-color-emphasis-50);
 }
-table.comparison tr:hover td.result.failed {
-  background: rgba( var(--ifm-color-pink-rgb), 0.7 );
+table.comparison tr td.result.failed {
+  color: var(--ifm-color-danger);
 }
 table.comparison tr td.result.lost {
   background: var(--ifm-color-emphasis-1000);
   color: var(--ifm-background-color);  
 }
-table.comparison tr:hover td.result.lost {
-  background: var(--ifm-color-emphasis-900);
-}
 table.comparison tr td.result.not-applicable {
   background: var(--ifm-color-emphasis-1000);
   color: rgba( var(--ifm-background-color-rgb), 0.5 );
 }
-table.comparison tr:hover td.result.not-applicable {
-  background: var(--ifm-color-emphasis-900);
-}
 table.comparison tr td.result.passed {
-  background: rgba( var(--ifm-color-primary-rgb), 1 );
-  color: var(--ifm-background-color);
-}
-table.comparison tr:hover td.result.passed {
-  background: rgba( var(--ifm-color-primary-rgb), 0.8 );
+  color: var(--ifm-color-primary);
 }
 table.comparison tr td.result.warning {
-  background: rgba( var(--ifm-color-warning-rgb), 1 );
-  color: var(--ifm-background-color);
+  color: var(--ifm-color-warning);
 }
-table.comparison tr:hover td.result.warning {
-  background: rgba( var(--ifm-color-warning-rgb), 0.9 );
+table.comparison tr td.result.passed.vector {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-background-color);  
+}
+table.comparison tr:hover td.result.passed.vector {
+  background: rgba( var(--ifm-color-primary-rgb), 0.8 );
 }
 table.comparison tr td.bar {
   padding: 0;
@@ -266,9 +263,6 @@ table.comparison tr td.bar .measurement {
 table.comparison tr td.bar .bar {
   background: var(--ifm-color-emphasis-1000);
   margin: 0 auto;
-}
-table.comparison tr td.bar.winner .place {
-  font-weight: bold;
 }
 table.comparison tr td.bar.vector {
   color: var(--ifm-color-primary);

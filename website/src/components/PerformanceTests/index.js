@@ -126,7 +126,7 @@ function MeasurementBar({cell}) {
       return (
         <td className={barClassNames}>
           <div className={classnames('place', `place-${cell.place}`)} title="Winner">
-            <i className="feather icon-award"></i>{getNumberWithOrdinal(cell.place)}
+            {getNumberWithOrdinal(cell.place)}
           </div>
           <div className="measurement">{cell.measurement.human_value}</div>
           <div className="bar" style={{height: `${height}px`}}></div>

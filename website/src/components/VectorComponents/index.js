@@ -12,9 +12,9 @@ import './styles.css';
 
 function Component({delivery_guarantee, description, event_types, name, status, type}) {
   let path = null;
-  if(type == "source") path = `/docs/components/sources/${name}`;
-  if(type == "transform") path = `/docs/components/transforms/${name}`;
-  if(type == "sink") path = `/docs/components/sinks/${name}`;
+  if(type == "source") path = `/docs/reference/sources/${name}`;
+  if(type == "transform") path = `/docs/reference/transforms/${name}`;
+  if(type == "sink") path = `/docs/reference/sinks/${name}`;
 
   return (
     <Link to={path} className="vector-component">

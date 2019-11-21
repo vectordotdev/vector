@@ -46,10 +46,10 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [docs.installation.manual]: https://vector.dev/docs/setup/installation/manual
 [docs.installation]: https://vector.dev/docs/setup/installation
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring
-[docs.sinks.clickhouse]: https://vector.dev/docs/components/sinks/clickhouse
-[docs.sinks.elasticsearch]: https://vector.dev/docs/components/sinks/elasticsearch
-[docs.sinks.kafka]: https://vector.dev/docs/components/sinks/kafka
-[docs.sources.docker]: https://vector.dev/docs/components/sources/docker
+[docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse
+[docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch
+[docs.sinks.kafka]: https://vector.dev/docs/reference/sinks/kafka
+[docs.sources.docker]: https://vector.dev/docs/reference/sources/docker
 [urls.compare_v0.4.0...v0.5.0]: https://github.com/timberio/vector/compare/v0.4.0...v0.5.0
 [urls.compare_v0.5.0...master]: https://github.com/timberio/vector/compare/v0.5.0...master
 [urls.conventional_commits]: https://www.conventionalcommits.org

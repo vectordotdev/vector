@@ -74,7 +74,7 @@ module.exports = {
     "version": "0.5.0"
   },
   "posts": [
-    "#<Post:0x00007fb83138f608>"
+    "#<Post:0x00007f94bff96838>"
   ],
   "sources": {
     "udp": {

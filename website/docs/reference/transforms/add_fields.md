@@ -234,7 +234,7 @@ special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 [docs.data-model.log#special-characters]: /docs/about/data-model/log#special-characters
 [docs.data-model.log]: /docs/about/data-model/log
 [docs.data-model]: /docs/about/data-model
-[docs.transforms.lua]: /docs/components/transforms/lua
-[docs.transforms.remove_fields]: /docs/components/transforms/remove_fields
+[docs.transforms.lua]: /docs/reference/transforms/lua
+[docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields
 [urls.toml_array]: https://github.com/toml-lang/toml#array
 [urls.toml_table]: https://github.com/toml-lang/toml#table

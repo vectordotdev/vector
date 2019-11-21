@@ -45,5 +45,6 @@ DOCS_HOST = "#{HOST}#{DOCS_BASE_PATH}"
 META_ROOT = File.join(ROOT_DIR, ".meta")
 PAGES_ROOT = File.join(ROOT_DIR, "website", "src", "pages")
 POSTS_ROOT = File.join(ROOT_DIR, "website", "blog")
+REFERENCE_ROOT = File.join(ROOT_DIR, "website", "docs", "reference")
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
 PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials")

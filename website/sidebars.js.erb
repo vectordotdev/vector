@@ -100,9 +100,10 @@ module.exports = {
     },
     {
       type: 'category',
-      label: 'Components',
+      label: 'Reference',
       items: [
-        <%= metadata.links.fetch_id("docs.components").to_json %>,
+        <%= metadata.links.fetch_id("docs.reference").to_json %>,
+        <%= metadata.links.fetch_id("docs.reference.global-options").to_json %>,
         {
           type: 'category',
           label: 'Sources',

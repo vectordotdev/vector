@@ -19,4 +19,4 @@ More options can be set with [flags][docs.process-management#flags] when
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
 [docs.process-management#flags]: /docs/administration/process-management#flags
 [docs.process-management#starting]: /docs/administration/process-management#starting
-[docs.sinks]: /docs/components/sinks
+[docs.sinks]: /docs/reference/sinks

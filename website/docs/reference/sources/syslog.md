@@ -407,6 +407,6 @@ ingestion and parsing scheme.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.data-model.log]: /docs/about/data-model/log
-[docs.sources.tcp]: /docs/components/sources/tcp
-[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
+[docs.sources.tcp]: /docs/reference/sources/tcp
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

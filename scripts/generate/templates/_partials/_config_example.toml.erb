@@ -1,4 +1,4 @@
-<% if array %>[[<%= path %>]]<% else %>[<%= path %>]<% end %>
+<% if path %><% if array %>[[<%= path %>]]<% else %>[<%= path %>]<% end %><% end %>
 <% example.grouped.each do |title, options| -%>
   <%- if example.grouped.length > 1 -%>
   # <%= title %>

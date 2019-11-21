@@ -126,7 +126,7 @@ templates = Templates.new(ROOT_DIR, metadata)
 #
 
 metadata.components.each do |component|
-  template_path = "#{DOCS_ROOT}/components/#{component.type.pluralize}/#{component.name}.md.erb"
+  template_path = "#{REFERENCE_ROOT}/#{component.type.pluralize}/#{component.name}.md.erb"
 
   if !File.exists?(template_path)
     contents = templates.component_default(component)

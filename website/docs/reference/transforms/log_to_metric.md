@@ -595,4 +595,4 @@ individual metrics for reduction in the metrics storage itself.
 [docs.data-model#sets]: /docs/about/data-model#sets
 [docs.data-model#tags]: /docs/about/data-model#tags
 [docs.data-model.metric]: /docs/about/data-model/metric
-[docs.sinks.prometheus]: /docs/components/sinks/prometheus
+[docs.sinks.prometheus]: /docs/reference/sinks/prometheus

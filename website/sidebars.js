@@ -102,34 +102,35 @@ module.exports = {
     },
     {
       type: 'category',
-      label: 'Components',
+      label: 'Reference',
       items: [
-        "components",
+        "reference",
+        "reference/global-options",
         {
           type: 'category',
           label: 'Sources',
           items: [
-            "components/sources",
+            "reference/sources",
             
-              "components/sources/docker",
+              "reference/sources/docker",
             
-              "components/sources/file",
+              "reference/sources/file",
             
-              "components/sources/journald",
+              "reference/sources/journald",
             
-              "components/sources/kafka",
+              "reference/sources/kafka",
             
-              "components/sources/statsd",
+              "reference/sources/statsd",
             
-              "components/sources/stdin",
+              "reference/sources/stdin",
             
-              "components/sources/syslog",
+              "reference/sources/syslog",
             
-              "components/sources/tcp",
+              "reference/sources/tcp",
             
-              "components/sources/udp",
+              "reference/sources/udp",
             
-              "components/sources/vector",
+              "reference/sources/vector",
             
           ]
         },
@@ -137,35 +138,35 @@ module.exports = {
           type: 'category',
           label: 'Transforms',
           items: [
-            "components/transforms",
+            "reference/transforms",
             
-              "components/transforms/add_fields",
+              "reference/transforms/add_fields",
             
-              "components/transforms/add_tags",
+              "reference/transforms/add_tags",
             
-              "components/transforms/coercer",
+              "reference/transforms/coercer",
             
-              "components/transforms/field_filter",
+              "reference/transforms/field_filter",
             
-              "components/transforms/grok_parser",
+              "reference/transforms/grok_parser",
             
-              "components/transforms/json_parser",
+              "reference/transforms/json_parser",
             
-              "components/transforms/log_to_metric",
+              "reference/transforms/log_to_metric",
             
-              "components/transforms/lua",
+              "reference/transforms/lua",
             
-              "components/transforms/regex_parser",
+              "reference/transforms/regex_parser",
             
-              "components/transforms/remove_fields",
+              "reference/transforms/remove_fields",
             
-              "components/transforms/remove_tags",
+              "reference/transforms/remove_tags",
             
-              "components/transforms/sampler",
+              "reference/transforms/sampler",
             
-              "components/transforms/split",
+              "reference/transforms/split",
             
-              "components/transforms/tokenizer",
+              "reference/transforms/tokenizer",
             
           ]
         },
@@ -173,41 +174,41 @@ module.exports = {
           type: 'category',
           label: 'Sinks',
           items: [
-            "components/sinks",
+            "reference/sinks",
             
-              "components/sinks/aws_cloudwatch_logs",
+              "reference/sinks/aws_cloudwatch_logs",
             
-              "components/sinks/aws_cloudwatch_metrics",
+              "reference/sinks/aws_cloudwatch_metrics",
             
-              "components/sinks/aws_kinesis_streams",
+              "reference/sinks/aws_kinesis_streams",
             
-              "components/sinks/aws_s3",
+              "reference/sinks/aws_s3",
             
-              "components/sinks/blackhole",
+              "reference/sinks/blackhole",
             
-              "components/sinks/clickhouse",
+              "reference/sinks/clickhouse",
             
-              "components/sinks/console",
+              "reference/sinks/console",
             
-              "components/sinks/datadog_metrics",
+              "reference/sinks/datadog_metrics",
             
-              "components/sinks/elasticsearch",
+              "reference/sinks/elasticsearch",
             
-              "components/sinks/file",
+              "reference/sinks/file",
             
-              "components/sinks/http",
+              "reference/sinks/http",
             
-              "components/sinks/kafka",
+              "reference/sinks/kafka",
             
-              "components/sinks/prometheus",
+              "reference/sinks/prometheus",
             
-              "components/sinks/splunk_hec",
+              "reference/sinks/splunk_hec",
             
-              "components/sinks/statsd",
+              "reference/sinks/statsd",
             
-              "components/sinks/tcp",
+              "reference/sinks/tcp",
             
-              "components/sinks/vector",
+              "reference/sinks/vector",
             
           ],
         },

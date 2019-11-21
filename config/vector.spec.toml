@@ -600,8 +600,7 @@ data_dir = "/var/lib/vector"
   # * must be: "add_fields"
   type = "add_fields"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -640,8 +639,7 @@ data_dir = "/var/lib/vector"
   # * must be: "add_tags"
   type = "add_tags"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -673,8 +671,7 @@ data_dir = "/var/lib/vector"
   # * must be: "coercer"
   type = "coercer"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -710,8 +707,7 @@ data_dir = "/var/lib/vector"
   # * must be: "field_filter"
   type = "field_filter"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -744,8 +740,7 @@ data_dir = "/var/lib/vector"
   # * must be: "grok_parser"
   type = "grok_parser"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -802,8 +797,7 @@ data_dir = "/var/lib/vector"
   # * must be: "json_parser"
   type = "json_parser"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -855,8 +849,7 @@ data_dir = "/var/lib/vector"
   # * must be: "log_to_metric"
   type = "log_to_metric"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -920,8 +913,7 @@ data_dir = "/var/lib/vector"
   # * must be: "lua"
   type = "lua"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -965,8 +957,7 @@ end
   # * must be: "regex_parser"
   type = "regex_parser"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1023,8 +1014,7 @@ end
   # * must be: "remove_fields"
   type = "remove_fields"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1046,8 +1036,7 @@ end
   # * must be: "remove_tags"
   type = "remove_tags"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1069,8 +1058,7 @@ end
   # * must be: "sampler"
   type = "sampler"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1107,8 +1095,7 @@ end
   # * must be: "split"
   type = "split"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1177,8 +1164,7 @@ end
   # * must be: "tokenizer"
   type = "tokenizer"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1245,8 +1231,7 @@ end
   # * must be: "aws_cloudwatch_logs"
   type = "aws_cloudwatch_logs"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1432,8 +1417,7 @@ end
   # * must be: "aws_cloudwatch_metrics"
   type = "aws_cloudwatch_metrics"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1480,8 +1464,7 @@ end
   # * must be: "aws_kinesis_streams"
   type = "aws_kinesis_streams"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1650,8 +1633,7 @@ end
   # * must be: "aws_s3"
   type = "aws_s3"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1850,8 +1832,7 @@ end
   # * must be: "blackhole"
   type = "blackhole"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1886,8 +1867,7 @@ end
   # * must be: "clickhouse"
   type = "clickhouse"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2138,8 +2118,7 @@ end
   # * must be: "console"
   type = "console"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2188,8 +2167,7 @@ end
   # * must be: "datadog_metrics"
   type = "datadog_metrics"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2310,8 +2288,7 @@ end
   # * must be: "elasticsearch"
   type = "elasticsearch"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2598,8 +2575,7 @@ end
   # * must be: "file"
   type = "file"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2654,8 +2630,7 @@ end
   # * must be: "http"
   type = "http"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2912,8 +2887,7 @@ end
   # * must be: "kafka"
   type = "kafka"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3058,8 +3032,7 @@ end
   # * must be: "prometheus"
   type = "prometheus"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3108,8 +3081,7 @@ end
   # * must be: "splunk_hec"
   type = "splunk_hec"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3330,8 +3302,7 @@ end
   # * must be: "statsd"
   type = "statsd"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3372,8 +3343,7 @@ end
   # * must be: "tcp"
   type = "tcp"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3527,8 +3497,7 @@ end
   # * must be: "vector"
   type = "vector"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]

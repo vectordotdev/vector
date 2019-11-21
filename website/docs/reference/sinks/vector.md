@@ -285,4 +285,4 @@ event-by-event basis. It does not batch data.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.sources.vector]: /docs/components/sources/vector
+[docs.sources.vector]: /docs/reference/sources/vector
