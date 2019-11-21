@@ -37,7 +37,7 @@ check-generate: ## Checks for pending `make generate` changes
 	@scripts/check-generate.sh
 
 check-examples: ## Validates the config examples
-	@find ./config/examples -name "*.toml" | xargs -I{} sh -c "cargo run -q -- validate --topology --deny-warnings -c {} || exit 255"
+	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-version: ## Checks that the version in Cargo.toml is up-to-date
 	@bundle install --gemfile=scripts/Gemfile --quiet

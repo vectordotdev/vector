@@ -98,15 +98,8 @@ struct Validate {
     #[structopt(short, long)]
     deny_warnings: bool,
 
-    /// Read configuration from the specified file
-    #[structopt(
-        name = "config",
-        value_name = "FILE",
-        short,
-        long,
-        default_value = "/etc/vector/vector.toml"
-    )]
-    config_path: PathBuf,
+    /// Any number of Vector config files to validate.
+    config_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -197,7 +190,7 @@ fn main() {
 
     sub_command.map(|s| {
         std::process::exit(match s {
-            SubCommand::Validate(v) => validate(&v, &opts),
+            SubCommand::Validate(v) => validate(&v),
             SubCommand::List(l) => list::cmd(&l),
             SubCommand::Generate(g) => generate::cmd(&g),
         })
@@ -388,79 +381,67 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn validate(opts: &Validate, root_opts: &RootOpts) -> exitcode::ExitCode {
-    let (rconf, rconf_is_set) = root_opts.config_path.to_str().map_or(("", false), |s| {
-        let default_root_config = RootOpts::from_iter(vec![""]);
-        (
-            s,
-            s != default_root_config.config_path.to_str().unwrap_or(""),
-        )
-    });
-    if rconf_is_set {
-        error!(
-            "Config flag should appear after sub command: `vector validate -c {}`.",
-            rconf
-        );
-        return exitcode::USAGE;
-    }
-
-    let file = if let Some(file) = open_config(&opts.config_path) {
-        file
-    } else {
-        error!(
-            message = "Failed to open config file.",
-            path = ?opts.config_path
-        );
-        return exitcode::CONFIG;
-    };
-
-    trace!(
-        message = "Parsing config.",
-        path = ?opts.config_path
-    );
-
-    let config = vector::topology::Config::load(file);
-    let config = handle_config_errors(config);
-    let config = config.unwrap_or_else(|| {
-        error!(
-            message = "Failed to parse config file.",
-            path = ?opts.config_path
-        );
-        std::process::exit(exitcode::CONFIG);
-    });
-
-    if opts.topology {
-        let exit = match topology::builder::check(&config) {
-            Err(errors) => {
-                for error in errors {
-                    error!("Topology error: {}", error);
-                }
-                Some(exitcode::CONFIG)
-            }
-            Ok(warnings) => {
-                for warning in &warnings {
-                    warn!("Topology warning: {}", warning);
-                }
-                if opts.deny_warnings && !warnings.is_empty() {
-                    Some(exitcode::CONFIG)
-                } else {
-                    None
-                }
-            }
-        };
-        if exit.is_some() {
+fn validate(opts: &Validate) -> exitcode::ExitCode {
+    for config_path in &opts.config_paths {
+        let file = if let Some(file) = open_config(&config_path) {
+            file
+        } else {
             error!(
-                message = "Failed to verify config file topology.",
-                path = ?opts.config_path
+                message = "Failed to open config file.",
+                path = ?config_path
             );
-            return exit.unwrap();
+            return exitcode::CONFIG;
+        };
+
+        trace!(
+            message = "Parsing config.",
+            path = ?config_path
+        );
+
+        let config = vector::topology::Config::load(file);
+        let config = handle_config_errors(config);
+        let config = config.unwrap_or_else(|| {
+            error!(
+                message = "Failed to parse config file.",
+                path = ?config_path
+            );
+            std::process::exit(exitcode::CONFIG);
+        });
+
+        if opts.topology {
+            let exit = match topology::builder::check(&config) {
+                Err(errors) => {
+                    for error in errors {
+                        error!("Topology error: {}", error);
+                    }
+                    Some(exitcode::CONFIG)
+                }
+                Ok(warnings) => {
+                    for warning in &warnings {
+                        warn!("Topology warning: {}", warning);
+                    }
+                    if opts.deny_warnings && !warnings.is_empty() {
+                        Some(exitcode::CONFIG)
+                    } else {
+                        None
+                    }
+                }
+            };
+            if exit.is_some() {
+                error!(
+                    message = "Failed to verify config file topology.",
+                    path = ?config_path
+                );
+                return exit.unwrap();
+            }
         }
+
+        debug!(
+            message = "Validation successful.",
+            path = ?config_path
+        );
     }
 
-    debug!(
-        message = "Validation successful.",
-        path = ?opts.config_path
-    );
     exitcode::OK
 }
 
