@@ -10,6 +10,7 @@ use vector::test_util::{
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
+#[cfg(unix)]
 #[test]
 fn test_buffering() {
     let data_dir = tempdir().unwrap();
