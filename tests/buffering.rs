@@ -77,7 +77,7 @@ fn test_buffering() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    block_on(topology.stop()).unwrap();
+    rt.block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
