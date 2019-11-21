@@ -34,6 +34,11 @@
   height: 100%;
 }
 
+.configuration__diagram svg #config-file-bg {
+  fill: var(--ifm-panel-background);
+  stroke: var(--ifm-panel-border-color);
+}
+
 @media (max-width: 996px) {
   .configuration__diagram {
     margin: 0 auto;

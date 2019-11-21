@@ -219,9 +219,12 @@ table.comparison tr td.description .links {
   font-size: 0.9em;
   margin-top: var(--ifm-spacing-vertical);
 }
+table.comparison tr td.result {
+  background: var(--ifm-panel-background);
+}
 table.comparison tr:hover td.row-label,
 table.comparison tr:hover td.result {
-  background: var(--ifm-color-emphasis-50);
+  background: var(--ifm-color-emphasis-25);
 }
 table.comparison tr td.result.failed {
   color: var(--ifm-color-danger);

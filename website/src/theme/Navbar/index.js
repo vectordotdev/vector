@@ -51,7 +51,8 @@ function navLinkAttributes(label) {
     case 'github':
       return {
         badge: '3k',
-        icon: 'github'
+        icon: 'github',
+        hideText: true 
       };
 
     default:
@@ -78,7 +79,7 @@ function NavLink(props) {
             to: toUrl,
           })}>
       {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {props.label}
+      {!attributes.hideText && props.label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
