@@ -220,7 +220,7 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
     let mut rp_config = RegexParserConfig::default();
     // message field
     rp_config.regex =
-        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$"
+        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>[^\n]*)[\n]?$"
             .to_owned();
     // drop field
     rp_config
@@ -274,15 +274,24 @@ fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform
 
     let namespace_regex = r"(?P<pod_namespace>[0-9a-z.\-]*)";
     let name_regex = r"(?P<pod_name>[0-9a-z.\-]*)";
-    let uid_regex = r"(?P<object_uid>[0-9A-Fa-f\-]*)";
+    let uid_regex = r"(?P<object_uid>([0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}|[0-9A-Fa-f]{32}))";
 
-    // Minikube 1.5.2
+    // Minikube 1.5.2, MicroK8s 1.15, DigitalOcean, Google Kubernetes Engine
     // format: namespace_name_UID
     regexes.push(format!(
         "^{}_{}_{}$",
         namespace_regex, name_regex, uid_regex
     ));
-    // TODO Common regexes
+
+    // EKS kube 1.13 , AKS kube 1.13.12
+    // If everything else fails, try to at least parse out uid from somewhere.
+    // This is somewhat robust as UUID format is hard to create by accident
+    // ,at least in this context, plus regex requires that UUID is separated
+    // from other data either by start,end of string or by non UUID character.
+    regexes.push(format!(
+        r"(^|[^0-9A-Fa-f\-]){}([^0-9A-Fa-f\-]|$)",
+        uid_regex
+    ));
 
     let mut transforms = Vec::new();
     for regex in regexes {
@@ -394,5 +403,39 @@ mod tests {
                 .unwrap()
                 .with_timezone(&Utc),
         );
+    }
+
+    #[test]
+    fn pod_uid_transform_namespace_name_uid() {
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit(
+            "pod_uid".into(),
+            "kube-system_kube-apiserver-minikube_8f6b5d95bfe4bcf4cc9c4d8435f0668b"
+                .to_owned()
+                .into(),
+        );
+
+        let mut transform = transform_pod_uid(None).unwrap();
+
+        let event = transform.transform(event).expect("Transformed");
+
+        has(&event, "pod_namespace", "kube-system");
+        has(&event, "pod_name", "kube-apiserver-minikube");
+        has(&event, "object_uid", "8f6b5d95bfe4bcf4cc9c4d8435f0668b");
+    }
+
+    #[test]
+    fn pod_uid_transform_uid() {
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit(
+            "pod_uid".into(),
+            "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned().into(),
+        );
+
+        let mut transform = transform_pod_uid(None).unwrap();
+
+        let event = transform.transform(event).expect("Transformed");
+
+        has(&event, "object_uid", "306cd636-0c6d-11ea-9079-1c1b0de4d755");
     }
 }
