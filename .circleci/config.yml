@@ -91,32 +91,24 @@ jobs:
             # see https://github.com/rust-lang/cargo/issues/2078
             printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
       - run:
-          name: Download Perl
+          name: Install Perl
           shell: bash
           command: |
             VERSION=5.30.0.1
             # we need to verify checksum because strawberryperl.com doesn't support HTTPS
             SHA256SUM=459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12
-            curl http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+            curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
             echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
+            echo "msiexec /quiet /i perl-installer.msi" | cmd
+            rm perl-installer.msi
       - run:
-          name: Install Perl
-          shell: cmd.exe # installation times out with bash shell
-          command: |
-            msiexec /quiet /i perl-installer.msi
-            del perl-installer.msi
-      - run:
-          name: Download CMake
+          name: Install CMake
           shell: bash
           command: |
             VERSION=3.15.5
-            curl -L https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
-      - run:
-          name: Install CMake
-          shell: cmd.exe
-          command: |
-            msiexec /quiet /i cmake-installer.msi
-            del cmake-installer.msi
+            curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
+            echo "msiexec /quiet /i cmake-installer.msi" | cmd
+            rm cmake-intaller.msi
       - run:
           name: Build and test
           shell: bash
@@ -126,17 +118,6 @@ jobs:
             FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
             rm rust-toolchain
             cargo test --no-default-features --features "$FEATURES"
-      # - run:
-      #     name: Build and test
-      #     shell: bash
-      #     command: |
-      #       RUSTFLAGS=-Ctarget-feature=+crt-static
-      #       FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
-      #       PATH="$HOME/.cargo/bin:$PATH"
-      #       # see https://github.com/rust-lang/cargo/issues/2078
-      #       printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
-      #       rm rust-toolchain # to use nightly
-      #       cargo test --no-default-features --features "$FEATURES"
 
   test-stable:
     resource_class: xlarge
