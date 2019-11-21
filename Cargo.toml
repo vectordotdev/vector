@@ -83,7 +83,6 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # External libs
-atty = "0.2"
 derivative = "1.0"
 chrono = "0.4.9"
 rand = "0.5.5"
@@ -128,6 +127,9 @@ listenfd = "0.3.3"
 inventory = "0.1"
 syslog_rfc5424 = "0.6.1"
 shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber", default-features = false }
+
+[target.'cfg(unix)'.dependencies]
+atty = "0.2"
 
 [build-dependencies]
 prost-build = "0.4.0"

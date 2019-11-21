@@ -183,7 +183,10 @@ fn main() {
     };
 
     let color = match opts.color.clone().unwrap_or(Color::Auto) {
+        #[cfg(unix)]
         Color::Auto => atty::is(atty::Stream::Stdout),
+        #[cfg(windows)]
+        Color::Auto => false, // ANSI colors are not supported by cmd.exe
         Color::Always => true,
         Color::Never => false,
     };
