@@ -14,7 +14,7 @@ method. Each installation guide provides it's own "Updating" section:
 **<%= category.to_s.humanize %>**
 
 <%- methods.each do |method| -%>
-<Jump to="[[[<%= method["name"] %>][docs.<%= category %>.<%= method["id"] %>#updating]]]"><%= method["name"] %></Jump>
+<Jump to="[[[docs.<%= category %>.<%= method["id"] %>#updating]]]"><%= method["name"] %></Jump>
 <%- end -%>
 <%- end -%>
 

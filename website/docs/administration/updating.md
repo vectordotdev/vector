@@ -12,13 +12,13 @@ method. Each installation guide provides it's own "Updating" section:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="[[[Docker][docs.containers.docker#updating]]]">Docker</Jump>
+<Jump to="/docs/setup/installation/containers/docker#updating">Docker</Jump>
 
 **Package managers**
 
-<Jump to="[[[DPKG][docs.package_managers.dpkg#updating]]]">DPKG</Jump>
-<Jump to="[[[Homebrew][docs.package_managers.homebrew#updating]]]">Homebrew</Jump>
-<Jump to="[[[RPM][docs.package_managers.rpm#updating]]]">RPM</Jump>
+<Jump to="/docs/setup/installation/package-managers/dpkg#updating">DPKG</Jump>
+<Jump to="/docs/setup/installation/package-managers/homebrew#updating">Homebrew</Jump>
+<Jump to="/docs/setup/installation/package-managers/rpm#updating">RPM</Jump>
 
 **Manual**
 
@@ -44,9 +44,5 @@ data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
 
 
-[docs.containers.docker#updating]: /docs/setup/installation/containers/docker#updating
 [docs.installation]: /docs/setup/installation
-[docs.package_managers.dpkg#updating]: /docs/setup/installation/package-managers/dpkg#updating
-[docs.package_managers.homebrew#updating]: /docs/setup/installation/package-managers/homebrew#updating
-[docs.package_managers.rpm#updating]: /docs/setup/installation/package-managers/rpm#updating
 [docs.topologies]: /docs/setup/deployment/topologies
