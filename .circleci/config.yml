@@ -262,6 +262,7 @@ jobs:
             export TARGET="x86_64-pc-windows-msvc"
 
             ./scripts/build-archive.sh
+            ls -lha target/artifacts
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -450,6 +451,17 @@ jobs:
       - run:
           name: Verify installation
           command: vector --version
+
+  verify-zip-artifact-on-windows:
+    executor: win/vs2019
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Verify package
+          shell: bash
+          command: |
+            powershell Expand-Archive target/artifacts/vector-x86_64-pc-windows-msvc.zip .
+            ./vector-x86_64-pc-windows-msvc/bin/vector.exe --version
 
   verify-docker:
     docker:
@@ -724,6 +736,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - verify-deb-artifact-on-ubuntu-16-04
     - verify-deb-artifact-on-ubuntu-18-04
     - verify-deb-artifact-on-ubuntu-19-04
+    - verify-zip-artifact-on-windows
     - verify-docker
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
@@ -779,6 +792,9 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-zip-artifact-on-windows:
+          requires:
+            - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
@@ -850,6 +866,10 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-zip-artifact-on-windows:
+          <<: *release-filters
+          requires:
+            - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
           <<: *release-filters
           requires:
@@ -933,6 +953,9 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-zip-artifact-on-windows:
+          requires:
+            - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
