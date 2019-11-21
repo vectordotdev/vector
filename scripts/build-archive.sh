@@ -54,7 +54,7 @@ if [ -z "$NATIVE_BUILD" ]; then
   build_flags="$build_flags --target $TARGET"
 fi
 
-
+on_exit=""
 
 # Currently the only way to set Rust codegen LTO type (-C lto, as opposed to
 # -C compiler-plugin-lto) at build time for a crate with library dependencies
@@ -62,8 +62,9 @@ fi
 # https://github.com/rust-lang/cargo/issues/4349 and
 # https://bugzilla.mozilla.org/show_bug.cgi?id=1386371#c2.
 if [ -n "$RUST_LTO" ]; then
+  on_exit="mv Cargo.toml.orig Cargo.toml; $on_exit"
+  trap "$on_exit" EXIT
   cp Cargo.toml Cargo.toml.orig
-  trap "mv Cargo.toml.orig Cargo.toml" EXIT
   case "$RUST_LTO" in
     lto) lto_value="true";;
     lto=thin) lto_value="\"thin\"";;
@@ -73,7 +74,8 @@ fi
 
 # Rename the rust-toolchain file so that we can use our custom version of rustc installed
 # on release containers.
-trap "mv rust-toolchain.bak rust-toolchain" EXIT
+on_exit="mv rust-toolchain.bak rust-toolchain; $on_exit"
+trap "$on_exit" EXIT
 mv rust-toolchain rust-toolchain.bak
 
 if [ "$FEATURES" != "default" ]; then
