@@ -250,7 +250,7 @@ jobs:
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             function zip() {
-              echo "Compress-Archive $3 $2" | powershell
+              echo "Compress-Archive \"$3\" \"$2\"" | powershell
             }
             export -f zip
 
@@ -261,7 +261,7 @@ jobs:
             export RUST_LTO="lto"
             export TARGET="x86_64-pc-windows-msvc"
 
-            make build-archive
+            ./scripts/build-archive.sh
       - persist_to_workspace:
           root: target/artifacts
           paths:
