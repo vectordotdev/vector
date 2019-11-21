@@ -147,6 +147,8 @@ module.exports = {
             
               "components/transforms/field_filter",
             
+              "components/transforms/geoip",
+            
               "components/transforms/grok_parser",
             
               "components/transforms/json_parser",

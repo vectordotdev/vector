@@ -132,6 +132,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`add_tags`**][docs.transforms.add_tags] | Accepts [`metric`][docs.data-model#metric] events and allows you to add one or more metric tags. |
 | [**`coercer`**][docs.transforms.coercer] | Accepts [`log`][docs.data-model#log] events and allows you to coerce log fields into fixed types. |
 | [**`field_filter`**][docs.transforms.field_filter] | Accepts [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events and allows you to filter events by a log field's value. |
+| [**`geoip`**][docs.transforms.geoip] | Accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 database. |
 | [**`grok_parser`**][docs.transforms.grok_parser] | Accepts [`log`][docs.data-model#log] events and allows you to parse a log field value with [Grok][urls.grok]. |
 | [**`json_parser`**][docs.transforms.json_parser] | Accepts [`log`][docs.data-model#log] events and allows you to parse a log field value as JSON. |
 | [**`log_to_metric`**][docs.transforms.log_to_metric] | Accepts [`log`][docs.data-model#log] events and allows you to convert logs into one or more metrics. |
@@ -254,6 +255,7 @@ the License.
 [docs.transforms.add_tags]: https://vector.dev/docs/components/transforms/add_tags
 [docs.transforms.coercer]: https://vector.dev/docs/components/transforms/coercer
 [docs.transforms.field_filter]: https://vector.dev/docs/components/transforms/field_filter
+[docs.transforms.geoip]: https://vector.dev/docs/components/transforms/geoip
 [docs.transforms.grok_parser]: https://vector.dev/docs/components/transforms/grok_parser
 [docs.transforms.json_parser]: https://vector.dev/docs/components/transforms/json_parser
 [docs.transforms.log_to_metric]: https://vector.dev/docs/components/transforms/log_to_metric

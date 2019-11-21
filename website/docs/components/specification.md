@@ -744,6 +744,36 @@ data_dir = "/var/lib/vector"
   # * type: string
   value = "/var/log/nginx.log"
 
+# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 database.
+[transforms.geoip]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `geoip`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "geoip"
+  type = "geoip"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Path to the MaxMind GeoIP2 database file.
+  # 
+  # * required
+  # * type: string
+  field = "/path/to/database"
+
+  # TODO: fill me in
+  # 
+  # * optional
+  # * default: "default_geoip_target_field"
+  # * type: string
+  target = "default_geoip_target_field"
+
 # Accepts `log` events and allows you to parse a log field value with Grok.
 [transforms.grok_parser]
   #

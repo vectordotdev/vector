@@ -1,0 +1,26 @@
+[transforms.geoip]
+allow_you_to_description = "enrich events with geolocation data from the MaxMind GeoIP2 database"
+common = false
+function_category = "enrich"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.geoip.options.field]
+type = "string"
+common = true
+examples = ["/path/to/database"]
+null = false
+description = """\
+Path to the MaxMind GeoIP2 database file.\
+"""
+
+[transforms.geoip.options.target]
+type = "string"
+common = true
+default = "default_geoip_target_field"
+null = false
+description = """\
+TODO: fill me in\
+"""

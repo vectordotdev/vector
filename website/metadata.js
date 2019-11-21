@@ -74,7 +74,7 @@ module.exports = {
     "version": "0.5.0"
   },
   "posts": [
-    "#<Post:0x00007fb83138f608>"
+    "#<Post:0x00007fc61749b2b0>"
   ],
   "sources": {
     "udp": {
@@ -246,6 +246,19 @@ module.exports = {
       "function_category": "parse",
       "id": "json_parser_transform",
       "name": "json_parser",
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform"
+    },
+    "geoip": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "event_types": [
+        "log"
+      ],
+      "function_category": "enrich",
+      "id": "geoip_transform",
+      "name": "geoip",
       "service_provider": null,
       "status": "prod-ready",
       "type": "transform"

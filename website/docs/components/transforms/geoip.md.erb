@@ -1,0 +1,25 @@
+<%- component = metadata.transforms.geoip -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Database
+
+The `geoip` transform uses the Maxmind Geoip 2 database.
+
+TODO: Fill in with:
+
+1. How is the data enriched?
+2. Which fields are added?
+3. What happens if a look up fails?

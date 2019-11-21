@@ -40,6 +40,7 @@ scopes:
   - add_tags transform
   - coercer transform
   - field_filter transform
+  - geoip transform
   - grok_parser transform
   - json_parser transform
   - log_to_metric transform
