@@ -39,7 +39,7 @@ simple and unified.
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
-#### [Components][https://vector.dev/components]
+#### [Components](https://vector.dev/components)
 
 * [**Sources**][docs.sources] - 
 * [**Transforms**][docs.transforms]
