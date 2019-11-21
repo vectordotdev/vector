@@ -7,7 +7,7 @@
   --vector-switcher-color: var(--ifm-background-color);
   --vector-switcher-color-inverted: var(--ifm-color-emphasis-1000);
 
-  background: linear-gradient(to right, var(--ifm-color-primary), var(--ifm-color-pink));
+  background: linear-gradient(to right, var(--ifm-color-primary), var(--ifm-color-blue), var(--ifm-color-pink));
   border-radius: var(--ifm-global-radius);
   display: flex;
   justify-content: space-between;

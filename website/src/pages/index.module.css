@@ -245,7 +245,7 @@ html[data-theme="dark"] .hero {
 }
 
 .installationPlatforms {
-  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  margin: calc( var(--ifm-spacing-vertical) * 4 ) 0 calc( var(--ifm-spacing-vertical) * 1 ) 0;
   text-align: center;
 }
 
@@ -258,15 +258,19 @@ html[data-theme="dark"] .hero {
   max-width: 100px;
 }
 
-.installationPlatforms a:hover svg [fill="#10E7FF"] {
+.installationPlatforms svg [fill="#10E7FF"] {
   fill: var(--ifm-heading-color);
 }
 
+.installationPlatforms a:hover svg [fill="#10E7FF"] {
+  fill: var(--ifm-color-primary);
+}
+
 .installationChecks {
-  color: var(--ifm-color-primary);
   display: flex;
+  font-weight: bold;
   justify-content: center;
-  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 4 );
   vertical-align: center;
 }
 
