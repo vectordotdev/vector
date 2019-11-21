@@ -23,8 +23,8 @@ import VectorComponents from '@site/src/components/VectorComponents';
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.roles.agent]: /docs/setup/deployment/roles/agent
 [docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sources.file]: /docs/components/sources/file
-[docs.sources.stdin]: /docs/components/sources/stdin
-[docs.sources.syslog]: /docs/components/sources/syslog
-[docs.sources.tcp]: /docs/components/sources/tcp
-[docs.sources.vector]: /docs/components/sources/vector
+[docs.sources.file]: /docs/reference/sources/file
+[docs.sources.stdin]: /docs/reference/sources/stdin
+[docs.sources.syslog]: /docs/reference/sources/syslog
+[docs.sources.tcp]: /docs/reference/sources/tcp
+[docs.sources.vector]: /docs/reference/sources/vector

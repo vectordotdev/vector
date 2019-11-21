@@ -27,9 +27,9 @@ from A to B.
 [docs.performance]: /docs/about/performance
 [docs.roles.agent]: /docs/setup/deployment/roles/agent
 [docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sinks]: /docs/components/sinks
-[docs.sources]: /docs/components/sources
-[docs.transforms]: /docs/components/transforms
+[docs.sinks]: /docs/reference/sinks
+[docs.sources]: /docs/reference/sources
+[docs.transforms]: /docs/reference/transforms
 [docs.use_cases]: /docs/use_cases
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_repo]: https://github.com/timberio/vector

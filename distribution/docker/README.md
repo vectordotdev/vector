@@ -126,9 +126,9 @@ docker run timberio/vector:nightly-alpine
 [docs.performance]: https://vector.dev/docs/about/performance
 [docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent
 [docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service
-[docs.sinks]: https://vector.dev/docs/components/sinks
-[docs.sources]: https://vector.dev/docs/components/sources
-[docs.transforms]: https://vector.dev/docs/components/transforms
+[docs.sinks]: https://vector.dev/docs/reference/sinks
+[docs.sources]: https://vector.dev/docs/reference/sources
+[docs.transforms]: https://vector.dev/docs/reference/transforms
 [docs.use_cases]: https://vector.dev/docs/use_cases
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine

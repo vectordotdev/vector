@@ -202,7 +202,7 @@ performance issues.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.performance]: /docs/about/performance
-[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns

@@ -127,6 +127,6 @@ filters.
 
 
 [docs.data-model#event]: /docs/about/data-model#event
-[docs.sinks]: /docs/components/sinks
+[docs.sinks]: /docs/reference/sinks
 [pages.components]: /components
 [urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

@@ -149,10 +149,10 @@ reducing cost, etc.
 [docs.guides]: /docs/setup/guides
 [docs.performance]: /docs/about/performance
 [docs.roles]: /docs/setup/deployment/roles
-[docs.sinks]: /docs/components/sinks
-[docs.sources]: /docs/components/sources
+[docs.sinks]: /docs/reference/sinks
+[docs.sources]: /docs/reference/sources
 [docs.topologies]: /docs/setup/deployment/topologies
-[docs.transforms]: /docs/components/transforms
+[docs.transforms]: /docs/reference/transforms
 [urls.rust]: https://www.rust-lang.org/
 [urls.toml]: https://github.com/toml-lang/toml
 [urls.toml_table]: https://github.com/toml-lang/toml#table

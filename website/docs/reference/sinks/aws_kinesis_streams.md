@@ -686,7 +686,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.guarantees]: /docs/about/guarantees
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
-[docs.transforms.add_fields]: /docs/components/transforms/add_fields
+[docs.transforms.add_fields]: /docs/reference/transforms/add_fields
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

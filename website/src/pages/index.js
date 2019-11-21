@@ -72,7 +72,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        An <Link to="/docs/components/transforms/lua">embedded LUA engine</Link> makes it easy to program powerful transforms. Handle complex use cases without limitations.
+        An <Link to="/docs/reference/transforms/lua">embedded LUA engine</Link> makes it easy to program powerful transforms. Handle complex use cases without limitations.
       </>
     ),
   },
@@ -106,7 +106,6 @@ function Features({features}) {
   return (
     <section className={styles.features}>
       <div className="container">
-        <h2>Features</h2>
         {rows}
       </div>
     </section>
@@ -150,7 +149,7 @@ function Correctness() {
             <thead>
               <tr>
                 <th></th>
-                <th>Vector</th>
+                <th className="vector">Vector</th>
                 <th>Filebeat</th>
                 <th>FluentBit</th>
                 <th>FluentD</th>
@@ -161,8 +160,8 @@ function Correctness() {
             </thead>
             <tbody>
               <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness">Disk buffer persistence</a></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness">Disk buffer persistence</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
@@ -171,28 +170,8 @@ function Correctness() {
                 <td className="result passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness">File rotate (create)</a></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-              </tr>
-              <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness">File rotate (copytruncate)</a></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result failed"><i className="feather icon-x"></i></td>
-                <td className="result failed"><i className="feather icon-x"></i></td>
-                <td className="result failed"><i className="feather icon-x"></i></td>
-                <td className="result failed"><i className="feather icon-x"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
-              </tr>
-              <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness">File truncation</a></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness">File rotate (create)</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
@@ -201,8 +180,28 @@ function Correctness() {
                 <td className="result passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness">Process (SIGHUP)</a></td>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness">File rotate (copytruncate)</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
+                <td className="result failed"><i className="feather icon-x"></i></td>
+                <td className="result failed"><i className="feather icon-x"></i></td>
+                <td className="result failed"><i className="feather icon-x"></i></td>
+                <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness">File truncation</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="result passed"><i className="feather icon-check"></i></td>
+              </tr>
+              <tr>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness">Process (SIGHUP)</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
@@ -211,8 +210,8 @@ function Correctness() {
                 <td className="result passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_stream_correctness">TCP Streaming</a></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_stream_correctness">TCP Streaming</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
@@ -221,8 +220,8 @@ function Correctness() {
                 <td className="result passed"><i className="feather icon-check"></i></td>
               </tr>
               <tr>
-                <td><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness">JSON (wrapped)</a></td>
-                <td className="result passed"><i className="feather icon-check"></i></td>
+                <td className="row-label"><a target="_blank" href="https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness">JSON (wrapped)</a></td>
+                <td className="result passed vector"><i className="feather icon-check"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
                 <td className="result failed"><i className="feather icon-x"></i></td>
                 <td className="result passed"><i className="feather icon-check"></i></td>
@@ -275,13 +274,13 @@ function Integrations() {
           <div className={styles.componentsCanvas} id="component-canvas"></div>
           <ul>
             {Object.keys(sources).map((key, index) => (
-              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/components/sources/${key}`}>{sources[key].name}</Link></li>
+              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}`}>{sources[key].name}</Link></li>
             ))}
             {Object.keys(transforms).map((key, index) => (
-              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/components/transforms/${key}`}>{transforms[key].name}</Link></li>
+              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}`}>{transforms[key].name}</Link></li>
             ))}
             {Object.keys(sinks).map((key, index) => (
-              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/components/sinks/${key}`}>{sinks[key].name}</Link></li>
+              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}`}>{sinks[key].name}</Link></li>
             ))}
           </ul>
         </div>
@@ -324,7 +323,7 @@ function Installation() {
             <i className="feather icon-package"></i> Fully static, no dependencies
           </div>
           <div>
-            <i className="feather icon-feather"></i> Light-weight, weighing only 8mb
+            <i className="feather icon-feather"></i> Light-weight, weighing only 7mb
           </div>
           <div>
             <i className="feather icon-zap"></i> No runtime or garbage collection

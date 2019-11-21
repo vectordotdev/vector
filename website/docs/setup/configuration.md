@@ -4,10 +4,10 @@ description: Configuring Vector
 ---
 
 This section covers configuring Vector and creating
-[pipelines][docs.configuration#composition] like the [example](#example) below.
-Vector requires only a _single_ [TOML][urls.toml] configurable file, which you
-can specify via the [`--config` flag][docs.process-management#flags] when
-[starting][docs.process-management#starting] vector:
+[pipelines][docs.concepts#pipelines] like the [example](#example) below.
+Vector's configuration uses the [TOML][urls.toml] syntax, and the configuration
+file must be passed via the [`--config` flag][docs.process-management#flags]
+when [starting][docs.process-management#starting] vector:
 
 ```bash
 vector --config /etc/vector/vector.toml
@@ -61,61 +61,103 @@ data_dir = "/var/lib/vector"
   encoding     = "ndjson"                      # new line delimited JSON
 ```
 
-## Global Options
+## Quick Start
 
-import Fields from '@site/src/components/Fields';
+At the very minimum, a Vector configuration file must be composed of a
+[source][docs.sources] and a [sink][docs.sinks], [transforms][docs.transforms]
+are optional. To get started:
 
-import Field from '@site/src/components/Field';
+<div class="section-list section-list--lg">
+<div class="section">
 
-<Fields filters={true}>
+### 1. Choose a source
 
+To begin, you'll need to ingest data into Vector. This happens through one
+or more [sources][docs.sources]. For example:
 
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/var/lib/vector"]}
-  name={"data_dir"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
+<CodeHeader fileName="vector.toml" />
 
-### data_dir
+```toml
+[sources.nginx_logs]
+  type = "file"
+  include = "/var/log/nginx*.log"
+```
 
-The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
+</div>
+<div class="section">
 
+### 2. Optionally choose a transform
 
-</Field>
+Next, you'll want to choose a [transform][docs.transforms]. Transforms are
+optional, but most configuration include at least one since they help to
+improve your data through parsing, structuring, and enriching. For example,
+let's use the [`regex_parser` transform][docs.transforms.regex_parser] to parse
+and structure our data:
 
+<CodeHeader fileName="vector.toml" />
 
-</Fields>
+```toml
+[sources.nginx_logs]
+  type = "file"
+  include = "/var/log/nginx*.log"
 
-## Specification
+[transforms.nginx_parser]
+  inputs  = ["nginx_logs"] # <--- connect the transform to our source
+  type    = "regex_parser"
+  include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
+```
 
+Notice how we connected the new transform to our source via the `inputs`
+option.
 
+</div>
+<div class="section">
+
+### 3. Choose a sink
+
+Finally, you'll want to choose a sink. Sinks are responsible for emitting data
+out of Vector. For this example, we'll use the
+[`console` sink][docs.sinks.console], which is simply writes the data to
+`STDOUT`:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[sources.nginx_logs]
+  type = "file"
+  include = "/var/log/nginx*.log"
+
+[transforms.nginx_parser]
+  inputs  = ["nginx_logs"]
+  type    = "regex_parser"
+  include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
+
+[sinks.print]
+  inputs = ["nginx_parser"] # <--- connect the sink to our transform
+  type   = "console"
+```
+
+Again, notice how we connect the new sink via the `inputs` option.
+
+</div>
+<div class="section">
+
+### 4. Next steps
+
+This serves as a basic example of how to build a minimal Vector configuration
+file. It's likely you'll want to build more advanced pipelines which are
+covered in the [guides section][docs.guides].
+
+</div>
+</div>
 
 ## How It Works
 
-### Composition
+### Config File Location
 
-The primary purpose of the configuration file is to compose pipelines. Pipelines
-are formed by connecting [sources][docs.sources], [transforms][docs.transforms],
-and [sinks][docs.sinks] through the `inputs` option.
-
-Notice in the above example each input references the `id` assigned to a
-previous source or transform.
-
-### Data Directory
-
-Vector requires a[`data_dir`](#data_dir) value for on-disk operations. Currently, the only
-operation using this directory are Vector's on-disk buffers. Buffers, by
-default, are memory-based, but if you switch them to disk-based you'll need to
-specify a[`data_dir`](#data_dir).
+The location of your Vector configuration file depends on your [installation
+method][docs.installation]. For most Linux based systems the file can be
+found at `/etc/vector/vector.toml`.
 
 ### Environment Variables
 
@@ -143,102 +185,55 @@ quotes around the definition.
 
 </Alert>
 
-#### Escaping
+#### Environment Variable Escaping
 
 You can escape environment variable by preceding them with a `$` character. For
 example `$${HOSTNAME}` will be treated _literally_ in the above environment
 variable example.
 
-### Example Location
+### Field Interpolation
 
-The location of your Vector configuration file depends on your [installation
-method][docs.installation]. For most Linux based systems the file can be
-found at `/etc/vector/vector.toml`.
+Select configuration options support Vector's field interpolation syntax to
+produce dynamic values derived from the event's data. Two syntaxes are supported
+for fields that support field interpolation:
 
-### Format
+1. [Strptime specifiers][urls.strptime_specifiers]. Ex: `date=%Y/%m/%d`
+2. [Event fields][docs.data-model]. Ex: `{{ field_name }}`
 
-The Vector configuration file requires the [TOML][urls.toml] format for it's
+For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[sinks.es_cluster]
+  type  = "elasticsearch"
+  index = "user-{{ user_id }}-%Y-%m-%d"
+```
+
+The above `index` value will be calculate for _each_ event. For example, given
+the following event:
+
+```json
+{
+  "timestamp": "2019-05-02T00:23:22Z",
+  "message": "message",
+  "user_id": 2
+}
+```
+
+The `index` value will result in:
+
+```toml
+index = "user-2-2019-05-02"
+```
+
+### Syntax
+
+The Vector configuration file follows the [TOML][urls.toml] syntax for it's
 simplicity, explicitness, and relaxed white-space parsing. For more information,
-please refer to the excellent [TOML documentation][urls.toml].
+please refer to the [TOML documentation][urls.toml].
 
-### Template Syntax
-
-Select configuration options support Vector's template syntax to produce
-dynamic values derived from the event's data. There are 2 special syntaxes:
-
-1. Strptime specifiers. Ex: `date=%Y/%m/%d`
-2. Event fields. Ex: `{{ field_name }}`
-
-Each are described in more detail below.
-
-#### Strptime specifiers
-
-For simplicity, Vector allows you to supply [strptime \
-specifiers][urls.strptime_specifiers] directly as part of the value to produce
-formatted timestamp values based off of the event's `timestamp` field.
-
-For example, given the following [`log` event][docs.data-model.log]:
-
-```rust
-LogEvent {
-    "timestamp": chrono::DateTime<2019-05-02T00:23:22Z>,
-    "message": "message"
-    "host": "my.host.com"
-}
-```
-
-And the following configuration:
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[sinks.my_s3_sink_id]
-  type = "aws_s3"
-  key_prefix = "date=%Y-%m-%d"
-```
-
-Vector would produce the following value for the `key_prefix` field:
-
-```
-date=2019-05-02
-```
-
-This effectively enables time partitioning.
-
-##### Event fields
-
-In addition to formatting the `timestamp` field, Vector allows you to directly
-access event fields with the `{{ <field-name> }}` syntax.
-
-For example, given the following [`log` event][docs.data-model.log]:
-
-```rust
-LogEvent {
-    "timestamp": chrono::DateTime<2019-05-02T00:23:22Z>,
-    "message": "message"
-    "application_id":  1
-}
-```
-
-And the following configuration:
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[sinks.my_s3_sink_id]
-  type = "aws_s3"
-  key_prefix = "application_id={{ application_id }}/date=%Y-%m-%d"
-```
-
-Vector would produce the following value for the `key_prefix` field:
-
-```
-application_id=1/date=2019-05-02
-```
-
-This effectively enables application specific time partitioning.
-
-### Value Types
+### Types
 
 All TOML values types are supported. For convenience this includes:
 
@@ -254,13 +249,16 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
-[docs.configuration#composition]: /docs/setup/configuration#composition
-[docs.data-model.log]: /docs/about/data-model/log
+[docs.concepts#pipelines]: /docs/about/concepts#pipelines
+[docs.data-model]: /docs/about/data-model
+[docs.guides]: /docs/setup/guides
 [docs.installation]: /docs/setup/installation
 [docs.process-management#flags]: /docs/administration/process-management#flags
 [docs.process-management#starting]: /docs/administration/process-management#starting
-[docs.sinks]: /docs/components/sinks
-[docs.sources]: /docs/components/sources
-[docs.transforms]: /docs/components/transforms
+[docs.sinks.console]: /docs/reference/sinks/console
+[docs.sinks]: /docs/reference/sinks
+[docs.sources]: /docs/reference/sources
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
+[docs.transforms]: /docs/reference/transforms
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.toml]: https://github.com/toml-lang/toml

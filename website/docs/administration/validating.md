@@ -53,8 +53,7 @@ expanding the above checks with the following:
 4. At least one [sink][docs.sinks] is defined.
 5. All `inputs` values contain at least one value (cannot be empty).
 6. All `inputs` values reference valid and upstream [source][docs.sources] or
-[transform][docs.transforms] components. See
-[composition][docs.configuration#composition] for more info.
+[transform][docs.transforms] components.
 
 To see other customization options for the `validate` subcommand run
 `vector validate --help`.
@@ -103,8 +102,7 @@ flag to also run health checks for all defined sinks.
 8. All [sinks][docs.sinks] are able to connect to their targets.
 
 
-[docs.configuration#composition]: /docs/setup/configuration#composition
 [docs.configuration#value-types]: /docs/setup/configuration#value-types
-[docs.sinks]: /docs/components/sinks
-[docs.sources]: /docs/components/sources
-[docs.transforms]: /docs/components/transforms
+[docs.sinks]: /docs/reference/sinks
+[docs.sources]: /docs/reference/sources
+[docs.transforms]: /docs/reference/transforms

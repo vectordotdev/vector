@@ -4,19 +4,16 @@
 }
 
 .performance-tests--switcher {
-  --vector-switcher-color: var(--ifm-background-color);
-  --vector-switcher-color-inverted: var(--ifm-color-emphasis-1000);
+  --vector-switcher-color: var(--ifm-heading-color);
+  --vector-switcher-active-background: var(--ifm-color-primary);
+  --vector-switcher-active-color: var(--ifm-background-color);
 
-  background: linear-gradient(to right, var(--ifm-color-primary), var(--ifm-color-blue), var(--ifm-color-pink));
+  background: var(--ifm-panel-background);
   border-radius: var(--ifm-global-radius);
   display: flex;
   justify-content: space-between;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
   padding: calc( var(--ifm-spacing-vertical) / 3 ) calc( var(--ifm-spacing-horizontal) / 2 );
-}
-
-.performance-tests--switcher > * {
-
 }
 
 .performance-tests--switcher .react-select-container {
@@ -93,8 +90,8 @@
 }
 
 .performance-tests--switcher .pills .pill-item--active {
-  background: var(--vector-switcher-color);
-  color: var(--vector-switcher-color-inverted);
+  background: var(--vector-switcher-active-background);
+  color: var(--vector-switcher-active-color);
 }
 
 @media (max-width: 480px) {

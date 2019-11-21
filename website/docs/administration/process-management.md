@@ -264,7 +264,7 @@ transition from the old to new pipeline is graceful.
 [docs.configuration]: /docs/setup/configuration
 [docs.roles.agent#limiting-resources]: /docs/setup/deployment/roles/agent#limiting-resources
 [docs.roles.agent]: /docs/setup/deployment/roles/agent
-[docs.sources]: /docs/components/sources
+[docs.sources]: /docs/reference/sources
 [docs.validating]: /docs/administration/validating
 [urls.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/

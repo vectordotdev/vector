@@ -113,9 +113,9 @@ you'll need to combine to create your pipelines.
 [docs.configuration]: /docs/setup/configuration
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.installation]: /docs/setup/installation
-[docs.sinks.console]: /docs/components/sinks/console
-[docs.sinks]: /docs/components/sinks
-[docs.sources.stdin]: /docs/components/sources/stdin
-[docs.sources]: /docs/components/sources
-[docs.transforms.regex_parser]: /docs/components/transforms/regex_parser
-[docs.transforms]: /docs/components/transforms
+[docs.sinks.console]: /docs/reference/sinks/console
+[docs.sinks]: /docs/reference/sinks
+[docs.sources.stdin]: /docs/reference/sources/stdin
+[docs.sources]: /docs/reference/sources
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
+[docs.transforms]: /docs/reference/transforms

@@ -152,7 +152,7 @@ Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
 stored as UTC.
 
 
-[docs.sources]: /docs/components/sources
-[docs.transforms.coercer]: /docs/components/transforms/coercer
+[docs.sources]: /docs/reference/sources
+[docs.transforms.coercer]: /docs/reference/transforms/coercer
 [urls.issue_551]: https://github.com/timberio/vector/issues/551
 [urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html

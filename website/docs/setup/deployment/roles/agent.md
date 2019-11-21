@@ -86,10 +86,10 @@ documentation on limiting resources.
 
 #### Resource limit recommendations
 
-In general, we recommend the following  minimum limitations:
+In general, we recommend the following _minimum_ limitations:
 
-* CPU &gt;= 5%
-* Memory &gt;= 256mb
+* At least 5% CPU
+* At least 256mb of memory
 
 A good resource manager will allow Vector to use more CPU and memory when
 available. You should not have to provide any additional limitations.
@@ -116,11 +116,11 @@ where it left off.
 [docs.performance]: /docs/about/performance
 [docs.process-management#reloading]: /docs/administration/process-management#reloading
 [docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sinks.vector]: /docs/components/sinks/vector
-[docs.sinks]: /docs/components/sinks
-[docs.sources.file]: /docs/components/sources/file
-[docs.sources.stdin]: /docs/components/sources/stdin
-[docs.sources.vector]: /docs/components/sources/vector
+[docs.sinks.vector]: /docs/reference/sinks/vector
+[docs.sinks]: /docs/reference/sinks
+[docs.sources.file]: /docs/reference/sources/file
+[docs.sources.stdin]: /docs/reference/sources/stdin
+[docs.sources.vector]: /docs/reference/sources/vector
 [docs.topologies#centralized]: /docs/setup/deployment/topologies#centralized
 [docs.topologies#stream-based]: /docs/setup/deployment/topologies#stream-based
 [docs.updating]: /docs/administration/updating
