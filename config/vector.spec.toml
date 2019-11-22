@@ -611,8 +611,8 @@ data_dir = "/var/lib/vector"
   #
 
   [transforms.add_fields.fields]
-    # A key/value pair representing the new log fields to be added. Accepts all
-    # supported types. Use `.` for adding nested fields.
+    # The name of the field to add. Accepts all supported types. Use `.` for adding
+    # nested fields.
     # 
     # * required
     # * type: *
@@ -650,10 +650,11 @@ data_dir = "/var/lib/vector"
   #
 
   [transforms.add_tags.tags]
-    # A key/value pair representing the new tag to be added.
+    # The name of the tag to add. Due to the nature of metric tags, the value must
+    # be a string.
     # 
     # * required
-    # * type: *
+    # * type: string
     my_tag = "my value"
     my_env_tag = "${ENV_VAR}"
 

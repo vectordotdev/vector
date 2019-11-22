@@ -92,8 +92,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}" # example
-    X-Powered-By = "Vector" # example
+    Authorization = "${TOKEN_ENV_VAR}"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]

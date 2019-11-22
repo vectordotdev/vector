@@ -30,7 +30,7 @@ vector test /etc/vector/*.toml
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-<%= config_example(metadata.testing.to_h.values.sort, common: true) %>
+<%= config_example(metadata.testing.tests.options, path: "tests", common: true) %>
 ```
 
 </TabItem>
@@ -39,7 +39,7 @@ vector test /etc/vector/*.toml
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-<%= config_example(metadata.testing.to_h.values.sort, common: false) %>
+<%= config_example(metadata.testing.tests.options, path: "tests", common: false) %>
 ```
 
 </TabItem>
@@ -48,4 +48,4 @@ vector test /etc/vector/*.toml
 
 ## Options
 
-<%= options(metadata.testing.to_h.values.sort, heading_depth: 3) %>
+<%= options(metadata.testing.tests.options, heading_depth: 3) %>

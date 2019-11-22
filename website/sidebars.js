@@ -105,7 +105,6 @@ module.exports = {
       label: 'Reference',
       items: [
         "reference",
-        "reference/global-options",
         {
           type: 'category',
           label: 'Sources',
@@ -214,6 +213,7 @@ module.exports = {
         },
         "reference",
         "reference/testing",
+        "reference/global-options",
       ],
     },
     {

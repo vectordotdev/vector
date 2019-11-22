@@ -68,7 +68,7 @@ class Field
   end
 
   def <=>(other)
-    if name == "*"
+    if wildcard? && !other.wildcard?
       1
     else
       name <=> other.name
@@ -93,5 +93,9 @@ class Field
 
   def required?
     !optional?
+  end
+
+  def wildcard?
+    name.start_with?("`<")
   end
 end

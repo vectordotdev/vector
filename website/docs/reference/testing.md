@@ -8,7 +8,7 @@ a network of transforms within the topology. The intention of these tests is to
 improve the maintainability of configs containing larger and more complex
 combinations of transforms.
 
-Executing tests within a config file can be done with the[`test`](#test) subcommand:
+Executing tests within a config file can be done with the `test` subcommand:
 
 ```bash
 vector test /etc/vector/*.toml
@@ -36,27 +36,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[[.tests]]
+[tests]
+  # REQUIRED - General
+  name = "foo test" # example
+  
+  # REQUIRED - Outputs
+  [[tests.outputs]]
     # REQUIRED - General
-    name = "foo test" # example
+    extract_from = "bar" # example
     
-    # REQUIRED - Outputs
-    [[.tests.outputs]]
-      # REQUIRED - General
-      extract_from = "bar" # example
-      
-      # REQUIRED - Conditions
-      [.tests.outputs.conditions]
-        [.tests.outputs.conditions.*]
+    # REQUIRED - Conditions
+    [tests.outputs.conditions]
+      [tests.outputs.conditions.*]
+  
+  # REQUIRED - Input
+  [tests.input]
+    # REQUIRED
+    type = "raw" # example, enum
+    insert_at = "foo" # example
     
-    # REQUIRED - Input
-    [.tests.input]
-      # REQUIRED
-      type = "raw" # example, enum
-      insert_at = "foo" # example
-      
-      # OPTIONAL
-      value = "some message contents" # example, no default, relevant when type = "raw"
+    # OPTIONAL
+    value = "some message contents" # example, no default, relevant when type = "raw"
 ```
 
 </TabItem>
@@ -65,49 +65,49 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[[.tests]]
+[tests]
+  # REQUIRED - General
+  name = "foo test" # example
+  
+  # REQUIRED - Outputs
+  [[tests.outputs]]
     # REQUIRED - General
-    name = "foo test" # example
+    extract_from = "bar" # example
     
-    # REQUIRED - Outputs
-    [[.tests.outputs]]
-      # REQUIRED - General
-      extract_from = "bar" # example
-      
-      # REQUIRED - Conditions
-      [.tests.outputs.conditions]
-        [.tests.outputs.conditions.*]
+    # REQUIRED - Conditions
+    [tests.outputs.conditions]
+      [tests.outputs.conditions.*]
+  
+  # REQUIRED - Input
+  [tests.input]
+    # REQUIRED - General
+    type = "raw" # example, enum
+    insert_at = "foo" # example
     
-    # REQUIRED - Input
-    [.tests.input]
+    # OPTIONAL - General
+    value = "some message contents" # example, no default, relevant when type = "raw"
+    
+    # OPTIONAL - Log fields
+    [tests.input.log_fields]
+      message = "some message contents" # example
+      host = "myhost" # example
+    
+    # OPTIONAL - Metric
+    [tests.input.metric]
       # REQUIRED - General
-      type = "raw" # example, enum
-      insert_at = "foo" # example
+      type = "counter" # example, enum
+      name = "duration_total" # example
+      timestamp = "2019-11-01T21:15:47.443232Z" # example
+      val = 10.2 # example
       
       # OPTIONAL - General
-      value = "some message contents" # example, no default, relevant when type = "raw"
+      direction = "plus" # example, no default, enum
+      sample_rate = 1 # example, no default
       
-      # OPTIONAL - Log fields
-      [.tests.input.log_fields]
-        message = "some message contents" # example
-        host = "myhost" # example
-      
-      # OPTIONAL - Metric
-      [.tests.input.metric]
-        # REQUIRED - General
-        type = "counter" # example, enum
-        name = "duration_total" # example
-        timestamp = "2019-11-01T21:15:47.443232Z" # example
-        val = 10.2 # example
-        
-        # OPTIONAL - General
-        direction = "plus" # example, no default, enum
-        sample_rate = 1 # example, no default
-        
-        # OPTIONAL - Tags
-        [.tests.input.metric.tags]
-          host = "foohost" # example
-          region = "us-east-1" # example
+      # OPTIONAL - Tags
+      [tests.input.metric.tags]
+        host = "foohost" # example
+        region = "us-east-1" # example
 ```
 
 </TabItem>
@@ -127,32 +127,10 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
-  name={"tests"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[table]"}
-  unit={null}
-  >
-
-### tests
-
-A table that defines a unit test.
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["foo test"]}
   name={"name"}
   nullable={false}
-  path={"tests"}
+  path={null}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -160,7 +138,7 @@ A table that defines a unit test.
   unit={null}
   >
 
-#### name
+### name
 
 A unique identifier for this test.
 
@@ -175,7 +153,7 @@ A unique identifier for this test.
   examples={[]}
   name={"input"}
   nullable={false}
-  path={"tests"}
+  path={null}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -183,7 +161,7 @@ A unique identifier for this test.
   unit={null}
   >
 
-#### input
+### input
 
 A table that defines a unit test input event.
 
@@ -197,7 +175,7 @@ A table that defines a unit test input event.
   examples={["foo"]}
   name={"insert_at"}
   nullable={false}
-  path={"tests.input"}
+  path={"input"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -205,7 +183,7 @@ A table that defines a unit test input event.
   unit={null}
   >
 
-##### insert_at
+#### insert_at
 
 The name of a transform, the input event will be delivered to this transform inorder to begin the test.
 
@@ -220,7 +198,7 @@ The name of a transform, the input event will be delivered to this transform ino
   examples={["raw","log","metric"]}
   name={"type"}
   nullable={false}
-  path={"tests.input"}
+  path={"input"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -228,7 +206,7 @@ The name of a transform, the input event will be delivered to this transform ino
   unit={null}
   >
 
-##### type
+#### type
 
 The event type.
 
@@ -243,7 +221,7 @@ The event type.
   examples={["some message contents"]}
   name={"value"}
   nullable={true}
-  path={"tests.input"}
+  path={"input"}
   relevantWhen={{"type":"raw"}}
   required={false}
   templateable={false}
@@ -251,7 +229,7 @@ The event type.
   unit={null}
   >
 
-##### value
+#### value
 
 Specifies the log message field contents when the input type is 'raw'.
 
@@ -266,7 +244,7 @@ Specifies the log message field contents when the input type is 'raw'.
   examples={[]}
   name={"log_fields"}
   nullable={true}
-  path={"tests.input"}
+  path={"input"}
   relevantWhen={{"type":"log"}}
   required={false}
   templateable={false}
@@ -274,7 +252,7 @@ Specifies the log message field contents when the input type is 'raw'.
   unit={null}
   >
 
-##### log_fields
+#### log_fields
 
 Specifies the log fields when the input type is 'log'.
 
@@ -286,9 +264,9 @@ Specifies the log fields when the input type is 'log'.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"message","value":"some message contents"},{"name":"host","value":"myhost"}]}
-  name={"*"}
+  name={"`<field-name>`"}
   nullable={false}
-  path={"tests.input.log_fields"}
+  path={"input.log_fields"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -296,7 +274,7 @@ Specifies the log fields when the input type is 'log'.
   unit={null}
   >
 
-###### *
+##### `<field-name>`
 
 A key/value pair representing a field to be added to the input event.
 
@@ -316,7 +294,7 @@ A key/value pair representing a field to be added to the input event.
   examples={[]}
   name={"metric"}
   nullable={true}
-  path={"tests.input"}
+  path={"input"}
   relevantWhen={{"type":"metric"}}
   required={false}
   templateable={false}
@@ -324,7 +302,7 @@ A key/value pair representing a field to be added to the input event.
   unit={null}
   >
 
-##### metric
+#### metric
 
 Specifies the metric type when the input type is 'metric'.
 
@@ -338,7 +316,7 @@ Specifies the metric type when the input type is 'metric'.
   examples={["counter"]}
   name={"type"}
   nullable={false}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -346,7 +324,7 @@ Specifies the metric type when the input type is 'metric'.
   unit={null}
   >
 
-###### type
+##### type
 
 The metric type.
 
@@ -361,7 +339,7 @@ The metric type.
   examples={["duration_total"]}
   name={"name"}
   nullable={false}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -369,7 +347,7 @@ The metric type.
   unit={null}
   >
 
-###### name
+##### name
 
 The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
 
@@ -384,7 +362,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   examples={[]}
   name={"tags"}
   nullable={true}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -392,7 +370,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   unit={null}
   >
 
-###### tags
+##### tags
 
 Key/value pairs representing [metric tags][docs.data-model#tags].
 
@@ -404,9 +382,9 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"host","value":"foohost"},{"name":"region","value":"us-east-1"}]}
-  name={"*"}
+  name={"`<tag-name>`"}
   nullable={false}
-  path={"tests.input.metric.tags"}
+  path={"input.metric.tags"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -414,7 +392,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-####### *
+###### `<tag-name>`
 
 Key/value pairs representing [metric tags][docs.data-model#tags].
 
@@ -434,7 +412,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   examples={[10.2]}
   name={"val"}
   nullable={false}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -442,7 +420,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-###### val
+##### val
 
 Amount to increment/decrement or gauge.
 
@@ -457,7 +435,7 @@ Amount to increment/decrement or gauge.
   examples={["2019-11-01T21:15:47.443232Z"]}
   name={"timestamp"}
   nullable={false}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -465,7 +443,7 @@ Amount to increment/decrement or gauge.
   unit={null}
   >
 
-###### timestamp
+##### timestamp
 
 Time metric was created/ingested.
 
@@ -480,7 +458,7 @@ Time metric was created/ingested.
   examples={[1]}
   name={"sample_rate"}
   nullable={true}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -488,7 +466,7 @@ Time metric was created/ingested.
   unit={null}
   >
 
-###### sample_rate
+##### sample_rate
 
 The bucket/distribution the metric is a part of.
 
@@ -503,7 +481,7 @@ The bucket/distribution the metric is a part of.
   examples={["plus","minus"]}
   name={"direction"}
   nullable={true}
-  path={"tests.input.metric"}
+  path={"input.metric"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -511,7 +489,7 @@ The bucket/distribution the metric is a part of.
   unit={null}
   >
 
-###### direction
+##### direction
 
 The direction to increase or decrease the gauge value.
 
@@ -536,7 +514,7 @@ The direction to increase or decrease the gauge value.
   examples={[]}
   name={"outputs"}
   nullable={false}
-  path={"tests"}
+  path={null}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -544,7 +522,7 @@ The direction to increase or decrease the gauge value.
   unit={null}
   >
 
-#### outputs
+### outputs
 
 A table that defines a unit test expected output.
 
@@ -558,7 +536,7 @@ A table that defines a unit test expected output.
   examples={["bar"]}
   name={"extract_from"}
   nullable={false}
-  path={"tests.outputs"}
+  path={"outputs"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -566,7 +544,7 @@ A table that defines a unit test expected output.
   unit={null}
   >
 
-##### extract_from
+#### extract_from
 
 The name of a transform, at the end of the test events extracted from thistransform will be checked against a table of conditions.
 
@@ -581,7 +559,7 @@ The name of a transform, at the end of the test events extracted from thistransf
   examples={[]}
   name={"conditions"}
   nullable={false}
-  path={"tests.outputs"}
+  path={"outputs"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -589,7 +567,7 @@ The name of a transform, at the end of the test events extracted from thistransf
   unit={null}
   >
 
-##### conditions
+#### conditions
 
 A table that defines a collection of conditions to check against the output of atransform. A test is considered to have passed when each condition has resolvedtrue for one or more events extracted from the target transform.
 
@@ -603,7 +581,7 @@ A table that defines a collection of conditions to check against the output of a
   examples={[{"key":"check message is a thing","value":{"type":"check_fields","message.equals":"a thing"}}]}
   name={"*"}
   nullable={false}
-  path={"tests.outputs.conditions"}
+  path={"outputs.conditions"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -611,15 +589,10 @@ A table that defines a collection of conditions to check against the output of a
   unit={null}
   >
 
-###### *
+##### *
 
 A key/value pair representing a condition to be checked on the output of atransform. Keys should be an identifier for the condition that gives context asto what it is checking for.
 
-
-</Field>
-
-
-</Fields>
 
 </Field>
 
