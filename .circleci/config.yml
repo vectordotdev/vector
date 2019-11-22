@@ -37,47 +37,48 @@ jobs:
   #
 
   check-code:
-    resource_class: xlarge
-    docker:
-      - image: timberiodev/vector-checker:latest
+    resource_class: large
+    machine:
+      docker_layer_caching: true
     steps:
       - checkout
       - run:
-          name: Check code
+          name: Check generate
           environment:
             RUSTFLAGS: "-D warnings"
-          command: make check-code
+          command: ./scripts/run-docker.sh checker make check-code
 
   check-fmt:
-    docker:
-      - image: timberiodev/vector-checker:latest
+    resource_class: large
+    machine:
+      docker_layer_caching: true
     steps:
       - checkout
       - run:
           name: Check fmt
           environment:
             RUSTFLAGS: "-D warnings"
-          command: |
-            rustup component add rustfmt
-            make check-fmt
+          command: ./scripts/run-docker.sh checker make check-fmt
 
   check-generate:
-    docker:
-      - image: timberiodev/vector-checker:latest
+    resource_class: large
+    machine:
+      docker_layer_caching: true
     steps:
       - checkout
       - run:
           name: Check generate
-          command: make check-generate
+          command: ./scripts/run-docker.sh checker make check-generate
 
   check-version:
-    docker:
-      - image: timberiodev/vector-checker:latest
+    resource_class: large
+    machine:
+      docker_layer_caching: true
     steps:
       - checkout
       - run:
           name: Check version
-          command: make check-version
+          command: ./scripts/run-docker.sh checker make check-version
 
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019

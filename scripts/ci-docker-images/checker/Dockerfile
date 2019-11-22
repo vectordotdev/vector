@@ -1,20 +1,17 @@
-FROM ubuntu:18.04
+FROM ruby:2.6
 
 RUN apt-get update && \
   apt-get install -y \
   build-essential \
   curl \
-  git \
-  libssl-dev \
-  pkg-config \
-  ruby-full \
-  zlib1g-dev
+  git
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.39.0
 ENV PATH="$PATH:/root/.cargo/bin"
 RUN rustup component add rustfmt
 
-# We need ruby to check for documentation changes :)
+# Install Ruby dependencies
 ENV LC_ALL C.UTF-8
 RUN gem install bundler
 COPY checker/Gemfile Gemfile
