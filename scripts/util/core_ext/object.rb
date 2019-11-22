@@ -1,7 +1,7 @@
 class Object
   def deep_to_h
     if is_a?(OpenStruct)
-      to_h.deep_to_h
+      to_h.sort.to_h.deep_to_h
     elsif is_a?(Hash)
       new_h = {}
       each do |k, v|
@@ -11,7 +11,7 @@ class Object
     elsif is_a?(Array)
       map(&:deep_to_h)
     elsif respond_to?(:to_h)
-      to_h
+      to_h.sort.to_h
     else
       self
     end
