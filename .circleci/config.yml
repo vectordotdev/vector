@@ -487,9 +487,8 @@ jobs:
           name: Verify archive
           shell: ./scripts/run-docker.sh verifier-wine bash
           command: |
-            find target/artifacts
-            # unzip $(find target/artifacts/ -name *-x86_64-pc-windows-msvc.zip)
-            # wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+            unzip $(find target/artifacts/ -name *-x86_64-pc-windows-msvc.zip)
+            wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
 
   verify-docker:
     docker:
