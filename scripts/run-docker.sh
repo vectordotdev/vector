@@ -17,8 +17,12 @@ docker build \
   -f scripts/ci-docker-images/$tag/Dockerfile \
   scripts/ci-docker-images
 
+docker_flags="--privileged"
+if [ -t 1 ]; then # the script is running in a terminal
+  docker_flags="$docker_flags --interactive"
+fi
 docker run \
-  --privileged \
+  $docker_flags \
   $(env | xargs -n1 printf '-e "%s"\n') \
   -w "$PWD" \
   -v "$PWD":"$PWD" \

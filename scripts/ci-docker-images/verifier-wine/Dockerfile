@@ -1,3 +1,3 @@
 FROM ubuntu:18.04
 
-RUN apt-get install -y unzip wine
+RUN apt-get update && apt-get install -y unzip wine-stable
