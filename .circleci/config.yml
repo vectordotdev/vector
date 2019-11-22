@@ -480,16 +480,20 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-zip-artifact-on-windows:
-    executor: win/vs2019
+  verify-zip-artifact-on-wine:
+    resource_class: large
+    machine:
+      docker_layer_caching: true
     steps:
+      - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Verify package
-          shell: bash
+          name: Verify archive
           command: |
-            powershell Expand-Archive target/artifacts/vector-x86_64-pc-windows-msvc.zip .
-            ./vector-x86_64-pc-windows-msvc/bin/vector.exe --version
+            ./scripts/docker-run.sh verifier-wine bash -x \<<EOF
+              unzip target/artifacts/*-x86_64-pc-windows-msvc.zip
+              wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+            EOF
 
   verify-docker:
     docker:
@@ -765,7 +769,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - verify-deb-artifact-on-ubuntu-16-04
     - verify-deb-artifact-on-ubuntu-18-04
     - verify-deb-artifact-on-ubuntu-19-04
-    - verify-zip-artifact-on-windows
+    - verify-zip-artifact-on-wine
     - verify-docker
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
@@ -822,7 +826,7 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - verify-zip-artifact-on-windows:
+      - verify-zip-artifact-on-wine:
           requires:
             - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
@@ -898,7 +902,7 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - verify-zip-artifact-on-windows:
+      - verify-zip-artifact-on-wine:
           <<: *release-filters
           requires:
             - build-x86_64-pc-windows-msvc-archive
@@ -986,7 +990,7 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - verify-zip-artifact-on-windows:
+      - verify-zip-artifact-on-wine:
           requires:
             - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
