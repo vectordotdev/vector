@@ -57,6 +57,7 @@ class Metadata
 
     installation_hash = hash.fetch("installation")
     @installation.containers = installation_hash.fetch("containers").collect { |h| OpenStruct.new(h) }
+    @installation.downloads = installation_hash.fetch("downloads").collect { |h| OpenStruct.new(h) }
     @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
     @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
@@ -203,7 +204,7 @@ class Metadata
       installation: installation.deep_to_h,
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
-      posts: posts,
+      posts: posts.deep_to_h,
       sources: sources.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h

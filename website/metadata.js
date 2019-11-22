@@ -6,6 +6,38 @@ module.exports = {
         "id": "docker"
       }
     ],
+    "downloads": [
+      {
+        "name": "Linux (x86_64 w/ MUSL)",
+        "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
+        "latest": true,
+        "nightly": true
+      },
+      {
+        "name": "Linux (ARM64 w/ MUSL)",
+        "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
+        "latest": false,
+        "nightly": true
+      },
+      {
+        "name": "MacOS (64-bit OSX)",
+        "file_name": "vector-x86_64-apple-darwin.tar.gz",
+        "latest": true,
+        "nightly": true
+      },
+      {
+        "name": "Deb",
+        "file_name": "vector-amd64.deb",
+        "latest": true,
+        "nightly": true
+      },
+      {
+        "name": "RPM",
+        "file_name": "vector-x86_64.rpm",
+        "latest": true,
+        "nightly": true
+      }
+    ],
     "operating_systems": [
       {
         "name": "Amazon Linux",
@@ -64,17 +96,21 @@ module.exports = {
   },
   "latest_release": {
     "date": "2019-10-09",
-    "downloads": {
-      "vector-amd64.deb": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-amd64.deb",
-      "vector-x86_64-apple-darwin.tar.gz": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-x86_64-apple-darwin.tar.gz",
-      "vector-x86_64-unknown-linux-musl.tar.gz": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-x86_64-unknown-linux-musl.tar.gz",
-      "vector-x86_64.rpm": "https://github.com/timberio/vector/releases/download/v0.5.0/vector-x86_64.rpm"
-    },
     "last_version": "0.4.0",
     "version": "0.5.0"
   },
   "posts": [
-    "#<Post:0x00007f94bff96838>"
+    {
+      "author": "Luke",
+      "date": "2019-06-28",
+      "id": "introducing-vector",
+      "path": "/Users/benjohnson/Code/timber/vector/website/blog/2019-06-28-introducing-vector.md",
+      "permalink": "https://vector.dev/blog/introducing-vector",
+      "tags": [
+        "announcement"
+      ],
+      "title": "Introducing Vector"
+    }
   ],
   "sources": {
     "udp": {

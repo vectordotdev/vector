@@ -118,6 +118,10 @@ Or specify the nigtly version:
 docker run timberio/vector:nightly-alpine
 ```
 
+## Source Files
+
+Vector's Docker source files are located [in it's Github repo][urls.vector_docker_source_files].
+
 
 [docs.administration]: https://vector.dev/docs/administration
 [docs.configuration]: https://vector.dev/docs/setup/configuration
@@ -134,4 +138,5 @@ docker run timberio/vector:nightly-alpine
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
 [urls.vector_releases]: https://github.com/timberio/vector/releases

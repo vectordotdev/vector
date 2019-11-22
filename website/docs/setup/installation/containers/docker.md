@@ -2,6 +2,8 @@
 title: Use Vector On Docker
 sidebar_label: Docker
 description: Using Vector on Docker
+source_url: https://github.com/timberio/vector/tree/master/distribution/docker
+
 ---
 
 Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
@@ -102,10 +104,15 @@ Or specify the nigtly version:
 docker run timberio/vector:nightly-alpine
 ```
 
+## Source Files
+
+Vector's Docker source files are located [in it's Github repo][urls.vector_docker_source_files].
+
 
 [docs.configuration]: /docs/setup/configuration
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
+[urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
 [urls.vector_releases]: https://github.com/timberio/vector/releases

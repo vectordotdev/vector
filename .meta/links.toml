@@ -127,6 +127,7 @@ vector_bug_issues = "https://github.com/timberio/vector/issues?q=is%3Aopen+is%3A
 vector_changelog = "https://github.com/timberio/vector/blob/master/CHANGELOG.md"
 vector_chat = "https://chat.vector.dev"
 vector_community = "https://vector.dev/community"
+vector_docker_source_files = "https://github.com/timberio/vector/tree/master/distribution/docker"
 vector_initd_service = "https://github.com/timberio/vector/blob/master/distribution/init.d/vector"
 vector_issues = "https://github.com/timberio/vector/issues"
 vector_nightly_builds = "http://packages.timber.io/vector/nightly/latest/"

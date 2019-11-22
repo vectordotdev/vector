@@ -1,8 +1,4 @@
 [installation]
-downloads = [
-  {name = "vector-amd64.deb"},
-  {name = "vector-amd64.deb"}
-]
 containers = [
   {name = "Docker", id = "docker"}
 ]
@@ -20,3 +16,33 @@ package_managers = [
   {name = "Homebrew", id = "homebrew"},
   {name = "RPM", id = "rpm"},
 ]
+
+[[installation.downloads]]
+name = "Linux (x86_64 w/ MUSL)"
+file_name = "vector-x86_64-unknown-linux-musl.tar.gz"
+latest = true
+nightly = true
+
+[[installation.downloads]]
+name = "Linux (ARM64 w/ MUSL)"
+file_name = "vector-aarch64-unknown-linux-musl.tar.gz"
+latest = false
+nightly = true
+
+[[installation.downloads]]
+name = "MacOS (64-bit OSX)"
+file_name = "vector-x86_64-apple-darwin.tar.gz"
+latest = true
+nightly = true
+
+[[installation.downloads]]
+name = "Deb"
+file_name = "vector-amd64.deb"
+latest = true
+nightly = true
+
+[[installation.downloads]]
+name = "RPM"
+file_name = "vector-x86_64.rpm"
+latest = true
+nightly = true
