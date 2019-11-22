@@ -44,10 +44,10 @@ jobs:
       - checkout
       - run:
           name: Check generate
-          shell: ./scripts/docker-run.sh checker bash
           environment:
             RUSTFLAGS: "-D warnings"
-          command: make check-code
+          command: |
+            ./scripts/docker-run.sh checker make check-code
 
   check-fmt:
     resource_class: large
@@ -57,10 +57,10 @@ jobs:
       - checkout
       - run:
           name: Check fmt
-          shell: ./scripts/docker-run.sh checker bash
           environment:
             RUSTFLAGS: "-D warnings"
-          command: make check-fmt
+          command: |
+            ./scripts/docker-run.sh checker make check-fmt
 
   check-generate:
     resource_class: large
@@ -70,8 +70,8 @@ jobs:
       - checkout
       - run:
           name: Check generate
-          shell: ./scripts/docker-run.sh checker bash
-          command: make check-generate
+          command: |
+            ./scripts/docker-run.sh checker make check-generate
 
   check-version:
     resource_class: large
@@ -81,8 +81,8 @@ jobs:
       - checkout
       - run:
           name: Check version
-          shell: ./scripts/docker-run.sh checker bash
-          command: make check-version
+          command: |
+            ./scripts/docker-run.sh checker make check-version
 
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
