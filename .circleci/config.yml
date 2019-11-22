@@ -754,6 +754,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-fmt
     - check-generate
     - test-stable
+    - test-x86_64-pc-windows-msvc
     - build-x86_64-unknown-linux-musl-archive
     - build-aarch64-unknown-linux-musl-archive
     - build-armv7-unknown-linux-musleabihf-archive
@@ -851,6 +852,8 @@ workflows:
       - check-generate:
           <<: *release-filters
       - test-stable:
+          <<: *release-filters
+      - test-x86_64-pc-windows-msvc:
           <<: *release-filters
 
       # Build & verify
@@ -953,6 +956,7 @@ workflows:
       - check-fmt
       - check-generate
       - test-stable
+      - test-x86_64-pc-windows-msvc
 
       # Build & verify
 
