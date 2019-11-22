@@ -48,6 +48,7 @@ mkdir vector
 import Tabs from '@theme/Tabs';
 
 <Tabs
+  block={true}
   defaultValue="master"
   values={[
     { label: 'Master', value: 'master', },

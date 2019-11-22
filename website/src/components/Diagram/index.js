@@ -112,12 +112,9 @@ function Diagram({className, height, width}) {
   const defaulyXPosition = 7;
   const defaultTextLength = 60;
 
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     updateState({});
-  //   }, 2000);
-  //   return () => clearInterval(interval);
-  // }, [updateState]);
+  useEffect(() => {
+    updateState({});
+  }, [updateState]);
 
   if (!height) {
     height = "294px";
