@@ -30,3 +30,6 @@ Start Vector:
 ```powerhsell
 bin\vector.exe --config config\vector.toml
 ```
+
+
+
