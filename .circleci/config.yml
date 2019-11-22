@@ -826,7 +826,9 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - verify-zip-artifact-on-wine
+      - verify-zip-artifact-on-wine:
+          requires:
+            - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
