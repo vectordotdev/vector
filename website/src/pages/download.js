@@ -22,8 +22,6 @@ function Download() {
   let latestDownloads = downloads.filter(download => download.latest);
   let nightlyDownloads = downloads.filter(download => download.nightly);
 
-  console.log(latestDownloads)
-
   viewedNewRelease();
 
   return (
