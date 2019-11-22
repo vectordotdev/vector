@@ -298,17 +298,18 @@ jobs:
             - "*-amd64.deb"
 
   build-x86_64-unknown-linux-musl-archive:
-    docker:
-      - image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
-    resource_class: xlarge
+    machine:
+      docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
           name: Build archive
+          environment:
+            RUST_LTO: "lto"
+            TARGET: "x86_64-unknown-linux-musl"
           command: |
-            export RUST_LTO="lto"
-            export TARGET="x86_64-unknown-linux-musl"
-            make build-archive
+            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
