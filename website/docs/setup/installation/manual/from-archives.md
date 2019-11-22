@@ -35,7 +35,7 @@ archive URL.
 ### 2. Download & unpack the archive
 
 ```bash
-curl -o <release-download-url> | tar -xzf --directory="vector" --strip-components=1
+mkdir -p vector && curl -sSfL --proto '=https' --tlsv1.2 <release-download-url> | tar xzf - -C vector --strip-components=2
 ```
 
 </div>

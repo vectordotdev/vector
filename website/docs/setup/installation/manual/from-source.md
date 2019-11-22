@@ -60,14 +60,15 @@ import TabItem from '@theme/TabItem';
 <TabItem value="master">
 
 ```bash
-curl -OL https://github.com/timberio/vector/archive/master.tar.gz | tar -xzf - --directory="vector"
+mkdir -p vector && curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/master.tar.gz | tar xzf - -C vector --strip-components=1
 ```
 
 </TabItem>
 <TabItem value="latest">
 
 ```bash
-curl -OL https://github.com/timberio/vector/releases/latest/download/source.tar.gz | tar -xzf --directory="vector"
+mkdir -p vector && curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/releases/latest/download/source.tar.gz | tar xzf - -C vector --strip-components=1
+
 ```
 
 </TabItem>
