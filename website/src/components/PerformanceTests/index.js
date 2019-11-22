@@ -202,7 +202,7 @@ function Compare({measurements, metrics, onColumnClick, onRowClick, subjects, te
   let rows = buildRows(xAxis, yAxis, metrics, measurements);
 
   if (rows.length == 1) {
-    rows[0] = rows[0].sort((a, b) => (a.place > b.place));
+    let row = rows[0].sort((a, b) => (a.place > b.place));
 
     return (
       <div className="table-responsive">
@@ -218,7 +218,7 @@ function Compare({measurements, metrics, onColumnClick, onRowClick, subjects, te
             ))}
             <tr>
               <td className="description"></td>
-              {rows[0].map((cell, columnIdx) => (
+              {row.map((cell, columnIdx) => (
                 <Column key={columnIdx} obj={cell.xAxisItem} onClick={() => onColumnClick(cell.xAxisItem)} />
               ))}
             </tr>

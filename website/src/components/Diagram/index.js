@@ -108,7 +108,7 @@ function Diagram({className, height, width}) {
   let shuffledSinks = sinks.sort(() => 0.5 - Math.random());
   let selectedSinks = shuffledSinks.slice(0, 3);
 
-  const [, updateState] = useState();
+  const [_, updateState] = useState();
   const defaulyXPosition = 7;
   const defaultTextLength = 60;
 
@@ -117,7 +117,7 @@ function Diagram({className, height, width}) {
       updateState({});
     }, 100);
     return () => clearTimeout(timeout);
-  }, [updateState]);
+  }, []);
 
   if (!height) {
     height = "294px";
