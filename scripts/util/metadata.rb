@@ -36,6 +36,7 @@ class Metadata
     :log_fields,
     :metric_fields,
     :options,
+    :testing,
     :posts,
     :releases,
     :sinks,
@@ -52,6 +53,7 @@ class Metadata
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
+    @testing = OpenStruct.new()
 
     # installation
 
@@ -127,6 +129,16 @@ class Metadata
       ))
 
       @options.send("#{option_name}=", option)
+    end
+
+    # testing
+
+    hash.fetch("testing").each do |option_name, option_hash|
+      option = Option.new(
+        option_hash.merge({"name" => option_name})
+      )
+
+      @testing.send("#{option_name}=", option)
     end
 
     # links

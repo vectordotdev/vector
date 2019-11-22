@@ -212,6 +212,8 @@ module.exports = {
             
           ],
         },
+        "reference",
+        "reference/testing",
       ],
     },
     {

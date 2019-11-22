@@ -134,6 +134,8 @@ module.exports = {
             <% end %>
           ],
         },
+        <%= metadata.links.fetch_id("docs.reference").to_json %>,
+        <%= metadata.links.fetch_id("docs.reference.testing").to_json %>,
       ],
     },
     {
