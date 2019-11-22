@@ -322,16 +322,12 @@ jobs:
       - checkout
       - run:
           name: Build archive
+          environment:
+            RUST_LTO: "lto"
+            TARGET: "aarch64-unknown-linux-musl"
+            FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket"
           command: |
-            docker run \
-              --privileged \
-              -e RUST_LTO="lto" \
-              -e TARGET="aarch64-unknown-linux-musl" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket" \
-              -w "$PWD" \
-              -v "$PWD":"$PWD" \
-              -t timberiodev/vector-builder-aarch64-unknown-linux-musl:latest \
-              make build-archive
+            ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -345,16 +341,12 @@ jobs:
       - checkout
       - run:
           name: Build archive
+          environment:
+            RUST_LTO: "lto"
+            TARGET: "armv7-unknown-linux-musleabihf"
+            FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket"
           command: |
-            docker run \
-              --privileged \
-              -e RUST_LTO="lto" \
-              -e TARGET="armv7-unknown-linux-musleabihf" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket" \
-              -w "$PWD" \
-              -v "$PWD":"$PWD" \
-              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
-              make build-archive
+            ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
