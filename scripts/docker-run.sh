@@ -21,9 +21,9 @@ docker_flags="--privileged --interactive"
 if [ -t 0 ]; then # the script's input is connected to a terminal
   docker_flags="$docker_flags --tty"
 fi
+docker_flags="$docker_flags $(env | grep -v '^PATH=' | sed 's/^/-e /')"
 docker run \
   $docker_flags \
-  $(env | xargs -n1 printf '-e "%s"\n') \
   -w "$PWD" \
   -v "$PWD":"$PWD" \
   $image \
