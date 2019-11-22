@@ -1,35 +1,53 @@
 ---
-title: Install Vector On MacOS
-sidebar_label: MacOS
-description: Install Vector on MacOS
+title: Install Vector On Windows
+sidebar_label: Windows
+description: Install Vector on Windows
 ---
 
-Vector can be installed on Windows from an archive. The installation procedure
-is described below:
+Vector can be installed on Windows from an archive or source.
 
-Download Vector release archive:
+## Install from archive using PowerShell
 
-```powershell
-Invoke-WebRequest http://127.0.0.1:8000/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
-```
+1.  Download Vector release archive (latest):
 
-Extract files from the archive:
+    ```powershell
+    Invoke-WebRequest https://packages.timber.io/vector/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
 
-```powershell
-Expand-Archive vector-x86_64-pc-windows-msvc.zip .
-```
+    Download Vector release archive (nightly):
 
-Navigate to Vector directory:
+    ```powershell
+    Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+2.  Extract files from the archive:
 
-```powershell
-cd vector-x86_64-pc-windows-msvc
-```
+    ```powershell
+    Expand-Archive vector-x86_64-pc-windows-msvc.zip .
+    ```
 
-Start Vector:
+3.  Navigate to Vector directory:
 
-```powerhsell
-bin\vector.exe --config config\vector.toml
-```
+    ```powershell
+    cd vector-x86_64-pc-windows-msvc
+    ```
+4.  Start Vector:
+
+    ```powerhsell
+    bin\vector.exe --config config\vector.toml
+    ```
+
+## Install from archive manually
+
+1. [Download](https://vector.dev/download) release archive manually.
+2. Extract its content using the system context menu.
+3. Open command prompt and run
+    ```
+    cd "<full path of Vector>"
+    ```
+4. Start Vector:
+    ```
+    bin\vector.exe --config config\config.toml
+    ```
 
 
 
