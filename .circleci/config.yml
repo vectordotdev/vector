@@ -489,10 +489,11 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Verify archive
-          shell: ./scripts/docker-run.sh verifier-wine bash
           command: |
-            unzip $(find target/artifacts/ -name *-x86_64-pc-windows-msvc.zip)
-            wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+            ./scripts/docker-run.sh verifier-wine bash -ex \<<EOF
+              unzip target/artifacts/*-x86_64-pc-windows-msvc.zip
+              wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+            EOF
 
   verify-docker:
     docker:
