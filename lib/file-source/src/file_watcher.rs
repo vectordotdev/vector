@@ -1,8 +1,11 @@
 use crate::FilePosition;
-use std::fs;
-use std::io::{self, BufRead, Seek};
-use std::path::PathBuf;
-use std::time;
+use std::{
+    fs,
+    io::{self, BufRead, Seek},
+    path::PathBuf,
+    thread,
+    time::{Duration, SystemTime},
+};
 
 use crate::metadata_ext::PortableMetadataExt;
 
@@ -32,7 +35,7 @@ impl FileWatcher {
     pub fn new(
         path: PathBuf,
         file_position: FilePosition,
-        ignore_before: Option<time::SystemTime>,
+        ignore_before: Option<SystemTime>,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let metadata = f.metadata()?;
@@ -135,6 +138,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 ) -> io::Result<usize> {
     let mut total_read = 0;
     let mut discarding = false;
+    let mut already_slept = false;
     loop {
         let available = match r.fill_buf() {
             Ok(n) => n,
@@ -174,8 +178,14 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
         if done && discarding {
             discarding = false;
             buf.clear();
-        } else if done || used == 0 {
+        } else if done || (used == 0 && already_slept) {
             return Ok(total_read);
+        } else if used == 0 {
+            // We've hit EOF but not yet seen a newline. This can happen when unlucky timing causes
+            // us to observe an incomplete write, so a short sleep gives the rest of the write
+            // a chance to become visible before we give up and accept the EOF.
+            thread::sleep(Duration::from_millis(1));
+            already_slept = true;
         }
     }
 }
