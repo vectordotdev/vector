@@ -202,7 +202,7 @@ function Compare({measurements, metrics, onColumnClick, onRowClick, subjects, te
   let rows = buildRows(xAxis, yAxis, metrics, measurements);
 
   if (rows.length == 1) {
-    let row = rows[0].sort((a, b) => (a.place > b.place));
+    let row = rows[0].sort((a, b) => (a.place > b.place ? 1 : -1));
 
     return (
       <div className="table-responsive">

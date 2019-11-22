@@ -109,7 +109,7 @@ function Diagram({className, height, width}) {
   let selectedSinks = shuffledSinks.slice(0, 3);
 
   const [_, updateState] = useState();
-  const defaulyXPosition = 7;
+  const defaultXPosition = 7;
   const defaultTextLength = 60;
 
   useEffect(() => {
@@ -166,7 +166,7 @@ function Diagram({className, height, width}) {
               <g id="Sink-3" transform="translate(0.000000, 184.000000)">
                 <circle id="Oval-Copy" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
                 <text textLength={selectedSinks[2].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[2].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x={selectedSinks[2].xPosition || defaulyXPosition} y={selectedSinks[2].yPosition}>{selectedSinks[2].label}</tspan>
+                  <tspan x={selectedSinks[2].xPosition || defaultXPosition} y={selectedSinks[2].yPosition}>{selectedSinks[2].label}</tspan>
                 </text>
               </g>
             </Link>
@@ -174,7 +174,7 @@ function Diagram({className, height, width}) {
               <g id="Sink-2" transform="translate(81.000000, 124.000000)">
                 <circle id="Oval-Copy" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
                 <text textLength={selectedSinks[1].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[1].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x={selectedSinks[1].xPosition || defaulyXPosition} y={selectedSinks[1].yPosition}>{selectedSinks[1].label}</tspan>
+                  <tspan x={selectedSinks[1].xPosition || defaultXPosition} y={selectedSinks[1].yPosition}>{selectedSinks[1].label}</tspan>
                 </text>
               </g>
             </Link>
@@ -182,7 +182,7 @@ function Diagram({className, height, width}) {
               <g id="Sink-1" transform="translate(1.000000, 58.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
                 <text textLength={selectedSinks[0].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSinks[0].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x={selectedSinks[0].xPosition || defaulyXPosition} y={selectedSinks[0].yPosition}>{selectedSinks[0].label}</tspan>
+                  <tspan x={selectedSinks[0].xPosition || defaultXPosition} y={selectedSinks[0].yPosition}>{selectedSinks[0].label}</tspan>
                 </text>
               </g>
             </Link>
@@ -195,7 +195,7 @@ function Diagram({className, height, width}) {
               <g id="Source-3" transform="translate(82.000000, 182.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
                 <text textLength={selectedSources[2].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[2].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x={selectedSources[2].xPosition || defaulyXPosition} y={selectedSources[2].yPosition}>{selectedSources[2].label}</tspan>
+                  <tspan x={selectedSources[2].xPosition || defaultXPosition} y={selectedSources[2].yPosition}>{selectedSources[2].label}</tspan>
                 </text>
               </g>
             </Link>
@@ -203,7 +203,7 @@ function Diagram({className, height, width}) {
               <g id="Source-2" transform="translate(0.000000, 122.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
                 <text textLength={selectedSources[1].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[1].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x={selectedSources[1].xPosition || defaulyXPosition} y={selectedSources[1].yPosition}>{selectedSources[1].label}</tspan>
+                  <tspan x={selectedSources[1].xPosition || defaultXPosition} y={selectedSources[1].yPosition}>{selectedSources[1].label}</tspan>
                 </text>
               </g>
             </Link>
@@ -211,7 +211,7 @@ function Diagram({className, height, width}) {
               <g id="Source-1" transform="translate(82.000000, 56.000000)">
                 <circle id="Oval-Copy-2" fill="#000000" cx="37.5" cy="37.5" r="37.5"></circle>
                 <text textLength={selectedSources[0].textLength || defaultTextLength} lengthAdjust="spacingAndGlyphs" fontFamily="Ubuntu-Bold, Ubuntu" fontSize={selectedSources[0].fontSize} fontWeight="bold" fill="#FFFFFF">
-                  <tspan x={selectedSources[0].xPosition || defaulyXPosition} y={selectedSources[0].yPosition}>{selectedSources[0].label}</tspan>
+                  <tspan x={selectedSources[0].xPosition || defaultXPosition} y={selectedSources[0].yPosition}>{selectedSources[0].label}</tspan>
                 </text>
               </g>
             </Link>
