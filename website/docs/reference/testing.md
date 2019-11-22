@@ -36,7 +36,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[tests]
+[[tests]]
   # REQUIRED - General
   name = "foo test" # example
   
@@ -46,8 +46,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
     extract_from = "bar" # example
     
     # REQUIRED - Conditions
-    [tests.outputs.conditions]
-      [tests.outputs.conditions.*]
+    [[tests.outputs.conditions]]
+      # REQUIRED
+      type = "check_fields" # example
+      
+      # OPTIONAL
+      message.eq = "this is the content to match against" # example
+      host.exists = true # example
+      method.neq = "POST" # example
   
   # REQUIRED - Input
   [tests.input]
@@ -65,7 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[tests]
+[[tests]]
   # REQUIRED - General
   name = "foo test" # example
   
@@ -75,8 +81,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
     extract_from = "bar" # example
     
     # REQUIRED - Conditions
-    [tests.outputs.conditions]
-      [tests.outputs.conditions.*]
+    [[tests.outputs.conditions]]
+      # REQUIRED
+      type = "check_fields" # example
+      
+      # OPTIONAL
+      message.eq = "this is the content to match against" # example
+      host.exists = true # example
+      method.neq = "POST" # example
   
   # REQUIRED - Input
   [tests.input]
@@ -185,7 +197,7 @@ A table that defines a unit test input event.
 
 #### insert_at
 
-The name of a transform, the input event will be delivered to this transform inorder to begin the test.
+The name of a transform, the input event will be delivered to this transform in order to begin the test.
 
 
 </Field>
@@ -546,7 +558,7 @@ A table that defines a unit test expected output.
 
 #### extract_from
 
-The name of a transform, at the end of the test events extracted from thistransform will be checked against a table of conditions.
+The name of a transform, at the end of the test events extracted from this transform will be checked against a table of conditions.
 
 
 </Field>
@@ -563,13 +575,13 @@ The name of a transform, at the end of the test events extracted from thistransf
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"table"}
+  type={"[table]"}
   unit={null}
   >
 
 #### conditions
 
-A table that defines a collection of conditions to check against the output of atransform. A test is considered to have passed when each condition has resolvedtrue for one or more events extracted from the target transform.
+A table that defines a collection of conditions to check against the output of a transform. A test is considered to have passed when each condition has resolved true for one or more events extracted from the target transform.
 
 <Fields filters={false}>
 
@@ -578,20 +590,89 @@ A table that defines a collection of conditions to check against the output of a
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"key":"check message is a thing","value":{"type":"check_fields","message.equals":"a thing"}}]}
-  name={"*"}
+  examples={["check_fields"]}
+  name={"type"}
   nullable={false}
   path={"outputs.conditions"}
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"table"}
+  type={"string"}
   unit={null}
   >
 
-##### *
+##### type
 
-A key/value pair representing a condition to be checked on the output of atransform. Keys should be an identifier for the condition that gives context asto what it is checking for.
+The type of the condition to execute. Currently only the `check_fields` type is available.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"name":"message.eq","value":"this is the content to match against"}]}
+  name={"`<field_name>`.eq"}
+  nullable={true}
+  path={"outputs.conditions"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `<field_name>`.eq
+
+Check whether a fields contents exactly matches the value specified.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"name":"method.neq","value":"POST"}]}
+  name={"`<field_name>`.neq"}
+  nullable={true}
+  path={"outputs.conditions"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `<field_name>`.neq
+
+Check whether a fields contents does not match the value specified.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"name":"host.exists","value":true}]}
+  name={"`<field_name>`.exists"}
+  nullable={true}
+  path={"outputs.conditions"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+##### `<field_name>`.exists
+
+Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
 
 </Field>

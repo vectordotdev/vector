@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 pub struct UnitTestCheck {
     extract_from: String,
-    conditions: HashMap<String, Box<dyn Condition>>,
+    conditions: Vec<Box<dyn Condition>>,
 }
 
 pub struct UnitTestTransform {
@@ -71,9 +71,9 @@ impl UnitTest {
         for check in &self.checks {
             if let Some(results) = results.get(&check.extract_from) {
                 let mut failed_conditions = Vec::new();
-                for (name, cond) in &check.conditions {
+                for (index, cond) in check.conditions.iter().enumerate() {
                     if results.iter().find(|e| cond.check(e)).is_none() {
-                        failed_conditions.push(name.to_owned());
+                        failed_conditions.push(index);
                     }
                 }
                 if !failed_conditions.is_empty() {
@@ -82,7 +82,7 @@ impl UnitTest {
                     errors.push(format!(
                         "check transform '{}' failed conditions: [ {} ], payloads (encoded in JSON format):\n  {}",
                         check.extract_from,
-                        failed_conditions.join(", "),
+                        failed_conditions.iter().map(|i| format!("{}", i)).collect::<Vec<String>>().join(", "),
                         event_strings.join("\n  "),
                     ));
                 }
@@ -269,24 +269,24 @@ fn build_unit_test(
 
     // Build all output conditions.
     let checks = definition.outputs.iter().map(|o| {
-        let mut conditions: HashMap<String, Box<dyn Condition>> = HashMap::new();
-        for (k, cond_conf) in &o.conditions {
+        let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
+        for (index, cond_conf) in o.conditions.iter().enumerate() {
             match cond_conf {
                 TestCondition::Embedded(b) => {
                     match b.build() {
                         Ok(c) => {
-                            conditions.insert(k.clone(), c);
+                            conditions.push(c);
                         },
                         Err(e) => {
                             errors.push(format!(
                                 "failed to create test condition '{}': {}",
-                                k, e,
+                                index, e,
                             ));
                         },
                     }
                 },
                 TestCondition::String(_s) => {
-                    errors.push(format!("failed to create test condition '{}': condition references are not yet supported", k));
+                    errors.push(format!("failed to create test condition '{}': condition references are not yet supported", index));
                 },
             }
         }
@@ -357,7 +357,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "bar"
-    [tests.outputs.conditions.always_false]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "#,
         )
@@ -403,13 +403,13 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "baz"
-    [tests.outputs.conditions.always_false]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "not this"
 
   [[tests.outputs]]
     extract_from = "quz"
-    [tests.outputs.conditions.always_false]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "not this"
 
@@ -422,7 +422,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "quz"
-    [tests.outputs.conditions.always_false]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "not this"
       "#,
@@ -464,7 +464,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "foo"
-    [tests.outputs.conditions.always_false]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "#,
         )
@@ -510,14 +510,14 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "foo"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "message.equals" = "nah this doesnt matter"
 
   [[tests.outputs]]
     extract_from = "bar"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "second_new_field.equals" = "also a string value"
@@ -525,7 +525,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "baz"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "second_new_field.equals" = "also a string value"
@@ -562,7 +562,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "foo"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "message.equals" = "this is the message"
@@ -601,7 +601,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "foo"
-    [tests.outputs.conditions.check_new_tag]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "tagfoo.equals" = "valfoo"
       "new_tag.eq" = "new value added"
@@ -644,7 +644,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "baz"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "second_new_field.equals" = "also a string value"
@@ -695,7 +695,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "bar"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "second_new_field.equals" = "also a string value"
@@ -703,7 +703,7 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "baz"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "new_field.equals" = "string value"
       "second_new_field.equals" = "also also a string value"
@@ -746,16 +746,16 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "foo"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "nah this doesnt matter"
 
   [[tests.outputs]]
     extract_from = "bar"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "not this"
-    [tests.outputs.conditions.check_second_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "second_new_field.equals" = "and not this"
 
@@ -768,13 +768,13 @@ mod tests {
 
   [[tests.outputs]]
     extract_from = "foo"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "also this doesnt matter"
 
   [[tests.outputs]]
     extract_from = "baz"
-    [tests.outputs.conditions.check_new_field]
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "second_new_field.equals" = "nope not this"
       "third_new_field.equals" = "and not this"

@@ -23,7 +23,7 @@ examples = ["foo"]
 common = true
 null = false
 description = """\
-The name of a transform, the input event will be delivered to this transform in\
+The name of a transform, the input event will be delivered to this transform in \
 order to begin the test.\
 """
 
@@ -162,32 +162,60 @@ examples = ["bar"]
 common = true
 null = false
 description = """\
-The name of a transform, at the end of the test events extracted from this\
+The name of a transform, at the end of the test events extracted from this \
 transform will be checked against a table of conditions.\
 """
 
 [testing.tests.options.outputs.options.conditions]
-type = "table"
+type = "[table]"
 common = true
 null = false
 description = """\
-A table that defines a collection of conditions to check against the output of a\
-transform. A test is considered to have passed when each condition has resolved\
+A table that defines a collection of conditions to check against the output of a \
+transform. A test is considered to have passed when each condition has resolved \
 true for one or more events extracted from the target transform.\
 """
 
-[testing.tests.options.outputs.options.conditions.options."*"]
-type = "table"
+[testing.tests.options.outputs.options.conditions.options.type]
+type = "string"
 null = false
+examples = ["check_fields"]
 common = true
 description = """\
-A key/value pair representing a condition to be checked on the output of a\
-transform. Keys should be an identifier for the condition that gives context as\
-to what it is checking for.\
+The type of the condition to execute. Currently only the `check_fields` type is \
+available.\
 """
 
-[[testing.tests.options.outputs.options.conditions.options."*".examples]]
-  key = "check message is a thing"
-  [testing.tests.options.outputs.options.conditions.options."*".examples.value]
-    type = "check_fields"
-    "message.equals" = "a thing"
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.eq"]
+type = "string"
+null = true
+examples = [
+  { name = "message.eq", value = "this is the content to match against" }
+]
+common = true
+description = """\
+Check whether a fields contents exactly matches the value specified.\
+"""
+
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.neq"]
+type = "string"
+null = true
+examples = [
+  { name = "method.neq", value = "POST" }
+]
+common = true
+description = """\
+Check whether a fields contents does not match the value specified.\
+"""
+
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.exists"]
+type = "bool"
+null = true
+examples = [
+  { name = "host.exists", value = true }
+]
+common = true
+description = """\
+Check whether a field exists or does not exist, depending on the provided value\
+being `true` or `false` respectively.\
+"""

@@ -216,7 +216,7 @@ fn default_test_input_type() -> String {
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
     pub extract_from: String,
-    pub conditions: IndexMap<String, TestCondition>,
+    pub conditions: Vec<TestCondition>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
