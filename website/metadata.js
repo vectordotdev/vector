@@ -87,7 +87,7 @@ module.exports = {
     "author": "Luke",
     "date": "2019-06-28",
     "id": "introducing-vector",
-    "path": "/Users/benjohnson/Code/timber/vector/website/blog/2019-06-28-introducing-vector.md",
+    "path": "website/blog/2019-06-28-introducing-vector.md",
     "permalink": "https://vector.dev/blog/introducing-vector",
     "tags": [
       "announcement"
@@ -104,7 +104,7 @@ module.exports = {
       "author": "Luke",
       "date": "2019-06-28",
       "id": "introducing-vector",
-      "path": "/Users/benjohnson/Code/timber/vector/website/blog/2019-06-28-introducing-vector.md",
+      "path": "website/blog/2019-06-28-introducing-vector.md",
       "permalink": "https://vector.dev/blog/introducing-vector",
       "tags": [
         "announcement"
@@ -113,15 +113,15 @@ module.exports = {
     }
   ],
   "sources": {
-    "udp": {
+    "tcp": {
       "beta": false,
       "delivery_guarantee": "best_effort",
       "event_types": [
         "log"
       ],
       "function_category": "receive",
-      "id": "udp_source",
-      "name": "udp",
+      "id": "tcp_source",
+      "name": "tcp",
       "service_provider": null,
       "status": "prod-ready",
       "type": "source"
@@ -139,19 +139,6 @@ module.exports = {
       "status": "prod-ready",
       "type": "source"
     },
-    "docker": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "collect",
-      "id": "docker_source",
-      "name": "docker",
-      "service_provider": null,
-      "status": "beta",
-      "type": "source"
-    },
     "vector": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -164,6 +151,19 @@ module.exports = {
       "name": "vector",
       "service_provider": null,
       "status": "beta",
+      "type": "source"
+    },
+    "udp": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "udp_source",
+      "name": "udp",
+      "service_provider": null,
+      "status": "prod-ready",
       "type": "source"
     },
     "statsd": {
@@ -192,17 +192,17 @@ module.exports = {
       "status": "beta",
       "type": "source"
     },
-    "journald": {
-      "beta": true,
+    "syslog": {
+      "beta": false,
       "delivery_guarantee": "best_effort",
       "event_types": [
         "log"
       ],
-      "function_category": "collect",
-      "id": "journald_source",
-      "name": "journald",
+      "function_category": "receive",
+      "id": "syslog_source",
+      "name": "syslog",
       "service_provider": null,
-      "status": "beta",
+      "status": "prod-ready",
       "type": "source"
     },
     "file": {
@@ -218,57 +218,82 @@ module.exports = {
       "status": "prod-ready",
       "type": "source"
     },
-    "syslog": {
-      "beta": false,
+    "docker": {
+      "beta": true,
       "delivery_guarantee": "best_effort",
       "event_types": [
         "log"
       ],
-      "function_category": "receive",
-      "id": "syslog_source",
-      "name": "syslog",
+      "function_category": "collect",
+      "id": "docker_source",
+      "name": "docker",
       "service_provider": null,
-      "status": "prod-ready",
+      "status": "beta",
       "type": "source"
     },
-    "tcp": {
-      "beta": false,
+    "journald": {
+      "beta": true,
       "delivery_guarantee": "best_effort",
       "event_types": [
         "log"
       ],
-      "function_category": "receive",
-      "id": "tcp_source",
-      "name": "tcp",
+      "function_category": "collect",
+      "id": "journald_source",
+      "name": "journald",
       "service_provider": null,
-      "status": "prod-ready",
+      "status": "beta",
       "type": "source"
     }
   },
   "transforms": {
-    "log_to_metric": {
-      "beta": false,
-      "delivery_guarantee": null,
-      "event_types": [
-        "log",
-        "metric"
-      ],
-      "function_category": "convert",
-      "id": "log_to_metric_transform",
-      "name": "log_to_metric",
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "transform"
-    },
-    "split": {
+    "coercer": {
       "beta": false,
       "delivery_guarantee": null,
       "event_types": [
         "log"
       ],
       "function_category": "parse",
-      "id": "split_transform",
-      "name": "split",
+      "id": "coercer_transform",
+      "name": "coercer",
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform"
+    },
+    "add_fields": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "event_types": [
+        "log"
+      ],
+      "function_category": "shape",
+      "id": "add_fields_transform",
+      "name": "add_fields",
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform"
+    },
+    "remove_fields": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "event_types": [
+        "log"
+      ],
+      "function_category": "shape",
+      "id": "remove_fields_transform",
+      "name": "remove_fields",
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform"
+    },
+    "tokenizer": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "event_types": [
+        "log"
+      ],
+      "function_category": "parse",
+      "id": "tokenizer_transform",
+      "name": "tokenizer",
       "service_provider": null,
       "status": "prod-ready",
       "type": "transform"
@@ -286,31 +311,17 @@ module.exports = {
       "status": "prod-ready",
       "type": "transform"
     },
-    "field_filter": {
+    "sampler": {
       "beta": true,
-      "delivery_guarantee": null,
-      "event_types": [
-        "log",
-        "metric"
-      ],
-      "function_category": "filter",
-      "id": "field_filter_transform",
-      "name": "field_filter",
-      "service_provider": null,
-      "status": "beta",
-      "type": "transform"
-    },
-    "remove_fields": {
-      "beta": false,
       "delivery_guarantee": null,
       "event_types": [
         "log"
       ],
-      "function_category": "shape",
-      "id": "remove_fields_transform",
-      "name": "remove_fields",
+      "function_category": "filter",
+      "id": "sampler_transform",
+      "name": "sampler",
       "service_provider": null,
-      "status": "prod-ready",
+      "status": "beta",
       "type": "transform"
     },
     "regex_parser": {
@@ -339,28 +350,15 @@ module.exports = {
       "status": "prod-ready",
       "type": "transform"
     },
-    "coercer": {
+    "split": {
       "beta": false,
       "delivery_guarantee": null,
       "event_types": [
         "log"
       ],
       "function_category": "parse",
-      "id": "coercer_transform",
-      "name": "coercer",
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "transform"
-    },
-    "add_fields": {
-      "beta": false,
-      "delivery_guarantee": null,
-      "event_types": [
-        "log"
-      ],
-      "function_category": "shape",
-      "id": "add_fields_transform",
-      "name": "add_fields",
+      "id": "split_transform",
+      "name": "split",
       "service_provider": null,
       "status": "prod-ready",
       "type": "transform"
@@ -378,15 +376,29 @@ module.exports = {
       "status": "beta",
       "type": "transform"
     },
-    "tokenizer": {
+    "remove_tags": {
       "beta": false,
       "delivery_guarantee": null,
       "event_types": [
-        "log"
+        "metric"
       ],
-      "function_category": "parse",
-      "id": "tokenizer_transform",
-      "name": "tokenizer",
+      "function_category": "shape",
+      "id": "remove_tags_transform",
+      "name": "remove_tags",
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform"
+    },
+    "log_to_metric": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "event_types": [
+        "log",
+        "metric"
+      ],
+      "function_category": "convert",
+      "id": "log_to_metric_transform",
+      "name": "log_to_metric",
       "service_provider": null,
       "status": "prod-ready",
       "type": "transform"
@@ -404,72 +416,33 @@ module.exports = {
       "status": "prod-ready",
       "type": "transform"
     },
-    "sampler": {
+    "field_filter": {
       "beta": true,
       "delivery_guarantee": null,
-      "event_types": [
-        "log"
-      ],
-      "function_category": "filter",
-      "id": "sampler_transform",
-      "name": "sampler",
-      "service_provider": null,
-      "status": "beta",
-      "type": "transform"
-    },
-    "remove_tags": {
-      "beta": false,
-      "delivery_guarantee": null,
-      "event_types": [
-        "metric"
-      ],
-      "function_category": "shape",
-      "id": "remove_tags_transform",
-      "name": "remove_tags",
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "transform"
-    }
-  },
-  "sinks": {
-    "datadog_metrics": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "metric"
-      ],
-      "function_category": "transmit",
-      "id": "datadog_metrics_sink",
-      "name": "datadog_metrics",
-      "service_provider": "Datadog",
-      "status": "beta",
-      "type": "sink"
-    },
-    "blackhole": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
       "event_types": [
         "log",
         "metric"
       ],
-      "function_category": "test",
-      "id": "blackhole_sink",
-      "name": "blackhole",
+      "function_category": "filter",
+      "id": "field_filter_transform",
+      "name": "field_filter",
       "service_provider": null,
-      "status": "prod-ready",
-      "type": "sink"
-    },
-    "aws_s3": {
-      "beta": true,
-      "delivery_guarantee": "at_least_once",
+      "status": "beta",
+      "type": "transform"
+    }
+  },
+  "sinks": {
+    "tcp": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
       "event_types": [
         "log"
       ],
       "function_category": "transmit",
-      "id": "aws_s3_sink",
-      "name": "aws_s3",
-      "service_provider": "AWS",
-      "status": "beta",
+      "id": "tcp_sink",
+      "name": "tcp",
+      "service_provider": null,
+      "status": "prod-ready",
       "type": "sink"
     },
     "vector": {
@@ -498,15 +471,67 @@ module.exports = {
       "status": "beta",
       "type": "sink"
     },
-    "aws_cloudwatch_logs": {
+    "prometheus": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "transmit",
+      "id": "prometheus_sink",
+      "name": "prometheus",
+      "service_provider": null,
+      "status": "beta",
+      "type": "sink"
+    },
+    "splunk_hec": {
+      "beta": false,
+      "delivery_guarantee": "at_least_once",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "splunk_hec_sink",
+      "name": "splunk_hec",
+      "service_provider": "Splunk",
+      "status": "prod-ready",
+      "type": "sink"
+    },
+    "kafka": {
+      "beta": false,
+      "delivery_guarantee": "at_least_once",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "kafka_sink",
+      "name": "kafka",
+      "service_provider": "Confluent",
+      "status": "prod-ready",
+      "type": "sink"
+    },
+    "datadog_metrics": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "transmit",
+      "id": "datadog_metrics_sink",
+      "name": "datadog_metrics",
+      "service_provider": "Datadog",
+      "status": "beta",
+      "type": "sink"
+    },
+    "aws_kinesis_streams": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
       "event_types": [
         "log"
       ],
       "function_category": "transmit",
-      "id": "aws_cloudwatch_logs_sink",
-      "name": "aws_cloudwatch_logs",
+      "id": "aws_kinesis_streams_sink",
+      "name": "aws_kinesis_streams",
       "service_provider": "AWS",
       "status": "beta",
       "type": "sink"
@@ -524,33 +549,20 @@ module.exports = {
       "status": "beta",
       "type": "sink"
     },
-    "kafka": {
-      "beta": false,
+    "aws_s3": {
+      "beta": true,
       "delivery_guarantee": "at_least_once",
       "event_types": [
         "log"
       ],
       "function_category": "transmit",
-      "id": "kafka_sink",
-      "name": "kafka",
-      "service_provider": "Confluent",
-      "status": "prod-ready",
+      "id": "aws_s3_sink",
+      "name": "aws_s3",
+      "service_provider": "AWS",
+      "status": "beta",
       "type": "sink"
     },
-    "splunk_hec": {
-      "beta": false,
-      "delivery_guarantee": "at_least_once",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "transmit",
-      "id": "splunk_hec_sink",
-      "name": "splunk_hec",
-      "service_provider": "Splunk",
-      "status": "prod-ready",
-      "type": "sink"
-    },
-    "console": {
+    "blackhole": {
       "beta": false,
       "delivery_guarantee": "best_effort",
       "event_types": [
@@ -558,47 +570,8 @@ module.exports = {
         "metric"
       ],
       "function_category": "test",
-      "id": "console_sink",
-      "name": "console",
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "sink"
-    },
-    "aws_kinesis_streams": {
-      "beta": true,
-      "delivery_guarantee": "at_least_once",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "transmit",
-      "id": "aws_kinesis_streams_sink",
-      "name": "aws_kinesis_streams",
-      "service_provider": "AWS",
-      "status": "beta",
-      "type": "sink"
-    },
-    "clickhouse": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "transmit",
-      "id": "clickhouse_sink",
-      "name": "clickhouse",
-      "service_provider": null,
-      "status": "beta",
-      "type": "sink"
-    },
-    "file": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "transmit",
-      "id": "file_sink",
-      "name": "file",
+      "id": "blackhole_sink",
+      "name": "blackhole",
       "service_provider": null,
       "status": "prod-ready",
       "type": "sink"
@@ -616,17 +589,57 @@ module.exports = {
       "status": "beta",
       "type": "sink"
     },
-    "tcp": {
+    "file": {
       "beta": false,
       "delivery_guarantee": "best_effort",
       "event_types": [
         "log"
       ],
       "function_category": "transmit",
-      "id": "tcp_sink",
-      "name": "tcp",
+      "id": "file_sink",
+      "name": "file",
       "service_provider": null,
       "status": "prod-ready",
+      "type": "sink"
+    },
+    "clickhouse": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "clickhouse_sink",
+      "name": "clickhouse",
+      "service_provider": null,
+      "status": "beta",
+      "type": "sink"
+    },
+    "console": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "log",
+        "metric"
+      ],
+      "function_category": "test",
+      "id": "console_sink",
+      "name": "console",
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "sink"
+    },
+    "aws_cloudwatch_logs": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "aws_cloudwatch_logs_sink",
+      "name": "aws_cloudwatch_logs",
+      "service_provider": "AWS",
+      "status": "beta",
       "type": "sink"
     },
     "http": {
@@ -640,19 +653,6 @@ module.exports = {
       "name": "http",
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
-    },
-    "prometheus": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "metric"
-      ],
-      "function_category": "transmit",
-      "id": "prometheus_sink",
-      "name": "prometheus",
-      "service_provider": null,
-      "status": "beta",
       "type": "sink"
     }
   }
