@@ -219,6 +219,7 @@ module.exports = {
       type: 'category',
       label: 'Administration',
       items: [
+        "administration",
         "administration/process-management",
         "administration/monitoring",
         "administration/tuning",
