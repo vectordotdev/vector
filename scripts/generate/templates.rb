@@ -89,7 +89,7 @@ class Templates
     render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
   end
 
-  def common_component_links(type, limit = 5)
+  def common_component_links(type, limit = 6)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
     links =
@@ -239,6 +239,14 @@ class Templates
 
   def full_config_spec
     render("#{partials_path}/_full_config_spec.toml", binding).strip
+  end
+
+  def install_from_archive_linux(archive_name)
+    render("#{partials_path}/_install_from_archive_linux.md", binding).strip
+  end
+
+  def manual_installation_next_steps
+    render("#{partials_path}/_manual_installation_next_steps.md", binding).strip
   end
 
   def option_description(option)

@@ -9,7 +9,8 @@ operating_systems = [
   {name = "MacOS", id = "macos"},
   {name = "Raspberry Pi", id = "raspberry-pi"},
   {name = "RHEL", id = "rhel"},
-  {name = "Ubuntu", id = "ubuntu"}
+  {name = "Ubuntu", id = "ubuntu"},
+  {name = "Windows", id = "windows"}
 ]
 package_managers = [
   {name = "DPKG", id = "dpkg"},
@@ -18,31 +19,53 @@ package_managers = [
 ]
 
 [[installation.downloads]]
-name = "Linux (x86_64 w/ MUSL)"
+cpu = "x86_64"
 file_name = "vector-x86_64-unknown-linux-musl.tar.gz"
 latest = true
+name = "Linux (x86_64 w/ MUSL)"
 nightly = true
+os = "Linux"
+type = "archive"
 
 [[installation.downloads]]
-name = "Linux (ARM64 w/ MUSL)"
+cpu = "ARM64"
 file_name = "vector-aarch64-unknown-linux-musl.tar.gz"
 latest = false
+name = "Linux (ARM64 w/ MUSL)"
 nightly = true
+os = "Linux"
+type = "archive"
 
 [[installation.downloads]]
-name = "MacOS (64-bit OSX)"
+cpu = "x86_64"
 file_name = "vector-x86_64-apple-darwin.tar.gz"
 latest = true
+name = "MacOS (x86_64, 10.7+)"
 nightly = true
+os = "MacOS"
+type = "archive"
 
 [[installation.downloads]]
-name = "Deb"
+cpu = "x86_64"
+file_name = "vector-x86_64-pc-windows-msvc.zip"
+latest = false
+name = "Windows (x86_64 w/ MSVC, 7+)"
+nightly = true
+os = "Windows"
+type = "archive"
+
+[[installation.downloads]]
 file_name = "vector-amd64.deb"
 latest = true
+name = "Deb"
 nightly = true
+os = "Linux"
+type = "package"
 
 [[installation.downloads]]
-name = "RPM"
 file_name = "vector-x86_64.rpm"
 latest = true
+name = "RPM"
 nightly = true
+os = "Linux"
+type = "package"

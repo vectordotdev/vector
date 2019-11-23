@@ -8,34 +8,56 @@ module.exports = {
     ],
     "downloads": [
       {
+        "cpu": "x86_64",
         "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
         "latest": true,
         "name": "Linux (x86_64 w/ MUSL)",
-        "nightly": true
+        "nightly": true,
+        "os": "Linux",
+        "type": "archive"
       },
       {
+        "cpu": "ARM64",
         "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
         "latest": false,
         "name": "Linux (ARM64 w/ MUSL)",
-        "nightly": true
+        "nightly": true,
+        "os": "Linux",
+        "type": "archive"
       },
       {
+        "cpu": "x86_64",
         "file_name": "vector-x86_64-apple-darwin.tar.gz",
         "latest": true,
-        "name": "MacOS (64-bit OSX)",
-        "nightly": true
+        "name": "MacOS (x86_64, 10.7+)",
+        "nightly": true,
+        "os": "MacOS",
+        "type": "archive"
+      },
+      {
+        "cpu": "x86_64",
+        "file_name": "vector-x86_64-pc-windows-msvc.zip",
+        "latest": false,
+        "name": "Windows (x86_64 w/ MSVC, 7+)",
+        "nightly": true,
+        "os": "Windows",
+        "type": "archive"
       },
       {
         "file_name": "vector-amd64.deb",
         "latest": true,
         "name": "Deb",
-        "nightly": true
+        "nightly": true,
+        "os": "Linux",
+        "type": "package"
       },
       {
         "file_name": "vector-x86_64.rpm",
         "latest": true,
         "name": "RPM",
-        "nightly": true
+        "nightly": true,
+        "os": "Linux",
+        "type": "package"
       }
     ],
     "operating_systems": [
@@ -66,6 +88,10 @@ module.exports = {
       {
         "id": "ubuntu",
         "name": "Ubuntu"
+      },
+      {
+        "id": "windows",
+        "name": "Windows"
       }
     ],
     "package_managers": [

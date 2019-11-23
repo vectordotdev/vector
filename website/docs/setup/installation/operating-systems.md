@@ -13,6 +13,7 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/installation/operating-systems/raspberry-pi">Raspberry pi</Jump>
 <Jump to="/docs/setup/installation/operating-systems/rhel">Rhel</Jump>
 <Jump to="/docs/setup/installation/operating-systems/ubuntu">Ubuntu</Jump>
+<Jump to="/docs/setup/installation/operating-systems/windows">Windows</Jump>
 
 
 

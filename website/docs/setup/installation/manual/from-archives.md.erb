@@ -1,0 +1,107 @@
+---
+title: Install Vector From Archives
+sidebar_label: From Archives
+description: Install Vector from pre-compiled archives
+---
+
+This page covers installing Vector from a pre-built archive. These archives
+contain the `vector` binary as well as supporting configuration files.
+
+<Alert type="warning">
+
+We recommend installing Vector through a supported [container
+platform][docs.containers] or [package manager][docs.package_managers], if
+possible. These handle permissions, directory creation, and other
+intricacies covered in the [Next Steps](#next-steps) section.
+
+</Alert>
+
+## Installation
+
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="linux_x86_64"
+  urlKey="os"
+  values={[
+    { label: 'Linux (x86_64)', value: 'linux_x86_64', },
+    { label: 'Linux (ARM64)', value: 'linux_arm64', },
+    { label: 'MacOS (x86_64)', value: 'macos_x86_64', },
+    { label: 'Windows (x86_64)', value: 'windows_x86_64', },
+    { label: 'Other', value: 'other', },
+  ]}>
+
+<TabItem value="linux_x86_64">
+
+<%= install_from_archive_linux("vector-x86_64-unknown-linux-musl.tar.gz") %>
+
+</TabItem>
+<TabItem value="linux_arm64">
+
+<%= install_from_archive_linux("vector-aarch64-unknown-linux-musl.tar.gz") %>
+
+</TabItem>
+<TabItem value="macos_x86_64">
+
+<%= install_from_archive_linux("vector-x86_64-apple-darwin.tar.gz") %>
+
+</TabItem>
+<TabItem value="windows_x86_64">
+
+1.  Download Vector release archive (latest):
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```powershell
+    Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.latest/vector-x86_64-pc-windows-msvc.zip") %> -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```powershell
+    Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.nightly/latest/vector-x86_64-pc-windows-msvc.zip") %> -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Extract files from the archive:
+
+    ```powershell
+    Expand-Archive vector-x86_64-pc-windows-msvc.zip .
+    ```
+
+3.  Navigate to Vector directory:
+
+    ```powershell
+    cd vector-x86_64-pc-windows-msvc
+    ```
+4.  Start Vector:
+
+    ```powerhsell
+    bin\vector.exe --config config\vector.toml
+    ```
+
+</TabItem>
+<TabItem value="other">
+
+To install Vector on targets not listed above we recommend that you [build
+Vector from source][docs.from_source]. You can also request a target by
+[opening an issue][urls.new_target].
+
+</TabItem>
+</Tabs>
+
+## Next Steps
+
+<%= manual_installation_next_steps %>

@@ -4,72 +4,254 @@ sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---
 
-Installing Vector from a pre-built archive should be a last resort if Vector
-cannot be installed through a supported [container system][docs.containers] or
-[operating system][docs.operating_systems]. Archives are built for released
-versions as well as nightly builds.
-
-## Installation
+This page covers installing Vector from a pre-built archive. These archives
+contain the `vector` binary as well as supporting configuration files.
 
 import Alert from '@site/src/components/Alert';
 
-<Alert type="info">
+<Alert type="warning">
 
-If you don't see your target, then we recommend [building Vector from source][docs.from_source].
-You can also request a target by [opening an issue][urls.new_target] requesting
-your new target.
+We recommend installing Vector through a supported [container
+platform][docs.containers] or [package manager][docs.package_managers], if
+possible. These handle permissions, directory creation, and other
+intricacies covered in the [Next Steps](#next-steps) section.
 
 </Alert>
 
-<div class="section-list section-list--lg">
-<div class="section">
+## Installation
 
-### 1. Copy the Vector archive URL
+import Tabs from '@theme/Tabs';
 
-Head over to the [download page][pages.download] and copy the appropriate
-archive URL.
+<Tabs
+  block={true}
+  defaultValue="linux_x86_64"
+  urlKey="os"
+  values={[
+    { label: 'Linux (x86_64)', value: 'linux_x86_64', },
+    { label: 'Linux (ARM64)', value: 'linux_arm64', },
+    { label: 'MacOS (x86_64)', value: 'macos_x86_64', },
+    { label: 'Windows (x86_64)', value: 'windows_x86_64', },
+    { label: 'Other', value: 'other', },
+  ]}>
 
-</div>
-<div class="section">
+import TabItem from '@theme/TabItem';
 
-### 2. Download & unpack the archive
+<TabItem value="linux_x86_64">
 
-```bash
-mkdir -p vector && curl -sSfL --proto '=https' --tlsv1.2 <release-download-url> | tar xzf - -C vector --strip-components=2
-```
+1.  Download & unpack the archive
+    
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
 
-</div>
-<div class="section">
+    <TabItem value="latest">
 
-### 3. Change into the `vector` directory
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
 
-```bash
-cd vector
-```
+    </TabItem>
+    <TabItem value="nightly">
 
-</div>
-<div class="section">
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
 
-### 4. Move `vector` into your $PATH
+    </TabItem>
+    </Tabs>
 
-```bash
-echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
-source $HOME/.profile
-```
+2.  Change into the `vector` directory
 
-</div>
-<div class="section">
+    ```bash
+    cd vector
+    ```
 
-### 5. Start Vector
+3.  Move `vector` into your $PATH
 
-That's it! You can start vector with:
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
 
-```bash
-vector --config config/vector.toml
-```
+4.  Start Vector
 
-</div>
-</div>
+    That's it! You can start vector with:
+
+    ```bash
+    vector --config config/vector.toml
+    ```
+
+</TabItem>
+<TabItem value="linux_arm64">
+
+1.  Download & unpack the archive
+    
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-aarch64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-aarch64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Change into the `vector` directory
+
+    ```bash
+    cd vector
+    ```
+
+3.  Move `vector` into your $PATH
+
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
+
+4.  Start Vector
+
+    That's it! You can start vector with:
+
+    ```bash
+    vector --config config/vector.toml
+    ```
+
+</TabItem>
+<TabItem value="macos_x86_64">
+
+1.  Download & unpack the archive
+    
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-x86_64-apple-darwin.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-x86_64-apple-darwin.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Change into the `vector` directory
+
+    ```bash
+    cd vector
+    ```
+
+3.  Move `vector` into your $PATH
+
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
+
+4.  Start Vector
+
+    That's it! You can start vector with:
+
+    ```bash
+    vector --config config/vector.toml
+    ```
+
+</TabItem>
+<TabItem value="windows_x86_64">
+
+1.  Download Vector release archive (latest):
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```powershell
+    Invoke-WebRequest https://packages.timber.io/vector/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```powershell
+    Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Extract files from the archive:
+
+    ```powershell
+    Expand-Archive vector-x86_64-pc-windows-msvc.zip .
+    ```
+
+3.  Navigate to Vector directory:
+
+    ```powershell
+    cd vector-x86_64-pc-windows-msvc
+    ```
+4.  Start Vector:
+
+    ```powerhsell
+    bin\vector.exe --config config\vector.toml
+    ```
+
+</TabItem>
+<TabItem value="other">
+
+To install Vector on targets not listed above we recommend that you [build
+Vector from source][docs.from_source]. You can also request a target by
+[opening an issue][urls.new_target].
+
+</TabItem>
+</Tabs>
 
 ## Next Steps
 
@@ -87,25 +269,29 @@ Vector in the [Configuration][docs.configuration] section.
 
 ### Data Directory
 
-We highly recommend creating a [data directory][docs.configuration#data-directory]
+We highly recommend creating a [data directory][docs.global-options#data-directory]
 that Vector can use:
 
 ```
 mkdir /var/lib/vector
 ```
 
-And in your `vector.toml` file:
-
-```toml
-data_dir = "/var/lib/vector"
-```
-
 <Alert type="warning">
 
-If you plan to run Vector under a separate user, be sure that the directory
-is writable by the `vector` process.
+Make sure that this directory is writable by the `vector` process.
 
 </Alert>
+
+Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
+you can use to specify the path of your directory.
+
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+data_dir = "/var/lib/vector" # default
+```
 
 ### Service Managers
 
@@ -132,10 +318,10 @@ cp -av etc/systemd/vector /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration#data-directory]: /docs/setup/configuration#data-directory
 [docs.configuration]: /docs/setup/configuration
 [docs.containers]: /docs/setup/installation/containers
 [docs.from_source]: /docs/setup/installation/manual/from-source
-[docs.operating_systems]: /docs/setup/installation/operating-systems
-[pages.download]: /download
+[docs.global-options#data-directory]: /docs/reference/global-options#data-directory
+[docs.global-options#data_dir]: /docs/reference/global-options#data_dir
+[docs.package_managers]: /docs/setup/installation/package-managers
 [urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations
