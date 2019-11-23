@@ -154,7 +154,7 @@ function VectorComponents(props) {
   //
 
   const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
-  const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['providers']));
+  const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['functions']));
   const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
   const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');

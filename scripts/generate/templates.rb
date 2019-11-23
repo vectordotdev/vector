@@ -89,6 +89,23 @@ class Templates
     render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
   end
 
+  def common_component_links(type, limit = 5)
+    common = metadata.send("#{type.to_s.pluralize}_list").select(&:common?)
+
+    links =
+      common[0..limit].collect do |component|
+        "[#{component.name}][docs.#{type.to_s.pluralize}.#{component.name}]"
+      end
+
+    num_leftover = common.size - links.size
+
+    if num_leftover > 0
+      links << "and [15 more][docs.#{type.to_s.pluralize}]"
+    end
+
+    links.join(", ")
+  end
+
   def component_config_example(component)
     render("#{partials_path}/_component_config_example.md", binding).strip
   end

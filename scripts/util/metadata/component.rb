@@ -9,6 +9,7 @@ class Component
   include Comparable
 
   attr_reader :beta,
+    :common,
     :function_category,
     :id,
     :name,
@@ -18,6 +19,7 @@ class Component
 
   def initialize(hash)
     @beta = hash["beta"] == true
+    @common = hash["common"] == true
     @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
     @type ||= self.class.name.downcase
@@ -69,6 +71,10 @@ class Component
 
   def beta?
     beta == true
+  end
+
+  def common?
+    common == true
   end
 
   def context_options
