@@ -37,14 +37,18 @@ to be followed on your target machine.
     ```bash
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     ```
+2. Install C++ toolchain
 
-2.  Create the `vector` directory
+    Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
+    on your system.
+
+3.  Create the `vector` directory
 
     ```bash
     mkdir vector
     ```
 
-3.  Download Vector's Source
+4.  Download Vector's Source
   
     <Tabs
       className="mini"
@@ -76,13 +80,13 @@ to be followed on your target machine.
     </TabItem>
     </Tabs>
 
-4.  Change into the `vector` directory
+5.  Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-5.  Compile Vector
+6.  Compile Vector
 
     ```bash
     make build
@@ -93,7 +97,7 @@ to be followed on your target machine.
     is `x86_64-apple-darwin`, and the Vector binary will be located at
     `target/x86_64-apple-darwin/release/vector`.
 
-6.  Start Vector
+7.  Start Vector
 
     Finally, start vector:
 
