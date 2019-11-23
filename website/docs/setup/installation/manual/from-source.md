@@ -88,6 +88,31 @@ to be followed on your target machine.
     make build
     ```
 
+    <Alert type="info">
+    The command above builds Vector with default configuration, which is
+    suitable for most cases. However, it is possible to customize the build
+    by explicitly specifying the features you want Vector to be built with.
+
+    It can be done by running the build as
+
+    ```bash
+    FEATURES="<space-separated list of feature flags>" make build
+    ```
+
+    The following feature flags are supported:
+
+    | Feature | Description | Enabled by default |
+    | :------ | :---------- | :----------------- |
+    | `jemallocator` | Enables [jemalloc](https://github.com/jemalloc/jemalloc) instead of default memory allocator, which improves [performance](https://vector.dev/#performance). | ✅ |
+    | `leveldb` | Enabled support for [disk buffers][docs.glossary.buffer] using [LevelDB][urls.leveldb]. | ✅ |
+    | `leveldb/leveldb-sys-2` | Can be used together with `leveldb` feature to use LevelDB from [`leveldb-sys` 2.x][urls.leveldb-sys-2] crate, which doesn't have have `cmake` dependency, but supports less platforms. | ✅ |
+    | `leveldb/leveldb-sys-3` | Can be used together with `leveldb` feature to use LevelDB from development version of [`leveldb-sys` 3.x][urls.leveldb-sys-3] crate, which requires `cmake` as dependency, but supports more platforms. | |
+    | `openssl/vendored` | Enables static linking to vendored version of [OpenSSL][urls.openssl]. If disabled, system SSL library is used instead. | ✅ |
+    | `rdkafka` | Enables [librdkafka](https://github.com/edenhill/librdkafka) dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | ✅ |
+    | `rdkafka/cmake_build` | Can be used together with `rdkafka` feature to build `librdkafka` using `cmake` instead of default build script in case of build problems on non-standard system configurations. | |
+    | `shiplift/unix` | Enables support Unix domain sockets in [`docker`][docs.sources.docker] source. | ✅ |
+    </Alert>
+
     The vector binary will be placed in `target/<target>/release/vector`.
     For example, if you are building Vector on your Mac, your target triple
     is `x86_64-apple-darwin`, and the Vector binary will be located at
@@ -169,8 +194,23 @@ Simply follow the same [installation instructions above](#installation).
 [docs.configuration]: /docs/setup/configuration
 [docs.containers]: /docs/setup/installation/containers
 [docs.from_archives]: /docs/setup/installation/manual/from-archives
+<<<<<<< HEAD
 [docs.global-options#data-directory]: /docs/reference/global-options#data-directory
 [docs.global-options#data_dir]: /docs/reference/global-options#data_dir
 [docs.package_managers]: /docs/setup/installation/package-managers
+=======
+[docs.operating_systems]: /docs/setup/installation/operating-systems
+[docs.performance]: /#performance
+[docs.sources.docker]: /docs/reference/sources/docker
+[docs.sources.kafka]: /docs/reference/sources/kafka
+[docs.sinks.kafka]: /docs/reference/sinks/kafka
+[docs.glossary.buffer]: /docs/meta/glossary#buffer
+>>>>>>> docs: Describe build features
 [urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [urls.rust]: https://www.rust-lang.org/
+[urls.jemalloc]: https://github.com/jemalloc/jemalloc
+[urls.librdkafka]: https://github.com/edenhill/librdkafka
+[urls.leveldb]: https://github.com/google/leveldb
+[urls.leveldb-sys-2]: https://crates.io/crates/leveldb-sys
+[urls.leveldb-sys-3]: https://github.com/timberio/leveldb-sys/tree/v3.0.0
+[urls.openssl]: https://www.openssl.org/
