@@ -140,6 +140,7 @@ module.exports = {
       type: 'category',
       label: 'Administration',
       items: [
+        <%= metadata.links.fetch_id("docs.administration").to_json %>,
         <%= metadata.links.fetch_id("docs.administration.process-management").to_json %>,
         <%= metadata.links.fetch_id("docs.administration.monitoring").to_json %>,
         <%= metadata.links.fetch_id("docs.administration.tuning").to_json %>,
