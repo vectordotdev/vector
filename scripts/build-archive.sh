@@ -106,6 +106,8 @@ cp -av $target_dir/release/vector $archive_dir/bin
 
 # Copy the entire config dir to /config
 cp -rv config $archive_dir/config
+# Remove templates sources
+find $archive_dir/config -type f -name '*.erb' -delete
 
 # Copy /etc usefule files
 mkdir -p $archive_dir/etc/systemd
