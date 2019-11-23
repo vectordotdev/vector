@@ -42,9 +42,9 @@ simple and unified.
 
 #### Reference
 
-* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka]
-* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_cloudwatch_metrics][docs.sinks.aws_cloudwatch_metrics], [aws_kinesis_streams][docs.sinks.aws_kinesis_streams], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], and [15 more][docs.sinks]
+* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], and [6 more...][docs.sources]
+* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [10 more...][docs.transforms]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [http][docs.sinks.http], [kafka][docs.sinks.kafka], and [11 more...][docs.sinks]
 
 #### Administration
 
@@ -143,11 +143,11 @@ Or view [platform specific installation instructions][docs.installation].
 [docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service
 [docs.roles]: https://vector.dev/docs/setup/deployment/roles
 [docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs
-[docs.sinks.aws_cloudwatch_metrics]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_metrics
-[docs.sinks.aws_kinesis_streams]: https://vector.dev/docs/reference/sinks/aws_kinesis_streams
 [docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3
 [docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch
+[docs.sinks.http]: https://vector.dev/docs/reference/sinks/http
+[docs.sinks.kafka]: https://vector.dev/docs/reference/sinks/kafka
 [docs.sinks]: https://vector.dev/docs/reference/sinks
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file

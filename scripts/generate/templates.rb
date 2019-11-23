@@ -90,17 +90,17 @@ class Templates
   end
 
   def common_component_links(type, limit = 5)
-    common = metadata.send("#{type.to_s.pluralize}_list").select(&:common?)
+    components = metadata.send("#{type.to_s.pluralize}_list")
 
     links =
-      common[0..limit].collect do |component|
+      components.select(&:common?)[0..limit].collect do |component|
         "[#{component.name}][docs.#{type.to_s.pluralize}.#{component.name}]"
       end
 
-    num_leftover = common.size - links.size
+    num_leftover = components.size - links.size
 
     if num_leftover > 0
-      links << "and [15 more][docs.#{type.to_s.pluralize}]"
+      links << "and [#{num_leftover} more...][docs.#{type.to_s.pluralize}]"
     end
 
     links.join(", ")

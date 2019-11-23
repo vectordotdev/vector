@@ -1,7 +1,7 @@
 [sinks.aws_cloudwatch_metrics]
 beta = true
 buffer = false
-common = true
+common = false
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
 function_category = "transmit"
