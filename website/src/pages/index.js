@@ -314,8 +314,8 @@ function Installation() {
         <div className={styles.installationPlatforms}>
           <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/linux.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/raspberry-pi.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/windows.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/raspberry-pi"><SVG src="/img/raspberry-pi.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/windows"><SVG src="/img/windows.svg" /></Link>
         </div>
 
         <div className={styles.installationChecks}>
