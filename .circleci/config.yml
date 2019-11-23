@@ -128,7 +128,7 @@ jobs:
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
+            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
             rm rust-toolchain
             cargo test --no-default-features --features "$FEATURES" -- --test-threads=1
 
@@ -260,7 +260,7 @@ jobs:
             export -f zip
 
             export RUSTFLAGS=-Ctarget-feature=+crt-static
-            export FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build"
+            export FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
             export ARCHIVE_TYPE="zip"
             export STRIP="false"
             export RUST_LTO=""
@@ -327,7 +327,7 @@ jobs:
               --privileged \
               -e RUST_LTO="lto" \
               -e TARGET="aarch64-unknown-linux-musl" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket" \
+              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
               -t timberiodev/vector-builder-aarch64-unknown-linux-musl:latest \
@@ -350,7 +350,7 @@ jobs:
               --privileged \
               -e RUST_LTO="lto" \
               -e TARGET="armv7-unknown-linux-musleabihf" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket" \
+              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored" \
               -w "$PWD" \
               -v "$PWD":"$PWD" \
               -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
