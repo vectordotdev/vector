@@ -5,7 +5,7 @@ description: Install Vector from the Vector source code
 ---
 
 Installing Vector from source should be a last resort if Vector does not
-support your [container system][docs.containers], [operating
+support your [container platform][docs.containers], [operating
 system][docs.operating_systems], or provide a pre-built
 [archive][docs.from_archives]. Because Vector is written in [Rust][urls.rust]
 it can compile to a single static binary. You can view an example of this

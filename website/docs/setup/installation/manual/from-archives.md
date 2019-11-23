@@ -5,71 +5,188 @@ description: Install Vector from pre-compiled archives
 ---
 
 Installing Vector from a pre-built archive should be a last resort if Vector
-cannot be installed through a supported [container system][docs.containers] or
+cannot be installed through a supported [container platform][docs.containers] or
 [operating system][docs.operating_systems]. Archives are built for released
 versions as well as nightly builds.
 
 ## Installation
 
-import Alert from '@site/src/components/Alert';
+import Tabs from '@theme/Tabs';
 
-<Alert type="info">
+<Tabs
+  block={true}
+  defaultValue="linux_x86_64"
+  values={[
+    { label: 'Linux (x86_64)', value: 'linux_x86_64', },
+    { label: 'Linux (ARM64)', value: 'linux_arm64', },
+    { label: 'Windows (x86_64)', value: 'windows_x86_64', },
+    { label: 'Other', value: 'other', },
+  ]}>
 
-If you don't see your target, then we recommend [building Vector from source][docs.from_source].
-You can also request a target by [opening an issue][urls.new_target] requesting
-your new target.
+import TabItem from '@theme/TabItem';
 
-</Alert>
+<TabItem value="linux_x86_64">
 
-<div class="section-list section-list--lg">
-<div class="section">
+1.  Download & unpack the archive
+    
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
 
-### 1. Copy the Vector archive URL
+    <TabItem value="latest">
 
-Head over to the [download page][pages.download] and copy the appropriate
-archive URL.
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
 
-</div>
-<div class="section">
+    </TabItem>
+    <TabItem value="nightly">
 
-### 2. Download & unpack the archive
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
 
-```bash
-mkdir -p vector && curl -sSfL --proto '=https' --tlsv1.2 <release-download-url> | tar xzf - -C vector --strip-components=2
-```
+    </TabItem>
+    </Tabs>
 
-</div>
-<div class="section">
+2.  Change into the `vector` directory
 
-### 3. Change into the `vector` directory
+    ```bash
+    cd vector
+    ```
 
-```bash
-cd vector
-```
+3.  Move `vector` into your $PATH
 
-</div>
-<div class="section">
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
 
-### 4. Move `vector` into your $PATH
+4.  Start Vector
 
-```bash
-echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
-source $HOME/.profile
-```
+    That's it! You can start vector with:
 
-</div>
-<div class="section">
+    ```bash
+    vector --config config/vector.toml
+    ```
 
-### 5. Start Vector
+</TabItem>
+<TabItem value="linux_arm64">
 
-That's it! You can start vector with:
+1.  Download & unpack the archive
+    
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
 
-```bash
-vector --config config/vector.toml
-```
+    <TabItem value="latest">
 
-</div>
-</div>
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-aarch64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-aarch64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Change into the `vector` directory
+
+    ```bash
+    cd vector
+    ```
+
+3.  Move `vector` into your $PATH
+
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
+
+4.  Start Vector
+
+    That's it! You can start vector with:
+
+    ```bash
+    vector --config config/vector.toml
+    ```
+
+</TabItem>
+<TabItem value="windows_x86_64">
+
+1.  Download Vector release archive (latest):
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```powershell
+    Invoke-WebRequest https://packages.timber.io/vector/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```powershell
+    Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Extract files from the archive:
+
+    ```powershell
+    Expand-Archive vector-x86_64-pc-windows-msvc.zip .
+    ```
+
+3.  Navigate to Vector directory:
+
+    ```powershell
+    cd vector-x86_64-pc-windows-msvc
+    ```
+4.  Start Vector:
+
+    ```powerhsell
+    bin\vector.exe --config config\vector.toml
+    ```
+
+</TabItem>
+<TabItem value="other">
+
+To install Vector on targets not listed above we recommend that you [build
+Vector from source][docs.from_source]. You can also request a target by
+[opening an issue][urls.new_target].
+
+</TabItem>
+</Tabs>
 
 ## Next Steps
 
@@ -99,6 +216,8 @@ And in your `vector.toml` file:
 ```toml
 data_dir = "/var/lib/vector"
 ```
+
+import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 
@@ -137,5 +256,4 @@ Simply follow the same [installation instructions above](#installation).
 [docs.containers]: /docs/setup/installation/containers
 [docs.from_source]: /docs/setup/installation/manual/from-source
 [docs.operating_systems]: /docs/setup/installation/operating-systems
-[pages.download]: /download
 [urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations

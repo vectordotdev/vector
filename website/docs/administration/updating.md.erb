@@ -7,10 +7,7 @@ Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides it's own "Updating" section:
 
 ---
-<%- updateable_methods = metadata.installation.to_h -%>
-<%- updateable_methods.delete(:downloads) -%>
-<%- updateable_methods.delete(:operating_systems) -%>
-<%- updateable_methods.each do |category, methods| -%>
+<%- metadata.installation.to_h.slice(:containers, :package_managers).each do |category, methods| -%>
 
 **<%= category.to_s.humanize %>**
 
