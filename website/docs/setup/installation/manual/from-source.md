@@ -189,28 +189,3 @@ cp -av etc/systemd/vector /etc/systemd/system
 ### Updating
 
 Simply follow the same [installation instructions above](#installation).
-
-
-[docs.configuration]: /docs/setup/configuration
-[docs.containers]: /docs/setup/installation/containers
-[docs.from_archives]: /docs/setup/installation/manual/from-archives
-<<<<<<< HEAD
-[docs.global-options#data-directory]: /docs/reference/global-options#data-directory
-[docs.global-options#data_dir]: /docs/reference/global-options#data_dir
-[docs.package_managers]: /docs/setup/installation/package-managers
-=======
-[docs.operating_systems]: /docs/setup/installation/operating-systems
-[docs.performance]: /#performance
-[docs.sources.docker]: /docs/reference/sources/docker
-[docs.sources.kafka]: /docs/reference/sources/kafka
-[docs.sinks.kafka]: /docs/reference/sinks/kafka
-[docs.glossary.buffer]: /docs/meta/glossary#buffer
->>>>>>> docs: Describe build features
-[urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-[urls.rust]: https://www.rust-lang.org/
-[urls.jemalloc]: https://github.com/jemalloc/jemalloc
-[urls.librdkafka]: https://github.com/edenhill/librdkafka
-[urls.leveldb]: https://github.com/google/leveldb
-[urls.leveldb-sys-2]: https://crates.io/crates/leveldb-sys
-[urls.leveldb-sys-3]: https://github.com/timberio/leveldb-sys/tree/v3.0.0
-[urls.openssl]: https://www.openssl.org/
