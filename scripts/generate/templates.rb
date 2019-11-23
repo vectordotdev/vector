@@ -89,7 +89,7 @@ class Templates
     render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
   end
 
-  def common_component_links(type, limit = 5)
+  def common_component_links(type, limit = 6)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
     links =
