@@ -117,7 +117,7 @@ to be followed on your target machine.
     | `rdkafka/cmake_build` | Can be used together with `rdkafka` feature to build `librdkafka` using `cmake` instead of default build script in case of build problems on non-standard system configurations. | |
     | `shiplift/unix` | Enables support for Unix domain sockets in [`docker`][docs.sources.docker] source. | <i className="feather icon-check"></i> |
     </Alert>
-    
+
 6.  Start Vector
 
     Finally, start vector:
