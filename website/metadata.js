@@ -90,7 +90,7 @@ module.exports = {
         "name": "Ubuntu"
       },
       {
-        "id": "ubuntu",
+        "id": "windows",
         "name": "Windows"
       }
     ],

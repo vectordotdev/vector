@@ -5,13 +5,23 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import React, {useState, Children} from 'react';
+import React, {useState, useEffect, Children} from 'react';
 
 import classnames from 'classnames';
+import queryString from 'query-string';
 
 function Tabs(props) {
-  const {block, children, defaultValue, values} = props;
+  const {block, children, defaultValue, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location && urlKey) {
+      let queryObj = queryString.parse(window.location.search);
+
+      if (queryObj[urlKey])
+        setSelectedValue(queryObj[urlKey]);
+    }
+  }, []);
 
   return (
     <div>

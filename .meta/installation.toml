@@ -10,7 +10,7 @@ operating_systems = [
   {name = "Raspberry Pi", id = "raspberry-pi"},
   {name = "RHEL", id = "rhel"},
   {name = "Ubuntu", id = "ubuntu"},
-  {name = "Windows", id = "ubuntu"}
+  {name = "Windows", id = "windows"}
 ]
 package_managers = [
   {name = "DPKG", id = "dpkg"},

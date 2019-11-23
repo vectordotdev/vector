@@ -67,89 +67,74 @@ At the very minimum, a Vector configuration file must be composed of a
 [source][docs.sources] and a [sink][docs.sinks], [transforms][docs.transforms]
 are optional. To get started:
 
-<div class="section-list section-list--lg">
-<div class="section">
+1.  Choose a source
 
-### 1. Choose a source
+    To begin, you'll need to ingest data into Vector. This happens through one
+    or more [sources][docs.sources]. For example:
 
-To begin, you'll need to ingest data into Vector. This happens through one
-or more [sources][docs.sources]. For example:
+    <CodeHeader fileName="vector.toml" />
 
-<CodeHeader fileName="vector.toml" />
+    ```toml
+    [sources.nginx_logs]
+      type = "file"
+      include = "/var/log/nginx*.log"
+    ```
 
-```toml
-[sources.nginx_logs]
-  type = "file"
-  include = "/var/log/nginx*.log"
-```
+2.  Optionally choose a transform
 
-</div>
-<div class="section">
+    Next, you'll want to choose a [transform][docs.transforms]. Transforms are
+    optional, but most configuration include at least one since they help to
+    improve your data through parsing, structuring, and enriching. For example,
+    let's use the [`regex_parser` transform][docs.transforms.regex_parser] to parse
+    and structure our data:
 
-### 2. Optionally choose a transform
+    <CodeHeader fileName="vector.toml" />
 
-Next, you'll want to choose a [transform][docs.transforms]. Transforms are
-optional, but most configuration include at least one since they help to
-improve your data through parsing, structuring, and enriching. For example,
-let's use the [`regex_parser` transform][docs.transforms.regex_parser] to parse
-and structure our data:
+    ```toml
+    [sources.nginx_logs]
+      type = "file"
+      include = "/var/log/nginx*.log"
 
-<CodeHeader fileName="vector.toml" />
+    [transforms.nginx_parser]
+      inputs  = ["nginx_logs"] # <--- connect the transform to our source
+      type    = "regex_parser"
+      include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
+    ```
 
-```toml
-[sources.nginx_logs]
-  type = "file"
-  include = "/var/log/nginx*.log"
+    Notice how we connected the new transform to our source via the `inputs`
+    option.
 
-[transforms.nginx_parser]
-  inputs  = ["nginx_logs"] # <--- connect the transform to our source
-  type    = "regex_parser"
-  include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
-```
+3.  Choose a sink
 
-Notice how we connected the new transform to our source via the `inputs`
-option.
+    Finally, you'll want to choose a sink. Sinks are responsible for emitting data
+    out of Vector. For this example, we'll use the
+    [`console` sink][docs.sinks.console], which is simply writes the data to
+    `STDOUT`:
 
-</div>
-<div class="section">
+    <CodeHeader fileName="vector.toml" />
 
-### 3. Choose a sink
+    ```toml
+    [sources.nginx_logs]
+      type = "file"
+      include = "/var/log/nginx*.log"
 
-Finally, you'll want to choose a sink. Sinks are responsible for emitting data
-out of Vector. For this example, we'll use the
-[`console` sink][docs.sinks.console], which is simply writes the data to
-`STDOUT`:
+    [transforms.nginx_parser]
+      inputs  = ["nginx_logs"]
+      type    = "regex_parser"
+      include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
 
-<CodeHeader fileName="vector.toml" />
+    [sinks.print]
+      inputs = ["nginx_parser"] # <--- connect the sink to our transform
+      type   = "console"
+    ```
 
-```toml
-[sources.nginx_logs]
-  type = "file"
-  include = "/var/log/nginx*.log"
+    Again, notice how we connect the new sink via the `inputs` option.
 
-[transforms.nginx_parser]
-  inputs  = ["nginx_logs"]
-  type    = "regex_parser"
-  include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
+4.  Next steps
 
-[sinks.print]
-  inputs = ["nginx_parser"] # <--- connect the sink to our transform
-  type   = "console"
-```
-
-Again, notice how we connect the new sink via the `inputs` option.
-
-</div>
-<div class="section">
-
-### 4. Next steps
-
-This serves as a basic example of how to build a minimal Vector configuration
-file. It's likely you'll want to build more advanced pipelines which are
-covered in the [guides section][docs.guides].
-
-</div>
-</div>
+    This serves as a basic example of how to build a minimal Vector configuration
+    file. It's likely you'll want to build more advanced pipelines which are
+    covered in the [guides section][docs.guides].
 
 ## How It Works
 

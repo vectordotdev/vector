@@ -245,6 +245,10 @@ class Templates
     render("#{partials_path}/_install_from_archive_linux.md", binding).strip
   end
 
+  def manual_installation_next_steps
+    render("#{partials_path}/_manual_installation_next_steps.md", binding).strip
+  end
+
   def option_description(option)
     description = option.description.strip
 

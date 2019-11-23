@@ -4,10 +4,17 @@ sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---
 
-Installing Vector from a pre-built archive should be a last resort if Vector
-cannot be installed through a supported [container platform][docs.containers] or
-[operating system][docs.operating_systems]. Archives are built for released
-versions as well as nightly builds.
+This page covers installing Vector from a pre-built archive. These archives
+contain the `vector` binary as well as supporting configuration files.
+
+<Alert type="warning">
+
+We recommend installing Vector through a supported [container
+platform][docs.containers] or [package manager][docs.package_managers], if
+possible. These handle permissions, directory creation, and other
+intricacies covered in the [Next Steps](#next-steps) section.
+
+</Alert>
 
 ## Installation
 
@@ -16,9 +23,11 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="linux_x86_64"
+  urlKey="os"
   values={[
     { label: 'Linux (x86_64)', value: 'linux_x86_64', },
     { label: 'Linux (ARM64)', value: 'linux_arm64', },
+    { label: 'MacOS (x86_64)', value: 'macos_x86_64', },
     { label: 'Windows (x86_64)', value: 'windows_x86_64', },
     { label: 'Other', value: 'other', },
   ]}>
@@ -31,6 +40,11 @@ import Tabs from '@theme/Tabs';
 <TabItem value="linux_arm64">
 
 <%= install_from_archive_linux("vector-aarch64-unknown-linux-musl.tar.gz") %>
+
+</TabItem>
+<TabItem value="macos_x86_64">
+
+<%= install_from_archive_linux("vector-x86_64-apple-darwin.tar.gz") %>
 
 </TabItem>
 <TabItem value="windows_x86_64">
@@ -90,60 +104,4 @@ Vector from source][docs.from_source]. You can also request a target by
 
 ## Next Steps
 
-### Configuring
-
-The Vector configuration file is located at:
-
-```
-config/vector.toml
-```
-
-A full spec is located at `config/vector.spec.toml` and examples are
-located in `config/vector/examples/*`. You can learn more about configuring
-Vector in the [Configuration][docs.configuration] section.
-
-### Data Directory
-
-We highly recommend creating a [data directory][docs.configuration#data-directory]
-that Vector can use:
-
-```
-mkdir /var/lib/vector
-```
-
-And in your `vector.toml` file:
-
-```toml
-data_dir = "/var/lib/vector"
-```
-
-<Alert type="warning">
-
-If you plan to run Vector under a separate user, be sure that the directory
-is writable by the `vector` process.
-
-</Alert>
-
-### Service Managers
-
-Vector archives ship with service files in case you need them:
-
-#### Init.d
-
-To install Vector into Init.d run:
-
-```bash
-cp -av etc/init.d/vector /etc/init.d
-```
-
-#### Systemd
-
-To install Vector into Systemd run:
-
-```bash
-cp -av etc/systemd/vector /etc/systemd/system
-```
-
-### Updating
-
-Simply follow the same [installation instructions above](#installation).
+<%= manual_installation_next_steps %>
