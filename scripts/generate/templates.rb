@@ -89,6 +89,23 @@ class Templates
     render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
   end
 
+  def common_component_links(type, limit = 6)
+    components = metadata.send("#{type.to_s.pluralize}_list")
+
+    links =
+      components.select(&:common?)[0..limit].collect do |component|
+        "[#{component.name}][docs.#{type.to_s.pluralize}.#{component.name}]"
+      end
+
+    num_leftover = components.size - links.size
+
+    if num_leftover > 0
+      links << "and [#{num_leftover} more...][docs.#{type.to_s.pluralize}]"
+    end
+
+    links.join(", ")
+  end
+
   def component_config_example(component)
     render("#{partials_path}/_component_config_example.md", binding).strip
   end
@@ -222,6 +239,20 @@ class Templates
 
   def full_config_spec
     render("#{partials_path}/_full_config_spec.toml", binding).strip
+  end
+
+  def install_from_archive_linux(archive_name)
+    render("#{partials_path}/_install_from_archive_linux.md", binding).strip
+  end
+
+  def manual_installation_next_steps(type)
+    if type != :source && type != :archives
+      raise ArgumentError.new("type must be one of :source or :archives")
+    end
+
+    distribution_dir = type == :source ? "distribution" : "etc"
+
+    render("#{partials_path}/_manual_installation_next_steps.md", binding).strip
   end
 
   def option_description(option)

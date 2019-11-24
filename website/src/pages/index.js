@@ -128,7 +128,7 @@ function Performance() {
   return (
     <section className={styles.performance}>
       <div className="container">
-        <h2>Performance</h2>
+        <h2 id="performance">Performance</h2>
         <div className="sub-title">Higher throughout with the lowest memory footprint</div>
 
         <PerformanceTests />
@@ -312,10 +312,11 @@ function Installation() {
         <div className="sub-title">Fully static, no dependencies, no runtime, memory safe</div>
 
         <div className={styles.installationPlatforms}>
-          <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
+          <Link to="/docs/setup/installation/containers/docker"><SVG src="/img/docker.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/linux.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/raspberry-pi.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/windows.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/raspberry-pi"><SVG src="/img/raspberry-pi.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/windows"><SVG src="/img/windows.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
         </div>
 
         <div className={styles.installationChecks}>

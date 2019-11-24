@@ -38,15 +38,20 @@ simple and unified.
 * [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
+* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started]
 
-#### [Components](https://vector.dev/components)
+#### Reference
 
-* [**Sources**][docs.sources] - 
-* [**Transforms**][docs.transforms]
-* [**Sinks**][docs.sinks]
+* [**Sources**][docs.sources] - <%= common_component_links(:source) %>
+* [**Transforms**][docs.transforms] - <%= common_component_links(:transform) %>
+* [**Sinks**][docs.sinks] - <%= common_component_links(:sink) %>
 
-* [**Administration**][docs.administration] - [process management][docs.process-management], [monitoring][docs.monitoring], [updating][docs.updating], [validating][docs.validating]
-* [**Guides**][docs.guides]
+#### Administration
+
+* [**Process management**][docs.process-management]
+* [**Monitoring**][docs.monitoring]
+* [**Updating**][docs.updating]
+* [**Validating**][docs.validating]
 
 #### Resources
 
@@ -104,44 +109,6 @@ Run the following in your terminal, then follow the on-screen instructions.
 ```
 
 Or view [platform specific installation instructions][docs.installation].
-
-
-## Sources
-
-<%= components_table(metadata.sources.to_h.values.sort) %>
-
-[+ request a new source][urls.new_source]
-
-
-## Transforms
-
-<%= components_table(metadata.transforms.to_h.values.sort) %>
-
-[+ request a new transform][urls.new_transform]
-
-
-## Sinks
-
-<%= components_table(metadata.sinks.to_h.values.sort) %>
-
-[+ request a new sink][urls.new_sink]
-
-
-## License
-
-Copyright <%= Time.now.year %>, Vector Authors. All rights reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may not
-use these files except in compliance with the License. You may obtain a copy
-of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-License for the specific language governing permissions and limitations under
-the License.
 
 ---
 

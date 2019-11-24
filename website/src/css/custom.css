@@ -564,6 +564,19 @@ span.link:hover {
   background: var(--ifm-color-emphasis-25);
 }
 
+.markdown ol {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  margin-left: 0.25em;
+  padding-left: calc( var(--ifm-spacing-horizontal) - 3px );
+}
+.markdown ol li {
+  padding-left: calc( var(--ifm-spacing-horizontal) / 2 );
+  margin: 0;
+}
+.markdown ol li::marker {
+  font-weight: bold;
+}
+
 .menu > ul.menu__list li {
   margin-top: 0;
   margin-bottom: 0;
@@ -878,6 +891,19 @@ ul.tabs li.tab-item.tab-item--active {
   border-bottom-color: var(--ifm-background-color);
   border-left-color: var(--ifm-hr-border-color);
   color: var(--ifm-font-base-color);
+}
+
+ul.tabs.mini {
+  background: none;
+  border: 0px none;
+}
+ul.tabs.mini li {
+  border: 0px none;
+  padding: 0;
+  margin-right: 1em;
+}
+ul.tabs.mini li.tab-item.tab-item--active {
+  color: var(--ifm-color-primary);
 }
 
 /*
