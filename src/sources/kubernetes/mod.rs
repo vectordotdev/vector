@@ -276,14 +276,14 @@ fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform
     let name_regex = r"(?P<pod_name>[0-9a-z.\-]*)";
     let uid_regex = r"(?P<object_uid>([0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}|[0-9A-Fa-f]{32}))";
 
-    // Minikube 1.5.2, MicroK8s 1.15, DigitalOcean, Google Kubernetes Engine
+    // Minikube 1.15, MicroK8s 1.15,1.14,1.16 , DigitalOcean 1.16 , Google Kubernetes Engine 1.13, 1.14, EKS 1.14
     // format: namespace_name_UID
     regexes.push(format!(
         "^{}_{}_{}$",
         namespace_regex, name_regex, uid_regex
     ));
 
-    // EKS kube 1.13 , AKS kube 1.13.12
+    // EKS 1.13 , AKS 1.13.12, MicroK8s 1.13
     // If everything else fails, try to at least parse out uid from somewhere.
     // This is somewhat robust as UUID format is hard to create by accident
     // ,at least in this context, plus regex requires that UUID is separated
