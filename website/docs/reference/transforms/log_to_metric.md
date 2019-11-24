@@ -2,12 +2,12 @@
 
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-operating_systems: ["linux","macos","windows"]
+
 sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
 status: "prod-ready"
 title: "log_to_metric transform"
-unsupported_operating_systems: []
+
 ---
 
 The `log_to_metric` transform accepts [`log`][docs.data-model#log] events and allows you to convert logs into one or more metrics.

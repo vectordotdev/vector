@@ -2,12 +2,12 @@
 
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
-operating_systems: ["linux","macos","windows"]
+
 sidebar_label: "add_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
 status: "prod-ready"
 title: "add_tags transform"
-unsupported_operating_systems: []
+
 ---
 
 The `add_tags` transform accepts [`metric`][docs.data-model#metric] events and allows you to add one or more metric tags.

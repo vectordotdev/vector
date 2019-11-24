@@ -46,12 +46,12 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
 
   let operatingSystemsEls = [];
 
-  operatingSystems.forEach(operatingSystem => {
+  (operatingSystems || []).forEach(operatingSystem => {
     operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
     operatingSystemsEls.push(<>, </>);
   });
 
-  unsupportedOperatingSystems.forEach(operatingSystem => {
+  (unsupportedOperatingSystems || []).forEach(operatingSystem => {
     operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
     operatingSystemsEls.push(<>, </>);
   });
@@ -85,7 +85,7 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
             <i className="feather icon-shield"></i> at-least-once
           </Link>
         </div>}
-      {operatingSystems && 
+      {operatingSystemsEls.length > 0 && 
         <div>
           <Link to="/docs/setup/installation/operating-systems" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
             <i className="feather icon-cpu"></i> {operatingSystemsEls}

@@ -2,12 +2,12 @@
 <% if component.respond_to?(:delivery_guarantee) %>delivery_guarantee: <%= component.delivery_guarantee.to_json %><% end %>
 event_types: <%= component.event_types.to_json %>
 issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
-operating_systems: <%= component.operating_systems.to_json %>
+<% if !component.transform? %>operating_systems: <%= component.operating_systems.to_json %><% end %>
 sidebar_label: <%= "#{component.name}|#{component.event_types.to_json}".to_json %>
 source_url: <%= metadata.links.fetch("urls.#{component.id}_source") %>
 status: <%= component.status.to_json %>
 title: <%= "#{component.name} #{component.type}".to_json %>
-unsupported_operating_systems: <%= component.unsupported_operating_systems.to_json %>
+<% if !component.transform? %>unsupported_operating_systems: <%= component.unsupported_operating_systems.to_json %><% end %>
 ---
 
 The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>

@@ -2,12 +2,12 @@
 
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
-operating_systems: ["linux","macos","windows"]
+
 sidebar_label: "lua|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 status: "beta"
 title: "lua transform"
-unsupported_operating_systems: []
+
 ---
 
 The `lua` transform accepts [`log`][docs.data-model#log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine.
