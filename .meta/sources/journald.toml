@@ -4,6 +4,7 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
 guides = []
+only_operating_systems = ["linux"]
 output_types = ["log"]
 resources = []
 through_description = "log records from journald"

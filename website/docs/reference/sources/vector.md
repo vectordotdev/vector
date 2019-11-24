@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "vector|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/vector.rs
 status: "beta"
-title: "vector source" 
+title: "vector source"
+unsupported_operating_systems: []
 ---
 
 The `vector` source ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events.

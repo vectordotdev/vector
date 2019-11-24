@@ -157,9 +157,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "aws_cloudwatch_logs_sink",
       "name": "aws_cloudwatch_logs",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "AWS",
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "aws_cloudwatch_metrics": {
       "beta": true,
@@ -170,9 +178,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "aws_cloudwatch_metrics_sink",
       "name": "aws_cloudwatch_metrics",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "AWS",
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "aws_kinesis_streams": {
       "beta": true,
@@ -183,9 +199,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "aws_kinesis_streams_sink",
       "name": "aws_kinesis_streams",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "AWS",
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "aws_s3": {
       "beta": true,
@@ -196,9 +220,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "aws_s3_sink",
       "name": "aws_s3",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "AWS",
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "blackhole": {
       "beta": false,
@@ -210,9 +242,17 @@ module.exports = {
       "function_category": "test",
       "id": "blackhole_sink",
       "name": "blackhole",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "clickhouse": {
       "beta": true,
@@ -223,9 +263,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "clickhouse_sink",
       "name": "clickhouse",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "console": {
       "beta": false,
@@ -237,9 +285,17 @@ module.exports = {
       "function_category": "test",
       "id": "console_sink",
       "name": "console",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "datadog_metrics": {
       "beta": true,
@@ -250,9 +306,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "datadog_metrics_sink",
       "name": "datadog_metrics",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "Datadog",
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "elasticsearch": {
       "beta": true,
@@ -263,9 +327,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "elasticsearch_sink",
       "name": "elasticsearch",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "Elastic",
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "file": {
       "beta": false,
@@ -276,9 +348,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "file_sink",
       "name": "file",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "http": {
       "beta": false,
@@ -289,9 +369,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "http_sink",
       "name": "http",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "kafka": {
       "beta": false,
@@ -302,9 +390,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "kafka_sink",
       "name": "kafka",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "Confluent",
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "prometheus": {
       "beta": true,
@@ -315,9 +411,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "prometheus_sink",
       "name": "prometheus",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "splunk_hec": {
       "beta": false,
@@ -328,9 +432,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "splunk_hec_sink",
       "name": "splunk_hec",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": "Splunk",
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "statsd": {
       "beta": true,
@@ -341,9 +453,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "statsd_sink",
       "name": "statsd",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "tcp": {
       "beta": false,
@@ -354,9 +474,17 @@ module.exports = {
       "function_category": "transmit",
       "id": "tcp_sink",
       "name": "tcp",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "vector": {
       "beta": false,
@@ -367,9 +495,17 @@ module.exports = {
       "function_category": "proxy",
       "id": "vector_sink",
       "name": "vector",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "sink"
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
     }
   },
   "sources": {
@@ -382,9 +518,17 @@ module.exports = {
       "function_category": "collect",
       "id": "docker_source",
       "name": "docker",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "file": {
       "beta": false,
@@ -395,9 +539,17 @@ module.exports = {
       "function_category": "collect",
       "id": "file_source",
       "name": "file",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "journald": {
       "beta": true,
@@ -408,9 +560,16 @@ module.exports = {
       "function_category": "collect",
       "id": "journald_source",
       "name": "journald",
+      "operating_systems": [
+        "linux"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+        "macos",
+        "windows"
+      ]
     },
     "kafka": {
       "beta": true,
@@ -421,9 +580,17 @@ module.exports = {
       "function_category": "collect",
       "id": "kafka_source",
       "name": "kafka",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "statsd": {
       "beta": true,
@@ -434,9 +601,17 @@ module.exports = {
       "function_category": "receive",
       "id": "statsd_source",
       "name": "statsd",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "stdin": {
       "beta": false,
@@ -447,9 +622,17 @@ module.exports = {
       "function_category": "receive",
       "id": "stdin_source",
       "name": "stdin",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "syslog": {
       "beta": false,
@@ -460,9 +643,17 @@ module.exports = {
       "function_category": "receive",
       "id": "syslog_source",
       "name": "syslog",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "tcp": {
       "beta": false,
@@ -473,9 +664,17 @@ module.exports = {
       "function_category": "receive",
       "id": "tcp_source",
       "name": "tcp",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "udp": {
       "beta": false,
@@ -486,9 +685,17 @@ module.exports = {
       "function_category": "receive",
       "id": "udp_source",
       "name": "udp",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "vector": {
       "beta": true,
@@ -500,9 +707,17 @@ module.exports = {
       "function_category": "proxy",
       "id": "vector_source",
       "name": "vector",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "source"
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
     }
   },
   "transforms": {
@@ -515,9 +730,17 @@ module.exports = {
       "function_category": "shape",
       "id": "add_fields_transform",
       "name": "add_fields",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "add_tags": {
       "beta": false,
@@ -528,9 +751,17 @@ module.exports = {
       "function_category": "shape",
       "id": "add_tags_transform",
       "name": "add_tags",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "coercer": {
       "beta": false,
@@ -541,9 +772,17 @@ module.exports = {
       "function_category": "parse",
       "id": "coercer_transform",
       "name": "coercer",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "field_filter": {
       "beta": true,
@@ -555,9 +794,17 @@ module.exports = {
       "function_category": "filter",
       "id": "field_filter_transform",
       "name": "field_filter",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "grok_parser": {
       "beta": false,
@@ -568,9 +815,17 @@ module.exports = {
       "function_category": "parse",
       "id": "grok_parser_transform",
       "name": "grok_parser",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "json_parser": {
       "beta": false,
@@ -581,9 +836,17 @@ module.exports = {
       "function_category": "parse",
       "id": "json_parser_transform",
       "name": "json_parser",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "log_to_metric": {
       "beta": false,
@@ -595,9 +858,17 @@ module.exports = {
       "function_category": "convert",
       "id": "log_to_metric_transform",
       "name": "log_to_metric",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "lua": {
       "beta": true,
@@ -608,9 +879,17 @@ module.exports = {
       "function_category": "program",
       "id": "lua_transform",
       "name": "lua",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "regex_parser": {
       "beta": false,
@@ -621,9 +900,17 @@ module.exports = {
       "function_category": "parse",
       "id": "regex_parser_transform",
       "name": "regex_parser",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "remove_fields": {
       "beta": false,
@@ -634,9 +921,17 @@ module.exports = {
       "function_category": "shape",
       "id": "remove_fields_transform",
       "name": "remove_fields",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "remove_tags": {
       "beta": false,
@@ -647,9 +942,17 @@ module.exports = {
       "function_category": "shape",
       "id": "remove_tags_transform",
       "name": "remove_tags",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "sampler": {
       "beta": true,
@@ -660,9 +963,17 @@ module.exports = {
       "function_category": "filter",
       "id": "sampler_transform",
       "name": "sampler",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "beta",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "split": {
       "beta": false,
@@ -673,9 +984,17 @@ module.exports = {
       "function_category": "parse",
       "id": "split_transform",
       "name": "split",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     },
     "tokenizer": {
       "beta": false,
@@ -686,9 +1005,17 @@ module.exports = {
       "function_category": "parse",
       "id": "tokenizer_transform",
       "name": "tokenizer",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
       "service_provider": null,
       "status": "prod-ready",
-      "type": "transform"
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     }
   }
 };

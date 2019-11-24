@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
 status: "beta"
-title: "prometheus sink" 
+title: "prometheus sink"
+unsupported_operating_systems: []
 ---
 
 The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.

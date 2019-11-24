@@ -3,7 +3,7 @@
 require_relative "component"
 
 class Sink < Component
-  EGRESS_METHODS = ["batching", "exposing", "streaming"]
+  EGRESS_METHODS = ["batching", "exposing", "streaming"].freeze
 
   attr_reader :buffer,
     :delivery_guarantee,

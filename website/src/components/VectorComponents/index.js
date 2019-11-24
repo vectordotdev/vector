@@ -4,8 +4,9 @@ import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
 import classnames from 'classnames';
+import flatten from 'lodash/flatten';
 import humanizeString from 'humanize-string';
-import queryString from 'query-string';
+import qs from 'qs';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
@@ -24,17 +25,17 @@ function Component({delivery_guarantee, description, event_types, name, status, 
       </div>
       <div className="vector-component--badges">
         {event_types.includes("log") ?
-          <span className="badge badge--secondary" title="This component works with log event types"><i className="feather icon-database"></i> log</span> :
+          <span className="badge badge--primary" title="This component works with log event types"><i className="feather icon-database"></i></span> :
           ''}
         {event_types.includes("metric") ?
-          <span className="badge badge--secondary" title="This component works with metric event types"><i className="feather icon-bar-chart"></i> metric</span> :
+          <span className="badge badge--primary" title="This component works with metric event types"><i className="feather icon-bar-chart"></i></span> :
           ''}
         {status == "beta" ?
-          <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i> beta</span> :
-          <span className="badge badge--primary" title="This component has passed reliability standards that make it production ready"><i className="feather icon-award"></i> prod-ready</span>}
+          <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i></span> :
+          <span className="badge badge--primary" title="This component has passed reliability standards that make it production ready"><i className="feather icon-award"></i></span>}
         {delivery_guarantee == "best_effort" ?
-          <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i> best-effort</span> :
-          <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i> at-least-once</span>}
+          <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i></span> :
+          <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i></span>}
       </div>
     </Link>
   );
@@ -124,7 +125,7 @@ function FilterList({label, icon, values, currentState, setState}) {
                 setState(newValues);
               }}
               checked={currentState.has(value)} />
-            {label} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
+            {icon ? <i className={`feather icon-${icon}`}></i> : ''} {label}
           </label>
         );
       })}
@@ -141,7 +142,7 @@ function VectorComponents(props) {
   const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
-  const queryObj = props.location ? queryString.parse(props.location.search) : {};
+  const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
 
   let components = [];
   if (props.sources || props.sources == undefined) components = components.concat(Object.values(sources));
@@ -157,6 +158,7 @@ function VectorComponents(props) {
   const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['functions']));
   const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
   const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
+  const [onlyOperatingSystems, setOnlyOperatingSystems] = useState(new Set(queryObj['operating-systems']));
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
   const [onlyProviders, setOnlyProviders] = useState(new Set(queryObj['providers']));
   const [searchTerm, setSearchTerm] = useState(null);
@@ -188,6 +190,10 @@ function VectorComponents(props) {
     components = components.filter(component => component.event_types.includes("metric"));
   }
 
+  if (onlyOperatingSystems.size > 0) {
+    components = components.filter(component => Array.from(onlyOperatingSystems).filter(x => component.operating_systems.includes(x)).length > 0);
+  }
+
   if (onlyProductionReady) {
     components = components.filter(component => component.status == "prod-ready");
   }
@@ -199,6 +205,11 @@ function VectorComponents(props) {
   //
   // Filter options
   //
+
+  let operatingSystemsArr = components.map(component => component.operating_systems);
+  console.log(flatten(operatingSystemsArr))
+  operatingSystemsArr = flatten(operatingSystemsArr).sort((a, b) => (a > b) ? 1 : -1);
+  const operatingSystems = new Set(operatingSystemsArr);
 
   const serviceProvidersArr =
     components.filter(component => component.service_provider).
@@ -237,14 +248,14 @@ function VectorComponents(props) {
                 type="checkbox"
                 onChange={(event) => setOnlyLog(event.currentTarget.checked)}
                 checked={onlyLog} />
-              Log <i className="feather icon-database"></i>
+              <i className="feather icon-database"></i> Log
             </label>
             <label title="Show only components that work with metric event types.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyMetric(event.currentTarget.checked)}
                 checked={onlyMetric} />
-              Metric <i className="feather icon-bar-chart"></i>
+              <i className="feather icon-bar-chart"></i> Metric
             </label>
           </span>
           <span className="vector-components--filters--section">
@@ -258,16 +269,22 @@ function VectorComponents(props) {
                 type="checkbox"
                 onChange={(event) => setOnlyAtLeastOnce(event.currentTarget.checked)}
                 checked={onlyAtLeastOnce} />
-              At-least-once <i className="feather icon-shield"></i>
+              <i className="feather icon-shield"></i> At-least-once
             </label>
             <label title="Show only production ready components.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyProductionReady(event.currentTarget.checked)}
                 checked={onlyProductionReady} />
-              Prod-ready <i className="feather icon-award"></i>
+              <i className="feather icon-award"></i> Prod-ready
             </label>
           </span>
+          <FilterList
+            label="Operating Systems"
+            icon="cpu"
+            values={operatingSystems}
+            currentState={onlyOperatingSystems}
+            setState={setOnlyOperatingSystems} />
           <FilterList
             label="Providers"
             icon="cloud"
@@ -276,6 +293,7 @@ function VectorComponents(props) {
             setState={setOnlyProviders} />
           <FilterList
             label="Functions"
+            icon="code"
             values={functionCategories}
             currentState={onlyFunctions}
             setState={setOnlyFunctions} />

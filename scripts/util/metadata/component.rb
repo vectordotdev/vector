@@ -3,8 +3,9 @@
 require_relative "option"
 
 class Component
-  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"]
-  EVENT_TYPES = ["log", "metric"]
+  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
+  EVENT_TYPES = ["log", "metric"].freeze
+  OPERATING_SYSTEMS = ["linux", "macos", "windows"].freeze
 
   include Comparable
 
@@ -13,9 +14,11 @@ class Component
     :function_category,
     :id,
     :name,
+    :operating_systems,
     :options,
     :resources,
-    :type
+    :type,
+    :unsupported_operating_systems
 
   def initialize(hash)
     @beta = hash["beta"] == true
@@ -25,6 +28,20 @@ class Component
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = OpenStruct.new()
+
+    # Operating Systems
+
+    if hash["only_operating_systems"]
+      @operating_systems = hash["only_operating_systems"]
+    elsif hash["except_operating_systems"]
+      @operating_systems = OPERATING_SYSTEMS - hash["except_operating_systems"]
+    else
+      @operating_systems = OPERATING_SYSTEMS
+    end
+
+    @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
+
+    # Options
 
     (hash["options"] || {}).each do |option_name, option_hash|
       option = Option.new(
@@ -133,9 +150,11 @@ class Component
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
       name: name,
+      operating_systems: operating_systems,
       service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
       status: status,
-      type: type
+      type: type,
+      unsupported_operating_systems: unsupported_operating_systems
     }
   end
 

@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "file|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
 status: "prod-ready"
-title: "file sink" 
+title: "file sink"
+unsupported_operating_systems: []
 ---
 
 The `file` sink [streams](#streaming) [`log`][docs.data-model#log] events to a file.

@@ -2,10 +2,12 @@
 
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "field_filter|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 status: "beta"
-title: "field_filter transform" 
+title: "field_filter transform"
+unsupported_operating_systems: []
 ---
 
 The `field_filter` transform accepts [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events and allows you to filter events by a log field's value.

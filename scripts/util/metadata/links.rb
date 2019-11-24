@@ -25,12 +25,12 @@ require 'net/http'
 # implement dynamic readers that can be found in the `#fetch_dynamic_url`
 # method.
 class Links
-  CATEGORIES = ["assets", "docs", "pages", "urls"]
-  VECTOR_ROOT = "https://github.com/timberio/vector"
-  VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
-  VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"
-  VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull"
-  TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness"
+  CATEGORIES = ["assets", "docs", "pages", "urls"].freeze
+  VECTOR_ROOT = "https://github.com/timberio/vector".freeze
+  VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit".freeze
+  VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues".freeze
+  VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull".freeze
+  TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness".freeze
 
   attr_reader :values
 
