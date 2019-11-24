@@ -12,7 +12,7 @@ project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 absolute_archive_path="$project_root/$archive_path"
-
+package_version="$($project_root/version.sh)"
 echo "Packaging .deb for $archive_name"
 
 # Rename the rust-toolchain file so that we can use our custom version of rustc installed
@@ -44,7 +44,7 @@ cmark-gfm $project_root/README.md --to commonmark | # expand link aliases
 #
 #   --no-build
 #     because this stop should follow a build
-cargo deb --target $TARGET --deb-version $VERSION --no-build
+cargo deb --target $TARGET --deb-version $package_version --no-build
 
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.
