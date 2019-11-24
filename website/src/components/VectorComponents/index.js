@@ -4,8 +4,8 @@ import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
 import classnames from 'classnames';
+import flatten from 'lodash/flatten';
 import humanizeString from 'humanize-string';
-import intersection from 'underscore';
 import qs from 'qs';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
@@ -206,9 +206,9 @@ function VectorComponents(props) {
   // Filter options
   //
 
-  const operatingSystemsArr =
-    components.flatMap(component => component.operating_systems).
-    sort((a, b) => (a > b) ? 1 : -1);
+  let operatingSystemsArr = components.map(component => component.operating_systems);
+  console.log(flatten(operatingSystemsArr))
+  operatingSystemsArr = flatten(operatingSystemsArr).sort((a, b) => (a > b) ? 1 : -1);
   const operatingSystems = new Set(operatingSystemsArr);
 
   const serviceProvidersArr =

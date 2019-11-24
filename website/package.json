@@ -24,8 +24,7 @@
     "react-dom": "^16.8.4",
     "react-inlinesvg": "^1.1.7",
     "react-select": "^3.0.8",
-    "svg.js": "^2.6.2",
-    "underscore": "^1.9.1"
+    "svg.js": "^2.6.2"
   },
   "browserslist": {
     "production": [
