@@ -59,7 +59,7 @@
                     <tspan x="711" y="624" fill="#000000">5. Archive</tspan>
                     <tspan x="711" y="648" font-weight="normal" fill="#000000">Archive everything in a compressed format in a cheap </tspan>
                     <tspan x="711" y="672" font-weight="normal" fill="#000000">durable storage like S3.</tspan>
-                    <a href="/docs/reference/sinks/s3"><tspan x="711" y="696" font-weight="normal" fill="#10E7FF">View the s3 sink</tspan></a>
+                    <a href="/docs/reference/sinks/aws_s3"><tspan x="711" y="696" font-weight="normal" fill="#10E7FF">View the s3 sink</tspan></a>
                 </text>
                 <text id="[sources.nginx_error" font-family="Courier-Bold, Courier" font-size="14" font-weight="bold" line-spacing="26" letter-spacing="0.3">
                     <tspan x="67" y="48" fill="#B963CE">[sources.nginx_error_log]</tspan>
