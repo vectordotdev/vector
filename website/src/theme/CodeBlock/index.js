@@ -19,6 +19,7 @@ import useTheme from '@theme/hooks/useTheme';
 
 (typeof global !== 'undefined' ? global : window).Prism = Prism;
 require('prismjs/components/prism-http');
+require('prismjs/components/prism-powershell');
 require('prismjs/components/prism-protobuf');
 require('prismjs/components/prism-rust');
 require('prismjs/components/prism-toml');

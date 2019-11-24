@@ -5,8 +5,8 @@ hide_pagination: true
 ---
 
 Installing Vector manually should be a last resort if Vector cannot be
-installed through a supported [container system][docs.containers] or [operating 
-system][docs.operating_systems].
+installed through a supported [container platform][docs.containers] or
+[operating system][docs.operating_systems].
 
 import Jump from '@site/src/components/Jump';
 

@@ -58,6 +58,7 @@ module.exports = {
                   "setup/installation/operating-systems/raspberry-pi",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
+                  "setup/installation/operating-systems/windows",
               ],
             },
             {
@@ -218,6 +219,7 @@ module.exports = {
       type: 'category',
       label: 'Administration',
       items: [
+        "administration",
         "administration/process-management",
         "administration/monitoring",
         "administration/tuning",

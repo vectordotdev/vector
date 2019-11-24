@@ -7,25 +7,33 @@
   display: block;
   font-weight: 500;
   margin-bottom: var(--ifm-spacing-vertical);
-  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+  padding: 1em var(--ifm-spacing-horizontal);
   text-align: left;
   transition: var(--ifm-transition-fast) ease;
 }
-
+.jump-to .badge {
+  margin-left: 10px;
+  position: relative;
+  top: -1px;
+}
+.jump-to .right {
+  float: right;
+}
 .jump-to:hover {
   background: var(--ifm-panel-background-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
   text-decoration: none;
 }
-
 .jump-to .arrow {
-  float: right;
   font-size: 1.8em !important;
   margin-right: 10px;
   transition: var(--ifm-transition-fast) ease;
 }
-
 .jump-to:hover .arrow {
   margin-right: 0;
+}
+
+.jump-to.jump-to--sm {
+  font-size: 0.8em;
 }
