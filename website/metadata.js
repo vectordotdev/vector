@@ -26,6 +26,15 @@ module.exports = {
         "type": "archive"
       },
       {
+        "cpu": "vector-armv7-unknown-linux-musleabihf",
+        "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
+        "latest": false,
+        "name": "Linux (ARMv7 w/ MUSL)",
+        "nightly": true,
+        "os": "Linux",
+        "type": "archive"
+      },
+      {
         "cpu": "x86_64",
         "file_name": "vector-x86_64-apple-darwin.tar.gz",
         "latest": true,

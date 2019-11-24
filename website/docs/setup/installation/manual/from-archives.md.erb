@@ -27,6 +27,7 @@ import Tabs from '@theme/Tabs';
   values={[
     { label: 'Linux (x86_64)', value: 'linux_x86_64', },
     { label: 'Linux (ARM64)', value: 'linux_arm64', },
+    { label: 'Linux (ARMv7)', value: 'linux_armv7', },
     { label: 'MacOS (x86_64)', value: 'macos_x86_64', },
     { label: 'Windows (x86_64)', value: 'windows_x86_64', },
     { label: 'Other', value: 'other', },
@@ -40,6 +41,11 @@ import Tabs from '@theme/Tabs';
 <TabItem value="linux_arm64">
 
 <%= install_from_archive_linux("vector-aarch64-unknown-linux-musl.tar.gz") %>
+
+</TabItem>
+<TabItem value="linux_armv7">
+
+<%= install_from_archive_linux("vector-armv7-unknown-linux-musleabihf.tar.gz") %>
 
 </TabItem>
 <TabItem value="macos_x86_64">

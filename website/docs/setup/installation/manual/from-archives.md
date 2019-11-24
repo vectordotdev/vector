@@ -29,6 +29,7 @@ import Tabs from '@theme/Tabs';
   values={[
     { label: 'Linux (x86_64)', value: 'linux_x86_64', },
     { label: 'Linux (ARM64)', value: 'linux_arm64', },
+    { label: 'Linux (ARMv7)', value: 'linux_armv7', },
     { label: 'MacOS (x86_64)', value: 'macos_x86_64', },
     { label: 'Windows (x86_64)', value: 'windows_x86_64', },
     { label: 'Other', value: 'other', },
@@ -116,6 +117,60 @@ import TabItem from '@theme/TabItem';
     ```bash
     mkdir -p vector && \
       curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-aarch64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Change into the `vector` directory
+
+    ```bash
+    cd vector
+    ```
+
+3.  Move `vector` into your $PATH
+
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
+
+4.  Start Vector
+
+    That's it! You can start vector with:
+
+    ```bash
+    vector --config config/vector.toml
+    ```
+
+</TabItem>
+<TabItem value="linux_armv7">
+
+1.  Download & unpack the archive
+    
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-armv7-unknown-linux-musleabihf.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-armv7-unknown-linux-musleabihf.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 

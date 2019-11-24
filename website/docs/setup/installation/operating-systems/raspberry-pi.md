@@ -17,6 +17,9 @@ Alternatively, if you prefer manual installation:
 <Jump to="/docs/setup/installation/manual/from-archives?os=linux_arm64" size="sm">
   <i className="feather icon-terminal"></i> Install From an Archive (ARM64)
 </Jump>
+<Jump to="/docs/setup/installation/manual/from-archives?os=linux_armv7" size="sm">
+  <i className="feather icon-terminal"></i> Install From an Archive (ARMv7)
+</Jump>
 <Jump to="/docs/setup/installation/manual/from-source" size="sm">
   <i className="feather icon-terminal"></i> Install From Source
 </Jump>
