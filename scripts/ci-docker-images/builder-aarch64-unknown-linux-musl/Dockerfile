@@ -272,7 +272,7 @@ RUN echo > dummy.c && \
   rm dummy.c dummy.o
 
 # The actual builder.
-FROM ubuntu:18.04
+FROM ubuntu:19.10
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
@@ -331,3 +331,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
 
 COPY builder-aarch64-unknown-linux-musl/start.sh /start.sh
 ENTRYPOINT ["/start.sh"]
+
+ENV TARGET="$TARGET"
+
+# Install `cargo-deb from Git until
+# https://github.com/mmstick/cargo-deb/pull/112 is published on crates.io
+RUN cargo install --git https://github.com/mmstick/cargo-deb --rev cc879930c06fa22e99f2839bad620ac0d0da879e cargo-deb
+
+RUN apt-get install -y rename cmark-gfm
