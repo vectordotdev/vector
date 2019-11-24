@@ -45,7 +45,7 @@ jobs:
       - run:
           name: Check generate
           environment:
-            RUSTFLAGS: "-D warnings"
+            PASS_RUSTFLAGS: "-D warnings"
           command: |
             ./scripts/docker-run.sh checker make check-code
 
@@ -58,7 +58,7 @@ jobs:
       - run:
           name: Check fmt
           environment:
-            RUSTFLAGS: "-D warnings"
+            PASS_RUSTFLAGS: "-D warnings"
           command: |
             ./scripts/docker-run.sh checker make check-fmt
 
