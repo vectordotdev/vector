@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "datadog_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
 status: "beta"
-title: "datadog_metrics sink" 
+title: "datadog_metrics sink"
+unsupported_operating_systems: []
 ---
 
 The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-model#metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).

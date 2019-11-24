@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "clickhouse|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
 status: "beta"
-title: "clickhouse sink" 
+title: "clickhouse sink"
+unsupported_operating_systems: []
 ---
 
 The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].

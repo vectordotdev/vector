@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "file|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 status: "prod-ready"
-title: "file source" 
+title: "file source"
+unsupported_operating_systems: []
 ---
 
 The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model#log] events.

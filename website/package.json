@@ -19,6 +19,7 @@
     "docusaurus": "^2.0.0-alpha.36",
     "humanize-string": "^2.1.0",
     "prismjs": "^1.17.1",
+    "qs": "^6.9.1",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",
     "react-inlinesvg": "^1.1.7",

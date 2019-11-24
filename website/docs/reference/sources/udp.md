@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "udp|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/udp.rs
 status: "prod-ready"
-title: "udp source" 
+title: "udp source"
+unsupported_operating_systems: []
 ---
 
 The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model#log] events.

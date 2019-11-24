@@ -2,10 +2,12 @@
 delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
-title: "splunk_hec sink" 
+title: "splunk_hec sink"
+unsupported_operating_systems: []
 ---
 
 The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].

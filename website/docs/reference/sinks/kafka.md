@@ -2,10 +2,12 @@
 delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
 status: "prod-ready"
-title: "kafka sink" 
+title: "kafka sink"
+unsupported_operating_systems: []
 ---
 
 The `kafka` sink [streams](#streaming) [`log`][docs.data-model#log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].

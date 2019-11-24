@@ -82,12 +82,12 @@
                     <tspan x="223.624609" y="438" fill="#000000"></tspan>
                     <tspan x="67" y="464" fill="#000000"></tspan>
                     <tspan x="67" y="490" fill="#0092A8">[sinks.es_cluster]</tspan>
-                    <tspan x="67" y="516" fill="#0092A8">  inputs = ['nginx_error_parser']</tspan>
+                    <tspan x="67" y="516" fill="#0092A8">  inputs = ['nginx_transaction_sampler']</tspan>
                     <tspan x="67" y="542" fill="#0092A8">  type   = 'elasticsearch'</tspan>
                     <tspan x="67" y="568" fill="#0092A8">  host   = '123.123.123.123:5000'</tspan>
                     <tspan x="67" y="594" fill="#0092A8"></tspan>
                     <tspan x="67" y="620" fill="#0092A8">[sinks.s3_archive]</tspan>
-                    <tspan x="67" y="646" fill="#0092A8">  inputs = ['nginx_transaction_sampler']</tspan>
+                    <tspan x="67" y="646" fill="#0092A8">  inputs = ['nginx_error_parser']</tspan>
                     <tspan x="67" y="672" fill="#0092A8">  type   = 's3'</tspan>
                     <tspan x="67" y="698" fill="#0092A8">  region = 'us-east-1'</tspan>
                     <tspan x="67" y="724" fill="#0092A8">  bucket = 'log-archives'</tspan>
