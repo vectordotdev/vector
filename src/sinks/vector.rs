@@ -3,7 +3,7 @@ use crate::{
     event::proto,
     sinks::tcp::TcpSink,
     sinks::util::SinkExt,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
@@ -24,6 +24,10 @@ impl VectorSinkConfig {
     pub fn new(address: String) -> Self {
         Self { address }
     }
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<VectorSinkConfig>("vector")
 }
 
 #[typetag::serde(name = "vector")]
@@ -47,13 +51,17 @@ impl SinkConfig for VectorSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "vector"
+    }
 }
 
 pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
         TcpSink::new(hostname, addr, None)
             .stream_ack(acker)
-            .with(move |event| encode_event(event)),
+            .with(encode_event),
     )
 }
 

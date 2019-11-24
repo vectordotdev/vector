@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::event::Event;
-use crate::topology::config::DataType;
+use crate::topology::config::{DataType, TransformConfig, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,8 +14,12 @@ pub struct CoercerConfig {
     pub types: HashMap<Atom, String>,
 }
 
+inventory::submit! {
+    TransformDescription::new::<CoercerConfig>("coercer")
+}
+
 #[typetag::serde(name = "coercer")]
-impl crate::topology::config::TransformConfig for CoercerConfig {
+impl TransformConfig for CoercerConfig {
     fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer { types }))
@@ -27,6 +31,10 @@ impl crate::topology::config::TransformConfig for CoercerConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "coercer"
     }
 }
 
@@ -42,10 +50,11 @@ impl Transform for Coercer {
                 match conv.convert(value) {
                     Ok(converted) => log.insert_explicit(field.into(), converted),
                     Err(error) => {
-                        debug!(
+                        warn!(
                             message = "Could not convert types.",
                             field = &field[..],
                             %error,
+                            rate_limit_secs = 10,
                         );
                     }
                 }

@@ -5,6 +5,7 @@ use serde::Deserialize;
 use sinks::tcp::{self, TcpSinkConfig};
 use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
+#[cfg(unix)]
 use tokio_uds::UnixStream;
 use vector::test_util::{
     block_on, next_addr, random_maps, random_string, receive, send_lines, shutdown_on_idle,
@@ -12,7 +13,7 @@ use vector::test_util::{
 };
 use vector::topology::{self, config};
 use vector::{
-    sinks,
+    runtime, sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
 
@@ -24,10 +25,15 @@ fn test_tcp_syslog() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", SyslogConfig::new(Mode::Tcp { address: in_addr }));
+    config.add_source(
+        "in",
+        SyslogConfig::new(Mode::Tcp {
+            address: in_addr.into(),
+        }),
+    );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
@@ -68,7 +74,7 @@ fn test_udp_syslog() {
     config.add_source("in", SyslogConfig::new(Mode::Udp { address: in_addr }));
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
@@ -85,11 +91,11 @@ fn test_udp_syslog() {
     for line in input_lines.iter() {
         socket.send_to(line.as_bytes(), &in_addr).unwrap();
         // Space things out slightly to try to avoid dropped packets
-        thread::sleep(Duration::from_nanos(200_000));
+        thread::sleep(Duration::from_millis(2));
     }
 
     // Give packets some time to flow through
-    thread::sleep(Duration::from_millis(30));
+    thread::sleep(Duration::from_millis(300));
 
     // Shut down server
     block_on(topology.stop()).unwrap();
@@ -115,6 +121,7 @@ fn test_udp_syslog() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn test_unix_stream_syslog() {
     let num_messages: usize = 10000;
@@ -131,7 +138,7 @@ fn test_unix_stream_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 

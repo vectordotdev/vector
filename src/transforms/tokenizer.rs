@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use nom::{
@@ -24,6 +24,10 @@ pub struct TokenizerConfig {
     pub field: Option<Atom>,
     pub drop_field: bool,
     pub types: HashMap<Atom, String>,
+}
+
+inventory::submit! {
+    TransformDescription::new::<TokenizerConfig>("tokenizer")
 }
 
 #[typetag::serde(name = "tokenizer")]
@@ -50,6 +54,10 @@ impl TransformConfig for TokenizerConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "tokenizer"
     }
 }
 
@@ -133,7 +141,7 @@ pub fn parse(input: &str) -> Vec<&str> {
     );
 
     // fall back to returning the rest of the input, if any
-    let remainder = verify(rest, |s: &str| s.len() > 0);
+    let remainder = verify(rest, |s: &str| !s.is_empty());
     let field = alt((bracket, string, simple, remainder));
 
     all_consuming(many0(terminated(field, space0)))(input)

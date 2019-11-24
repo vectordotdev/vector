@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{metric::Direction, Metric},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
     Event,
 };
 use futures::{future, try_ready, Async, AsyncSink, Future, Sink};
@@ -65,6 +65,10 @@ pub fn default_flush_period() -> Duration {
     Duration::from_secs(60)
 }
 
+inventory::submit! {
+    SinkDescription::new_without_default::<PrometheusSinkConfig>("prometheus")
+}
+
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -84,6 +88,10 @@ impl SinkConfig for PrometheusSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Metric
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "prometheus"
     }
 }
 

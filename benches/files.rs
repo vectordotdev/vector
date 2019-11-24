@@ -7,7 +7,7 @@ use tokio::codec::{BytesCodec, FramedWrite};
 use tokio::fs::OpenOptions;
 use vector::test_util::random_lines;
 use vector::{
-    sinks, sources,
+    runtime, sinks, sources,
     topology::{self, config},
 };
 
@@ -50,11 +50,11 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     sinks::file::FileSinkConfig {
                         path: output.into(),
                         idle_timeout_secs: None,
-                        encoding: None,
+                        encoding: sinks::file::Encoding::Text,
                     },
                 );
 
-                let mut rt = tokio::runtime::Runtime::new().unwrap();
+                let mut rt = runtime::Runtime::new().unwrap();
                 let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
                 let mut options = OpenOptions::new();

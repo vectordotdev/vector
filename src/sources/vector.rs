@@ -1,21 +1,20 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
 use bytes::{Bytes, BytesMut};
 use futures::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use tokio::codec::LengthDelimitedCodec;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
-    pub address: SocketAddr,
+    pub address: SocketListenAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
 }
@@ -25,12 +24,16 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
-    pub fn new(address: SocketAddr) -> Self {
+    pub fn new(address: SocketListenAddr) -> Self {
         Self {
             address,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<VectorConfig>("vector")
 }
 
 #[typetag::serde(name = "vector")]
@@ -47,6 +50,10 @@ impl SourceConfig for VectorConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "vector"
     }
 }
 
@@ -94,10 +101,10 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
 
         let addr = next_addr();
-        let server = VectorConfig::new(addr.clone())
+        let server = VectorConfig::new(addr.into())
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 

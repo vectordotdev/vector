@@ -1,34 +1,28 @@
 use crate::{
     buffers::Acker,
-    event::{metric::Direction, Event, Metric},
+    event::Metric,
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{Future, Poll};
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
-use rusoto_core::{Region, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::{convert::TryInto, time::Duration};
 use tower::{Service, ServiceBuilder};
 
-#[derive(Clone, Default)]
-struct State {
-    gauges: HashMap<String, f64>,
-}
-
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
     client: CloudWatchClient,
     config: CloudWatchMetricsSinkConfig,
-    state: State,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -37,8 +31,8 @@ pub struct CloudWatchMetricsSinkConfig {
     pub namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -47,6 +41,10 @@ pub struct CloudWatchMetricsSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+inventory::submit! {
+    SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
 }
 
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
@@ -60,6 +58,10 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn sink_type(&self) -> &'static str {
+        "aws_cloudwatch_metrics"
+    }
 }
 
 impl CloudWatchMetricsSvc {
@@ -69,8 +71,7 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<super::RouterSink> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
-        let batch_size = config.batch_size.unwrap_or(20);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let batch = config.batch.unwrap_or(20, 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -85,13 +86,7 @@ impl CloudWatchMetricsSvc {
             CloudWatchMetricsRetryLogic,
         );
 
-        let state = State::default();
-
-        let cloudwatch_metrics = CloudWatchMetricsSvc {
-            client,
-            config,
-            state,
-        };
+        let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
         let svc = ServiceBuilder::new()
             .concurrency_limit(in_flight_limit)
@@ -100,11 +95,7 @@ impl CloudWatchMetricsSvc {
             .timeout(Duration::from_secs(timeout))
             .service(cloudwatch_metrics);
 
-        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
-            Vec::new(),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        );
+        let sink = BatchServiceSink::new(svc, acker).batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }
@@ -148,10 +139,10 @@ impl CloudWatchMetricsSvc {
         }
     }
 
-    fn encode_events(&mut self, events: Vec<Event>) -> PutMetricDataInput {
+    fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
         let metric_data: Vec<_> = events
             .into_iter()
-            .filter_map(|event| match event.into_metric() {
+            .filter_map(|event| match event {
                 Metric::Counter {
                     name,
                     val,
@@ -167,37 +158,16 @@ impl CloudWatchMetricsSvc {
                 Metric::Gauge {
                     name,
                     val,
-                    direction,
+                    direction: None,
                     timestamp,
                     tags,
-                } => {
-                    let delta = match direction {
-                        None => 0.0,
-                        Some(Direction::Plus) => val,
-                        Some(Direction::Minus) => -val,
-                    };
-
-                    let val = self
-                        .state
-                        .gauges
-                        .entry(name.clone())
-                        .and_modify(|v| {
-                            if direction.is_none() {
-                                *v = val
-                            } else {
-                                *v += delta
-                            }
-                        })
-                        .or_insert(val);
-
-                    Some(MetricDatum {
-                        metric_name: name.to_string(),
-                        value: Some(*val),
-                        timestamp: timestamp.map(timestamp_to_string),
-                        dimensions: tags.map(tags_to_dimensions),
-                        ..Default::default()
-                    })
-                }
+                } => Some(MetricDatum {
+                    metric_name: name.to_string(),
+                    value: Some(val),
+                    timestamp: timestamp.map(timestamp_to_string),
+                    dimensions: tags.map(tags_to_dimensions),
+                    ..Default::default()
+                }),
                 Metric::Histogram {
                     name,
                     val,
@@ -207,7 +177,7 @@ impl CloudWatchMetricsSvc {
                 } => Some(MetricDatum {
                     metric_name: name.to_string(),
                     values: Some(vec![val]),
-                    counts: Some(vec![sample_rate as f64]),
+                    counts: Some(vec![f64::from(sample_rate)]),
                     timestamp: timestamp.map(timestamp_to_string),
                     dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
@@ -218,25 +188,23 @@ impl CloudWatchMetricsSvc {
 
         let namespace = self.config.namespace.clone();
 
-        let datum = PutMetricDataInput {
+        PutMetricDataInput {
             namespace,
             metric_data,
-        };
-
-        datum
+        }
     }
 }
 
-impl Service<Vec<Event>> for CloudWatchMetricsSvc {
+impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
     type Response = ();
-    type Error = PutMetricDataError;
+    type Error = RusotoError<PutMetricDataError>;
     type Future = RusotoFuture<(), PutMetricDataError>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
     }
 
-    fn call(&mut self, items: Vec<Event>) -> Self::Future {
+    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = self.encode_events(items);
 
         if !input.metric_data.is_empty() {
@@ -252,14 +220,14 @@ impl Service<Vec<Event>> for CloudWatchMetricsSvc {
 struct CloudWatchMetricsRetryLogic;
 
 impl RetryLogic for CloudWatchMetricsRetryLogic {
-    type Error = PutMetricDataError;
+    type Error = RusotoError<PutMetricDataError>;
     type Response = ();
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            PutMetricDataError::HttpDispatch(_) => true,
-            PutMetricDataError::InternalServiceFault(_) => true,
-            PutMetricDataError::Unknown(res)
+            RusotoError::HttpDispatch(_) => true,
+            RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
+            RusotoError::Unknown(res)
                 if res.status.is_server_error()
                     || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
             {
@@ -288,7 +256,7 @@ fn tags_to_dimensions(tags: HashMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::metric::Metric, Event};
+    use crate::event::metric::Metric;
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -305,31 +273,26 @@ mod tests {
         let config = config();
         let region = config.region.clone().try_into().unwrap();
         let client = CloudWatchMetricsSvc::create_client(region).unwrap();
-        let state = State::default();
 
-        CloudWatchMetricsSvc {
-            client,
-            config,
-            state,
-        }
+        CloudWatchMetricsSvc { client, config }
     }
 
     #[test]
     fn encode_events_basic_counter() {
         let events = vec![
-            Event::Metric(Metric::Counter {
+            Metric::Counter {
                 name: "exception_total".into(),
                 val: 1.0,
                 timestamp: None,
                 tags: None,
-            }),
-            Event::Metric(Metric::Counter {
+            },
+            Metric::Counter {
                 name: "bytes_out".into(),
                 val: 2.5,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
-            }),
-            Event::Metric(Metric::Counter {
+            },
+            Metric::Counter {
                 name: "healthcheck".into(),
                 val: 1.0,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
@@ -338,7 +301,7 @@ mod tests {
                         .into_iter()
                         .collect(),
                 ),
-            }),
+            },
         ];
 
         assert_eq!(
@@ -374,13 +337,13 @@ mod tests {
 
     #[test]
     fn encode_events_absolute_gauge() {
-        let events = vec![Event::Metric(Metric::Gauge {
+        let events = vec![Metric::Gauge {
             name: "temperature".into(),
             val: 10.0,
             direction: None,
             timestamp: None,
             tags: None,
-        })];
+        }];
 
         assert_eq!(
             svc().encode_events(events),
@@ -396,76 +359,14 @@ mod tests {
     }
 
     #[test]
-    fn encode_events_relative_gauge() {
-        let events = vec![
-            Event::Metric(Metric::Gauge {
-                name: "temperature".into(),
-                val: 10.0,
-                direction: None,
-                timestamp: None,
-                tags: None,
-            }),
-            Event::Metric(Metric::Gauge {
-                name: "temperature".into(),
-                val: 1.0,
-                direction: Some(Direction::Plus),
-                timestamp: None,
-                tags: None,
-            }),
-            Event::Metric(Metric::Gauge {
-                name: "temperature".into(),
-                val: 1.5,
-                direction: Some(Direction::Minus),
-                timestamp: None,
-                tags: None,
-            }),
-            Event::Metric(Metric::Gauge {
-                name: "temperature".into(),
-                val: 3.2,
-                direction: None,
-                timestamp: None,
-                tags: None,
-            }),
-        ];
-
-        assert_eq!(
-            svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![
-                    MetricDatum {
-                        metric_name: "temperature".into(),
-                        value: Some(10.0),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "temperature".into(),
-                        value: Some(11.0),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "temperature".into(),
-                        value: Some(9.5),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "temperature".into(),
-                        value: Some(3.2),
-                        ..Default::default()
-                    },
-                ],
-            }
-        );
-    }
-    #[test]
     fn encode_events_histogram() {
-        let events = vec![Event::Metric(Metric::Histogram {
+        let events = vec![Metric::Histogram {
             name: "latency".into(),
             val: 11.0,
             sample_rate: 100,
             timestamp: None,
             tags: None,
-        })];
+        }];
 
         assert_eq!(
             svc().encode_events(events),
@@ -486,6 +387,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
+    use crate::event::Event;
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
     use chrono::offset::TimeZone;
@@ -514,10 +416,9 @@ mod integration_tests {
 
         let mut events = Vec::new();
 
-        let counter_name = random_string(10);
-        for i in 0..10 {
+        for i in 0..100 {
             let event = Event::Metric(Metric::Counter {
-                name: format!("counter-{}", counter_name),
+                name: format!("counter-{}", 0),
                 val: i as f64,
                 timestamp: None,
                 tags: Some(

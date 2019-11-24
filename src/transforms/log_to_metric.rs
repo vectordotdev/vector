@@ -3,7 +3,7 @@ use crate::{
     event::metric::Metric,
     event::{self, ValueKind},
     template::Template,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
@@ -68,6 +68,10 @@ pub struct LogToMetric {
     config: LogToMetricConfig,
 }
 
+inventory::submit! {
+    TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
+}
+
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     fn build(&self) -> crate::Result<Box<dyn Transform>> {
@@ -80,6 +84,10 @@ impl TransformConfig for LogToMetricConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Metric
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "log_to_metric"
     }
 }
 

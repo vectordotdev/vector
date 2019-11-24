@@ -1,12 +1,12 @@
 use crate::{
     buffers::Acker,
-    event::{Event, Metric},
+    event::Metric,
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         retries::FixedRetryPolicy,
-        BatchServiceSink, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{Future, Poll};
@@ -44,8 +44,8 @@ pub struct DatadogConfig {
     #[serde(default = "default_host")]
     pub host: String,
     pub api_key: String,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -85,6 +85,10 @@ pub enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogPoint(i64, f64);
 
+inventory::submit! {
+    SinkDescription::new::<DatadogConfig>("datadog")
+}
+
 #[typetag::serde(name = "datadog")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -96,12 +100,15 @@ impl SinkConfig for DatadogConfig {
     fn input_type(&self) -> DataType {
         DataType::Metric
     }
+
+    fn sink_type(&self) -> &'static str {
+        "datadog"
+    }
 }
 
 impl DatadogSvc {
     pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
-        let batch_size = config.batch_size.unwrap_or(20);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let batch = config.batch.unwrap_or(20, 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -144,11 +151,8 @@ impl DatadogSvc {
             .timeout(Duration::from_secs(timeout))
             .service(datadog_http_service);
 
-        let sink = BatchServiceSink::new(service, acker).batched_with_min(
-            Vec::new(),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        );
+        let sink =
+            BatchServiceSink::new(service, acker).batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }
@@ -175,7 +179,7 @@ impl DatadogSvc {
     }
 }
 
-impl Service<Vec<Event>> for DatadogSvc {
+impl Service<Vec<Metric>> for DatadogSvc {
     type Response = HttpResponse;
     type Error = HttpError;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -184,7 +188,7 @@ impl Service<Vec<Event>> for DatadogSvc {
         self.inner.poll_ready()
     }
 
-    fn call(&mut self, items: Vec<Event>) -> Self::Future {
+    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let now = Utc::now().timestamp();
         let interval = now - self.state.last_sent_timestamp;
         self.state.last_sent_timestamp = now;
@@ -221,10 +225,10 @@ fn encode_namespace(namespace: &str, name: String) -> String {
     }
 }
 
-fn encode_events(events: Vec<Event>, interval: i64, namespace: &str) -> DatadogRequest {
+fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
     let series: Vec<_> = events
         .into_iter()
-        .filter_map(|event| match event.into_metric() {
+        .filter_map(|event| match event {
             Metric::Counter {
                 name,
                 val,
@@ -280,7 +284,7 @@ fn encode_events(events: Vec<Event>, interval: i64, namespace: &str) -> DatadogR
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::metric::Metric, Event};
+    use crate::event::metric::Metric;
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
 
@@ -317,18 +321,18 @@ mod tests {
         let now = Utc::now().timestamp();
         let interval = 60;
         let events = vec![
-            Event::Metric(Metric::Counter {
+            Metric::Counter {
                 name: "total".into(),
                 val: 1.5,
                 timestamp: None,
                 tags: None,
-            }),
-            Event::Metric(Metric::Counter {
+            },
+            Metric::Counter {
                 name: "check".into(),
                 val: 1.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
-            }),
+            },
         ];
         let input = encode_events(events, interval, "ns");
         let json = serde_json::to_string(&input).unwrap();
@@ -341,13 +345,13 @@ mod tests {
 
     #[test]
     fn encode_gauge() {
-        let events = vec![Event::Metric(Metric::Gauge {
+        let events = vec![Metric::Gauge {
             name: "volume".into(),
             val: -1.1,
             direction: None,
             timestamp: Some(ts()),
             tags: None,
-        })];
+        }];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();
 
@@ -359,13 +363,13 @@ mod tests {
 
     #[test]
     fn encode_histogram() {
-        let events = vec![Event::Metric(Metric::Histogram {
+        let events = vec![Metric::Histogram {
             name: "login".into(),
             val: 1.0,
             sample_rate: 2,
             timestamp: Some(ts()),
             tags: None,
-        })];
+        }];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();
 

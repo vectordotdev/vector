@@ -1,15 +1,11 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use tokio::{
-    codec::FramedRead,
-    io::{stdin, AsyncRead},
-};
+use std::{io, thread, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -32,6 +28,10 @@ fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
+inventory::submit! {
+    SourceDescription::new::<StdinConfig>("stdin")
+}
+
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     fn build(
@@ -40,44 +40,71 @@ impl SourceConfig for StdinConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        Ok(stdin_source(stdin(), self.clone(), out))
+        Ok(stdin_source(
+            io::BufReader::new(io::stdin()),
+            self.clone(),
+            out,
+        ))
     }
 
     fn output_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn source_type(&self) -> &'static str {
+        "stdin"
+    }
 }
 
-pub fn stdin_source<S>(stream: S, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
+pub fn stdin_source<R>(stdin: R, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
 where
-    S: AsyncRead + Send + 'static,
+    R: Send + io::BufRead + 'static,
 {
     Box::new(future::lazy(move || {
         info!("Capturing STDIN");
 
         let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
         let hostname = hostname::get_hostname();
+        let (mut tx, rx) = futures::sync::mpsc::channel(1024);
 
-        let source = FramedRead::new(
-            stream,
-            BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
-        )
-        .map(move |line| create_event(line, &host_key, &hostname))
-        .map_err(|e| error!("error reading line: {:?}", e))
-        .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-        .map(|_| info!("finished sending"));
+        thread::spawn(move || {
+            for line in stdin.lines() {
+                match line {
+                    Err(e) => {
+                        error!(message = "Unable to read from source.", error = %e);
+                        break;
+                    }
+                    Ok(string_data) => {
+                        let msg = Bytes::from(string_data);
+                        while let Err(e) = tx.try_send(msg.clone()) {
+                            if e.is_full() {
+                                thread::sleep(Duration::from_millis(10));
+                                continue;
+                            }
+                            error!(message = "Unable to send event.", error = %e);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
 
-        source
+        rx.map(move |line| create_event(line, &host_key, &hostname))
+            .map_err(|e| error!("error reading line: {:?}", e))
+            .forward(
+                out.sink_map_err(|e| error!(message = "Unable to send event to out.", error = %e)),
+            )
+            .map(|_| info!("finished sending"))
     }))
 }
 
-fn create_event(line: Bytes, host_key: &String, hostname: &Option<String>) -> Event {
+fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
     let mut event = Event::from(line);
 
     if let Some(hostname) = &hostname {
         event
             .as_mut_log()
-            .insert_implicit(host_key.clone().into(), hostname.clone().into());
+            .insert_implicit(host_key.into(), hostname.clone().into());
     }
 
     event

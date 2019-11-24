@@ -1,20 +1,19 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
-    pub address: SocketAddr,
+    pub address: SocketListenAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -31,7 +30,7 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(address: SocketAddr) -> Self {
+    pub fn new(address: SocketListenAddr) -> Self {
         Self {
             address,
             max_length: default_max_length(),
@@ -39,6 +38,10 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<TcpConfig>("tcp")
 }
 
 #[typetag::serde(name = "tcp")]
@@ -57,6 +60,10 @@ impl SourceConfig for TcpConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "tcp"
     }
 }
 
@@ -99,6 +106,7 @@ impl TcpSource for RawTcpSource {
 mod test {
     use super::TcpConfig;
     use crate::event;
+    use crate::runtime;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
@@ -110,10 +118,10 @@ mod test {
 
         let addr = next_addr();
 
-        let server = TcpConfig::new(addr)
+        let server = TcpConfig::new(addr.into())
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 
@@ -151,13 +159,13 @@ mod test {
 
         let addr = next_addr();
 
-        let mut config = TcpConfig::new(addr);
+        let mut config = TcpConfig::new(addr.into());
         config.max_length = 10;
 
         let server = config
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 

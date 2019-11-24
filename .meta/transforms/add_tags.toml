@@ -1,6 +1,7 @@
 [transforms.add_tags]
 allow_you_to_description = "add one or more metric tags"
-function_categories = ["change_tags"]
+common = false
+function_category = "shape"
 guides = []
 input_types = ["metric"]
 output_types = ["metric"]
@@ -8,6 +9,7 @@ resources = []
 
 [transforms.add_tags.options.tags]
 type = "table"
+common = true
 null = false
 description = """\
 A table of key/value pairs representing the tags to be added to the \

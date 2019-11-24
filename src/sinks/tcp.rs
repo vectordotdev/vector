@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{
@@ -69,6 +69,10 @@ impl TcpSinkConfig {
     }
 }
 
+inventory::submit! {
+    SinkDescription::new_without_default::<TcpSinkConfig>("tcp")
+}
+
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -106,6 +110,10 @@ impl SinkConfig for TcpSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "tcp"
     }
 }
 
@@ -317,12 +325,12 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
     let log = event.into_log();
 
     let b = match encoding {
-        &Encoding::Json => serde_json::to_vec(&log.unflatten()),
-        &Encoding::Text => {
+        Encoding::Json => serde_json::to_vec(&log.unflatten()),
+        Encoding::Text => {
             let bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
-                .unwrap_or(Vec::new());
+                .unwrap_or_default();
             Ok(bytes)
         }
     };

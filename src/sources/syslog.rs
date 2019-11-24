@@ -1,7 +1,7 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -15,6 +15,7 @@ use tokio::{
     codec::{BytesCodec, FramedRead, LinesCodec},
     net::{UdpFramed, UdpSocket},
 };
+#[cfg(unix)]
 use tokio_uds::UnixListener;
 use tracing::field;
 use tracing_futures::Instrument;
@@ -33,9 +34,16 @@ pub struct SyslogConfig {
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp { address: SocketAddr },
-    Udp { address: SocketAddr },
-    Unix { path: PathBuf },
+    Tcp {
+        address: SocketListenAddr,
+    },
+    Udp {
+        address: SocketAddr,
+    },
+    #[cfg(unix)]
+    Unix {
+        path: PathBuf,
+    },
 }
 
 fn default_max_length() -> usize {
@@ -50,6 +58,10 @@ impl SyslogConfig {
             max_length: default_max_length(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<SyslogConfig>("syslog")
 }
 
 #[typetag::serde(name = "syslog")]
@@ -72,12 +84,17 @@ impl SourceConfig for SyslogConfig {
                 source.run(address, shutdown_secs, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            #[cfg(unix)]
             Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
         }
     }
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "syslog"
     }
 }
 
@@ -145,6 +162,7 @@ pub fn udp(
     )
 }
 
+#[cfg(unix)]
 pub fn unix(
     path: PathBuf,
     max_length: usize,
@@ -200,7 +218,7 @@ pub fn unix(
 // null byte delimiter in place of newline
 
 fn event_from_str(
-    host_key: &String,
+    host_key: &str,
     default_host: Option<Bytes>,
     raw: impl AsRef<str>,
 ) -> Option<Event> {
@@ -218,17 +236,17 @@ fn event_from_str(
             if let Some(host) = &parsed.hostname {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.clone().into(), host.clone().into());
+                    .insert_implicit(host_key.into(), host.clone().into());
             } else if let Some(default_host) = default_host {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.clone().into(), default_host.into());
+                    .insert_implicit(host_key.into(), default_host.into());
             }
 
             let timestamp = parsed
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                .unwrap_or(Utc::now());
+                .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
                 .insert_implicit(event::TIMESTAMP.clone(), timestamp.into());
@@ -282,7 +300,7 @@ mod test {
     use chrono::TimeZone;
 
     #[test]
-    fn config() {
+    fn config_tcp() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "tcp"
@@ -291,7 +309,10 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_tcp());
+    }
 
+    #[test]
+    fn config_udp() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "udp"
@@ -301,7 +322,11 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_udp());
+    }
 
+    #[cfg(unix)]
+    #[test]
+    fn config_unix() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "unix"

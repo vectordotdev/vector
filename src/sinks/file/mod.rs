@@ -19,7 +19,7 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    pub encoding: Option<Encoding>,
+    pub encoding: Encoding,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -27,6 +27,12 @@ pub struct FileSinkConfig {
 pub enum Encoding {
     Text,
     Ndjson,
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Text
+    }
 }
 
 #[typetag::serde(name = "file")]
@@ -46,12 +52,16 @@ impl SinkConfig for FileSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "file"
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct PartitionedFileSink {
     path: Template,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     idle_timeout_secs: u64,
     partitions: HashMap<Bytes, File>,
     last_accessed: HashMap<Bytes, Instant>,
@@ -175,23 +185,22 @@ mod tests {
     use crate::{
         buffers::Acker,
         event,
-        test_util::{lines_from_file, random_events_with_stream, random_lines_with_stream},
+        test_util::{
+            lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
+            temp_file,
+        },
         topology::config::SinkConfig,
     };
     use futures::stream;
-    use tempfile::tempdir;
 
     #[test]
     fn single_partition() {
-        let directory = tempdir().unwrap();
-
-        let mut template = directory.into_path().to_string_lossy().to_string();
-        template.push_str("/test.out");
+        let template = temp_file();
 
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: None,
+            encoding: Encoding::Text,
         };
 
         let (sink, _) = config.build(Acker::Null).unwrap();
@@ -209,8 +218,7 @@ mod tests {
 
     #[test]
     fn many_partitions() {
-        let directory = tempdir().unwrap();
-        let directory = directory.into_path();
+        let directory = temp_dir();
 
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");
@@ -218,7 +226,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: None,
+            encoding: Encoding::Text,
         };
 
         let (sink, _) = config.build(Acker::Null).unwrap();

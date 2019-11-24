@@ -90,12 +90,16 @@ impl LogEvent {
         self.fields.get(key).map(|v| &v.value)
     }
 
-    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
-        self.fields.remove(key).map(|v| v.value)
+    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut ValueKind> {
+        self.fields.get_mut(key).map(|v| &mut v.value)
     }
 
-    pub fn is_structured(&self) -> bool {
-        self.fields.iter().any(|(_, v)| v.explicit)
+    pub fn contains(&self, key: &Atom) -> bool {
+        self.fields.contains_key(key)
+    }
+
+    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
+        self.fields.remove(key).map(|v| v.value)
     }
 
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
@@ -126,7 +130,7 @@ impl LogEvent {
         self.fields.keys()
     }
 
-    pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
+    pub fn all_fields(&self) -> FieldsIter {
         FieldsIter {
             inner: self.fields.iter(),
             explicit_only: false,
@@ -137,7 +141,7 @@ impl LogEvent {
         unflatten::Unflatten::from(self.fields)
     }
 
-    pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
+    pub fn explicit_fields(&self) -> FieldsIter {
         FieldsIter {
             inner: self.fields.iter(),
             explicit_only: true,
@@ -249,7 +253,7 @@ impl From<DateTime<Utc>> for ValueKind {
 
 impl From<f32> for ValueKind {
     fn from(value: f32) -> Self {
-        ValueKind::Float(value as f64)
+        ValueKind::Float(f64::from(value))
     }
 }
 

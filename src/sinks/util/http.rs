@@ -224,13 +224,13 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::runtime::Runtime::new().unwrap();
 
         rt.spawn(server);
 
         rt.block_on(req).unwrap();
 
-        rt.shutdown_now();
+        let _ = rt.shutdown_now();
 
         let (body, _rest) = rx.into_future().wait().unwrap();
         assert_eq!(body.unwrap().unwrap(), "hello");

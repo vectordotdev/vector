@@ -1,0 +1,31 @@
+.fields .filters {
+  color: var(--ifm-color-emphasis-300);
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.fields .filters .checkboxes {
+  font-size: 0.9em;
+  padding: calc( var(--ifm-spacing-vertical) / 2 ) var(--ifm-spacing-horizontal);
+}
+
+.fields .filters .checkboxes label {
+  margin-right: 1em;
+}
+
+.fields .filters .checkboxes label input {
+  margin-right: 0.5em;
+}
+
+.fields .filters .result-count {
+  float: right;
+  font-size: 0.9em;
+  line-height: 1;
+  margin-bottom: -1em;
+  margin-right: var(--ifm-spacing-horizontal);
+  position: relative;
+  top: 0.75em;
+}
+
+.fields .filters .search input {
+  width: 100%;
+}

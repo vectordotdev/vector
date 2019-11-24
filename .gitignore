@@ -1,11 +1,11 @@
-/target
+*.iml
+*.tmp
 **/*.rs.bk
-logs*/
-sample.log
 .envrc
-miniodat
 .DS_Store
 .idea/
 checkpoints/*
-*.iml
-*.tmp
+logs*/
+miniodat
+sample.log
+target

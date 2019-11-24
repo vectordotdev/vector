@@ -16,7 +16,7 @@
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# /usage/configuration
+# /docs/setup/configuration
 
 # ------------------------------------------------------------------------------
 # Global
@@ -65,7 +65,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  include_labels = "key=value"
+  include_labels = "label_key=label_value"
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
@@ -102,7 +102,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  exclude = ["/var/log/nginx/access.log"]
+  exclude = ["/var/log/nginx/*.[0-9]*.log"]
 
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
@@ -136,6 +136,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * default: false
   # * type: bool
+  start_at_beginning = true
   start_at_beginning = false
 
   #
@@ -200,6 +201,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * default: false
   # * type: bool
+  oldest_first = true
   oldest_first = false
 
   #
@@ -224,7 +226,7 @@ data_dir = "/var/lib/vector"
     # * default: 256
     # * type: int
     # * unit: bytes
-    # * relevant when fingerprinting.strategy = "checksum"
+    # * relevant when strategy = "checksum"
     fingerprint_bytes = 256
 
     # The number of bytes to skip ahead (or ignore) when generating a unique
@@ -234,7 +236,7 @@ data_dir = "/var/lib/vector"
     # * default: 0
     # * type: int
     # * unit: bytes
-    # * relevant when fingerprinting.strategy = "checksum"
+    # * relevant when strategy = "checksum"
     ignored_header_bytes = 0
 
 # Ingests data through log records from journald and outputs `log` events.
@@ -247,12 +249,21 @@ data_dir = "/var/lib/vector"
   # * must be: "journald"
   type = "journald"
 
-  # Include only entries from the current runtime (boot)
+  # The systemd journal is read in batches, and a checkpoint is set at the end of
+  # each batch. This option limits the size of the batch.
+  # 
+  # * optional
+  # * default: 16
+  # * type: int
+  batch_size = 16
+
+  # Include only entries from the current boot.
   # 
   # * optional
   # * default: true
   # * type: bool
-  current_runtime_only = true
+  current_boot_only = true
+  current_boot_only = false
 
   # The directory used to persist the journal checkpoint position. By default,
   # the global `data_dir` is used. Please make sure the Vector project has write
@@ -269,6 +280,7 @@ data_dir = "/var/lib/vector"
   # * default: true
   # * type: bool
   local_only = true
+  local_only = false
 
   # The list of units names to monitor. If empty or not present, all units are
   # accepted. Unit names lacking a `"."` will have `".service"` appended to make
@@ -308,7 +320,7 @@ data_dir = "/var/lib/vector"
   # 
   # * required
   # * type: [string]
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.
@@ -424,13 +436,16 @@ data_dir = "/var/lib/vector"
   mode = "udp"
   mode = "unix"
 
-  # The TCP or UDP address to listen on.
+  # The TCP or UDP address to listen for connections on, or "systemd#N" to use
+  # the Nth socket passed by systemd socket activation.
   # 
   # * optional
   # * no default
   # * type: string
   # * relevant when mode = "tcp" or mode = "udp"
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#2"
 
   # The maximum bytes size of incoming messages before they are discarded.
   # 
@@ -473,11 +488,14 @@ data_dir = "/var/lib/vector"
   # * must be: "tcp"
   type = "tcp"
 
-  # The address to bind the socket to.
+  # The address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation.
   # 
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#3"
 
   # The maximum bytes size of incoming messages before they are discarded.
   # 
@@ -545,7 +563,7 @@ data_dir = "/var/lib/vector"
   # * type: string
   host_key = "host"
 
-# Ingests data through another upstream Vector instance and outputs `log` and `metric` events.
+# Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `vector`.
@@ -555,11 +573,14 @@ data_dir = "/var/lib/vector"
   # * must be: "vector"
   type = "vector"
 
-  # The TCP address to bind to.
+  # The TCP address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation.
   # 
   # * required
   # * type: string
   address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#1"
 
   # The timeout before a connection is forcefully closed during shutdown.
   # 
@@ -589,8 +610,7 @@ data_dir = "/var/lib/vector"
   # * must be: "add_fields"
   type = "add_fields"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -629,8 +649,7 @@ data_dir = "/var/lib/vector"
   # * must be: "add_tags"
   type = "add_tags"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -662,8 +681,7 @@ data_dir = "/var/lib/vector"
   # * must be: "coercer"
   type = "coercer"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -675,7 +693,7 @@ data_dir = "/var/lib/vector"
 
   [transforms.coercer.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -699,8 +717,7 @@ data_dir = "/var/lib/vector"
   # * must be: "field_filter"
   type = "field_filter"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -733,8 +750,7 @@ data_dir = "/var/lib/vector"
   # * must be: "grok_parser"
   type = "grok_parser"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -752,6 +768,7 @@ data_dir = "/var/lib/vector"
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The log field to execute the `pattern` against. Must be a `string` value.
   # 
@@ -766,7 +783,7 @@ data_dir = "/var/lib/vector"
 
   [transforms.grok_parser.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -790,8 +807,7 @@ data_dir = "/var/lib/vector"
   # * must be: "json_parser"
   type = "json_parser"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -811,6 +827,24 @@ data_dir = "/var/lib/vector"
   # * type: string
   field = "message"
 
+  # If `target_field` is set and the log contains a field of the same name as the
+  # target, it will only be overwritten if this is set to `true`.
+  # 
+  # * optional
+  # * default: "false"
+  # * type: bool
+  overwrite_target = true
+  overwrite_target = false
+
+  # If this setting is present, the parsed JSON will be inserted into the log as
+  # a sub-object with this name. If a field with the same name already exists,
+  # the parser will fail and produce an error.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  target_field = "target"
+
 # Accepts `log` events and allows you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
@@ -825,8 +859,7 @@ data_dir = "/var/lib/vector"
   # * must be: "log_to_metric"
   type = "log_to_metric"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -867,6 +900,7 @@ data_dir = "/var/lib/vector"
     # * default: false
     # * type: bool
     # * relevant when type = "counter"
+    increment_by_value = true
     increment_by_value = false
 
     [transforms.log_to_metric.metrics.tags]
@@ -889,8 +923,7 @@ data_dir = "/var/lib/vector"
   # * must be: "lua"
   type = "lua"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -934,8 +967,7 @@ end
   # * must be: "regex_parser"
   type = "regex_parser"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -953,6 +985,7 @@ end
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The log field to parse.
   # 
@@ -967,7 +1000,7 @@ end
 
   [transforms.regex_parser.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -991,8 +1024,7 @@ end
   # * must be: "remove_fields"
   type = "remove_fields"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1014,8 +1046,7 @@ end
   # * must be: "remove_tags"
   type = "remove_tags"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1037,8 +1068,7 @@ end
   # * must be: "sampler"
   type = "sampler"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1075,8 +1105,7 @@ end
   # * must be: "split"
   type = "split"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1094,6 +1123,7 @@ end
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The field to apply the split on.
   # 
@@ -1116,7 +1146,7 @@ end
 
   [transforms.split.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1144,8 +1174,7 @@ end
   # * must be: "tokenizer"
   type = "tokenizer"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1163,6 +1192,7 @@ end
   # * default: true
   # * type: bool
   drop_field = true
+  drop_field = false
 
   # The log field to tokenize.
   # 
@@ -1177,7 +1207,7 @@ end
 
   [transforms.tokenizer.types]
     # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
+    # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     # 
     # * required
@@ -1211,8 +1241,7 @@ end
   # * must be: "aws_cloudwatch_logs"
   type = "aws_cloudwatch_logs"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1248,6 +1277,7 @@ end
   # * default: true
   # * type: bool
   create_missing_group = true
+  create_missing_group = false
 
   # Dynamically create a log stream if it does not already exist.
   # 
@@ -1255,6 +1285,7 @@ end
   # * default: true
   # * type: bool
   create_missing_stream = true
+  create_missing_stream = false
 
   # Custom endpoint for use with AWS-compatible services.
   # 
@@ -1269,6 +1300,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Batching
@@ -1395,8 +1427,7 @@ end
   # * must be: "aws_cloudwatch_metrics"
   type = "aws_cloudwatch_metrics"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1427,6 +1458,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
@@ -1442,8 +1474,7 @@ end
   # * must be: "aws_kinesis_streams"
   type = "aws_kinesis_streams"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1474,6 +1505,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # The log field used as the Kinesis record's partition key value.
   # 
@@ -1611,8 +1643,7 @@ end
   # * must be: "aws_s3"
   type = "aws_s3"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1643,6 +1674,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Batching
@@ -1675,13 +1707,15 @@ end
   # * default: true
   # * type: bool
   filename_append_uuid = true
+  filename_append_uuid = false
 
   # The extension to use in the object name.
   # 
   # * optional
   # * default: "log"
   # * type: bool
-  filename_extension = "log"
+  filename_extension = true
+  filename_extension = false
 
   # The format of the resulting object file name. `strftime` specifiers are
   # supported.
@@ -1808,8 +1842,7 @@ end
   # * must be: "blackhole"
   type = "blackhole"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1828,6 +1861,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Batches `log` events to Clickhouse via the `HTTP` Interface.
 [sinks.clickhouse]
@@ -1843,8 +1877,7 @@ end
   # * must be: "clickhouse"
   type = "clickhouse"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -1875,6 +1908,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Batching
@@ -1972,12 +2006,55 @@ end
     # * required
     # * type: string
     password = "password"
+    password = "${PASSWORD_ENV_VAR}"
 
     # The basic authentication user name.
     # 
     # * required
     # * type: string
     user = "username"
+
+  #
+  # Buffer
+  #
+
+  [sinks.clickhouse.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Tls
@@ -2025,6 +2102,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -2034,9 +2112,14 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `console`.
   # 
@@ -2045,20 +2128,11 @@ end
   # * must be: "console"
   type = "console"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # The standard stream to write to.
-  # 
-  # * required
-  # * type: string
-  # * enum: "stdout" or "stderr"
-  target = "stdout"
-  target = "stderr"
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -2066,6 +2140,28 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
+
+  # The standard stream to write to.
+  # 
+  # * optional
+  # * default: "stdout"
+  # * type: string
+  # * enum: "stdout" or "stderr"
+  target = "stdout"
+  target = "stderr"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  # 
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
 
 # Batches `metric` events to Datadog metrics service using HTTP API.
 [sinks.datadog_metrics]
@@ -2081,8 +2177,7 @@ end
   # * must be: "datadog_metrics"
   type = "datadog_metrics"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2106,6 +2201,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # Datadog endpoint to send metrics to.
   # 
@@ -2202,19 +2298,11 @@ end
   # * must be: "elasticsearch"
   type = "elasticsearch"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example.
-  # 
-  # * required
-  # * type: string
-  host = "http://10.24.32.122:9000"
 
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
@@ -2231,6 +2319,15 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
+
+  # The host of your Elasticsearch cluster. This should be the full URL as shown
+  # in the example. This is required if the `provider` is not `"aws"`
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://10.24.32.122:9000"
 
   # Index name to write events to.
   # 
@@ -2343,6 +2440,7 @@ end
     # * required
     # * type: string
     password = "password"
+    password = "${PASSWORD_ENV_VAR}"
 
     # The basic authentication user name.
     # 
@@ -2401,6 +2499,7 @@ end
     # 
     # * required
     # * type: string
+    Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
 
   #
@@ -2460,6 +2559,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -2469,6 +2569,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` events to a file.
 [sinks.file]
@@ -2484,8 +2585,7 @@ end
   # * must be: "file"
   type = "file"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2504,6 +2604,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # The amount of time a file can be idle  and stay open. After not receiving any
   # events for this timeout, the file will be flushed and closed.
@@ -2539,8 +2640,7 @@ end
   # * must be: "http"
   type = "http"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2559,6 +2659,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   # A URI that Vector can request in order to determine the service health.
   # 
@@ -2662,6 +2763,7 @@ end
     # * required
     # * type: string
     password = "password"
+    password = "${PASSWORD_ENV_VAR}"
 
     # The basic authentication user name.
     # 
@@ -2720,6 +2822,7 @@ end
     # 
     # * required
     # * type: string
+    Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
 
   #
@@ -2768,6 +2871,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -2777,6 +2881,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` events to Apache Kafka via the Kafka protocol.
 [sinks.kafka]
@@ -2792,8 +2897,7 @@ end
   # * must be: "kafka"
   type = "kafka"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2826,6 +2930,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # requests
@@ -2908,6 +3013,7 @@ end
     # * optional
     # * default: false
     # * type: bool
+    enabled = true
     enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
@@ -2936,8 +3042,7 @@ end
   # * must be: "prometheus"
   type = "prometheus"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -2970,6 +3075,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Batches `log` events to a Splunk HTTP Event Collector.
 [sinks.splunk_hec]
@@ -2985,8 +3091,7 @@ end
   # * must be: "splunk_hec"
   type = "splunk_hec"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3010,6 +3115,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # requests
@@ -3184,6 +3290,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -3193,6 +3300,7 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
@@ -3204,8 +3312,7 @@ end
   # * must be: "statsd"
   type = "statsd"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3230,6 +3337,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
 # Streams `log` events to a TCP connection.
 [sinks.tcp]
@@ -3245,8 +3353,7 @@ end
   # * must be: "tcp"
   type = "tcp"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3264,6 +3371,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # requests
@@ -3346,6 +3454,7 @@ end
     # * optional
     # * default: false
     # * type: bool
+    enabled = true
     enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
@@ -3372,6 +3481,7 @@ end
     # * default: true
     # * type: bool
     verify_certificate = true
+    verify_certificate = false
 
     # If `true` (the default), Vector will validate the configured remote host name
     # against the remote host's TLS certificate. Do NOT set this to `false` unless
@@ -3381,8 +3491,9 @@ end
     # * default: true
     # * type: bool
     verify_hostname = true
+    verify_hostname = false
 
-# Streams `log` events to another downstream Vector instance.
+# Streams `log` events to another downstream `vector` source.
 [sinks.vector]
   #
   # General
@@ -3396,8 +3507,7 @@ end
   # * must be: "vector"
   type = "vector"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
+  # A list of upstream source or transform IDs. See configuration for more info.
   # 
   # * required
   # * type: [string]
@@ -3415,6 +3525,7 @@ end
   # * default: true
   # * type: bool
   healthcheck = true
+  healthcheck = false
 
   #
   # Buffer
@@ -3457,6 +3568,3 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
-
-
-

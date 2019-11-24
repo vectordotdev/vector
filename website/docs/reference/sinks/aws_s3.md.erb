@@ -1,0 +1,74 @@
+<% component = metadata.sinks.aws_s3 %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= sink_output(component) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Columnar Formats
+
+Vector has plans to support column formats, such as ORC and Parquet, in
+[`v0.6`][urls.vector_roadmap].
+
+### Object Naming
+
+By default, Vector will name your S3 objects in the following format:
+
+<Tabs
+  block={true}
+  defaultValue="manual"
+  values={[
+    { label: 'Without Compression', value: 'without_compression', },
+    { label: 'With Compression', value: 'with_compression', },
+  ]
+}>
+
+<TabItem value="without_compression">
+
+```
+<key_prefix><timestamp>-<uuidv4>.log
+```
+
+For example:
+
+```
+date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
+```
+
+</TabItem>
+<TabItem value="with_compression">
+
+```
+<key_prefix><timestamp>-<uuidv4>.log.gz
+```
+
+For example:
+
+```
+date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
+```
+
+</TabItem>
+</Tabs>
+
+Vector appends a [UUIDV4][urls.uuidv4] token to ensure there are no name
+conflicts in the unlikely event 2 Vector instances are writing data at the same
+time.
+
+You can control the resulting name via the `key_prefix`, `filename_time_format`,
+and `filename_append_uuid` options.
+
+

@@ -3,27 +3,45 @@
 require_relative "option"
 
 class Component
-  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"]
-  EVENT_TYPES = ["log", "metric"]
+  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
+  EVENT_TYPES = ["log", "metric"].freeze
+  OPERATING_SYSTEMS = ["linux", "macos", "windows"].freeze
 
   include Comparable
 
   attr_reader :beta,
+    :common,
+    :function_category,
     :id,
     :name,
+    :operating_systems,
     :options,
     :resources,
-    :type
-
-  attr_accessor :alternatives
+    :type,
+    :unsupported_operating_systems
 
   def initialize(hash)
-    @alternatives = []
     @beta = hash["beta"] == true
+    @common = hash["common"] == true
+    @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = OpenStruct.new()
+
+    # Operating Systems
+
+    if hash["only_operating_systems"]
+      @operating_systems = hash["only_operating_systems"]
+    elsif hash["except_operating_systems"]
+      @operating_systems = OPERATING_SYSTEMS - hash["except_operating_systems"]
+    else
+      @operating_systems = OPERATING_SYSTEMS
+    end
+
+    @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
+
+    # Options
 
     (hash["options"] || {}).each do |option_name, option_hash|
       option = Option.new(
@@ -52,7 +70,7 @@ class Component
       @options.inputs =
         Option.new({
           "name" => "inputs",
-          "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.",
+          "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
           "examples" => [["my-source-id"]],
           "null" => false,
           "type" => "[string]"
@@ -72,8 +90,26 @@ class Component
     beta == true
   end
 
+  def common?
+    common == true
+  end
+
   def context_options
     options_list.select(&:context?)
+  end
+
+  def event_types
+    types = []
+
+    if respond_to?(:input_types)
+      types += input_types
+    end
+
+    if respond_to?(:output_types)
+      types += output_types
+    end
+
+    types.uniq
   end
 
   def options_list
@@ -98,8 +134,28 @@ class Component
     end
   end
 
+  def status
+    beta? ? "beta" : "prod-ready"
+  end
+
   def templateable_options
     options_list.select(&:templateable?)
+  end
+
+  def to_h
+    {
+      beta: beta?,
+      delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
+      event_types: event_types,
+      function_category: (respond_to?(:function_category, true) ? function_category : nil),
+      id: id,
+      name: name,
+      operating_systems: operating_systems,
+      service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
+      status: status,
+      type: type,
+      unsupported_operating_systems: unsupported_operating_systems
+    }
   end
 
   def transform?

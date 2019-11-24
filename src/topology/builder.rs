@@ -1,4 +1,7 @@
-use super::fanout::{self, Fanout};
+use super::{
+    fanout::{self, Fanout},
+    task::Task,
+};
 use crate::buffers;
 use futures::{
     future::{lazy, Either},
@@ -8,9 +11,6 @@ use futures::{
 use std::{collections::HashMap, time::Duration};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::util::FutureExt;
-use tracing_futures::Instrument;
-
-pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -21,121 +21,9 @@ pub struct Pieces {
     pub shutdown_triggers: HashMap<String, Trigger>,
 }
 
-pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec<String>> {
-    let mut inputs = HashMap::new();
-    let mut outputs = HashMap::new();
-    let mut tasks = HashMap::new();
-    let mut source_tasks = HashMap::new();
-    let mut healthchecks = HashMap::new();
-    let mut shutdown_triggers = HashMap::new();
-
+pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     let mut errors = vec![];
     let mut warnings = vec![];
-
-    // Build sources
-    for (name, source) in &config.sources {
-        let (tx, rx) = mpsc::channel(1000);
-
-        let server = match source.build(&name, &config.global, tx) {
-            Err(error) => {
-                errors.push(format!("Source \"{}\": {}", name, error));
-                continue;
-            }
-            Ok(server) => server,
-        };
-
-        let (trigger, tripwire) = Tripwire::new();
-
-        let (output, control) = Fanout::new();
-        let pump = rx.forward(output).map(|_| ());
-        let pump: Task = Box::new(pump);
-
-        let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
-        let server: Task = Box::new(server);
-
-        outputs.insert(name.clone(), control);
-        tasks.insert(name.clone(), pump);
-        source_tasks.insert(name.clone(), server);
-        shutdown_triggers.insert(name.clone(), trigger);
-    }
-
-    // Build transforms
-    for (name, transform) in &config.transforms {
-        let trans_inputs = &transform.inputs;
-        let mut transform = match transform.inner.build() {
-            Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", name, error));
-                continue;
-            }
-            Ok(transform) => transform,
-        };
-
-        let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
-        let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
-
-        let (output, control) = Fanout::new();
-
-        let task = input_rx
-            .map(move |event| {
-                let mut output = Vec::with_capacity(1);
-                transform.transform_into(&mut output, event);
-                futures::stream::iter_ok(output.into_iter())
-            })
-            .flatten()
-            .forward(output)
-            .map(|_| ());
-        let task: Task = Box::new(task);
-
-        inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
-        outputs.insert(name.clone(), control);
-        tasks.insert(name.clone(), task);
-    }
-
-    // Build sinks
-    for (name, sink) in &config.sinks {
-        let sink_inputs = &sink.inputs;
-        let enable_healthcheck = sink.healthcheck;
-
-        let buffer = sink.buffer.build(&config.global.data_dir, &name);
-        let (tx, rx, acker) = match buffer {
-            Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", name, error));
-                continue;
-            }
-            Ok(buffer) => buffer,
-        };
-
-        let (sink, healthcheck) = match sink.inner.build(acker) {
-            Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", name, error));
-                continue;
-            }
-            Ok((sink, healthcheck)) => (sink, healthcheck),
-        };
-
-        let task = rx.forward(sink).map(|_| ());
-        let task: Task = Box::new(task);
-
-        let healthcheck_task = if enable_healthcheck {
-            let healthcheck_task = healthcheck
-                // TODO: Add healthcheck timeouts per sink
-                .timeout(Duration::from_secs(10))
-                .map(move |_| info!("Healthcheck: Passed."))
-                .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
-            Either::A(healthcheck_task)
-        } else {
-            Either::B(lazy(|| {
-                info!("Healthcheck: Disabled.");
-                Ok(())
-            }))
-        };
-        let healthcheck_fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static> =
-            Box::new(healthcheck_task.instrument(info_span!("healthcheck", %name)));
-
-        inputs.insert(name.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(name.clone(), healthcheck_fut);
-        tasks.insert(name.clone(), task);
-    }
 
     // Warnings and errors
     let sink_inputs = config
@@ -192,6 +80,152 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         errors.push(format!("Configured topology contains a cycle"));
     } else if let Err(type_errors) = config.typecheck() {
         errors.extend(type_errors);
+    }
+
+    if errors.is_empty() {
+        Ok(warnings)
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec<String>> {
+    let mut inputs = HashMap::new();
+    let mut outputs = HashMap::new();
+    let mut tasks = HashMap::new();
+    let mut source_tasks = HashMap::new();
+    let mut healthchecks = HashMap::new();
+    let mut shutdown_triggers = HashMap::new();
+
+    let mut errors = vec![];
+    let mut warnings = vec![];
+
+    if config.sources.is_empty() {
+        return Err(vec!["No sources defined in the config.".to_owned()]);
+    }
+    if config.sinks.is_empty() {
+        return Err(vec!["No sinks defined in the config.".to_owned()]);
+    }
+
+    // Build sources
+    for (name, source) in &config.sources {
+        let (tx, rx) = mpsc::channel(1000);
+
+        let typetag = source.source_type();
+
+        let server = match source.build(&name, &config.global, tx) {
+            Err(error) => {
+                errors.push(format!("Source \"{}\": {}", name, error));
+                continue;
+            }
+            Ok(server) => server,
+        };
+
+        let (trigger, tripwire) = Tripwire::new();
+
+        let (output, control) = Fanout::new();
+        let pump = rx.forward(output).map(|_| ());
+        let pump = Task::new(&name, &typetag, pump);
+
+        let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+        let server = Task::new(&name, &typetag, server);
+
+        outputs.insert(name.clone(), control);
+        tasks.insert(name.clone(), pump);
+        source_tasks.insert(name.clone(), server);
+        shutdown_triggers.insert(name.clone(), trigger);
+    }
+
+    // Build transforms
+    for (name, transform) in &config.transforms {
+        let trans_inputs = &transform.inputs;
+
+        let typetag = &transform.inner.transform_type();
+
+        let mut transform = match transform.inner.build() {
+            Err(error) => {
+                errors.push(format!("Transform \"{}\": {}", name, error));
+                continue;
+            }
+            Ok(transform) => transform,
+        };
+
+        let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
+        let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
+
+        let (output, control) = Fanout::new();
+
+        let transform = input_rx
+            .map(move |event| {
+                let mut output = Vec::with_capacity(1);
+                transform.transform_into(&mut output, event);
+                futures::stream::iter_ok(output.into_iter())
+            })
+            .flatten()
+            .forward(output)
+            .map(|_| ());
+        let task = Task::new(&name, &typetag, transform);
+
+        inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
+        outputs.insert(name.clone(), control);
+        tasks.insert(name.clone(), task);
+    }
+
+    // Build sinks
+    for (name, sink) in &config.sinks {
+        let sink_inputs = &sink.inputs;
+        let enable_healthcheck = sink.healthcheck;
+
+        let typetag = sink.inner.sink_type();
+
+        let buffer = sink.buffer.build(&config.global.data_dir, &name);
+        let (tx, rx, acker) = match buffer {
+            Err(error) => {
+                errors.push(format!("Sink \"{}\": {}", name, error));
+                continue;
+            }
+            Ok(buffer) => buffer,
+        };
+
+        let (sink, healthcheck) = match sink.inner.build(acker) {
+            Err(error) => {
+                errors.push(format!("Sink \"{}\": {}", name, error));
+                continue;
+            }
+            Ok((sink, healthcheck)) => (sink, healthcheck),
+        };
+
+        let sink = rx.forward(sink).map(|_| ());
+        let task = Task::new(&name, &typetag, sink);
+
+        let healthcheck_task = if enable_healthcheck {
+            let healthcheck_task = healthcheck
+                // TODO: Add healthcheck timeouts per sink
+                .timeout(Duration::from_secs(10))
+                .map(move |_| info!("Healthcheck: Passed."))
+                .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
+            Either::A(healthcheck_task)
+        } else {
+            Either::B(lazy(|| {
+                info!("Healthcheck: Disabled.");
+                Ok(())
+            }))
+        };
+        let healthcheck_task = Task::new(&name, &typetag, healthcheck_task);
+
+        inputs.insert(name.clone(), (tx, sink_inputs.clone()));
+        healthchecks.insert(name.clone(), healthcheck_task);
+        tasks.insert(name.clone(), task);
+    }
+
+    // Warnings and errors
+    match check(&config) {
+        Err(check_errors) => {
+            errors.extend(check_errors);
+        }
+        Ok(check_warnings) => {
+            warnings.extend(check_warnings);
+        }
     }
 
     if errors.is_empty() {
