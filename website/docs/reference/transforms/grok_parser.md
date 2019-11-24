@@ -2,10 +2,12 @@
 
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "grok_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 status: "prod-ready"
-title: "grok_parser transform" 
+title: "grok_parser transform"
+unsupported_operating_systems: []
 ---
 
 The `grok_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value with [Grok][urls.grok].

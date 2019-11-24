@@ -2,10 +2,12 @@
 delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "aws_cloudwatch_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/mod.rs
 status: "beta"
-title: "aws_cloudwatch_logs sink" 
+title: "aws_cloudwatch_logs sink"
+unsupported_operating_systems: []
 ---
 
 The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).

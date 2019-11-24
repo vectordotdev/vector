@@ -72,7 +72,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        An <Link to="/docs/reference/transforms/lua">embedded LUA engine</Link> makes it easy to program powerful transforms. Handle complex use cases without limitations.
+        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of a programmable runtime. Handle complex use cases with ease!
       </>
     ),
   },

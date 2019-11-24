@@ -2,10 +2,12 @@
 delivery_guarantee: "at_least_once"
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "aws_cloudwatch_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
 status: "beta"
-title: "aws_cloudwatch_metrics sink" 
+title: "aws_cloudwatch_metrics sink"
+unsupported_operating_systems: []
 ---
 
 The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-model#metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).

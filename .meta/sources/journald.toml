@@ -2,6 +2,7 @@
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+except_operating_systems = ["windows"]
 function_category = "collect"
 guides = []
 output_types = ["log"]

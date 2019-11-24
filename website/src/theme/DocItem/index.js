@@ -40,13 +40,27 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({status, deliveryGuarantee}) {
-  if (!status && !deliveryGuarantee)
+function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOperatingSystems}) {
+  if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
+
+  let operatingSystemsEls = [];
+
+  operatingSystems.forEach(operatingSystem => {
+    operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
+    operatingSystemsEls.push(<>, </>);
+  });
+
+  unsupportedOperatingSystems.forEach(operatingSystem => {
+    operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
+    operatingSystemsEls.push(<>, </>);
+  });
+
+  operatingSystemsEls.pop();
 
   return (
     <div className="section">
-      <div className="title">Status</div>
+      <div className="title">Support</div>
       {status == "beta" &&
         <div>
           <Link to="/docs/about/guarantees#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
@@ -71,6 +85,12 @@ function Statuses({status, deliveryGuarantee}) {
             <i className="feather icon-shield"></i> at-least-once
           </Link>
         </div>}
+      {operatingSystems && 
+        <div>
+          <Link to="/docs/setup/installation/operating-systems" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
+            <i className="feather icon-cpu"></i> {operatingSystemsEls}
+          </Link>
+        </div>}
     </div>
   );
 }
@@ -80,7 +100,7 @@ function DocItem(props) {
   const {url: siteUrl} = siteConfig;
   const {metadata, content: DocContent} = props;
   const {
-    delivery_guarantee,
+    delivery_guarantee: deliveryGuarantee,
     description,
     editUrl,
     event_types: eventTypes,
@@ -89,10 +109,12 @@ function DocItem(props) {
     keywords,
     lastUpdatedAt,
     lastUpdatedBy,
+    operating_systems: operatingSystems,
     permalink,
     source_url: sourceUrl,
     status,
     title,
+    unsupported_operating_systems: unsupportedOperatingSystems,
   } = metadata;
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
@@ -144,7 +166,7 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className={styles.tableOfContents}>
-                  <Statuses status={status} deliveryGuarantee={delivery_guarantee} />
+                  <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>

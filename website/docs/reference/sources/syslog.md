@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "syslog|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
 status: "prod-ready"
-title: "syslog source" 
+title: "syslog source"
+unsupported_operating_systems: []
 ---
 
 The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model#log] events.

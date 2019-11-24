@@ -2,10 +2,12 @@
 
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "remove_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_tags.rs
 status: "prod-ready"
-title: "remove_tags transform" 
+title: "remove_tags transform"
+unsupported_operating_systems: []
 ---
 
 The `remove_tags` transform accepts [`metric`][docs.data-model#metric] events and allows you to remove one or more metric tags.

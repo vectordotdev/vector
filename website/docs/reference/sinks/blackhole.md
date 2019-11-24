@@ -2,10 +2,12 @@
 delivery_guarantee: "best_effort"
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
+operating_systems: ["linux","macos","windows"]
 sidebar_label: "blackhole|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
 status: "prod-ready"
-title: "blackhole sink" 
+title: "blackhole sink"
+unsupported_operating_systems: []
 ---
 
 The `blackhole` sink [streams](#streaming) [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
