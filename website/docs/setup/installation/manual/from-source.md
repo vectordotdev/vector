@@ -30,9 +30,10 @@ import Tabs from '@theme/Tabs';
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     ```
 
-2.  Install C++ toolchain
+2. Install C++ toolchain
 
-    Install C and C++ compilers (GCC or Clang) and GNU make if they are not pre-installed on your system.
+    Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
+    on your system.
 
 3.  Create the `vector` directory
 
@@ -56,7 +57,7 @@ import Tabs from '@theme/Tabs';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/v0.5.0.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.5.0 | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -150,7 +151,7 @@ Vector archives ship with service files in case you need them:
 To install Vector into Init.d run:
 
 ```bash
-cp -av etc/init.d/vector /etc/init.d
+cp -av distribution/init.d/vector /etc/init.d
 ```
 
 #### Systemd
@@ -158,7 +159,7 @@ cp -av etc/init.d/vector /etc/init.d
 To install Vector into Systemd run:
 
 ```bash
-cp -av etc/systemd/vector /etc/systemd/system
+cp -av distribution/systemd/vector.service /etc/systemd/system
 ```
 
 ### Updating

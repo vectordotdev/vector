@@ -121,14 +121,19 @@ module.exports = {
         href: 'https://timber.io/',
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
-    }
+    },
+    algolia: {
+      apiKey: 'api-key',
+      indexName: 'index-name',
+      algoliaOptions: {}, // Optional, if provided by Algolia
+    },
   },
   presets: [
     [
       '@docusaurus/preset-classic',
       {
         docs: {
-          editUrl: 'https://github.com/timberio/vector/edit/master/website/docs/',
+          editUrl: 'https://github.com/timberio/vector/edit/master/website/',
           sidebarPath: require.resolve('./sidebars.js'),
         },
         theme: {

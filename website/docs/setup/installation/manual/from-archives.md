@@ -365,7 +365,7 @@ cp -av etc/init.d/vector /etc/init.d
 To install Vector into Systemd run:
 
 ```bash
-cp -av etc/systemd/vector /etc/systemd/system
+cp -av etc/systemd/vector.service /etc/systemd/system
 ```
 
 ### Updating

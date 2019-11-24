@@ -245,7 +245,13 @@ class Templates
     render("#{partials_path}/_install_from_archive_linux.md", binding).strip
   end
 
-  def manual_installation_next_steps
+  def manual_installation_next_steps(type)
+    if type != :source && type != :archives
+      raise ArgumentError.new("type must be one of :source or :archives")
+    end
+
+    distribution_dir = type == :source ? "distribution" : "etc"
+
     render("#{partials_path}/_manual_installation_next_steps.md", binding).strip
   end
 

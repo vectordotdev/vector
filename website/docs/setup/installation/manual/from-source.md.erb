@@ -53,7 +53,7 @@ import Tabs from '@theme/Tabs';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/v<%= metadata.latest_version %>.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v<%= metadata.latest_version %> | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -100,7 +100,7 @@ import Tabs from '@theme/Tabs';
 
 ## Next Steps
 
-<%= manual_installation_next_steps %>
+<%= manual_installation_next_steps(:source) %>
 
 ## How It Works
 
