@@ -24,19 +24,12 @@ Steps](#next-steps) section.
 
 import Tabs from '@theme/Tabs';
 
-
-<Alert type="info">
-
-This guide does _not_ cover cross compiling Vector. This guide is intended
-to be followed on your target machine.
-
-</Alert>
-
 1.  Install Rust
 
     ```bash
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     ```
+
 2. Install C++ toolchain
 
     Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
@@ -89,10 +82,14 @@ to be followed on your target machine.
 6.  Compile Vector
 
     ```bash
-    make build
+    [FEATURES="<flag1>,<flag2>,..."] make build
     ```
 
-    The vector binary will be placed in `target/<target>/release/vector`.
+    The `FEATURES` environment variable is optional. You can override the
+    default features with this variable. See [feature flags](#feature-flags)
+    for more info.
+
+    When finished, the vector binary will be placed in `target/<target>/release/vector`.
     For example, if you are building Vector on your Mac, your target triple
     is `x86_64-apple-darwin`, and the Vector binary will be located at
     `target/x86_64-apple-darwin/release/vector`.
@@ -169,12 +166,44 @@ cp -av etc/systemd/vector /etc/systemd/system
 
 Simply follow the same [installation instructions above](#installation).
 
+## How It Works
+
+### Feature Flags
+
+The following feature flags are supported via the `FEATURES` env var when
+executing `make build`:
+
+```bash
+[FEATURES="<flag1>,<flag2>,..."] make build
+```
+
+| Feature | Description | Enabled by default |
+| :------ | :---------- | :----------------- |
+| `jemallocator` | Enables vendored [jemalloc][urls.jemalloc] instead of default memory allocator, which improves [performance][docs.performance]. | <i className="feather icon-check"></i> |
+| `leveldb` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb]. | <i className="feather icon-check"></i> |
+| `leveldb/leveldb-sys-2` | Can be used together with `leveldb` feature to use LevelDB from [`leveldb-sys` 2.x][urls.leveldb-sys-2] crate, which doesn't require `cmake` as build dependency, but supports less platforms. | <i className="feather icon-check"></i> |
+| `leveldb/leveldb-sys-3` | Can be used together with `leveldb` feature to use LevelDB from development version of [`leveldb-sys` 3.x][urls.leveldb-sys-3] crate, which requires `cmake` as build dependency, but supports more platforms. | |
+| `openssl/vendored` | Enables vendored [OpenSSL][urls.openssl]. If disabled, system SSL library is used instead. | <i className="feather icon-check"></i> |
+| `rdkafka` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
+| `rdkafka/cmake_build` | Can be used together with `rdkafka` feature to build `librdkafka` using `cmake` instead of default build script in case of build problems on non-standard system configurations. | |
+| `shiplift/unix` | Enables support for Unix domain sockets in [`docker`][docs.sources.docker] source. | <i className="feather icon-check"></i> |
+
 
 [docs.configuration]: /docs/setup/configuration
 [docs.containers]: /docs/setup/installation/containers
 [docs.from_archives]: /docs/setup/installation/manual/from-archives
 [docs.global-options#data-directory]: /docs/reference/global-options#data-directory
 [docs.global-options#data_dir]: /docs/reference/global-options#data_dir
+[docs.glossary#buffer]: /docs/meta/glossary#buffer
 [docs.package_managers]: /docs/setup/installation/package-managers
+[docs.performance]: /docs/about/performance
+[docs.sources.docker]: /docs/reference/sources/docker
+[docs.sources.kafka]: /docs/reference/sources/kafka
+[urls.jemalloc]: https://github.com/jemalloc/jemalloc
+[urls.leveldb-sys-2]: https://crates.io/crates/leveldb-sys
+[urls.leveldb-sys-3]: https://github.com/timberio/leveldb-sys/tree/v3.0.0
+[urls.leveldb]: https://github.com/google/leveldb
+[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+[urls.openssl]: https://www.openssl.org/
 [urls.rust]: https://www.rust-lang.org/
