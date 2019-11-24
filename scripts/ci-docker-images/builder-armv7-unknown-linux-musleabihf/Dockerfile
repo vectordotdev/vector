@@ -18,6 +18,8 @@ ARG MUSL_VERSION=1.1.22
 ARG TARGET="armv7-unknown-linux-musleabihf"
 # Target architecture for LLVM
 ARG LLVM_TARGET="ARM"
+# Target architecture for Linux kernel headres
+ARG LINUX_TARGET="arm"
 # We also need GCC for the target architecture to compile compier-rt. Because
 # GCC target triples are different from LLVM, we need to specify it explicitly.
 # Example: "arm-linux-gnueabihf".
@@ -141,13 +143,14 @@ RUN cd $MUSL_DIR && \
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
+ARG LINUX_TARGET
 ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 RUN make -j$(nproc) headers_install \
   KBUILD_VERBOSE=1 \
   HOSTCC="/usr/bin/gcc" \
-  ARCH="arm" \
+  ARCH="$LINUX_TARGET" \
   CC="$CC" \
   INSTALL_HDR_PATH=$LIBS_PREFIX
 

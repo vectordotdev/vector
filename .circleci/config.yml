@@ -297,22 +297,25 @@ jobs:
             - "*-x86_64-unknown-linux-gnu.tar.gz"
             - "*-amd64.deb"
 
-  build-x86_64-unknown-linux-musl-archive:
-    docker:
-      - image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
-    resource_class: xlarge
+  build-x86_64-unknown-linux-musl-archive-and-deb-package:
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
-          name: Build archive
+          name: Build archive and .deb package
+          environment:
+            PASS_RUST_LTO: "lto"
+            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
           command: |
-            export RUST_LTO="lto"
-            export TARGET="x86_64-unknown-linux-musl"
-            make build-archive
+            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-x86_64-unknown-linux-musl.tar.gz"
+            - "*-amd64.deb"
 
   build-aarch64-unknown-linux-musl-archive-and-deb-package:
     machine:
@@ -327,7 +330,7 @@ jobs:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
           command: |
-            ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
+            ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -752,7 +755,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-fmt
     - check-generate
     - test-stable
-    - build-x86_64-unknown-linux-musl-archive
+    - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
     - build-x86_64-apple-darwin-archive
@@ -791,7 +794,7 @@ workflows:
       # Build & verify
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - build-x86_64-unknown-linux-musl-archive
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
@@ -826,7 +829,7 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm
@@ -855,7 +858,7 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
           <<: *release-filters
-      - build-x86_64-unknown-linux-musl-archive:
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package:
           <<: *release-filters
       - build-aarch64-unknown-linux-musl-archive-and-deb-package:
           <<: *release-filters
@@ -904,7 +907,7 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
@@ -955,7 +958,7 @@ workflows:
       # Build & verify
 
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - build-x86_64-unknown-linux-musl-archive
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
@@ -990,7 +993,7 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm

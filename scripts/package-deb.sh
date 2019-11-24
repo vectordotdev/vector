@@ -12,7 +12,7 @@ project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 absolute_archive_path="$project_root/$archive_path"
-package_version="$($project_root/version.sh)"
+package_version="$($project_root/scripts/version.sh)"
 echo "Packaging .deb for $archive_name"
 
 # Rename the rust-toolchain file so that we can use our custom version of rustc installed
