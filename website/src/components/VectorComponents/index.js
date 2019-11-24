@@ -191,7 +191,7 @@ function VectorComponents(props) {
   }
 
   if (onlyOperatingSystems.size > 0) {
-    components = components.filter(component => Array.from(onlyOperatingSystems).filter(x => component.operating_systems.includes(x)).length > 0);
+    components = components.filter(component => Array.from(onlyOperatingSystems).every(x => component.operating_systems.includes(x)));
   }
 
   if (onlyProductionReady) {
@@ -207,7 +207,6 @@ function VectorComponents(props) {
   //
 
   let operatingSystemsArr = components.map(component => component.operating_systems);
-  console.log(flatten(operatingSystemsArr))
   operatingSystemsArr = flatten(operatingSystemsArr).sort((a, b) => (a > b) ? 1 : -1);
   const operatingSystems = new Set(operatingSystemsArr);
 
