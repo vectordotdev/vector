@@ -337,24 +337,20 @@ jobs:
           paths:
             - "*-aarch64-unknown-linux-musl.tar.gz"
 
-  build-armv7-unknown-linux-musleabihf-archive:
+  build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
-    resource_class: large # xlarge is not supported with "machine" executor
+    resource_class: large
     steps:
       - checkout
       - run:
           name: Build archive
+          environment:
+            PASS_RUST_LTO: "lto"
+            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
           command: |
-            docker run \
-              --privileged \
-              -e RUST_LTO="lto" \
-              -e TARGET="armv7-unknown-linux-musleabihf" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored" \
-              -w "$PWD" \
-              -v "$PWD":"$PWD" \
-              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
-              make build-archive
+            ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -761,7 +757,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - test-stable
     - build-x86_64-unknown-linux-musl-archive
     - build-aarch64-unknown-linux-musl-archive
-    - build-armv7-unknown-linux-musleabihf-archive
+    - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
     - build-x86_64-apple-darwin-archive
     - build-x86_64-pc-windows-msvc-archive
     - verify-deb-artifact-on-deb-8
@@ -800,7 +796,7 @@ workflows:
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
       - build-aarch64-unknown-linux-musl-archive
-      - build-armv7-unknown-linux-musleabihf-archive
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
       - package-rpm:
@@ -866,7 +862,7 @@ workflows:
           <<: *release-filters
       - build-aarch64-unknown-linux-musl-archive:
           <<: *release-filters
-      - build-armv7-unknown-linux-musleabihf-archive:
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
@@ -964,7 +960,7 @@ workflows:
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
       - build-aarch64-unknown-linux-musl-archive
-      - build-armv7-unknown-linux-musleabihf-archive
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
       - package-rpm:
