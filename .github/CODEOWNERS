@@ -1,0 +1,71 @@
+# https://help.github.com/articles/about-codeowners/
+
+/distribution/ @a-rodin
+
+/proto/ @lukesteensen
+
+/scripts/build-* @a-rodin
+/scripts/ci-docker-images/ @a-rodin
+/scripts/check-* @a-rodin
+/scripts/docker-* @a-rodin
+/scripts/generate* @binarylogic
+/scripts/package-* @a-rodin
+/scripts/release-* @a-rodin
+
+/src/buffers/ @a-rodin
+
+/src/generate.rs @Jeffail
+/src/list.rs @Jeffail
+/src/metrics.rs @lukesteensen
+/src/main.rs @lukesteensen
+/src/region.rs @LucioFranco
+/src/runtime.rs @LucioFranco
+/src/template.rs @lukesteensen
+/src/trace.rs @LucioFranco
+/src/types.rs @bruceg
+
+/src/sinks/*_metrics.rs @loony-bean
+/src/sinks/aws_kinesis_streams.rs @LucioFranco
+/src/sinks/aws_s3.rs @LucioFranco
+/src/sinks/blackhole.rs @LucioFranco
+/src/sinks/clickhouse.rs @a-rodin
+/src/sinks/console.rs @lukesteensen
+/src/sinks/elasticsearch.rs @LucioFranco
+/src/sinks/http.rs @LucioFranco
+/src/sinks/kafka.rs @lukesteensen
+/src/sinks/prometheus.rs @loony-bean
+/src/sinks/splunk_hec.rs @lukesteensen
+/src/sinks/statsd.rs @loony-bean
+/src/sinks/tcp.rs @bruceg
+/src/sinks/tcp.rs @lukesteensen
+
+/src/sources/docker.rs @LucioFranco
+/src/sources/file.rs @LucioFranco
+/src/sources/journald.rs @bruceg
+/src/sources/kafka.rs @a-rodin
+/src/sources/stdin.rs @bruceg
+/src/sources/syslog.rs @lukesteensen
+/src/sources/tcp.rs @bruceg
+/src/sources/udp.rs @bruceg
+/src/sources/vector.rs @lukesteensen
+
+/src/topology/ @lukesteensen
+
+/src/transforms/add_fields.rs @LucioFranco
+/src/transforms/add_tags.rs @loony-bean
+/src/transforms/ansi_stripper.rs @lukesteensen
+/src/transforms/coercer.rs @bruceg
+/src/transforms/field_filter.rs @lukesteensen
+/src/transforms/geoip.rs @lukesteensen
+/src/transforms/grok_parser.rs @lukesteensen
+/src/transforms/json_parser.rs @LucioFranco
+/src/transforms/log_to_metric.rs @loony-bean
+/src/transforms/lua.rs @a-rodin
+/src/transforms/regex_parser.rs @lukesteensen
+/src/transforms/remove_fields.rs @LucioFranco
+/src/transforms/remove_tags.rs @loony-bean
+/src/transforms/sampler.rs @lukesteensen
+/src/transforms/split.rs @lukesteensen
+/src/transforms/tokenzier.rs @lukesteensen
+
+/website/ @binarylogic
