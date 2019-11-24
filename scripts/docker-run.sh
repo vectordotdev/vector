@@ -23,9 +23,10 @@ if [ -t 0 ]; then # the script's input is connected to a terminal
   docker_flags+=("--tty")
 fi
 
-# copy environment variables except "$PATH" from host to the container
+# pass environment variables prefixed with `PASS_` to the container
+# with removed `PASS_` prefix
 IFS=$'\n'
-for line in $(env | grep -v '^PATH='); do
+for line in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
   docker_flags+=("-e" "$line")
 done
 unset IFS
