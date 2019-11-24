@@ -122,11 +122,11 @@ module.exports = {
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
     },
-    algolia: {
-      apiKey: 'api-key',
-      indexName: 'index-name',
-      algoliaOptions: {}, // Optional, if provided by Algolia
-    },
+    // algolia: {
+    //   apiKey: 'api-key',
+    //   indexName: 'index-name',
+    //   algoliaOptions: {}, // Optional, if provided by Algolia
+    // },
   },
   presets: [
     [
