@@ -359,6 +359,7 @@ jobs:
           root: target/artifacts
           paths:
             - "*-armv7-unknown-linux-musleabihf.tar.gz"
+            - "*-armhf.deb"
 
   #
   # Checks
