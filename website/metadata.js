@@ -592,6 +592,27 @@ module.exports = {
 
       ]
     },
+    "kubernetes": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "collect",
+      "id": "kubernetes_source",
+      "name": "kubernetes",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "statsd": {
       "beta": true,
       "delivery_guarantee": "best_effort",

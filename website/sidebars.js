@@ -121,6 +121,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/kubernetes",
+            
               "reference/sources/statsd",
             
               "reference/sources/stdin",
