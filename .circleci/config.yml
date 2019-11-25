@@ -92,7 +92,7 @@ jobs:
           name: Install Rust
           shell: bash
           command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-07-05 # nightly 1.38
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-07-29 # nightly 1.38
             # see https://github.com/rust-lang/cargo/issues/2078
             printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
       - run:
@@ -219,7 +219,7 @@ jobs:
           name: Install Rust
           shell: bash
           command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-07-05 # nightly 1.38
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-07-29 # nightly 1.38
             # see https://github.com/rust-lang/cargo/issues/2078
             printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
       - run:
