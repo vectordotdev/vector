@@ -85,7 +85,7 @@
   --ifm-panel-color: var(--ifm-color-emphasis-800);
   --ifm-panel-color-active: var(--ifm-color-primary);
   --ifm-pre-line-height: var(--ifm-line-height-base);
-  --ifm-sidebar-background: var(--ifm-color-emphasis-50);
+  --ifm-sidebar-background: var(--ifm-background-color);
   --ifm-sidebar-border-color: var(--ifm-hr-border-color);
   --ifm-table-stripe-background: var(--ifm-table-background);
 }
@@ -935,6 +935,7 @@ div[class^='sidebar_'] {
   font-weight: bold;
 }
 div[class^='sidebar_'] .menu {
+  background: var(--ifm-sidebar-background);
   font-weight: bold;
   margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
   margin-bottom: var(--ifm-spacing-vertical);
