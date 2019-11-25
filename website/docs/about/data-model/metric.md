@@ -28,9 +28,7 @@ import TabItem from '@theme/TabItem';
 ```javascript
 {
   "name": "login.count",
-  "tags": {
-    "host": "my.host.com"
-  },
+  "host": "my.host.com",
   "timestamp": "2019-11-01T21:15:47+00:00",
   "val": 10.2
 }
@@ -43,9 +41,7 @@ import TabItem from '@theme/TabItem';
 {
   "direction": "plus",
   "name": "memory_rss",
-  "tags": {
-    "host": "my.host.com"
-  },
+  "host": "my.host.com",
   "timestamp": "2019-11-01T21:15:47+00:00",
   "val": 554222.0
 }
@@ -58,9 +54,7 @@ import TabItem from '@theme/TabItem';
 {
   "name": "duration_ms",
   "sample_rate": 1,
-  "tags": {
-    "host": "my.host.com"
-  },
+  "host": "my.host.com",
   "timestamp": "2019-11-01T21:15:47+00:00",
   "val": 2.6
 }
@@ -72,9 +66,7 @@ import TabItem from '@theme/TabItem';
 ```javascript
 {
   "name": "unique_users",
-  "tags": {
-    "host": "my.host.com"
-  },
+  "host": "my.host.com",
   "timestamp": "2019-11-01T21:15:47+00:00",
   "val": 12
 }

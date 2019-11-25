@@ -16,12 +16,12 @@ A table of key/value pairs representing the tags to be added to the \
 metric.\
 """
 
-[transforms.add_tags.options.tags.options."*"]
+[transforms.add_tags.options.tags.options."`<tag-key>`"]
 type = "*"
 null = false
 examples = [
-  {name = "my_tag", value = "my value"},
-  {name = "my_env_tag", value = "${ENV_VAR}"},
+  {"my_tag" = "my value"},
+  {"my_env_tag" = "${ENV_VAR}"},
 ]
 description = """\
 A key/value pair representing the new tag to be added.\

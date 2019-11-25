@@ -107,9 +107,12 @@ output = """\
 }
 """
 
-[sources.journald.output.log.fields."*"]
+[sources.journald.output.log.fields."`<record-key>`"]
 type = "*"
-examples = ["my-value"]
+examples = [
+  {_SYSTEMD_UNIT = "ntpd.service"},
+  {_BOOT_ID = "124c781146e841ae8d9b4590df8b9231"},
+]
 optional = true
 description = """\
 Additional Journald fields are passed through as log fields.

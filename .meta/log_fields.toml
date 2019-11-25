@@ -24,9 +24,11 @@ description = """\
 A normalized [Rust DateTime struct][urls.rust_date_time] in UTC.\
 """
 
-[log_fields."*"]
+[log_fields."`<key>`"]
 type = "*"
-examples = ["my-value"]
+examples = [
+  {my-key = "my-value"}
+]
 optional = true
 description = """\
 In addition to the defined fields, you are welcome to add your own fields.\

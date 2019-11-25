@@ -66,11 +66,11 @@ type = "table"
 null = true
 description = "Options for custom headers."
 
-[sinks.elasticsearch.options.headers.options."*"]
+[sinks.elasticsearch.options.headers.options."`<header-key>`"]
 type = "string"
 examples = [
-  {name = "Authorization", value = "${TOKEN_ENV_VAR}"},
-  { name = "X-Powered-By", value = "Vector"}
+  {Authorization = "${TOKEN_ENV_VAR}"},
+  {"X-Powered-By" = "Vector"}
 ]
 null = false
 description = "A custom header to be added to each outgoing Elasticsearch request."
@@ -95,9 +95,9 @@ type = "table"
 null = true
 description = "Custom parameters to Elasticsearch query string."
 
-[sinks.elasticsearch.options.query.options."*"]
+[sinks.elasticsearch.options.query.options."`<param-key>`"]
 type = "string"
-examples = [{ name = "X-Powered-By", value = "Vector"}]
+examples = [{"X-Powered-By" = "Vector"}]
 null = false
 description = "A custom parameter to be added to each Elasticsearch request."
 

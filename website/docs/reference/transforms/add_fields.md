@@ -26,14 +26,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
-    my_string_field = "string value" # example
-    my_env_var_field = "${ENV_VAR}" # example
-    my_int_field = 1 # example
-    my_float_field = 1.2 # example
-    my_bool_field = true # example
-    my_timestamp_field = 1979-05-27T00:32:00Z # example
-    my_nested_fields = {key1 = "value1", key2 = "value2"} # example
-    my_list = ["first", "second", "third"] # example
+    {my_string_field = "string value"} # example
+    {my_env_var_field = "${ENV_VAR}"} # example
+    {my_int_field = 1} # example
+    {my_float_field = 1.2} # example
+    {my_bool_field = true} # example
+    {my_timestamp_field = 1979-05-27T00:32:00Z} # example
+    {my_nested_fields = {key1 = "value1", key2 = "value2"}} # example
+    {my_list = ["first", "second", "third"]} # example
 ```
 
 ## Options
@@ -71,8 +71,8 @@ A table of key/value pairs representing the keys to be added to the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"my_string_field","value":"string value"},{"name":"my_env_var_field","value":"${ENV_VAR}"},{"name":"my_int_field","value":1},{"name":"my_float_field","value":1.2},{"name":"my_bool_field","value":true},{"name":"my_timestamp_field","value":"1979-05-27 00:32:00 -0700"},{"name":"my_nested_fields","value":{"key1":"value1","key2":"value2"}},{"name":"my_list","value":["first","second","third"]}]}
-  name={"*"}
+  examples={[{"my_string_field":"string value"},{"my_env_var_field":"${ENV_VAR}"},{"my_int_field":1},{"my_float_field":1.2},{"my_bool_field":true},{"my_timestamp_field":"1979-05-27 00:32:00 -0700"},{"my_nested_fields":{"key1":"value1","key2":"value2"}},{"my_list":["first","second","third"]}]}
+  name={"`<field-key>`"}
   nullable={false}
   path={"fields"}
   relevantWhen={null}
@@ -82,7 +82,7 @@ A table of key/value pairs representing the keys to be added to the event.
   unit={null}
   >
 
-#### *
+#### `<field-key>`
 
 A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
 

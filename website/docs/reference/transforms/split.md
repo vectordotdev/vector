@@ -32,13 +32,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+    {name = "status", value = "int"}
 ```
 
 ## Options

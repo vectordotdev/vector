@@ -48,9 +48,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL
     [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}" # example
-      region = "us-east-1" # example
-      status = "{{status}}" # example
+      {host = "${HOSTNAME}"} # example
+      {region = "us-east-1"} # example
+      {status = "{{status}}"} # example
 ```
 
 </TabItem>
@@ -74,9 +74,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # OPTIONAL
     increment_by_value = true # default, relevant when type = "counter"
     [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}" # example
-      region = "us-east-1" # example
-      status = "{{status}}" # example
+      {host = "${HOSTNAME}"} # example
+      {region = "us-east-1"} # example
+      {status = "{{status}}"} # example
 ```
 
 </TabItem>
@@ -232,8 +232,8 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"host","value":"${HOSTNAME}"},{"name":"region","value":"us-east-1"},{"name":"status","value":"{{status}}"}]}
-  name={"*"}
+  examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
+  name={"`<tag-key>`"}
   nullable={false}
   path={"metrics.tags"}
   relevantWhen={null}
@@ -243,7 +243,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-##### *
+##### `<tag-key>`
 
 Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
 

@@ -66,9 +66,9 @@ The image name that the container is based on.\
 [sources.docker.output.log.fields."`<label-key>`"]
 type = "string"
 examples = [
-  {name = "com.example.vendor", value = "Timber Inc."},
-  {name = "com.example.name", value = "Vector"},
-  {name = "com.example.build-date", value = "2029-04-12T23:20:50.52Z"},
+  {"com.example.vendor" = "Timber Inc."},
+  {"com.example.name" = "Vector"},
+  {"com.example.build-date" = "2029-04-12T23:20:50.52Z"},
 ]
 optional = false
 description = """\

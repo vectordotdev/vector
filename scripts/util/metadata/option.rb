@@ -83,7 +83,11 @@ class Option
   end
 
   def <=>(other)
-    name <=> other.name
+    if wildcard? && !other.wildcard?
+      1
+    else
+      name <=> other.name
+    end
   end
 
   def advanced?
@@ -214,6 +218,6 @@ class Option
   end
 
   def wildcard?
-    name == "*"
+    name.start_with?("`<")
   end
 end
