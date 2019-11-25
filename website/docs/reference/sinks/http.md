@@ -41,7 +41,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   uri = "https://10.22.212.22:9000/endpoint" # example
   
   # REQUIRED - requests
-  encoding = "json" # example, enum
+  encoding = "ndjson" # example, enum
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   uri = "https://10.22.212.22:9000/endpoint" # example
   
   # REQUIRED - requests
-  encoding = "json" # example, enum
+  encoding = "ndjson" # example, enum
   
   # OPTIONAL - General
   healthcheck = true # default
@@ -361,8 +361,8 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","ndjson","text"]}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","json","text"]}
   name={"encoding"}
   nullable={false}
   path={null}
@@ -821,7 +821,16 @@ For example:
 <TabItem value="json">
 
 ```http
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
 
+[
+  <json_encoded_log>,
+  <json_encoded_log>,
+  <json_encoded_log>,
+]
 ```
 
 </TabItem>
@@ -829,7 +838,14 @@ For example:
 <TabItem value="ndjson">
 
 ```http
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
 
+<json_encoded_log>
+<json_encoded_log>
+<json_encoded_log>
 ```
 
 </TabItem>

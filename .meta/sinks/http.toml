@@ -7,7 +7,7 @@ common = true
 compressions = ["gzip"]
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
-encodings = ["json", "ndjson", "text"]
+encodings = ["ndjson", "json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -68,7 +68,7 @@ description = "The full URI to make HTTP requests to. This should include the pr
 [[sinks.http.output.examples]]
 label = "JSON"
 output.type = "http"
-ooutput.body = """\
+output.body = """\
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: application/x-ndjson
@@ -84,7 +84,7 @@ Content-Length: <byte_size>
 [[sinks.http.output.examples]]
 label = "NDJSON"
 output.type = "http"
-ooutput.body = """\
+output.body = """\
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: application/x-ndjson
