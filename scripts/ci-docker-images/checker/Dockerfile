@@ -7,7 +7,7 @@ RUN apt-get update && \
   git
 
 # Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.39.0
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.38.0
 ENV PATH="$PATH:/root/.cargo/bin"
 RUN rustup component add rustfmt
 
