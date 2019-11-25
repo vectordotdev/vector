@@ -37,7 +37,7 @@ A "transform" is anything that modifies an event or the stream as a whole, such 
 
 A sink is a destination for [events][docs.data_model#event]. Each sink's design and transmission method is dictated by the downstream service it is interacting with. For example, the [`tcp` sink][docs.sinks.tcp] will stream individual records, while the [`aws_s3` sink][docs.sinks.aws_s3] will buffer and flush data.
 
-<Jump to="/docs/reference/sources">View all sinks</Jump>
+<Jump to="/docs/reference/sinks">View all sinks</Jump>
 
 ## Events
 
