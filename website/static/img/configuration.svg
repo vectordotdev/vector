@@ -28,40 +28,40 @@
                 <polygon id="Line-6" fill="#000000" fill-rule="nonzero" points="685 49 685 50 288 50 288 49"></polygon>
                 <polygon id="Line-6" fill="#000000" fill-rule="nonzero" transform="translate(457.000000, 490.500000) scale(1, -1) translate(-457.000000, -490.500000) " points="685 490 685 491 229 491 229 490"></polygon>
                 <polygon id="Line-6" fill="#000000" fill-rule="nonzero" points="685 622 685 623 229 623 229 622"></polygon>
-                <text id="Learn-more-about-Vec" font-size="16" font-weight="normal" fill="#10E7FF">
+                <text font-size="16" font-weight="normal" fill="#10E7FF">
                     <a href="/docs/setup/configuration"><tspan x="711" y="747">Learn more about Vector's configuration</tspan></a>
                 </text>
-                <text id="1.-Define-One-Or-Mor" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24">
+                <text font-size="16" font-weight="bold" line-spacing="24">
                     <tspan x="711" y="51" fill="#000000">1. Define One Or More Data Sources</tspan>
                     <tspan x="711" y="75" font-weight="normal" fill="#000000">This can be a file, journald, STDIn, TCP, and more.</tspan>
                     <tspan x="711" y="99" font-weight="normal" fill="#000000">Vector collects data in any shape from many sources.</tspan>
                     <a href="/docs/reference/sources/file"><tspan x="711" y="123" font-weight="normal" fill="#10E7FF">View the file source</tspan></a>
                 </text>
-                <text id="2.-Parse-&amp;-Transform" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24">
+                <text font-size="16" font-weight="bold" line-spacing="24">
                     <tspan x="711" y="206" fill="#000000">2. Parse &amp; Transform</tspan>
                     <tspan x="711" y="230" font-weight="normal" fill="#000000">Common parsers are included out of the box with </tspan>
                     <tspan x="711" y="254" font-weight="normal" fill="#000000">support for custom Regex and LUA scripting.</tspan>
                     <a href="/docs/reference/transforms/tokenizer"><tspan x="711" y="278" font-weight="normal" fill="#10E7FF">View the tokenizer transform</tspan></a>
                 </text>
-                <text id="3.-Sample-&amp;-Reduce-V" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24">
+                <text font-size="16" font-weight="bold" line-spacing="24">
                     <tspan x="711" y="334" fill="#000000">3. Sample &amp; Reduce Volumne</tspan>
                     <tspan x="711" y="358" font-weight="normal" fill="#000000">Reduce volume by sampling data and removing </tspan>
                     <tspan x="711" y="382" font-weight="normal" fill="#000000">superflous events.</tspan>
                     <a href="/docs/reference/transforms/sampler"><tspan x="711" y="406" font-weight="normal" fill="#10E7FF">View the sampler transform</tspan></a>
                 </text>
-                <text id="4.-Aggregate-&amp;-Searc" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24">
+                <text font-size="16" font-weight="bold" line-spacing="24">
                     <tspan x="711" y="492" fill="#000000">4. Aggregate &amp; Search</tspan>
                     <tspan x="711" y="516" font-weight="normal" fill="#000000">Stream your data to Elasticsearch (or the storage of your </tspan>
                     <tspan x="711" y="540" font-weight="normal" fill="#000000">choice) to aggregate, search, and analyze.</tspan>
                     <a href="/docs/reference/sinks/elasticsearch"><tspan x="711" y="564" font-weight="normal" fill="#10E7FF">View the elasticsearch sink</tspan></a>
                 </text>
-                <text id="5.-Archive-Archive-e" font-family="SFProText-Bold, SF Pro Text" font-size="16" font-weight="bold" line-spacing="24">
+                <text font-size="16" font-weight="bold" line-spacing="24">
                     <tspan x="711" y="624" fill="#000000">5. Archive</tspan>
                     <tspan x="711" y="648" font-weight="normal" fill="#000000">Archive everything in a compressed format in a cheap </tspan>
                     <tspan x="711" y="672" font-weight="normal" fill="#000000">durable storage like S3.</tspan>
                     <a href="/docs/reference/sinks/aws_s3"><tspan x="711" y="696" font-weight="normal" fill="#10E7FF">View the s3 sink</tspan></a>
                 </text>
-                <text id="[sources.nginx_error" font-family="Courier-Bold, Courier" font-size="14" font-weight="bold" line-spacing="26" letter-spacing="0.3">
+                <text font-family="Courier-Bold, Courier" font-size="14" font-weight="bold" line-spacing="26" letter-spacing="0.3">
                     <tspan x="67" y="48" fill="#B963CE">[sources.nginx_error_log]</tspan>
                     <tspan x="67" y="74" fill="#B963CE">  type = 'file'</tspan>
                     <tspan x="67" y="100" fill="#B963CE">  path = '/var/log/nginx*.log'</tspan>
