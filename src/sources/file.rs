@@ -986,6 +986,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
     #[test]
     fn file_start_position_ignore_old_files() {
         use std::os::unix::io::AsRawFd;

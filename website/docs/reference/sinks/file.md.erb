@@ -1,0 +1,25 @@
+<% component = metadata.sinks.file %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= sink_output(component) %>
+
+## How It Works [[sort]]
+
+### Dynamic file and directory creation
+
+Vector will attempt to create the entire directory structure and the file when
+emitting events to the file sink. This requires that the Vector agent have
+the correct permissions to create and write to files in the specified directories.
+
+<%= component_sections(component) %>

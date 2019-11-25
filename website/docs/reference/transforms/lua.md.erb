@@ -1,0 +1,123 @@
+<% component = metadata.transforms.lua %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<Tabs
+  block={true}
+  defaultValue="timings"
+  values={[
+    { label: 'Add Fields', value: 'add_fields', },
+    { label: 'Remove Fields', value: 'remove_fields', },
+    { label: 'Drop Event', value: 'drop_event', },
+  ]
+}>
+
+<TabItem value="add_fields">
+
+Add a field to an event. Supply this as a the `source` value:
+
+```lua
+# Add root level field
+event["new_field"] = "new value"
+
+# Add nested field
+event["parent.child"] = "nested value"
+```
+
+</TabItem>
+<TabItem value="remove_fields">
+
+Remove a field from an event. Supply this as a the `source` value:
+
+```lua
+# Remove root level field
+event["field"] = nil
+
+# Remove nested field
+event["parent.child"] = nil
+```
+
+</TabItem>
+<TabItem value="drop_event">
+
+Drop an event entirely. Supply this as a the `source` value:
+
+```lua
+# Drop event entirely
+event = nil
+```
+
+</TabItem>
+</Tabs>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Dropping Events
+
+To drop events, simply set the `event` variable to `nil`. For example:
+
+```lua
+if event["message"].match(str, "debug") then
+  event = nil
+end
+```
+
+### Global Variables
+
+When evaluating the provided `source`, Vector will provide a single global
+variable representing the event:
+
+| Name    |           Type           | Description                                                                                                                                                                       |
+|:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
+
+Note, a Lua `table` is an associative array. You can read more about
+[Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
+
+### Nested Fields
+
+As described in the [Data Model document][docs.data_model], Vector flatten
+events, representing nested field with a `.` delimiter. Therefore, adding,
+accessing, or removing nested fields is as simple as added a `.` in your key
+name:
+
+```lua
+# Add nested field
+event["parent.child"] = "nested value"
+
+# Remove nested field
+event["parent.child"] = nil
+```
+
+### Iterate over fields
+
+To iterate over all fields of an `event` use the `pairs` method.  For example:
+
+```lua
+# Remove all fields where the value is "-"
+for f,v in pairs(event) do
+  if v == "-" then
+    event[f] = nil
+  end
+end
+```
+
+### Search Directories
+
+Vector provides a `search_dirs` option that allows you to specify absolute
+paths that will searched when using the [Lua `require`
+function][urls.lua_require].
+
+

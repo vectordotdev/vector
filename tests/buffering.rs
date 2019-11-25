@@ -10,6 +10,7 @@ use vector::test_util::{
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
+#[cfg(unix)]
 #[test]
 fn test_buffering() {
     let data_dir = tempdir().unwrap();
@@ -76,7 +77,7 @@ fn test_buffering() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    block_on(topology.stop()).unwrap();
+    rt.block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
@@ -160,7 +161,7 @@ fn test_max_size() {
 
     wait_for_tcp(in_addr);
 
-    block_on(topology.stop()).unwrap();
+    rt.block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 

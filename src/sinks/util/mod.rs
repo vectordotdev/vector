@@ -10,10 +10,9 @@ use futures::{
 };
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::time::Duration;
 use tower::Service;
 
-pub use batch::{Batch, BatchSink};
+pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
 pub use buffer::metrics::MetricBuffer;
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
@@ -33,24 +32,29 @@ where
         BatchSink::new(self, batch, limit)
     }
 
-    fn batched_with_min(self, batch: T, min: usize, delay: Duration) -> BatchSink<T, Self>
+    fn batched_with_min(self, batch: T, settings: &BatchSettings) -> BatchSink<T, Self>
     where
         T: Batch,
     {
-        BatchSink::new_min(self, batch, min, Some(delay))
+        BatchSink::new_min(self, batch, settings.size, Some(settings.timeout))
     }
 
     fn partitioned_batched_with_min<K>(
         self,
         batch: T,
-        min: usize,
-        delay: Duration,
+        settings: &BatchSettings,
     ) -> PartitionedBatchSink<T, Self, K>
     where
         T: Batch,
         K: Eq + Hash + Clone + Send + 'static,
     {
-        PartitionedBatchSink::with_linger(self, batch, min, min, delay)
+        PartitionedBatchSink::with_linger(
+            self,
+            batch,
+            settings.size,
+            settings.size,
+            settings.timeout,
+        )
     }
 }
 

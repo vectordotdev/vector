@@ -25,6 +25,7 @@ function build_image() {
 # The following images are basic Docker images that do not extend a
 # cross base image.
 all_images=(
+  build-aarch64-unknown-linux-musl
   builder-x86_64-unknown-linux-gnu
   builder-x86_64-unknown-linux-musl
   checker

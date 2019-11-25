@@ -192,9 +192,75 @@ where
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
+        self.seek_checkpoint();
+
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
 
+        loop {
+            let mut saw_record = false;
+            let mut at_end = false;
+
+            for _ in 0..self.batch_size {
+                let record = match self.journal.next() {
+                    None => {
+                        at_end = true;
+                        break;
+                    }
+                    Some(Ok(record)) => record,
+                    Some(Err(err)) => {
+                        error!(
+                            message = "Could not read from journald source",
+                            error = field::display(&err),
+                        );
+                        break;
+                    }
+                };
+                saw_record = true;
+                if !self.units.is_empty() {
+                    // Make sure the systemd unit is exactly one of the specified units
+                    if let Some(unit) = record.get("_SYSTEMD_UNIT") {
+                        if !self.units.contains(unit) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                match channel.send(record).wait() {
+                    Ok(_) => {}
+                    Err(()) => error!(message = "Could not send journald log"),
+                }
+            }
+
+            if saw_record {
+                match self.journal.cursor() {
+                    Ok(cursor) => {
+                        if let Err(err) = self.checkpointer.set(&cursor) {
+                            error!(
+                                message = "Could not set journald checkpoint.",
+                                error = field::display(&err)
+                            );
+                        }
+                    }
+                    Err(err) => error!(
+                        message = "Could not retrieve current journald checkpoint.",
+                        error = field::display(&err)
+                    ),
+                }
+            }
+
+            if at_end {
+                match self.shutdown.recv_timeout(timeout) {
+                    Ok(()) => unreachable!(), // The sender should never actually send
+                    Err(RecvTimeoutError::Timeout) => {}
+                    Err(RecvTimeoutError::Disconnected) => return,
+                }
+            }
+        }
+    }
+
+    fn seek_checkpoint(&mut self) {
         // Retrieve the saved checkpoint, and seek forward in the journald log
         match self.checkpointer.get() {
             Ok(Some(cursor)) => {
@@ -218,76 +284,7 @@ where
                 error = field::display(&err)
             ),
         }
-
-        loop {
-            use LoopState::*;
-            let mut state = NoOp;
-
-            for _ in 0..self.batch_size {
-                let record = match self.journal.next() {
-                    None => {
-                        state = AtEnd;
-                        break;
-                    }
-                    Some(Ok(record)) => record,
-                    Some(Err(err)) => {
-                        error!(
-                            message = "Could not read from journald source",
-                            error = field::display(&err),
-                        );
-                        break;
-                    }
-                };
-                state = SawRecord;
-                if !self.units.is_empty() {
-                    // Make sure the systemd unit is exactly one of the specified units
-                    if let Some(unit) = record.get("_SYSTEMD_UNIT") {
-                        if !self.units.contains(unit) {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-                match channel.send(record).wait() {
-                    Ok(_) => {}
-                    Err(()) => error!(message = "Could not send journald log"),
-                }
-            }
-
-            if state != NoOp {
-                match self.journal.cursor() {
-                    Ok(cursor) => {
-                        if let Err(err) = self.checkpointer.set(&cursor) {
-                            error!(
-                                message = "Could not set journald checkpoint.",
-                                error = field::display(&err)
-                            );
-                        }
-                    }
-                    Err(err) => error!(
-                        message = "Could not retrieve current journald checkpoint.",
-                        error = field::display(&err)
-                    ),
-                }
-            }
-
-            if state == AtEnd {
-                match self.shutdown.recv_timeout(timeout) {
-                    Ok(()) => unreachable!(), // The sender should never actually send
-                    Err(RecvTimeoutError::Timeout) => {}
-                    Err(RecvTimeoutError::Disconnected) => return,
-                }
-            }
-        }
     }
-}
-
-#[derive(PartialEq)]
-enum LoopState {
-    NoOp,
-    AtEnd,
-    SawRecord,
 }
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";

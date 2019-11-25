@@ -1,6 +1,7 @@
 [transforms.log_to_metric]
 allow_you_to_description = "convert logs into one or more metrics"
-function_categories = ["convert_types"]
+common = true
+function_category = "convert"
 guides = []
 input_types = ["log"]
 output_types = ["metric"]
@@ -8,6 +9,7 @@ resources = []
 
 [transforms.log_to_metric.options.metrics]
 type = "[table]"
+common = true
 null = false
 description = """\
 A table of key/value pairs representing the keys to be added to the \
@@ -17,7 +19,7 @@ event.\
 [transforms.log_to_metric.options.metrics.options.type]
 type = "string"
 null = false
-simple = true
+common = true
 description = "The metric type."
 
 [transforms.log_to_metric.options.metrics.options.type.enum]
@@ -30,7 +32,7 @@ set = "A [set metric type][docs.data-model#sets]."
 type = "string"
 examples = ["duration"]
 null = false
-simple = true
+common = true
 description = "The log field to use as the metric."
 
 [transforms.log_to_metric.options.metrics.options.increment_by_value]
@@ -47,7 +49,7 @@ the metric will be incremented by 1 regardless of the `field` value.\
 type = "string"
 examples = ["duration_total"]
 null = false
-simple = true
+common = true
 description = """\
 The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
@@ -57,7 +59,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 type = "table"
 display = "inline"
 null = true
-simple = true
+common = true
 description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
 
 [transforms.log_to_metric.options.metrics.options.tags.options."*"]
@@ -68,7 +70,7 @@ examples = [
   {name = "status", value = "{{status}}"},
 ]
 null = false
-simple = true
+common = true
 description = """\
 Key/value pairs representing [metric tags][docs.data-model#tags]. Environment \
 variables and field interpolation is allowed.\

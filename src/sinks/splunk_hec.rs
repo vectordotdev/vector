@@ -5,7 +5,7 @@ use crate::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -36,8 +36,8 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -91,12 +91,11 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
     let token = config.token.clone();
     let host_field = config.host_field;
 
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
     let gzip = match config.compression.unwrap_or(Compression::None) {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
+    let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
@@ -146,11 +145,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
     Ok(Box::new(sink))
@@ -548,7 +543,10 @@ mod integration_tests {
             host_field: "host".into(),
             compression: Some(Compression::None),
             encoding,
-            batch_size: Some(1),
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
             ..Default::default()
         }
     }

@@ -1,0 +1,21 @@
+---
+title: Metric Event
+description: A deep dive into Vector's metric event
+---
+
+<SVG src="/img/data-model-metric.svg" />
+
+## Description
+
+A `metric` event represents a numeric value. The types are heavily inspired by
+the Statsd and Prometheus models.
+
+## Schema
+
+<%= fields_example(metadata.metric_fields_list, breakout_top_keys: true) %>
+
+<%= fields(metadata.metric_fields_list, heading_depth: 3) %>
+
+## Components
+
+<Jump to="[[[pages.components]]]?metric=true">View all metric compatible components</Jump>
