@@ -8,6 +8,7 @@
 
 set -eu
 
+project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 package_version="$($project_root/scripts/version.sh)"
