@@ -166,7 +166,7 @@ fn http(
                     Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
                     Encoding::Json => {
                         body.insert(0, b'[');
-                        body.pop();
+                        body.pop(); // remove trailing comma from last record
                         body.push(b']');
                         builder.header("Content-Type", "application/json")
                     }
