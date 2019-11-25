@@ -908,10 +908,20 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
-<TabItem value="ndjson">
+<TabItem value="generic">
 
 ```http
+POST <host>/_bulk HTTP/1.1
+Host: <host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
 
+{ "index" : { "_index" : "<index>" } }
+<json_encoded_log>
+{ "index" : { "_index" : "<index>" } }
+<json_encoded_log>
+{ "index" : { "_index" : "<index>" } }
+<json_encoded_log>
 ```
 
 </TabItem>

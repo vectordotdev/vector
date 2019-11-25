@@ -2666,7 +2666,8 @@ end
   # 
   # * required
   # * type: string
-  # * enum: "ndjson" or "text"
+  # * enum: "json", "ndjson", and "text"
+  encoding = "json"
   encoding = "ndjson"
   encoding = "text"
 

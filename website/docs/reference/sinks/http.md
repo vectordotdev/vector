@@ -41,7 +41,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   uri = "https://10.22.212.22:9000/endpoint" # example
   
   # REQUIRED - requests
-  encoding = "ndjson" # example, enum
+  encoding = "json" # example, enum
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   uri = "https://10.22.212.22:9000/endpoint" # example
   
   # REQUIRED - requests
-  encoding = "ndjson" # example, enum
+  encoding = "json" # example, enum
   
   # OPTIONAL - General
   healthcheck = true # default
@@ -361,8 +361,8 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","ndjson","text"]}
   name={"encoding"}
   nullable={false}
   path={null}
@@ -813,6 +813,27 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
+<Tabs
+  block={true}
+  defaultValue="json"
+  values={[{"label":"JSON","value":"json"},{"label":"NDJSON","value":"ndjson"},{"label":"Text","value":"text"}]}>
+
+<TabItem value="json">
+
+```http
+
+```
+
+</TabItem>
+
+<TabItem value="ndjson">
+
+```http
+
+```
+
+</TabItem>
+
 <TabItem value="text">
 
 ```http
@@ -827,6 +848,7 @@ Content-Length: <byte_size>
 ```
 
 </TabItem>
+</Tabs>
 
 ## How It Works
 
