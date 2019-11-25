@@ -32,6 +32,12 @@
   top: calc(var(--ifm-navbar-height) + 2rem);
 }
 
+.paginator {
+  border-top: 1px solid var(--ifm-hr-border-color);
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 2 ) 0 calc( var(--ifm-spacing-horizontal) * 2 );
+  padding-top: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
 @media only screen and (max-width: 996px) {
   .tableOfContents {
     display: none;
