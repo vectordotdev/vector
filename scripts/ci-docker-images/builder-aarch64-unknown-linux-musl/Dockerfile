@@ -143,7 +143,7 @@ RUN cd $MUSL_DIR && \
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
-ARG LINUX_TAGET
+ARG LINUX_TARGET
 ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
@@ -261,8 +261,9 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
 RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
 
-# Use stdatomic.h header provided by Clang because it is not present in musl.
+# Use some headers provided by Clang because which are not present in musl.
 RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/emmintrin.h $LIBS_PREFIX/include/emmintrin.h
 
 # Some build scripts hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
