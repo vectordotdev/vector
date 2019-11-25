@@ -122,6 +122,9 @@ module.exports = {
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
     },
+    googleAnalytics: {
+      trackingID: 'UA-79173230-9',
+    },
     // algolia: {
     //   apiKey: 'api-key',
     //   indexName: 'index-name',
