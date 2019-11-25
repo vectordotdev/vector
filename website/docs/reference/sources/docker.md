@@ -77,7 +77,7 @@ A list of container ids to match against when filtering running containers. This
 
 ### include_labels
 
- A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels]. 
+A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].
 
 
 </Field>
@@ -92,7 +92,14 @@ For example:
 
 ```javascript
 {
-  "container": "evil_ptolemy",
+  "`<label-key>`": {
+    "name": "com.example.vendor",
+    "value": "Timber Inc."
+  },
+  "container_created_at": "2019-11-01T21:15:47+00:00",
+  "container_id": "9b6247364a03",
+  "container_name": "evil_ptolemy",
+  "image": "ubuntu:latest",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "stream": "stdout",
   "timestamp": "2019-11-01T21:15:47+00:00"
@@ -105,16 +112,84 @@ More detail on the output schema is below.
 
 <Field
   enumValues={null}
-  examples={["evil_ptolemy"]}
-  name={"container"}
+  examples={[{"name":"com.example.vendor","value":"Timber Inc."},{"name":"com.example.name","value":"Vector"},{"name":"com.example.build-date","value":"2029-04-12T23:20:50.52Z"}]}
+  name={"`<label-key>`"}
   path={null}
   required={true}
   type={"string"}
   >
 
-### container
+### `<label-key>`
+
+[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  name={"container_created_at"}
+  path={null}
+  required={true}
+  type={"timestamp"}
+  >
+
+### container_created_at
+
+A UTC timestamp representing when the container was created.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["9b6247364a03","715ebfcee040"]}
+  name={"container_id"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### container_id
+
+The Docker container ID that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["evil_ptolemy","nostalgic_stallman"]}
+  name={"container_name"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### container_name
 
 The Docker container name that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["ubuntu:latest","busybox","timberio/vector:latest-alpine"]}
+  name={"image"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### image
+
+The image name that the container is based on.
 
 
 </Field>
@@ -132,7 +207,6 @@ The Docker container name that the log was collected from.
 ### message
 
 The raw log message, unaltered.
-
 
 
 </Field>
@@ -166,8 +240,7 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 
 ### timestamp
 
-The timestamp extracted from the Docker log event.
-
+The UTC timestamp extracted from the Docker log event.
 
 
 </Field>

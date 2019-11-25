@@ -561,7 +561,6 @@ The current hostname, equivalent to the `gethostname` command.
 The raw log message, unaltered.
 
 
-
 </Field>
 
 
@@ -577,7 +576,6 @@ The raw log message, unaltered.
 ### timestamp
 
 The exact time the event was ingested.
-
 
 
 </Field>

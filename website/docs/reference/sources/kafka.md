@@ -268,7 +268,6 @@ The raw event message, unaltered.
 The exact time the event was ingested.
 
 
-
 </Field>
 
 
