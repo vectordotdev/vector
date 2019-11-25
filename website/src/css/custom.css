@@ -660,12 +660,31 @@ span.link:hover {
   vertical-align: middle;
 }
 .menu.menu--responsive .menu__button {
-  bottom: auto;
-  top: 0.75rem;
+  background: var(--ifm-panel-background-solid);
+  border-color: var(--ifm-color-content-secondary);
+  bottom: 1rem;
+  right: 1rem;
 }
-
-.navbar__brand {
-  min-width: 155px;
+.navbar .navbar__brand {
+  min-width: 100px;
+}
+.navbar .navbar__logo {
+  margin-right: 0;
+  max-width: 155px;
+}
+@media (max-width: 480px) {
+  .navbar .navbar__brand {
+    margin-right: 0;
+  }
+  .navbar .navbar__logo {
+    max-width: 130px;
+  }
+  .navbar .navbar__search {
+    margin-left: 0;
+  }
+  .navbar .search-bar-expanded {
+    width: 7rem !important;
+  }
 }
 .navbar .navbar__items--right {
   flex-grow: 2;
@@ -687,7 +706,15 @@ span.link:hover {
   position: relative;
   z-index: 1;
 }
+.navbar-sidebar__brand .navbar__brand {
+  flex: 1 0;
+}
+.navbar-sidebar__brand .react-toggle {
+  flex: 0;
+  text-align: right;
+}
 .navbar-sidebar__items .menu .menu__link {
+  color: var(--ifm-heading-color);
   display: block;
 }
 .navbar-sidebar__items .menu .menu__link .badge {
@@ -938,7 +965,7 @@ div[class^='sidebar_'] .menu {
   background: var(--ifm-sidebar-background);
   font-weight: bold;
   margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
-  margin-bottom: var(--ifm-spacing-vertical);
+  padding-bottom: var(--ifm-spacing-vertical);
 }
 div[class^='sidebar_'] .menu {
   margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
@@ -996,6 +1023,7 @@ html[data-theme="dark"] {
   --ifm-contents-border-color: var(--ifm-color-emphasis-75);
   --ifm-global-shadow-md: 0 3px 8px 0px rgba(0, 0, 0, 0.2);
   --ifm-heading-color: var(--ifm-color-gray-1000);
+  --ifm-navbar-search-input-icon: url('data:image/svg+xml;utf8,<svg fill="rgb(224, 235, 247)" alt="Search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" height="16px" width="16px"><path d="M6.02945,10.20327a4.17382,4.17382,0,1,1,4.17382-4.17382A4.15609,4.15609,0,0,1,6.02945,10.20327Zm9.69195,4.2199L10.8989,9.59979A5.88021,5.88021,0,0,0,12.058,6.02856,6.00467,6.00467,0,1,0,9.59979,10.8989l4.82338,4.82338a.89729.89729,0,0,0,1.29912,0,.89749.89749,0,0,0-.00087-1.29909Z" /></svg>');
   --ifm-panel-background: var(--ifm-color-emphasis-50);
   --ifm-panel-background-rgb: 37, 37, 50;
   --ifm-panel-background-solid: #252532;

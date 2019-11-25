@@ -38,8 +38,13 @@
   padding-top: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
-@media only screen and (max-width: 996px) {
+@media (max-width: 996px) {
   .tableOfContents {
     display: none;
+  }
+
+  .paginator {
+    margin-left: 0;
+    margin-right: 0;
   }
 }
