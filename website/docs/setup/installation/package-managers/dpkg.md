@@ -7,27 +7,50 @@ description: Install Vector through the DKG package manager
 Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Install
 
-1. Download the [Vector `.deb file`][urls.vector_downloads.latest/vector-amd64.deb]:
+1.  Download the [Vector `.deb file`][urls.vector_downloads.0.5.0/vector-amd64.deb]:
 
-   ```bash
-   curl -O https://packages.timber.io/vector/latest/vector-amd64.deb
-   ```
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
 
-2. Install the Vector `.deb` package directly:
+    <TabItem value="latest">
 
-   ```bash
-   sudo dpkg -i vector-amd64.deb
-   ```
+    ```bash
+    curl -O https://packages.timber.io/vector/0.5.0/vector-amd64.deb
+    ```
 
-3. Start Vector:
+    </TabItem>
+    <TabItem value="nightly">
 
-   ```bash
-   sudo systemctl start vector
-   ```
+    ```bash
+    curl -O https://packages.timber.io/vector/nightly/latest/vector-amd64.deb
+    ```
 
-   That's it! Proceed to [configure](#configuring) Vector for your use case.
+    </TabItem>
+    </Tabs>
+
+2.  Install the Vector `.deb` package directly:
+
+    ```bash
+    sudo dpkg -i vector-amd64.deb
+    ```
+
+3.  Start Vector:
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+    That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 ### Previous Versions
 
@@ -70,5 +93,5 @@ Vector.
 [docs.configuration]: /docs/setup/configuration
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
-[urls.vector_downloads.latest/vector-amd64.deb]: https://packages.timber.io/vector/latest/vector-amd64.deb
+[urls.vector_downloads.0.5.0/vector-amd64.deb]: https://packages.timber.io/vector/0.5.0/vector-amd64.deb
 [urls.vector_releases]: https://github.com/timberio/vector/releases

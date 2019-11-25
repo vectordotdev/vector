@@ -53,7 +53,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-x86_64-unknown-linux-musl.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -107,7 +107,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-aarch64-unknown-linux-musl.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-aarch64-unknown-linux-musl.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -161,7 +161,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-armv7-unknown-linux-musleabihf.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-armv7-unknown-linux-musleabihf.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -215,7 +215,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/latest/vector-x86_64-apple-darwin.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-x86_64-apple-darwin.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -268,7 +268,7 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```powershell
-    Invoke-WebRequest https://packages.timber.io/vector/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    Invoke-WebRequest https://packages.timber.io/vector/0.5.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>

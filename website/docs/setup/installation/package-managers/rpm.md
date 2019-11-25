@@ -7,27 +7,50 @@ description: Install Vector through the RPM package manager
 Vector can be installed through the [RPM package manager][urls.rpm] which is
 generally used on CentOS.
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Install
 
-1. Download the [Vector `.rpm file`][urls.vector_downloads.latest/vector-x86_64.rpm]
+1.  Download the [Vector `.rpm file`][urls.vector_downloads.0.5.0/vector-x86_64.rpm]
 
-   ```bash
-   curl -O https://packages.timber.io/vector/latest/vector-x86_64.rpm
-   ```
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
 
-2. Install the Vector `.rpm` package directly:
+    <TabItem value="latest">
 
-   ```bash
-   sudo rpm -i vector-x86_64.rpm
-   ```
+    ```bash
+    curl -O https://packages.timber.io/vector/0.5.0/vector-x86_64.rpm
+    ```
 
-3. Start Vector:
+    </TabItem>
+    <TabItem value="nightly">
 
-   ```bash
-   sudo systemctl start vector
-   ```
+    ```bash
+    curl -O https://packages.timber.io/vector/nightly/latest/vector-x86_64.rpm
+    ```
 
-   That's it! Proceed to [configure](#configuring) Vector for your use case.
+    </TabItem>
+    </Tabs>
+
+2.  Install the Vector `.rpm` package directly:
+
+    ```bash
+    sudo rpm -i vector-x86_64.rpm
+    ```
+
+3.  Start Vector:
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+    That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 ### Previous Versions
 
@@ -70,5 +93,5 @@ Vector.
 [docs.configuration]: /docs/setup/configuration
 [urls.rpm]: https://rpm.org/
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
-[urls.vector_downloads.latest/vector-x86_64.rpm]: https://packages.timber.io/vector/latest/vector-x86_64.rpm
+[urls.vector_downloads.0.5.0/vector-x86_64.rpm]: https://packages.timber.io/vector/0.5.0/vector-x86_64.rpm
 [urls.vector_releases]: https://github.com/timberio/vector/releases
