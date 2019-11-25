@@ -361,8 +361,8 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","json","text"]}
   name={"encoding"}
   nullable={false}
   path={null}
@@ -813,6 +813,43 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
+<Tabs
+  block={true}
+  defaultValue="json"
+  values={[{"label":"JSON","value":"json"},{"label":"NDJSON","value":"ndjson"},{"label":"Text","value":"text"}]}>
+
+<TabItem value="json">
+
+```http
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
+
+[
+  <json_encoded_log>,
+  <json_encoded_log>,
+  <json_encoded_log>,
+]
+```
+
+</TabItem>
+
+<TabItem value="ndjson">
+
+```http
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
+
+<json_encoded_log>
+<json_encoded_log>
+<json_encoded_log>
+```
+
+</TabItem>
+
 <TabItem value="text">
 
 ```http
@@ -827,6 +864,7 @@ Content-Length: <byte_size>
 ```
 
 </TabItem>
+</Tabs>
 
 ## How It Works
 

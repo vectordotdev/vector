@@ -77,6 +77,7 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Ndjson,
+    Json,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -148,7 +149,7 @@ fn http(
     let http_service =
         HttpService::builder()
             .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
+            .build(move |mut body: Vec<u8>| {
                 let mut builder = hyper::Request::builder();
 
                 let method = match method {
@@ -163,6 +164,12 @@ fn http(
                 match encoding {
                     Encoding::Text => builder.header("Content-Type", "text/plain"),
                     Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+                    Encoding::Json => {
+                        body.insert(0, b'[');
+                        body.pop(); // remove trailing comma from last record
+                        body.push(b']');
+                        builder.header("Content-Type", "application/json")
+                    }
                 };
 
                 if gzip {
@@ -263,10 +270,12 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let event = event.into_log();
 
-    let mut body = match encoding {
+    let body = match encoding {
         Encoding::Text => {
             if let Some(v) = event.get(&event::MESSAGE) {
-                v.to_string_lossy().into_bytes()
+                let mut b = v.to_string_lossy().into_bytes();
+                b.push(b'\n');
+                b
             } else {
                 warn!(
                     message = "Event missing the message key; Dropping event.",
@@ -276,12 +285,22 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
             }
         }
 
-        Encoding::Ndjson => serde_json::to_vec(&event.unflatten())
-            .map_err(|e| panic!("Unable to encode into JSON: {}", e))
-            .ok()?,
-    };
+        Encoding::Ndjson => {
+            let mut b = serde_json::to_vec(&event.unflatten())
+                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                .ok()?;
+            b.push(b'\n');
+            b
+        }
 
-    body.push(b'\n');
+        Encoding::Json => {
+            let mut b = serde_json::to_vec(&event.unflatten())
+                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                .ok()?;
+            b.push(b',');
+            b
+        }
+    };
 
     Some(body)
 }
