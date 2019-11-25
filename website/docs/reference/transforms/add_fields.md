@@ -77,7 +77,7 @@ A table of key/value pairs representing the keys to be added to the event.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"my_string_field","value":"string value"},{"name":"my_env_var_field","value":"${ENV_VAR}"},{"name":"my_int_field","value":1},{"name":"my_float_field","value":1.2},{"name":"my_bool_field","value":true},{"name":"my_timestamp_field","value":"1979-05-27 00:32:00 -0700"},{"name":"my_nested_fields","value":{"key1":"value1","key2":"value2"}},{"name":"my_list","value":["first","second","third"]}]}
-  name={"*"}
+  name={"`<field-name>`"}
   nullable={false}
   path={"fields"}
   relevantWhen={null}
@@ -87,9 +87,9 @@ A table of key/value pairs representing the keys to be added to the event.
   unit={null}
   >
 
-#### *
+#### `<field-name>`
 
-A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
+The name of the field to add. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
 
 
 </Field>

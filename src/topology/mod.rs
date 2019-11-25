@@ -2,6 +2,7 @@ pub mod builder;
 pub mod config;
 mod fanout;
 mod task;
+pub mod unit_test;
 
 pub use self::config::Config;
 

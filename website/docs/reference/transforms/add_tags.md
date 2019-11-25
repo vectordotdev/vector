@@ -71,19 +71,19 @@ A table of key/value pairs representing the tags to be added to the metric.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"my_tag","value":"my value"},{"name":"my_env_tag","value":"${ENV_VAR}"}]}
-  name={"*"}
+  name={"`<tag-name>`"}
   nullable={false}
   path={"tags"}
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"*"}
+  type={"string"}
   unit={null}
   >
 
-#### *
+#### `<tag-name>`
 
-A key/value pair representing the new tag to be added.
+The name of the tag to add. Due to the nature of metric tags, the value must be a string.
 
 
 </Field>

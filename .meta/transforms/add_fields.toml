@@ -16,7 +16,7 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.fields.options."*"]
+[transforms.add_fields.options.fields.options."`<field-name>`"]
 type = "*"
 null = false
 examples = [
@@ -30,6 +30,7 @@ examples = [
   {name = "my_list", value = ["first", "second", "third"]},
 ]
 description = """\
-A key/value pair representing the new log fields to be added. Accepts all \
-[supported types][docs.configuration#value_types]. Use `.` for adding nested fields.\
+The name of the field to add. Accepts all \
+[supported types][docs.configuration#value_types]. Use `.` for adding nested \
+fields.\
 """

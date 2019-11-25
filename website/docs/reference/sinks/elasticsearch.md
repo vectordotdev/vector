@@ -415,7 +415,7 @@ Options for custom headers.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"Authorization","value":"${TOKEN_ENV_VAR}"},{"name":"X-Powered-By","value":"Vector"}]}
-  name={"*"}
+  name={"`<header-name>`"}
   nullable={false}
   path={"headers"}
   relevantWhen={null}
@@ -425,7 +425,7 @@ Options for custom headers.
   unit={null}
   >
 
-#### *
+#### `<header-name>`
 
 A custom header to be added to each outgoing Elasticsearch request.
 
@@ -557,7 +557,7 @@ Custom parameters to Elasticsearch query string.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"X-Powered-By","value":"Vector"}]}
-  name={"*"}
+  name={"`<parameter-name>`"}
   nullable={false}
   path={"query"}
   relevantWhen={null}
@@ -567,7 +567,7 @@ Custom parameters to Elasticsearch query string.
   unit={null}
   >
 
-#### *
+#### `<parameter-name>`
 
 A custom parameter to be added to each Elasticsearch request.
 

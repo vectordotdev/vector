@@ -238,7 +238,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"host","value":"${HOSTNAME}"},{"name":"region","value":"us-east-1"},{"name":"status","value":"{{status}}"}]}
-  name={"*"}
+  name={"`<tag-name>`"}
   nullable={false}
   path={"metrics.tags"}
   relevantWhen={null}
@@ -248,7 +248,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-##### *
+##### `<tag-name>`
 
 Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
 

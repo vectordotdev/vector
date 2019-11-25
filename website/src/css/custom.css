@@ -776,19 +776,22 @@ section .sub-title {
   padding-left: var(--ifm-spacing-horizontal);
 }
 .section-list .section:hover > h3 > .hash-link,
-.section-list .section:hover > h4 > .hash-link {
+.section-list .section:hover > h4 > .hash-link,
+.section-list .section:hover > h5 > .hash-link,
+.section-list .section:hover > h6 > .hash-link {
   opacity: 1;
 }
-.section-list .section h3 .hash-link {
-  margin-left: calc((var(--ifm-spacing-horizontal) * -1) - 1.5rem) !important;
-  padding-right: 3rem;
-}
-.section-list .section h4 .hash-link {
-  margin-left: calc((var(--ifm-spacing-horizontal) * -2) - 1.5rem) !important;
-  padding-right: 4.25rem;
+.section-list .section h3 .hash-link,
+.section-list .section h4 .hash-link,
+.section-list .section h5 .hash-link,
+.section-list .section h6 .hash-link {
+  margin-left: calc((var(--ifm-spacing-horizontal) * -1.75) - var(--ifm-spacing-horizontal)) !important;
+  padding-right: 3em;
 }
 .section-list .section h3::before,
-.section-list .section h4::before {
+.section-list .section h4::before,
+.section-list .section h5::before,
+.section-list .section h6::before {
   content: "• ";
   float: left;
   display: block;
@@ -797,7 +800,9 @@ section .sub-title {
   text-align: center;
 }
 .section-list .section h3, 
-.section-list .section h4 {
+.section-list .section h4,
+.section-list .section h5,
+.section-list .section h6 {
   margin-bottom: 1em;
 }
 .section-list .section .info {
