@@ -261,8 +261,12 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
 RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
 
-# Use stdatomic.h header provided by Clang because it is not present in musl.
+# Use some headers provided by Clang because they are not present in musl.
 RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/emmintrin.h $LIBS_PREFIX/include/emmintrin.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/xmmintrin.h $LIBS_PREFIX/include/xmmintrin.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/mmintrin.h $LIBS_PREFIX/include/mmintrin.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/mm_malloc.h $LIBS_PREFIX/include/mm_malloc.h
 
 # Some build scripts hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
