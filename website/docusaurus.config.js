@@ -125,11 +125,11 @@ module.exports = {
     googleAnalytics: {
       trackingID: 'UA-79173230-9',
     },
-    // algolia: {
-    //   apiKey: 'api-key',
-    //   indexName: 'index-name',
-    //   algoliaOptions: {}, // Optional, if provided by Algolia
-    // },
+    algolia: {
+      apiKey: '2356c5cb76b57b43624c6450b0a031cc',
+      indexName: 'timberio_vector',
+      algoliaOptions: {}, // Optional, if provided by Algolia
+    },
   },
   presets: [
     [
