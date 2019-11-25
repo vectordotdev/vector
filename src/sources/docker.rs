@@ -28,6 +28,11 @@ const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
+    static ref IMAGE: Atom = Atom::from("image");
+    static ref CREATED_AT: Atom = Atom::from("container_created_at");
+    static ref NAME: Atom = Atom::from("container_name");
+    static ref STREAM: Atom = Atom::from("stream");
+    static ref CONTAINER: Atom = Atom::from("container_id");
 }
 
 type DockerEvent = shiplift::rep::Event;
@@ -668,7 +673,7 @@ impl ContainerLogInfo {
             StreamType::StdOut => STDOUT.clone(),
             _ => return None,
         };
-        log_event.insert_implicit(event::STREAM.clone(), stream.into());
+        log_event.insert_implicit(STREAM.clone(), stream.into());
 
         let mut bytes_message = BytesMut::from(message.data);
 
@@ -729,15 +734,15 @@ impl ContainerLogInfo {
         log_event.insert_explicit(event::MESSAGE.clone(), bytes_message.freeze().into());
 
         // Supply container
-        log_event.insert_implicit(event::CONTAINER.clone(), self.id.0.clone().into());
+        log_event.insert_implicit(CONTAINER.clone(), self.id.0.clone().into());
 
         // Add Metadata
         for (key, value) in self.metadata.labels.iter() {
             log_event.insert_implicit(key.clone(), value.clone());
         }
-        log_event.insert_implicit(event::NAME.clone(), self.metadata.name.clone());
-        log_event.insert_implicit(event::IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert_implicit(event::CREATED_AT.clone(), self.metadata.created_at.clone());
+        log_event.insert_implicit(NAME.clone(), self.metadata.name.clone());
+        log_event.insert_implicit(IMAGE.clone(), self.metadata.image.clone());
+        log_event.insert_implicit(CREATED_AT.clone(), self.metadata.created_at.clone());
 
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
@@ -1020,9 +1025,9 @@ mod tests {
 
         let log = events[0].as_log();
         assert_eq!(log[&event::MESSAGE], message.into());
-        assert_eq!(log[&event::CONTAINER], id.into());
-        assert!(log.get(&event::CREATED_AT).is_some());
-        assert_eq!(log[&event::IMAGE], "busybox".into());
+        assert_eq!(log[&super::CONTAINER], id.into());
+        assert!(log.get(&super::CREATED_AT).is_some());
+        assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&event::NAME], name.into());
     }
@@ -1110,10 +1115,10 @@ mod tests {
 
         let log = events[0].as_log();
         assert_eq!(log[&event::MESSAGE], message.into());
-        assert_eq!(log[&event::CONTAINER], id.into());
-        assert!(log.get(&event::CREATED_AT).is_some());
-        assert_eq!(log[&event::IMAGE], "busybox".into());
+        assert_eq!(log[&super::CONTAINER], id.into());
+        assert!(log.get(&super::CREATED_AT).is_some());
+        assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
-        assert_eq!(events[0].as_log()[&event::NAME], name.into());
+        assert_eq!(events[0].as_log()[&super::NAME], name.into());
     }
 }
