@@ -104,8 +104,9 @@ function Features({features}) {
   }
 
   return (
-    <section className={styles.features}>
+    <section id="features" className={styles.features}>
       <div className="container">
+        <h2>Features</h2>
         {rows}
       </div>
     </section>
@@ -126,10 +127,10 @@ function Feature({icon, title, description}) {
 
 function Performance() {
   return (
-    <section className={styles.performance}>
+    <section id="performance" className={styles.performance}>
       <div className="container">
-        <h2 id="performance">Performance</h2>
-        <div className="sub-title">Higher throughout with the lowest memory footprint</div>
+        <h2>Uncompromising Performance</h2>
+        <div className="sub-title">Higher throughout with a lower memory footprint</div>
 
         <PerformanceTests />
       </div>
@@ -142,7 +143,7 @@ function Correctness() {
     <section className={styles.correctness}>
       <div className="container">
         <h2>Correctness</h2>
-        <div className="sub-title">Obsessed with the details</div>
+        <div className="sub-title">Obsessed with the details and getting it right</div>
 
         <div className="table-responsive">
           <table className="comparison">

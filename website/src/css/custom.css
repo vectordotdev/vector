@@ -672,22 +672,34 @@ span.link:hover {
   margin-right: 0;
   max-width: 155px;
 }
+.navbar .search-icon-hidden {
+  display: none;
+}
+@media (max-width: 996px) {
+  .navbar .navbar__search {
+    flex-grow: 1;
+    text-align: right;
+  }
+  .navbar .navbar__search .navbar__search-input {
+    width: 12.5rem;
+  }
+}
 @media (max-width: 480px) {
   .navbar .navbar__brand {
     margin-right: 0;
   }
-  .navbar .navbar__logo {
+  .navbar .navbar__brand .navbar__logo {
     max-width: 130px;
   }
   .navbar .navbar__search {
     margin-left: 0;
   }
-  .navbar .search-bar-expanded {
-    width: 7rem !important;
+  .navbar .navbar__search .navbar__search-input {
+    width: 100%;
   }
-}
-.navbar .navbar__items--right {
-  flex-grow: 2;
+  .navbar .navbar__search .search-bar-expanded {
+    width: 100% !important;
+  }
 }
 .navbar .navbar__items--right .react-toggle {
   margin-left: calc( var(--ifm-navbar-item-padding-horizontal) * 0.5 );
