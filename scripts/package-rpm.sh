@@ -40,7 +40,10 @@ cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 # Perform the build.
 # Calling rpmbuild with --target tells RPM everything it needs to know
 # about where the build can run, including the architecture.
-rpmbuild --target $TARGET -ba distribution/rpm/vector.spec
+# However, `-musl` suffix needs to be replaced by `-gnu` because
+# RPM doesn't know about musl.
+RPM_TARGET=$(echo $TARGET | sed 's/-musl/-gnu/')
+rpmbuild --target $RPM_TARGET -ba distribution/rpm/vector.spec
 
 # Move the RPM into the artifacts dir
 ls "/root/rpmbuild/RPMS/$ARCH"
