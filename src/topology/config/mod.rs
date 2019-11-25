@@ -30,7 +30,7 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
 }
 
-fn default_data_dir() -> Option<PathBuf> {
+pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 

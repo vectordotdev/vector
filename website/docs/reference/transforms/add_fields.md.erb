@@ -1,0 +1,137 @@
+<% component = metadata.transforms.add_fields %>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+Given the following configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+
+A [`log` event][docs.data-model.log] will be output with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6.0": "item1",
+  "field6.1": "item2",
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+
+While unrealistic, this example demonstrates the various accepted
+[types][docs.configuration#value-types] and how they're repsented in Vector's
+internal [log structure][docs.data-model.log].
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Arrays
+
+The `add_fields` transform will support [TOML arrays][urls.toml_array]. Keep in
+mind that the values must be simple type (not tables), and each value must the
+same type. You cannot mix types:
+
+```toml
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    my_array = ["first", "second", "third"]
+```
+
+Results in:
+
+```json
+{
+  "my_array.0": "first",
+  "my_array.1": "second",
+  "my_array.2": "third"
+}
+```
+
+Learn more about how [`log` events][docs.data-model.log] are structured.
+
+### Complex Transforming
+
+The `add_fields` transform is designed for simple key additions. If you need
+more complex transforming then we recommend using a more versatile transform
+like the [`lua` transform][docs.transforms.lua].
+
+### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+### Nested Fields
+
+The `add_fields` transform will support dotted keys or [TOML
+tables][urls.toml_table]. We recommend the dotted key syntax since it is less
+verbose for this usecase:
+
+```
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    parent.child.grandchild = "my_value"
+```
+
+Results in:
+
+```json
+{
+  "parent.child.grandchild": "my_value"
+}
+```
+
+Learn more about how [`log` events][docs.data-model.log] are structured.
+
+### Removing Fields
+
+See the [`remove_fields` transform][docs.transforms.remove_fields].
+
+### Special Characters
+
+Aside from the [special characters][docs.data-model.log#special-characters]
+listed in the [Data Model][docs.data-model] doc, Vector does not restrict the
+characters allowed in keys. You can wrap key names in `" "` quote to preserve
+spaces and use `\` to escape quotes.
+
+### Types
+
+All supported [configuration value types][docs.configuration#value-types] are accepted.
+This includes primitivate types (`string`, `int`, `float`, `boolean`) and
+special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
+
+

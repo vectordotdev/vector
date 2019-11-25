@@ -3,8 +3,10 @@ batch_size = 1049000
 batch_timeout = 1
 beta = true
 buffer = true
+common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+function_category = "transmit"
 encodings = ["json", "text"]
 healthcheck = true
 input_types = ["log"]
@@ -20,6 +22,7 @@ write_to_description = "[AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLog
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
+common = true
 examples = [
   "{{ file }}",
   "ec2/{{ instance_id }}",
@@ -32,12 +35,14 @@ description = "The [group name][urls.aws_cw_logs_group_name] of the target Cloud
 
 [sinks.aws_cloudwatch_logs.options.region]
 type = "string"
+common = true
 examples = ["us-east-1"]
 null = false
 description = "The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
 
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
+common = true
 examples = [
   "{{ instance_id }}",
   "%Y-%m-%d",
@@ -50,6 +55,7 @@ description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Clo
 
 [sinks.aws_cloudwatch_logs.options.create_missing_group]
 type = "bool"
+common = true
 default = true
 null = true
 description = """\
@@ -59,6 +65,40 @@ Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not alr
 
 [sinks.aws_cloudwatch_logs.options.create_missing_stream]
 type = "bool"
+common = true
 default = true
 null = true
 description = "Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist."
+
+[[sinks.aws_cloudwatch_logs.output.examples]]
+label = "Generic"
+output.type = "http"
+output.body = """\
+POST / HTTP/1.1
+Host: logs.<region>.<domain>
+X-Amz-Date: <date>
+Accept: application/json
+Content-Type: application/x-amz-json-1.1
+Content-Length: <byte_size>
+Connection: Keep-Alive
+X-Amz-Target: Logs_20140328.PutLogEvents
+
+{
+  "logGroupName": "<group_name>",
+  "logStreamName": "<stream_name>",
+  "logEvents": [
+    {
+      "timestamp": <log_timestamp>, 
+      "message": "<json_encoded_log>"
+    }, 
+    {
+      "timestamp": <log_timestamp>, 
+      "message": "<json_encoded_log>"
+    }, 
+    {
+      "timestamp": <log_timestamp>, 
+      "message": "<json_encoded_log>"
+    }
+  ]
+}\
+"""

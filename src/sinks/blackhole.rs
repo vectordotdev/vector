@@ -32,7 +32,7 @@ impl SinkConfig for BlackholeConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
@@ -60,11 +60,13 @@ impl Sink for BlackholeSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let message_len = item
-            .as_log()
-            .get(&event::MESSAGE)
-            .map(|v| v.as_bytes().len())
-            .unwrap_or(0);
+        let message_len = match item {
+            Event::Log(log) => log
+                .get(&event::MESSAGE)
+                .map(|v| v.as_bytes().len())
+                .unwrap_or(0),
+            Event::Metric(metric) => serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0),
+        };
 
         self.total_events += 1;
         self.total_raw_bytes += message_len;

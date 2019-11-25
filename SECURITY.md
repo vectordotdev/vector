@@ -25,4 +25,4 @@ and verify the vulnerability before taking the necessary steps to fix it. After
 our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
-[urls.new_security_report]: https://github.com/timberio/vector/issues/new?labels=Domain%3A+Security
+[urls.new_security_report]: https://github.com/timberio/vector/issues/new?labels=domain%3A+security

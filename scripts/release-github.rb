@@ -21,14 +21,8 @@ SHA1 = ENV.fetch("CIRCLE_SHA1")
 # Commit
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
-  end
-
-templates = Templates.new(TEMPLATES_DIR, metadata)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
+templates = Templates.new(ROOT_DIR, metadata)
 release = metadata.releases.to_h.fetch(:"#{VERSION}")
 
 #

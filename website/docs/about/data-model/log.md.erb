@@ -1,0 +1,66 @@
+---
+title: Log Event
+description: A deep dive into Vector's log event
+---
+
+<SVG src="/img/data-model-log.svg" />
+
+## Description
+
+A `log` event is a structured represention of a point-in-time event. It contains
+an arbitrary set of fields (key/value pairs) that describe the event.
+
+## Schema
+
+<%= fields_example(metadata.log_fields_list, breakout_top_keys: false) %>
+
+<%= fields(metadata.log_fields_list, heading_depth: 3) %>
+
+## Components
+
+<Jump to="[[[pages.components]]]?log=true">View all log compatible components</Jump>
+
+## How It Works
+
+### Time Zones
+
+If Vector receives a timestamp that does not contain timezone information
+Vector assumes the timestamp is in local time, and will convert the timestamp
+to UTC from the local time. It is important that the host system contain
+time zone data files to properly determine the local time zone. This is
+typically installed through the `tzdata` package. See [issue 551][urls.issue_551]
+for more info.
+
+### Timestamp Coercion
+
+There are cases where Vector interacts with formats that do not have a formal
+timestamp defintion, such as JSON. In these cases, Vector will ingest the
+timestamp in it's primitive form (string or integer). You can then coerce the
+field into a `timestamp` using the
+[`coercer` transform][docs.transforms.coercer]. If you are parsing this data
+out of a string, all Vector parser transforms include a `types` option,
+allowing you to extract and coerce in one step.
+
+### Types
+
+#### Strings
+
+Strings are UTF8 compatible and are only bounded by the available system
+memory.
+
+#### Ints
+
+Integers are signed integers up to 64 bits.
+
+#### Floats
+
+Floats are signed floats up to 64 bits.
+
+#### Booleans
+
+Booleans represent binary true/false values.
+
+#### Timestamps
+
+Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
+stored as UTC.

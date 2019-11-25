@@ -1,0 +1,48 @@
+---
+title: Install Vector
+sidebar_label: hidden
+description: Install Vector on your platform
+hide_pagination: true
+---
+
+Vector compiles to a single `musl` static binary with no dependencies, making it
+simple to install.
+
+## Install script
+
+This light-weight script will perform platform detection and determine the best
+method to install Vector:
+
+
+<Tabs
+  block={true}
+  defaultValue="humans"
+  values={[
+    { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
+    { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
+  ]
+}>
+
+<TabItem value="humans">
+
+```bash
+<%= install_command %>
+```
+
+Enables prompts for a human to answer and confirm.
+
+</TabItem>
+<TabItem value="machines">
+
+```bash
+<%= install_command(prompts: false) %>
+```
+
+Disables prompts and installs without input.
+
+</TabItem>
+</Tabs>
+
+## Other methods
+
+<%= subpages() %>

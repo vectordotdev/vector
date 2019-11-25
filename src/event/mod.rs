@@ -90,6 +90,14 @@ impl LogEvent {
         self.fields.get(key).map(|v| &v.value)
     }
 
+    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut ValueKind> {
+        self.fields.get_mut(key).map(|v| &mut v.value)
+    }
+
+    pub fn contains(&self, key: &Atom) -> bool {
+        self.fields.contains_key(key)
+    }
+
     pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
         self.fields.remove(key).map(|v| v.value)
     }
