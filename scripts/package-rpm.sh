@@ -10,6 +10,7 @@ set -eu
 
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
+package_version="$($project_root/scripts/version.sh)"
 
 # RPM has a concept of releases, but we do not need this so every
 # release is 1.
@@ -18,7 +19,7 @@ export RELEASE=1
 # The RPM spec does not like a leading `v` or `-` in the version name.
 # Therefore we clean the version so that the `rpmbuild` command does
 # not fail.
-export CLEANED_VERSION=$VERSION
+export CLEANED_VERSION=$package_version
 CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 
 # The arch is the first part of the target
