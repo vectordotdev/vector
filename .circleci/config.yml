@@ -6,7 +6,7 @@ install-rust: &install-rust
   run:
     name: Install Rust
     command: |
-      curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.38
+      curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.38.0
 
 install-vector: &install-vector
   run:
