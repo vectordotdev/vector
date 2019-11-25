@@ -379,4 +379,4 @@ Simply follow the same [installation instructions above](#installation).
 [docs.global-options#data-directory]: /docs/reference/global-options#data-directory
 [docs.global-options#data_dir]: /docs/reference/global-options#data_dir
 [docs.package_managers]: /docs/setup/installation/package-managers
-[urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations
+[urls.new_target]: https://github.com/timberio/vector/issues/new?labels=type%3A+task&labels=domain%3A+operations

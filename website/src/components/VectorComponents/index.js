@@ -81,7 +81,7 @@ function Components({components, headingLevel, titles}) {
           </>:
           ''}
         <hr />
-        <Jump to="https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature" target="_blank" icon="plus-circle">
+        <Jump to="https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature" target="_blank" icon="plus-circle">
           Request a new component
         </Jump>
       </>
