@@ -80,10 +80,22 @@ struct DatadogMetric {
 pub enum DatadogMetricType {
     Gauge,
     Count,
+    Rate,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogPoint(i64, f64);
+
+#[derive(Debug, Clone, PartialEq)]
+struct DatadogStats {
+    min: f64,
+    max: f64,
+    median: f64,
+    avg: f64,
+    sum: f64,
+    count: f64,
+    quantiles: Vec<(f64, f64)>,
+}
 
 inventory::submit! {
     SinkDescription::new::<DatadogConfig>("datadog_metrics")
@@ -207,6 +219,41 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     }
 }
 
+fn stats(values: &Vec<f64>, counts: &Vec<u32>) -> Option<DatadogStats> {
+    let mut samples = Vec::new();
+    for (v, c) in values.iter().zip(counts.iter()) {
+        for _ in 0..*c {
+            samples.push(*v);
+        }
+    }
+
+    if samples.is_empty() {
+        return None;
+    }
+
+    samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+    let length = samples.len() as f64;
+    let min = samples.first().unwrap();
+    let max = samples.last().unwrap();
+
+    let p50 = samples[(0.50 * length - 1.0).round() as usize];
+    let p95 = samples[(0.95 * length - 1.0).round() as usize];
+
+    let sum = samples.iter().sum();
+    let avg = sum / length;
+
+    Some(DatadogStats {
+        min: *min,
+        max: *max,
+        median: p50,
+        avg,
+        sum,
+        count: length,
+        quantiles: vec![(0.95, p95)],
+    })
+}
+
 fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
     let series: Vec<_> = events
         .into_iter()
@@ -223,6 +270,65 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                         points: vec![DatadogPoint(ts, value)],
                         tags,
                     }]),
+                    MetricValue::Distribution {
+                        values,
+                        sample_rates,
+                    } => {
+                        // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
+                        // <name>.avg
+                        // <name>.count
+                        // <name>.median
+                        // <name>.95percentile
+                        // <name>.max
+                        if let Some(s) = stats(&values, &sample_rates) {
+                            let mut result = vec![
+                                DatadogMetric {
+                                    metric: format!("{}.avg", &fullname),
+                                    r#type: DatadogMetricType::Gauge,
+                                    interval: Some(interval),
+                                    points: vec![DatadogPoint(ts, s.avg)],
+                                    tags: tags.clone(),
+                                },
+                                DatadogMetric {
+                                    metric: format!("{}.count", &fullname),
+                                    r#type: DatadogMetricType::Rate,
+                                    interval: Some(interval),
+                                    points: vec![DatadogPoint(ts, s.count)],
+                                    tags: tags.clone(),
+                                },
+                                DatadogMetric {
+                                    metric: format!("{}.median", &fullname),
+                                    r#type: DatadogMetricType::Gauge,
+                                    interval: Some(interval),
+                                    points: vec![DatadogPoint(ts, s.median)],
+                                    tags: tags.clone(),
+                                },
+                                DatadogMetric {
+                                    metric: format!("{}.max", &fullname),
+                                    r#type: DatadogMetricType::Gauge,
+                                    interval: Some(interval),
+                                    points: vec![DatadogPoint(ts, s.max)],
+                                    tags: tags.clone(),
+                                },
+                            ];
+                            for (q, v) in s.quantiles {
+                                result.push(DatadogMetric {
+                                    metric: format!(
+                                        "{}.{}percentile",
+                                        &fullname,
+                                        (q * 100.0) as u32
+                                    ),
+                                    r#type: DatadogMetricType::Gauge,
+                                    interval: Some(interval),
+                                    points: vec![DatadogPoint(ts, v)],
+                                    tags: tags.clone(),
+                                })
+                            }
+                            Some(result)
+                        } else {
+                            None
+                        }
+                    }
                     MetricValue::Set { values } => Some(vec![DatadogMetric {
                         metric: fullname,
                         r#type: DatadogMetricType::Gauge,
@@ -365,6 +471,67 @@ mod tests {
         assert_eq!(
             json,
             r#"{"series":[{"metric":"users","type":"gauge","interval":null,"points":[[1542182950,2.0]],"tags":null}]}"#
+        );
+    }
+
+    #[test]
+    fn test_dense_percentiles() {
+        // https://github.com/DataDog/dd-agent/blob/master/tests/core/test_histogram.py
+        let values = (0..20).into_iter().map(f64::from).collect();
+        let counts = vec![1; 20];
+
+        assert_eq!(
+            stats(&values, &counts),
+            Some(DatadogStats {
+                min: 0.0,
+                max: 19.0,
+                median: 9.0,
+                avg: 9.5,
+                sum: 190.0,
+                count: 20.0,
+                quantiles: vec![(0.95, 18.0)],
+            })
+        );
+    }
+
+    #[test]
+    fn test_sparse_percentiles() {
+        let values = (1..5).into_iter().map(f64::from).collect();
+        let counts = (1..5).into_iter().collect();
+
+        assert_eq!(
+            stats(&values, &counts),
+            Some(DatadogStats {
+                min: 1.0,
+                max: 4.0,
+                median: 3.0,
+                avg: 3.0,
+                sum: 30.0,
+                count: 10.0,
+                quantiles: vec![(0.95, 4.0)],
+            })
+        );
+    }
+
+    #[test]
+    fn encode_distribution() {
+        // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
+        let events = vec![Metric {
+            name: "requests".into(),
+            timestamp: Some(ts()),
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+            },
+        }];
+        let input = encode_events(events, 60, "");
+        let json = serde_json::to_string(&input).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"series":[{"metric":"requests.avg","type":"gauge","interval":60,"points":[[1542182950,1.875]],"tags":null},{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,8.0]],"tags":null},{"metric":"requests.median","type":"gauge","interval":60,"points":[[1542182950,2.0]],"tags":null},{"metric":"requests.max","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null},{"metric":"requests.95percentile","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null}]}"#
         );
     }
 }
