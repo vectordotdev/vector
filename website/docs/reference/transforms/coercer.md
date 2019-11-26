@@ -31,13 +31,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    {name = "status", value = "int"} # example
-    {name = "duration", value = "float"} # example
-    {name = "success", value = "bool"} # example
-    {name = "timestamp", value = "timestamp|%s", comment = "unix"} # example
-    {name = "timestamp", value = "timestamp|%+", comment = "iso8601 (date and time)"} # example
-    {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"} # example
-    {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strptime format"} # example
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options
@@ -75,7 +75,7 @@ Key/Value pairs representing mapped log field types.
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"name":"status","value":"int"},{"name":"duration","value":"float"},{"name":"success","value":"bool"},{"name":"timestamp","value":"timestamp|%s","comment":"unix"},{"name":"timestamp","value":"timestamp|%+","comment":"iso8601 (date and time)"},{"name":"timestamp","value":"timestamp|%F","comment":"iso8601 (date)"},{"name":"timestamp","value":"timestamp|%a %b %e %T %Y","comment":"custom strptime format"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
   name={"`<field-name>`"}
   nullable={false}
   path={"types"}

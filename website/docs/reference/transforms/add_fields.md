@@ -31,14 +31,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
-    {my_string_field = "string value"} # example
-    {my_env_var_field = "${ENV_VAR}"} # example
-    {my_int_field = 1} # example
-    {my_float_field = 1.2} # example
-    {my_bool_field = true} # example
-    {my_timestamp_field = 1979-05-27T00:32:00Z} # example
-    {my_nested_fields = {key1 = "value1", key2 = "value2"}} # example
-    {my_list = ["first", "second", "third"]} # example
+    my_string_field = "string value" # example
+    my_env_var_field = "${ENV_VAR}" # example
+    my_int_field = 1 # example
+    my_float_field = 1.2 # example
+    my_bool_field = true # example
+    my_timestamp_field = 1979-05-27T00:32:00Z # example
+    my_nested_fields = key1 = "value1"
+  key2 = "value2" # example
+    my_list = ["first", "second", "third"] # example
 ```
 
 ## Options

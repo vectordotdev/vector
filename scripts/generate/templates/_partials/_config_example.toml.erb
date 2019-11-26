@@ -17,7 +17,7 @@
         <%- first_example = option.examples.first -%>
         <%- tags = option_tags(option, example: true, optionality: false, short: true, type: false) -%>
         <%- if first_example.is_a?(Hash) -%>
-  <%= first_example.to_toml %>
+<%= first_example.to_toml.indent(2) %>
         <%- else -%>
   <%= option.name %> = <%= first_example.to_toml %><% if tags.any? && !first_example.to_toml.include?("\n") %> # <%= tags.join(", ") %><% end %>
         <%- end -%>
