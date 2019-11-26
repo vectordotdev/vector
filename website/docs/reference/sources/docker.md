@@ -32,8 +32,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "docker" # example, must be: "docker"
   
   # OPTIONAL
-  include_containers = "nostalgic_stallman" # example, no default
-  include_labels = "label_key=label_value" # example, no default
+  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
+  include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
 
 ## Options
@@ -49,7 +49,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["nostalgic_stallman","9b6247364a03"]}
+  examples={[["my_container_name","container_prefix","9b6247364a03"]]}
   name={"include_containers"}
   nullable={true}
   path={null}
@@ -73,7 +73,7 @@ container ID or name. If not provided, all containers will be included.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["label_key=label_value"]}
+  examples={[["label_key1=label_value1","label_key2=label_value2"]]}
   name={"include_labels"}
   nullable={true}
   path={null}
