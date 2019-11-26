@@ -213,7 +213,7 @@ module.exports = {
           ],
         },
         "reference",
-        "reference/testing",
+        "reference/tests",
         "reference/global-options",
       ],
     },
