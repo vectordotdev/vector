@@ -1,6 +1,7 @@
 ---
 title: Unit Tests
 description: Unit test configuration options
+status: beta
 ---
 
 It's possible to define unit tests within a Vector configuration file that cover
@@ -30,6 +31,10 @@ vector test /etc/vector/*.toml
 <CodeHeader fileName="vector.toml" />
 
 ```toml
+[transforms.bar]
+  type = "regex_parser"
+  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+
 <%= config_example(metadata.testing.tests.options, path: "tests", array: true, common: true) %>
 ```
 
@@ -39,6 +44,10 @@ vector test /etc/vector/*.toml
 <CodeHeader fileName="vector.toml" />
 
 ```toml
+[transforms.bar]
+  type = "regex_parser"
+  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+
 <%= config_example(metadata.testing.tests.options, path: "tests", array: true, common: false) %>
 ```
 
