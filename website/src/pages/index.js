@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 
 import CodeBlock from '@theme/CodeBlock';
 import Diagram from '@site/src/components/Diagram';
+import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
@@ -27,6 +28,8 @@ import cloudify from '@site/src/exports/cloudify';
 
 import styles from './index.module.css';
 import './index.css';
+
+const AnchoredH2 = Heading('h2');
 
 const features = [
   {
@@ -104,9 +107,9 @@ function Features({features}) {
   }
 
   return (
-    <section id="features" className={styles.features}>
+    <section className={styles.features}>
       <div className="container">
-        <h2>Features</h2>
+        <AnchoredH2 id="features">Features</AnchoredH2>
         {rows}
       </div>
     </section>
@@ -127,9 +130,9 @@ function Feature({icon, title, description}) {
 
 function Performance() {
   return (
-    <section id="performance" className={styles.performance}>
+    <section className={styles.performance}>
       <div className="container">
-        <h2>Uncompromising Performance</h2>
+        <AnchoredH2 id="performance">Uncompromising Performance</AnchoredH2>
         <div className="sub-title">Higher throughout with a lower memory footprint</div>
 
         <PerformanceTests />
@@ -142,7 +145,7 @@ function Correctness() {
   return (
     <section className={styles.correctness}>
       <div className="container">
-        <h2>Correctness</h2>
+        <AnchoredH2 id="correctness">Correctness</AnchoredH2>
         <div className="sub-title">Obsessed with the details and getting it right</div>
 
         <div className="table-responsive">
@@ -261,7 +264,7 @@ function Integrations() {
   return (
     <section className={classnames(styles.integrations, 'integrations')}>
       <div className="container">
-        <h2>Integrates With Everything</h2>
+        <AnchoredH2 id="integrations">Integrates With Everything</AnchoredH2>
         <div className="sub-title">Sources, transforms, and sinks make it easy to compose pipelines</div>
 
         <div className={classnames(styles.components, 'components')}>
@@ -294,7 +297,7 @@ function Configuration() {
   return (
     <section className="configuration">
       <div className="container">
-        <h2>Simple To Configure</h2>
+        <AnchoredH2 id="configuration">Simple To Configure</AnchoredH2>
         <div className="sub-title">A simple composable format lets you build flexible pipelines</div>
 
         <div className="configuration__diagram">
@@ -309,7 +312,7 @@ function Installation() {
   return (
     <section className={styles.installation}>
       <div className="container">
-        <h2>Installs Everywhere</h2>
+        <AnchoredH2 id="installation">Installs Everywhere</AnchoredH2>
         <div className="sub-title">Fully static, no dependencies, no runtime, memory safe</div>
 
         <div className={styles.installationPlatforms}>
