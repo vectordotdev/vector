@@ -1,4 +1,3 @@
-use crate::runtime::Runtime;
 use crate::topology::config::GlobalOptions;
 use futures::{Async, Future, Poll};
 use hyper::client::connect::dns::{Name, Resolve};
@@ -22,12 +21,12 @@ pub struct DnsResolver {
 }
 
 impl DnsResolver {
-    pub fn new<'a, R: Into<Option<&'a mut Runtime>>>(
+    /// Returned future should be spinned up.
+    pub fn new(
         config: &GlobalOptions,
-        runtime: R,
-    ) -> Result<Self, DnsError> {
+    ) -> Result<(Self, Option<impl Future<Item = (), Error = ()>>), DnsError> {
         if config.dns_servers.is_empty() {
-            return Ok(DnsResolver::default());
+            return Ok((DnsResolver::default(), None));
         }
 
         let mut resolve_config = ResolverConfig::new();
@@ -60,64 +59,60 @@ impl DnsResolver {
 
         let (resolver, worker) = AsyncResolver::new(resolve_config, options);
 
-        if let Some(runtime) = runtime.into() {
-            runtime.spawn(worker);
-        } else {
-            // spin up worker thread for worker future
-            std::thread::spawn(move || {
-                // Worker futer will finish when all DnsResolvers are dropped.
-                // Then this thread will also end.
-                tokio::runtime::current_thread::run(worker);
-            });
-        }
-
-        Ok(DnsResolver {
-            resolver: Some(resolver),
-        })
+        Ok((
+            DnsResolver {
+                resolver: Some(resolver),
+            },
+            Some(worker),
+        ))
     }
 
     /// Resolves host:port address
-    /// Should be only called from outside tokio. From inside tokio, Async version should be used.
-    pub fn resolve_address(&self, s: &str) -> Result<IntoIter<SocketAddr>, DnsError> {
+    pub fn resolve_address(
+        &self,
+        s: &str,
+    ) -> Result<impl Future<Item = IntoIter<SocketAddr>, Error = io::Error>, DnsError> {
         // Try to parse as a regular SocketAddr first
-        if let Some(addr) = s.parse().ok() {
-            return Ok(vec![addr].into_iter());
-        }
+        let (future, port) = if let Some(address) = s.parse::<SocketAddr>().ok() {
+            (ResolveFuture::IpAddr(address.ip()), address.port())
+        } else {
+            // 's' should contain name:port
+            let mut parts = s.rsplitn(2, ':');
+            let port = parts
+                .next()
+                .ok_or_else(|| DnsError::MissingPort {
+                    address: s.to_owned(),
+                })?
+                .parse::<u16>()
+                .map_err(|source| DnsError::InvalidPort {
+                    address: s.to_owned(),
+                    source,
+                })?;
+            let name = parts
+                .next()
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| DnsError::MissingHost {
+                    address: s.to_owned(),
+                })?
+                .parse::<Name>()
+                .map_err(|source| DnsError::InvalidHost {
+                    address: s.to_owned(),
+                    source,
+                })?;
 
-        // Now 's' should contain name:port
-        let mut parts = s.rsplitn(2, ':');
-        let port = parts
-            .next()
-            .ok_or_else(|| DnsError::MissingPort {
-                address: s.to_owned(),
-            })?
-            .parse::<u16>()
-            .map_err(|source| DnsError::InvalidPort {
-                address: s.to_owned(),
-                source,
-            })?;
-        let name = parts
-            .next()
-            .ok_or_else(|| DnsError::MissingHost {
-                address: s.to_owned(),
-            })?
-            .parse::<Name>()
-            .map_err(|source| DnsError::InvalidHost {
-                address: s.to_owned(),
-                source,
-            })?;
+            (self.construct_future(name), port)
+        };
 
-        let addresses = self.resolve_name(name)?;
-
-        Ok(addresses
-            .map(|addr| (addr, port).into())
-            .collect::<Vec<SocketAddr>>()
-            .into_iter())
+        Ok(future.map(move |address| {
+            address
+                .map(|addr| (addr, port).into())
+                .collect::<Vec<SocketAddr>>()
+                .into_iter()
+        }))
     }
 
     /// Resolves host
-    /// Should be only called from outside tokio. From inside tokio, Async version should be used.
-    pub fn resolve_host(&self, host: &str) -> Result<IntoIter<IpAddr>, DnsError> {
+    pub fn resolve_host(&self, host: &str) -> Result<ResolveFuture, DnsError> {
         let name = host
             .parse::<Name>()
             .map_err(|error| DnsError::InvalidHost {
@@ -125,14 +120,7 @@ impl DnsResolver {
                 source: error,
             })?;
 
-        self.resolve_name(name).map_err(Into::into)
-    }
-
-    /// Should be only called from outside tokio. From inside tokio, Async version should be used.
-    fn resolve_name(&self, name: Name) -> Result<IntoIter<IpAddr>, io::Error> {
-        let future = self.construct_future(name);
-        // Will panic if called from inside tokio.
-        tokio::runtime::current_thread::block_on_all(future)
+        Ok(self.construct_future(name))
     }
 
     fn construct_future(&self, name: Name) -> ResolveFuture {
@@ -249,6 +237,7 @@ mod tests {
     use crate::runtime::Runtime;
     use crate::test_util::{next_addr, runtime};
     use crate::topology::config::GlobalOptions;
+    use futures::Future;
     use std::collections::BTreeMap;
     use std::net::{IpAddr, SocketAddr, UdpSocket};
     use std::str::FromStr;
@@ -365,7 +354,20 @@ mod tests {
         let mut config = GlobalOptions::default();
         config.dns_servers = vec![format!("{}", server)];
 
-        DnsResolver::new(&config, rt).unwrap()
+        let (dns, worker) = DnsResolver::new(&config).unwrap();
+        worker.map(|worker| rt.spawn(worker));
+        dns
+    }
+
+    fn future_ready<F: Future>(mut future: F) -> F::Item
+    where
+        F::Error: std::fmt::Debug,
+    {
+        match future.poll() {
+            Ok(Async::Ready(item)) => item,
+            Ok(Async::NotReady) => panic!("Future was not ready"),
+            Err(error) => panic!("Future was not ready, but errored: {:?}", error),
+        }
     }
 
     #[test]
@@ -378,8 +380,12 @@ mod tests {
 
         assert_eq!(
             target,
-            resolver
-                .resolve_host(join("name", domain).as_str())
+            runtime
+                .block_on(
+                    resolver
+                        .resolve_host(join("name", domain).as_str())
+                        .unwrap(),
+                )
                 .unwrap()
                 .next()
                 .unwrap()
@@ -396,8 +402,12 @@ mod tests {
 
         assert_eq!(
             SocketAddr::from((target, 9000)),
-            resolver
-                .resolve_address((join("address", domain) + ":9000").as_str())
+            runtime
+                .block_on(
+                    resolver
+                        .resolve_address((join("address", domain) + ":9000").as_str())
+                        .unwrap(),
+                )
                 .unwrap()
                 .next()
                 .unwrap()
@@ -424,12 +434,13 @@ mod tests {
             format!("{}", server2),
         ];
 
-        let resolver = DnsResolver::new(&config, &mut runtime).unwrap();
+        let (resolver, worker) = DnsResolver::new(&config).unwrap();
+        worker.map(|worker| runtime.spawn(worker));
 
         assert_eq!(
             target_a,
-            resolver
-                .resolve_host(join("a", domain_a).as_str())
+            runtime
+                .block_on(resolver.resolve_host(join("a", domain_a).as_str()).unwrap())
                 .unwrap()
                 .next()
                 .unwrap()
@@ -437,8 +448,8 @@ mod tests {
 
         assert_eq!(
             target_b,
-            resolver
-                .resolve_host(join("b", domain_b).as_str())
+            runtime
+                .block_on(resolver.resolve_host(join("b", domain_b).as_str()).unwrap())
                 .unwrap()
                 .next()
                 .unwrap()
@@ -446,8 +457,8 @@ mod tests {
 
         assert_eq!(
             target_c,
-            resolver
-                .resolve_host(join("c", domain_c).as_str())
+            runtime
+                .block_on(resolver.resolve_host(join("c", domain_c).as_str()).unwrap())
                 .unwrap()
                 .next()
                 .unwrap()
@@ -469,11 +480,13 @@ mod tests {
     #[test]
     fn resolve_address_socket_v4() {
         assert_eq!(
-            DnsResolver::default()
-                .resolve_address("89.03.02.84:9900")
-                .unwrap()
-                .next()
-                .unwrap(),
+            future_ready(
+                DnsResolver::default()
+                    .resolve_address("89.03.02.84:9900")
+                    .unwrap()
+            )
+            .next()
+            .unwrap(),
             SocketAddr::from_str("89.03.02.84:9900").unwrap()
         );
     }
@@ -481,11 +494,13 @@ mod tests {
     #[test]
     fn resolve_address_socket_v6() {
         assert_eq!(
-            DnsResolver::default()
-                .resolve_address("[::0]:9900")
-                .unwrap()
-                .next()
-                .unwrap(),
+            future_ready(
+                DnsResolver::default()
+                    .resolve_address("[::0]:9900")
+                    .unwrap()
+            )
+            .next()
+            .unwrap(),
             SocketAddr::from_str("[::0]:9900").unwrap()
         );
     }
@@ -493,9 +508,7 @@ mod tests {
     #[test]
     fn resolve_host_v4() {
         assert_eq!(
-            DnsResolver::default()
-                .resolve_host("89.03.02.84")
-                .unwrap()
+            future_ready(DnsResolver::default().resolve_host("89.03.02.84").unwrap())
                 .next()
                 .unwrap(),
             IpAddr::from_str("89.03.02.84").unwrap()
