@@ -31,8 +31,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
-    my_tag = "my value" # example
-    my_env_tag = "${ENV_VAR}" # example
+    {my_tag = "my value"} # example
+    {my_env_tag = "${ENV_VAR}"} # example
 ```
 
 ## Options
@@ -70,7 +70,7 @@ A table of key/value pairs representing the tags to be added to the metric.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"my_tag","value":"my value"},{"name":"my_env_tag","value":"${ENV_VAR}"}]}
+  examples={[{"my_tag":"my value"},{"my_env_tag":"${ENV_VAR}"}]}
   name={"`<tag-name>`"}
   nullable={false}
   path={"tags"}

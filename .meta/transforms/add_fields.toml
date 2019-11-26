@@ -20,14 +20,14 @@ event.\
 type = "*"
 null = false
 examples = [
-  {name = "my_string_field", value = "string value"},
-  {name = "my_env_var_field", value = "${ENV_VAR}"},
-  {name = "my_int_field", value = 1},
-  {name = "my_float_field", value = 1.2},
-  {name = "my_bool_field", value = true},
-  {name = "my_timestamp_field", value = 1979-05-27T00:32:00.999999-07:00},
-  {name = "my_nested_fields", value = {key1 = "value1", key2 = "value2"}},
-  {name = "my_list", value = ["first", "second", "third"]},
+  {"my_string_field" = "string value"},
+  {"my_env_var_field" = "${ENV_VAR}"},
+  {"my_int_field" = 1},
+  {"my_float_field" = 1.2},
+  {"my_bool_field" = true},
+  {"my_timestamp_field" = 1979-05-27T00:32:00.999999-07:00},
+  {"my_nested_fields" = {key1 = "value1", key2 = "value2"}},
+  {"my_list" = ["first", "second", "third"]},
 ]
 description = """\
 The name of the field to add. Accepts all \

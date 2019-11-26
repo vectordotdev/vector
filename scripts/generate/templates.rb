@@ -230,7 +230,13 @@ class Templates
       if field.fields_list.any?
         hash[field.name] = fields_hash(field.fields_list)
       else
-        hash[field.name] = field.examples.first
+        example = field.examples.first
+
+        if example.is_a?(Hash)
+          hash.merge!(example)
+        else
+          hash[field.name] = example
+        end
       end
     end
 

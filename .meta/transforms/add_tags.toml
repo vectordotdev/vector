@@ -20,8 +20,8 @@ metric.\
 type = "string"
 null = false
 examples = [
-  {name = "my_tag", value = "my value"},
-  {name = "my_env_tag", value = "${ENV_VAR}"},
+  {"my_tag" = "my value"},
+  {"my_env_tag" = "${ENV_VAR}"},
 ]
 description = """\
 The name of the tag to add. Due to the nature of metric tags, the value \

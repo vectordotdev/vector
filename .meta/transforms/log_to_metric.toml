@@ -65,9 +65,9 @@ description = "Key/value pairs representing [metric tags][docs.data-model#tags].
 [transforms.log_to_metric.options.metrics.options.tags.options."`<tag-name>`"]
 type = "string"
 examples = [
-  {name = "host", value = "${HOSTNAME}"},
-  {name = "region", value = "us-east-1"},
-  {name = "status", value = "{{status}}"},
+  {"host" = "${HOSTNAME}"},
+  {"region" = "us-east-1"},
+  {"status" = "{{status}}"},
 ]
 null = false
 common = true
