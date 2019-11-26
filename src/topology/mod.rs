@@ -167,8 +167,8 @@ impl RunningTopology {
             return false;
         }
 
-        if self.config.global.dns != new_config.global.dns {
-            error!("dns cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.dns);
+        if self.config.global.dns_servers != new_config.global.dns_servers {
+            error!("dns_servers cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.dns_servers);
             return false;
         }
 

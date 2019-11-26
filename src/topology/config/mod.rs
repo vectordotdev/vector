@@ -27,7 +27,7 @@ pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
-    pub dns: Vec<String>,
+    pub dns_servers: Vec<String>,
 }
 
 fn default_data_dir() -> Option<PathBuf> {
@@ -168,7 +168,7 @@ impl Config {
         Self {
             global: GlobalOptions {
                 data_dir: None,
-                dns: Vec::new(),
+                dns_servers: Vec::new(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),

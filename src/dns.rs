@@ -5,14 +5,13 @@ use hyper::client::connect::dns::{Name, Resolve};
 use std::error;
 use std::fmt;
 use std::io;
-use std::net::AddrParseError;
-use std::net::ToSocketAddrs;
-use std::net::*;
+use std::net::{AddrParseError, IpAddr, SocketAddr, ToSocketAddrs};
 use std::vec::IntoIter;
-use trust_dns_resolver::config::*;
-use trust_dns_resolver::error::ResolveErrorKind;
-use trust_dns_resolver::AsyncResolver;
-use trust_dns_resolver::BackgroundLookupIp;
+use trust_dns_resolver::{
+    config::{LookupIpStrategy, NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
+    error::ResolveErrorKind,
+    AsyncResolver, BackgroundLookupIp,
+};
 
 /// Default port for DNS service.
 const DNS_PORT: u16 = 53;
@@ -28,7 +27,7 @@ impl DnsResolver {
         config: &GlobalOptions,
         runtime: R,
     ) -> Result<Self, DnsError> {
-        if config.dns.is_empty() {
+        if config.dns_servers.is_empty() {
             return Ok(DnsResolver::default());
         }
 
@@ -36,7 +35,7 @@ impl DnsResolver {
 
         let mut errors = Vec::new();
 
-        for s in config.dns.iter() {
+        for s in config.dns_servers.iter() {
             let parsed = s
                 .parse::<SocketAddr>()
                 .or_else(|_| s.parse::<IpAddr>().map(|ip| SocketAddr::new(ip, DNS_PORT)));
@@ -369,7 +368,7 @@ mod tests {
     ) -> DnsResolver {
         let server = dns_server(subdomains, domain, rt);
         let mut config = GlobalOptions::default();
-        config.dns = vec![format!("{}", server)];
+        config.dns_servers = vec![format!("{}", server)];
 
         DnsResolver::new(&config, rt).unwrap()
     }
@@ -424,7 +423,7 @@ mod tests {
         let server1 = dns_server(&[("b", target_b)], domain_b, &mut runtime);
         let server2 = dns_server(&[("c", target_c)], domain_c, &mut runtime);
         let mut config = GlobalOptions::default();
-        config.dns = vec![
+        config.dns_servers = vec![
             format!("{}", server0),
             format!("{}", server1),
             format!("{}", server2),
