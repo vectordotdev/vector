@@ -1,6 +1,7 @@
 [transforms.grok_parser]
 allow_you_to_description = "parse a log field value with [Grok][urls.grok]"
-function_categories = ["parse"]
+common = false
+function_category = "parse"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -12,6 +13,7 @@ types_coercion = true
 
 [transforms.grok_parser.options.drop_field]
 type = "bool"
+common = true
 default = true
 null = false
 description = """\
@@ -21,6 +23,7 @@ types_coercion = true
 
 [transforms.grok_parser.options.field]
 type = "string"
+common = true
 default = "message"
 null = false
 description = """\
@@ -29,6 +32,7 @@ The log field to execute the `pattern` against. Must be a `string` value.\
 
 [transforms.grok_parser.options.pattern]
 type = "string"
+common = true
 examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 null = false
 description = "The [Grok pattern][urls.grok_patterns]"

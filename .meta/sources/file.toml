@@ -1,6 +1,8 @@
 [sources.file]
 beta = false
+common = true
 delivery_guarantee = "best_effort"
+function_category = "collect"
 guides = []
 output_types = ["log"]
 resources = []
@@ -18,6 +20,7 @@ sure the Vector project has write permissions to this dir.\
 
 [sources.file.options.include]
 type = "[string]"
+common = true
 examples = [["/var/log/nginx/*.log"]]
 null = false
 description = """\
@@ -26,7 +29,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported.\
 
 [sources.file.options.exclude]
 type = "[string]"
-examples = [["/var/log/nginx/access.log"]]
+examples = [["/var/log/nginx/*.[0-9]*.log"]]
 null = true
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
@@ -66,6 +69,7 @@ The key name added to each event representing the current host.\
 
 [sources.file.options.ignore_older]
 type = "int"
+common = true
 examples = [86400]
 null = true
 unit = "seconds"
@@ -86,6 +90,7 @@ files.\
 
 [sources.file.options.start_at_beginning]
 type = "bool"
+common = true
 null = false
 default = false
 description = """\
@@ -118,7 +123,7 @@ type = "int"
 default = 256
 null = false
 unit = "bytes"
-relevant_when = {"fingerprinting.strategy" = "checksum"}
+relevant_when = {strategy = "checksum"}
 description = """\
 The number of bytes read off the head of the file to generate a unique \
 fingerprint.\
@@ -129,7 +134,7 @@ type = "int"
 default = 0
 null = false
 unit = "bytes"
-relevant_when = {"fingerprinting.strategy" = "checksum"}
+relevant_when = {strategy = "checksum"}
 description = """\
 The number of bytes to skip ahead (or ignore) when generating a unique \
 fingerprint. This is helpful if all files share a common header.\
@@ -173,9 +178,44 @@ time.\
 [sources.file.options.oldest_first]
 type = "bool"
 category = "Priority"
+common = true
 default = false
 null = true
 description = """\
 Instead of balancing read capacity fairly across all watched files, prioritize \
 draining the oldest files before moving on to read data from younger files.\
+"""
+
+[sources.file.output.log.fields.file]
+type = "string"
+examples = ["/var/log/nginx.log"]
+key_name_option = "file_key"
+optional = false
+description = """\
+The _full_ path of the file tha the log originated from.\
+"""
+
+[sources.file.output.log.fields.host]
+type = "string"
+examples = ["my.host.com"]
+key_name_option = "host_key"
+optional = false
+description = """\
+The current hostname, equivalent to the `gethostname` command.\
+"""
+
+[sources.file.output.log.fields.message]
+type = "string"
+examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+optional = false
+description = """\
+The raw log message, unaltered.
+"""
+
+[sources.file.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The exact time the event was ingested.
 """

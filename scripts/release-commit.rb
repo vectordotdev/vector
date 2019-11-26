@@ -40,13 +40,7 @@ end
 # Commit
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
-  end
-
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
 release = metadata.latest_release
 
 if release_exists?(release)

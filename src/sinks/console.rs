@@ -2,7 +2,7 @@ use super::util::SinkExt;
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,10 @@ pub struct ConsoleSinkConfig {
 pub enum Encoding {
     Text,
     Json,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
 }
 
 #[typetag::serde(name = "console")]
@@ -87,7 +91,8 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
 #[cfg(test)]
 mod test {
     use super::{encode_event, Encoding};
-    use crate::{event::Metric, Event};
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::Event;
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
@@ -98,33 +103,37 @@ mod test {
 
     #[test]
     fn encodes_counter() {
-        let event = Event::Metric(Metric::Counter {
+        let event = Event::Metric(Metric {
             name: "foos".into(),
-            val: 100.0,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![("key".to_owned(), "value".to_owned())]
                     .into_iter()
                     .collect(),
             ),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            Ok(r#"{"type":"counter","name":"foos","val":100.0,"timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"}}"#.to_string()),
+            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
             encode_event(event, &Encoding::Text)
         );
     }
 
     #[test]
     fn encodes_histogram_without_timestamp() {
-        let event = Event::Metric(Metric::Histogram {
+        let event = Event::Metric(Metric {
             name: "glork".into(),
-            val: 10.0,
-            sample_rate: 1,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![10.0],
+                sample_rates: vec![1],
+            },
         });
         assert_eq!(
-            Ok(r#"{"type":"histogram","name":"glork","val":10.0,"sample_rate":1,"timestamp":null,"tags":null}"#.to_string()),
+            Ok(r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#.to_string()),
             encode_event(event, &Encoding::Text)
         );
     }

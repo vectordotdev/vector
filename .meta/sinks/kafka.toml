@@ -1,8 +1,10 @@
 [sinks.kafka]
 buffer = true
+common = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
 encodings = ["json", "text"]
+function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 service_provider = "Confluent"
@@ -11,6 +13,7 @@ tls_options = ["+enabled", "-verify"]
 
 [sinks.kafka.options.bootstrap_servers]
 type = "[string]"
+common = true
 examples = [["10.14.22.123:9092", "10.14.23.332:9092"]]
 null = false
 description = """\
@@ -20,6 +23,7 @@ its cluster metadata.\
 
 [sinks.kafka.options.key_field]
 type = "string"
+common = true
 examples = ["user_id"]
 null = false
 description = """\
@@ -30,6 +34,7 @@ will be used.\
 
 [sinks.kafka.options.topic]
 type = "string"
+common = true
 examples = ["topic-1234"]
 null = false
 description = "The Kafka topic name to write events to."

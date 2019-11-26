@@ -5,8 +5,8 @@ require "active_support/core_ext/string/filters"
 require_relative "commit_scope"
 
 class Commit
-  TYPES = ["chore", "docs", "enhancement", "feat", "fix", "perf"]
-  TYPES_THAT_REQUIRE_SCOPES = ["enhancement", "feat", "fix"]
+  TYPES = ["chore", "docs", "enhancement", "feat", "fix", "perf"].freeze
+  TYPES_THAT_REQUIRE_SCOPES = ["enhancement", "feat", "fix"].freeze
 
   attr_reader :author,
     :breaking_change,

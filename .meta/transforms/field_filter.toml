@@ -1,7 +1,8 @@
 [transforms.field_filter]
 allow_you_to_description = "filter events by a log field's value"
 beta = true
-function_categories = ["filter"]
+common = false
+function_category = "filter"
 guides = []
 input_types = ["log", "metric"]
 output_types = ["log", "metric"]
@@ -9,12 +10,14 @@ resources = []
 
 [transforms.field_filter.options.field]
 type = "string"
+common = true
 examples = ["file"]
 null = false
 description = "The target log field to compare against the `value`."
 
 [transforms.field_filter.options.value]
 type = "string"
+common = true
 examples = ["/var/log/nginx.log"]
 null = false
 description = """\

@@ -1,9 +1,13 @@
 use crate::FilePosition;
-use std::fs;
-use std::io::{self, BufRead, Seek};
-use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
-use std::time;
+use std::{
+    fs,
+    io::{self, BufRead, Seek},
+    path::PathBuf,
+    thread,
+    time::{Duration, SystemTime},
+};
+
+use crate::metadata_ext::PortableMetadataExt;
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
 /// from a file path, transparently updating the underlying file descriptor when
@@ -31,7 +35,7 @@ impl FileWatcher {
     pub fn new(
         path: PathBuf,
         file_position: FilePosition,
-        ignore_before: Option<time::SystemTime>,
+        ignore_before: Option<SystemTime>,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let metadata = f.metadata()?;
@@ -56,20 +60,20 @@ impl FileWatcher {
             findable: true,
             reader: rdr,
             file_position,
-            devno: metadata.dev(),
-            inode: metadata.ino(),
+            devno: metadata.portable_dev(),
+            inode: metadata.portable_ino(),
             is_dead: false,
         })
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let metadata = fs::metadata(&path)?;
-        if (metadata.dev(), metadata.ino()) != (self.devno, self.inode) {
+        if (metadata.portable_dev(), metadata.portable_ino()) != (self.devno, self.inode) {
             let mut new_reader = io::BufReader::new(fs::File::open(&path)?);
             new_reader.seek(io::SeekFrom::Start(self.file_position))?;
             self.reader = new_reader;
-            self.devno = metadata.dev();
-            self.inode = metadata.ino();
+            self.devno = metadata.portable_dev();
+            self.inode = metadata.portable_ino();
         }
         self.path = path;
         Ok(())
@@ -134,6 +138,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 ) -> io::Result<usize> {
     let mut total_read = 0;
     let mut discarding = false;
+    let mut already_slept = false;
     loop {
         let available = match r.fill_buf() {
             Ok(n) => n,
@@ -173,8 +178,14 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
         if done && discarding {
             discarding = false;
             buf.clear();
-        } else if done || used == 0 {
+        } else if done || (used == 0 && already_slept) {
             return Ok(total_read);
+        } else if used == 0 {
+            // We've hit EOF but not yet seen a newline. This can happen when unlucky timing causes
+            // us to observe an incomplete write, so a short sleep gives the rest of the write
+            // a chance to become visible before we give up and accept the EOF.
+            thread::sleep(Duration::from_millis(1));
+            already_slept = true;
         }
     }
 }

@@ -1,0 +1,41 @@
+.alert {
+  box-shadow: var(--ifm-panel-box-shadow);
+  color: var(--ifm-color-content) !important;
+  font-size: 95%;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  padding-left: 5em;
+}
+
+.alert > i.feather {
+  float: left;
+  font-size: 2em !important;
+  margin-left: -1.75em;
+}
+
+.alert p:last-child {
+  margin-bottom: 0;
+}
+
+.alert.alert--danger,
+.alert.alert--info,
+.alert.alert--success,
+.alert.alert--warning {
+  background: var(--ifm-panel-background) !important;
+  border: 0px none;
+}
+
+.alert.alert--danger {
+  border-left: 2px solid var(--ifm-color-danger);
+}
+
+.alert.alert--info {
+  border-left: 2px solid var(--ifm-color-info);
+}
+
+.alert.alert--success {
+  border-left: 2px solid var(--ifm-color-success);
+}
+
+.alert.alert--warning {
+  border-left: 3px solid var(--ifm-color-warning);
+}

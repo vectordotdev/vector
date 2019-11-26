@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
-    event::metric::Metric,
+    event::metric::{Metric, MetricKind, MetricValue},
     event::{self, ValueKind},
     template::Template,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
@@ -66,6 +66,10 @@ fn default_increment_by_value() -> bool {
 
 pub struct LogToMetric {
     config: LogToMetricConfig,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
 }
 
 #[typetag::serde(name = "log_to_metric")]
@@ -142,11 +146,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
     match config {
         MetricConfig::Counter(counter) => {
-            let val = log
+            let value = log
                 .get(&counter.field)
                 .ok_or(TransformError::FieldNotFound)?;
-            let val = if counter.increment_by_value {
-                val.to_string_lossy()
+            let value = if counter.increment_by_value {
+                value
+                    .to_string_lossy()
                     .parse()
                     .map_err(|_| TransformError::ParseError("counter value"))?
             } else {
@@ -158,16 +163,17 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&counter.tags, &event);
 
-            Ok(Metric::Counter {
+            Ok(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value },
             })
         }
         MetricConfig::Histogram(hist) => {
-            let val = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
-            let val = val
+            let value = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
+            let value = value
                 .to_string_lossy()
                 .parse()
                 .map_err(|_| TransformError::ParseError("histogram value"))?;
@@ -177,17 +183,20 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&hist.tags, &event);
 
-            Ok(Metric::Histogram {
+            Ok(Metric {
                 name,
-                val,
-                sample_rate: 1,
                 timestamp,
                 tags,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![value],
+                    sample_rates: vec![1],
+                },
             })
         }
         MetricConfig::Gauge(gauge) => {
-            let val = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
-            let val = val
+            let value = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
+            let value = value
                 .to_string_lossy()
                 .parse()
                 .map_err(|_| TransformError::ParseError("gauge value"))?;
@@ -197,28 +206,31 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&gauge.tags, &event);
 
-            Ok(Metric::Gauge {
+            Ok(Metric {
                 name,
-                val,
-                direction: None,
                 timestamp,
                 tags,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value },
             })
         }
         MetricConfig::Set(set) => {
-            let val = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
-            let val = val.to_string_lossy();
+            let value = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
+            let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
 
             let tags = render_tags(&set.tags, &event);
 
-            Ok(Metric::Set {
+            Ok(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec![value].into_iter().collect(),
+                },
             })
         }
     }
@@ -254,9 +266,9 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
-        event::{self, Metric},
+        event::metric::{Metric, MetricKind, MetricValue},
+        event::{self, Event},
         transforms::Transform,
-        Event,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
 
@@ -292,11 +304,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "status".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -326,9 +339,8 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "http_requests_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: Some(
                     vec![
@@ -339,6 +351,8 @@ mod tests {
                     .into_iter()
                     .collect(),
                 ),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -360,11 +374,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "exception_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -405,11 +420,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "amount_total".into(),
-                val: 33.99,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 33.99 },
             }
         );
     }
@@ -431,12 +447,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Gauge {
+            Metric {
                 name: "memory_rss_bytes".into(),
-                val: 123.0,
-                direction: None,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 123.0 },
             }
         );
     }
@@ -509,20 +525,22 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "exception_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "status".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
     }
@@ -570,20 +588,24 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Counter {
+            Metric {
                 name: "xyz_exception_total".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             }
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::Set {
+            Metric {
                 name: "local_abc_status_set".into(),
-                val: "42".into(),
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec!["42".into()].into_iter().collect()
+                },
             }
         );
     }
@@ -605,11 +627,14 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Set {
+            Metric {
                 name: "unique_user_ip".into(),
-                val: "1.2.3.4".into(),
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec!["1.2.3.4".into()].into_iter().collect()
+                },
             }
         );
     }
@@ -630,12 +655,15 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric::Histogram {
+            Metric {
                 name: "response_time".into(),
-                val: 2.5,
-                sample_rate: 1,
                 timestamp: Some(ts()),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.5],
+                    sample_rates: vec![1],
+                },
             }
         );
     }

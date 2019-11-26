@@ -54,9 +54,9 @@ expanding into more specifics.
 
 ### Git Branches
 
-_All_ changes must be made in a branch and submitted as [pull \
-requests](#pull-requests). Vector does not adopt any type of branch naming
-style, but please use something descriptive of your changes.
+_All_ changes must be made in a branch and submitted as [pull requests](#pull-requests).
+Vector does not adopt any type of branch naming style, but please use something
+descriptive of your changes.
 
 ### Git Commits
 
@@ -130,20 +130,13 @@ updated versions of Vector through various channels.
 1. Install Rust via [`rustup`](https://rustup.rs/):
 
    ```bash
-   curl https://sh.rustup.rs -sSf | sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-2. Install [OpenSSL 1.0.x](https://www.openssl.org/source/) and set two environment variables
-
-   ```
-   export OPENSSL_INCLUDE_DIR=<openssl prefix>/include
-   export OPENSSL_LIB_DIR=<openssl prefix>/lib
-   ```
-
-3. [Install Docker](https://docs.docker.com/install/). Docker
+2. [Install Docker](https://docs.docker.com/install/). Docker
    containers are used for mocking Vector's integrations.
 
-4. [Install Ruby](https://www.ruby-lang.org/en/downloads/) and
+3. [Install Ruby](https://www.ruby-lang.org/en/downloads/) and
    [Bundler 2](https://bundler.io/v2.0/guides/bundler_2_upgrade.html).
    They are used to build Vector's documentation.
 

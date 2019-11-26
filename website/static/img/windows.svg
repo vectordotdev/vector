@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512px" height="512px" viewBox="0 0 512 512" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 60 (88103) - https://sketch.com -->
+    <title>002-windows</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="002-windows" fill-rule="nonzero">
+            <circle id="Oval" fill="#10E7FF" cx="256" cy="256" r="256"></circle>
+            <path d="M510.758,230.723 L399.136,119.101 L244.204,137.516 L244.204,152.744 L230.594,139.134 L112.864,153.127 L112.864,250.158 L126.474,263.768 L112.864,263.768 L112.864,358.872 L265.787,511.795 C402.634,506.649 512,394.106 512,256 C512,247.47 511.573,239.039 510.758,230.723 Z" id="Path" fill-opacity="0.1" fill="#000000"></path>
+            <g id="Group" transform="translate(112.000000, 119.000000)">
+                <polygon id="Path" fill="#F25022" points="118.594 131.159 118.594 20.134 0.864 34.128 0.864 131.159"></polygon>
+                <polygon id="Path" fill="#7FBA00" points="132.204 131.159 287.137 131.159 287.137 0.101 132.204 18.516"></polygon>
+                <polygon id="Path" fill="#01A4EF" points="118.594 144.769 0.864 144.769 0.864 239.873 118.594 253.866"></polygon>
+                <polygon id="Path" fill="#FFB901" points="132.204 144.769 132.204 255.483 287.137 273.899 287.137 144.769"></polygon>
+            </g>
+        </g>
+    </g>
+</svg>

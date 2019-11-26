@@ -1,6 +1,7 @@
 [transforms.add_fields]
 allow_you_to_description = "add one or more log fields"
-function_categories = ["change_fields"]
+common = false
+function_category = "shape"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -8,13 +9,14 @@ resources = []
 
 [transforms.add_fields.options.fields]
 type = "table"
+common = true
 null = false
 description = """\
 A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.fields.options."*"]
+[transforms.add_fields.options.fields.options."`<field-name>`"]
 type = "*"
 null = false
 examples = [
@@ -28,6 +30,7 @@ examples = [
   {name = "my_list", value = ["first", "second", "third"]},
 ]
 description = """\
-A key/value pair representing the new log fields to be added. Accepts all \
-[supported types][docs.configuration#value_types]. Use `.` for adding nested fields.\
+The name of the field to add. Accepts all \
+[supported types][docs.configuration#value_types]. Use `.` for adding nested \
+fields.\
 """

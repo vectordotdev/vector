@@ -1,0 +1,10 @@
+.field .badges {
+  float: right;
+  margin-top: -0.25em;
+  text-align: right;
+}
+
+.field .badges .badge {
+  font-size: 0.7em;
+  margin-left: 3px;
+}
