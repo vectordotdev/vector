@@ -29,7 +29,7 @@ class Object
   def to_toml
     if is_a?(Hash)
       values = select { |_k, v| !v.nil? }.collect { |k, v| "#{k} = #{v.to_toml}" }
-      "{" + values.join(", ") + "}"
+      values.join("\n")
     elsif is_a?(Array)
       values = select { |v| !v.nil? }.collect { |v| v.to_toml }
       if any? { |v| v.is_a?(Hash) }

@@ -31,8 +31,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
-    {my_tag = "my value"} # example
-    {my_env_tag = "${ENV_VAR}"} # example
+    my_tag = "my value" # example
+    my_env_tag = "${ENV_VAR}" # example
 ```
 
 ## Options

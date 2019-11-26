@@ -11,13 +11,12 @@ through_description = "the docker engine daemon"
 [sources.docker.options.include_containers]
 type = "[string]"
 common = true
-examples = ["ffd2bc2cb74a"]
+examples = ["nostalgic_stallman", "9b6247364a03"]
 null = true
 description = """\
-A list of container ids to match against when filtering running containers. \
-This will attempt to match the container id from the beginning meaning you do \
-not need to include the whole id but just the first few characters. If no \
-containers ids are provided, all containers will be included.\
+A list of container IDs _or_ names to match against. Prefix matches are \
+supported, meaning you can supply just the first few characters of the
+container ID or name. If not provided, all containers will be included. \
 """
 
 [sources.docker.options.include_labels]

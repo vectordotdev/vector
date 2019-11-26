@@ -32,7 +32,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "docker" # example, must be: "docker"
   
   # OPTIONAL
-  include_containers = "ffd2bc2cb74a" # example, no default
+  include_containers = "nostalgic_stallman" # example, no default
   include_labels = "label_key=label_value" # example, no default
 ```
 
@@ -49,7 +49,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["ffd2bc2cb74a"]}
+  examples={["nostalgic_stallman","9b6247364a03"]}
   name={"include_containers"}
   nullable={true}
   path={null}
@@ -62,7 +62,8 @@ import Field from '@site/src/components/Field';
 
 ### include_containers
 
-A list of container ids to match against when filtering running containers. This will attempt to match the container id from the beginning meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.
+A list of container IDs _or_ names to match against. Prefix matches are supported, meaning you can supply just the first few characters of the
+container ID or name. If not provided, all containers will be included. 
 
 
 </Field>
@@ -100,36 +101,19 @@ For example:
 
 ```javascript
 {
-  "container_created_at": "2019-11-01T21:15:47+00:00",
   "container_id": "9b6247364a03",
+  "com.example.vendor": "Timber Inc.",
+  "container_created_at": "2019-11-01T21:15:47+00:00",
   "container_name": "evil_ptolemy",
   "image": "ubuntu:latest",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "stream": "stdout",
-  "timestamp": "2019-11-01T21:15:47+00:00",
-  "com.example.vendor": "Timber Inc."
+  "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
-<Field
-  enumValues={null}
-  examples={["2019-11-01T21:15:47+00:00"]}
-  name={"container_created_at"}
-  path={null}
-  required={true}
-  type={"timestamp"}
-  >
-
-### container_created_at
-
-A UTC timestamp representing when the container was created.
-
-
-</Field>
 
 
 <Field
@@ -144,6 +128,40 @@ A UTC timestamp representing when the container was created.
 ### container_id
 
 The Docker container ID that the log was collected from.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
+  name={"`<label-key>`"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### `<label-key>`
+
+[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["2019-11-01T21:15:47+00:00"]}
+  name={"container_created_at"}
+  path={null}
+  required={true}
+  type={"timestamp"}
+  >
+
+### container_created_at
+
+A UTC timestamp representing when the container was created.
 
 
 </Field>
@@ -229,23 +247,6 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 ### timestamp
 
 The UTC timestamp extracted from the Docker log event.
-
-
-</Field>
-
-
-<Field
-  enumValues={null}
-  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
-  name={"`<label-key>`"}
-  path={null}
-  required={true}
-  type={"string"}
-  >
-
-### `<label-key>`
-
-[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
 
 
 </Field>

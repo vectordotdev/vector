@@ -53,9 +53,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL
     [transforms.my_transform_id.metrics.tags]
-      {host = "${HOSTNAME}"} # example
-      {region = "us-east-1"} # example
-      {status = "{{status}}"} # example
+      host = "${HOSTNAME}" # example
+      region = "us-east-1" # example
+      status = "{{status}}" # example
 ```
 
 </TabItem>
@@ -79,9 +79,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # OPTIONAL
     increment_by_value = true # default, relevant when type = "counter"
     [transforms.my_transform_id.metrics.tags]
-      {host = "${HOSTNAME}"} # example
-      {region = "us-east-1"} # example
-      {status = "{{status}}"} # example
+      host = "${HOSTNAME}" # example
+      region = "us-east-1" # example
+      status = "{{status}}" # example
 ```
 
 </TabItem>
