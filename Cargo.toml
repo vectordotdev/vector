@@ -129,6 +129,7 @@ listenfd = "0.3.3"
 inventory = "0.1"
 maxminddb = "0.13.0"
 strip-ansi-escapes = "0.1.0"
+colored = "1.9"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"

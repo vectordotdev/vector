@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, Serialize, is_enum_variant)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Metric {
     Counter {
@@ -34,7 +34,7 @@ pub enum Metric {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Direction {
     Plus,
     Minus,
