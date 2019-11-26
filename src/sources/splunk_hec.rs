@@ -27,7 +27,7 @@ lazy_static! {
     pub static ref SOURCETYPE: Atom = Atom::from("sourcetype");
 }
 
-/// Cashed bodies for common responses
+/// Cached bodies for common responses
 mod splunk_response {
     use bytes::Bytes;
     use lazy_static::lazy_static;
@@ -87,7 +87,7 @@ impl SourceConfig for SplunkConfig {
         let server = Server::bind(&self.address)
             .serve(service)
             .with_graceful_shutdown(tripwire)
-            .map_err(|error| error!(message="Splunk HEC source stopped, because of error", %error));
+            .map_err(|error| error!(message="Splunk HEC source stopped", %error));
 
         Ok(Box::new(server))
     }
