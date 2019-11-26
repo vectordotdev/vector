@@ -22,7 +22,7 @@
       <%- end -%>
       <%- option.examples.each do |example| -%>
         <%- if example.is_a?(Hash) -%>
-  <%= example.fetch("name") %> = <%= example.fetch("value").to_toml %>
+  <%= example.to_toml %>
         <%- else -%>
   <%= option.name %> = <%= example.to_toml %>
         <%- end -%>

@@ -21,8 +21,6 @@ lazy_static! {
     pub static ref MESSAGE: Atom = Atom::from("message");
     pub static ref HOST: Atom = Atom::from("host");
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
-    pub static ref STREAM: Atom = Atom::from("stream");
-    pub static ref CONTAINER: Atom = Atom::from("container");
 }
 
 #[derive(PartialEq, Debug, Clone)]

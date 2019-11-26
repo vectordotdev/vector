@@ -24,7 +24,7 @@ an arbitrary set of fields (key/value pairs) that describe the event.
 
 ```javascript
 {
-  "*": "my-value",
+  "my-key": "my-value",
   "host": "my.host.com",
   "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
   "timestamp": "2019-11-01T21:15:47+00:00"
@@ -40,14 +40,14 @@ import Field from '@site/src/components/Field';
 
 <Field
   enumValues={null}
-  examples={["my-value"]}
-  name={"*"}
+  examples={[{"my-key":"my-value"}]}
+  name={"`<key>`"}
   path={null}
   required={false}
   type={"*"}
   >
 
-### *
+### `<key>`
 
 In addition to the defined fields, you are welcome to add your own fields.
 
