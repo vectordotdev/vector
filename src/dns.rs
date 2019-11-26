@@ -2,8 +2,7 @@ use crate::runtime::Runtime;
 use crate::topology::config::GlobalOptions;
 use futures::{Async, Future, Poll};
 use hyper::client::connect::dns::{Name, Resolve};
-use std::error;
-use std::fmt;
+use snafu::Snafu;
 use std::io;
 use std::net::{AddrParseError, IpAddr, SocketAddr, ToSocketAddrs};
 use std::vec::IntoIter;
@@ -89,14 +88,24 @@ impl DnsResolver {
         let mut parts = s.rsplitn(2, ':');
         let port = parts
             .next()
-            .ok_or_else(|| DnsError::MissingPort(s.to_owned()))?
+            .ok_or_else(|| DnsError::MissingPort {
+                address: s.to_owned(),
+            })?
             .parse::<u16>()
-            .map_err(|error| DnsError::InvalidPort(s.to_owned(), error))?;
+            .map_err(|source| DnsError::InvalidPort {
+                address: s.to_owned(),
+                source,
+            })?;
         let name = parts
             .next()
-            .ok_or_else(|| DnsError::MissingHost(s.to_owned()))?
+            .ok_or_else(|| DnsError::MissingHost {
+                address: s.to_owned(),
+            })?
             .parse::<Name>()
-            .map_err(|error| DnsError::InvalidHost(s.to_owned(), error))?;
+            .map_err(|source| DnsError::InvalidHost {
+                address: s.to_owned(),
+                source,
+            })?;
 
         let addresses = self.resolve_name(name)?;
 
@@ -111,7 +120,10 @@ impl DnsResolver {
     pub fn resolve_host(&self, host: &str) -> Result<IntoIter<IpAddr>, DnsError> {
         let name = host
             .parse::<Name>()
-            .map_err(|error| DnsError::InvalidHost(host.to_owned(), error))?;
+            .map_err(|error| DnsError::InvalidHost {
+                address: host.to_owned(),
+                source: error,
+            })?;
 
         self.resolve_name(name).map_err(Into::into)
     }
@@ -201,55 +213,33 @@ impl Future for ResolveFuture {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Snafu)]
 pub enum DnsError {
+    #[snafu(display("Invalid DNS server IPs: {:?}", servers.iter().map(|(s,e)| format!("({:?} : {})",s,e)).collect::<Vec<_>>()))]
     InputError {
         servers: Vec<(String, AddrParseError)>,
     },
-    MissingPort(String),
-    MissingHost(String),
-    InvalidPort(String, std::num::ParseIntError),
-    InvalidHost(String, hyper::client::connect::dns::InvalidNameError),
-    IO(io::Error),
-}
-
-impl error::Error for DnsError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            DnsError::InvalidPort(_, error) => Some(error),
-            DnsError::InvalidHost(_, error) => Some(error),
-            DnsError::IO(error) => Some(error),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for DnsError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DnsError::InputError { servers } => {
-                writeln!(f, "Invalid DNS server IPs:")?;
-                for (s, e) in servers {
-                    writeln!(f, " - {:?} {}", s, e)?;
-                }
-                Ok(())
-            }
-            DnsError::MissingPort(input) => writeln!(f, "Missing port in address {:?}", input),
-            DnsError::MissingHost(input) => writeln!(f, "Missing host in address {:?}", input),
-            DnsError::InvalidPort(input, error) => {
-                writeln!(f, "Invalid port in address {:?}, reason: {}", input, error)
-            }
-            DnsError::InvalidHost(input, error) => {
-                writeln!(f, "Invalid host in {:?}, reason: {}", input, error)
-            }
-            DnsError::IO(error) => writeln!(f, "{}", error),
-        }
-    }
+    #[snafu(display("Missing port in address {:?}", address))]
+    MissingPort { address: String },
+    #[snafu(display("Missing host in address {:?}", address))]
+    MissingHost { address: String },
+    #[snafu(display("Invalid port in address {:?}, source: {}", address, source))]
+    InvalidPort {
+        address: String,
+        source: std::num::ParseIntError,
+    },
+    #[snafu(display("Invalid host in {:?}, source: {}", address, source))]
+    InvalidHost {
+        address: String,
+        source: hyper::client::connect::dns::InvalidNameError,
+    },
+    #[snafu(display("{}", source))]
+    IO { source: io::Error },
 }
 
 impl From<io::Error> for DnsError {
     fn from(error: io::Error) -> Self {
-        DnsError::IO(error)
+        DnsError::IO { source: error }
     }
 }
 
