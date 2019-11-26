@@ -158,13 +158,18 @@ pub enum ResolveFuture {
 
 impl ResolveFuture {
     fn system_resolve(name: &Name) -> Poll<IntoIter<IpAddr>, io::Error> {
-        match (name.as_str(), 0).to_socket_addrs() {
-            Ok(ips) => Poll::Ok(Async::Ready(
+        let poll = tokio_threadpool::blocking(|| {
+            (name.as_str(), 0).to_socket_addrs().map(|ips| {
                 ips.map(|socket_addr| socket_addr.ip())
                     .collect::<Vec<_>>()
-                    .into_iter(),
-            )),
-            Err(error) => Poll::Err(error),
+                    .into_iter()
+            })
+        });
+        match poll {
+            Poll::Ok(Async::NotReady) => Poll::Ok(Async::NotReady),
+            Poll::Ok(Async::Ready(Ok(ips))) => Poll::Ok(Async::Ready(ips)),
+            Poll::Ok(Async::Ready(Err(error))) => Poll::Err(error),
+            Poll::Err(error) => Poll::Err(io::Error::new(io::ErrorKind::Other, error)),
         }
     }
 }
