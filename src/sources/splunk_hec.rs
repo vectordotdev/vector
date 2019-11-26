@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event, LogEvent, ValueKind},
+    event::{self, flatten::flatten, Event, LogEvent, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{buf::IntoBuf, Bytes};
@@ -447,9 +447,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if object.is_empty() {
                         return Err(event_error("Event field cannot be blank", 13, self.events));
                     }
-                    for (name, value) in object {
-                        insert(log, name, value);
-                    }
+                    flatten(log, object);
                 }
                 _ => {
                     return Err(event_error("Invalid data format", 6, self.events));
@@ -469,9 +467,7 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process fields field
         if let Some(Value::Object(object)) = json.get_mut("fields").map(Value::take) {
-            for (name, value) in object {
-                insert(log, name, value);
-            }
+            flatten(log, object);
         }
 
         // Process time field
@@ -593,44 +589,6 @@ fn raw_event(
     }
 
     Ok(event)
-}
-
-/// Recursevly inserts json values to event under given name
-pub fn insert(event: &mut LogEvent, name: String, value: Value) {
-    match value {
-        Value::String(string) => {
-            event.insert_explicit(name.into(), string.into());
-        }
-        Value::Number(number) => {
-            let val: ValueKind = if let Some(val) = number.as_i64() {
-                val.into()
-            } else if let Some(val) = number.as_f64() {
-                val.into()
-            } else {
-                number.to_string().into()
-            };
-
-            event.insert_explicit(name.into(), val);
-        }
-        Value::Bool(b) => {
-            event.insert_explicit(name.into(), b.into());
-        }
-        Value::Null => {
-            event.insert_explicit(name.into(), "".into());
-        }
-        Value::Array(array) => {
-            for (i, element) in array.into_iter().enumerate() {
-                let element_name = format!("{}[{}]", name, i);
-                insert(event, element_name, element);
-            }
-        }
-        Value::Object(object) => {
-            for (key, value) in object.into_iter() {
-                let item_name = format!("{}.{}", name, key);
-                insert(event, item_name, value);
-            }
-        }
-    }
 }
 
 /// As serde_json::from_reader, but doesn't require that all data has to be consumed,
