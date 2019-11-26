@@ -62,7 +62,7 @@ impl CheckFieldsPredicate for EqualsPredicate {
                 },
             }),
             Event::Metric(m) => m
-                .tags()
+                .tags
                 .as_ref()
                 .and_then(|t| t.get(self.target.as_ref()))
                 .map_or(false, |v| match &self.arg {
@@ -106,7 +106,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
                 .map(|f| f.as_bytes())
                 .map_or(false, |b| b != self.arg.as_bytes()),
             Event::Metric(m) => m
-                .tags()
+                .tags
                 .as_ref()
                 .and_then(|t| t.get(self.target.as_ref()))
                 .map_or(false, |v| v.as_bytes() != self.arg.as_bytes()),
@@ -142,7 +142,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
         (match event {
             Event::Log(l) => l.get(&self.target).is_some(),
             Event::Metric(m) => m
-                .tags()
+                .tags
                 .as_ref()
                 .map_or(false, |t| t.contains_key(self.target.as_ref())),
         }) == self.arg

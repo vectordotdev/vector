@@ -1,158 +1,107 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Metric {
+    pub name: String,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub tags: Option<HashMap<String, String>>,
+    pub kind: MetricKind,
+    pub value: MetricValue,
+}
+
+#[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[serde(rename_all = "snake_case")]
+pub enum MetricKind {
+    Incremental,
+    Absolute,
+}
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum Metric {
+pub enum MetricValue {
     Counter {
-        name: String,
-        val: f64,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
-    },
-    Histogram {
-        name: String,
-        val: f64,
-        sample_rate: u32,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
+        value: f64,
     },
     Gauge {
-        name: String,
-        val: f64,
-        direction: Option<Direction>,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
+        value: f64,
     },
     Set {
-        name: String,
-        val: String,
-        timestamp: Option<DateTime<Utc>>,
-        tags: Option<HashMap<String, String>>,
+        values: HashSet<String>,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub enum Direction {
-    Plus,
-    Minus,
+    Distribution {
+        values: Vec<f64>,
+        sample_rates: Vec<u32>,
+    },
+    AggregatedHistogram {
+        buckets: Vec<f64>,
+        counts: Vec<u32>,
+        count: u32,
+        sum: f64,
+    },
+    AggregatedSummary {
+        quantiles: Vec<f64>,
+        values: Vec<f64>,
+        count: u32,
+        sum: f64,
+    },
 }
 
 impl Metric {
-    pub fn tags(&self) -> &Option<HashMap<String, String>> {
-        match self {
-            Metric::Counter { tags, .. } => tags,
-            Metric::Gauge { tags, .. } => tags,
-            Metric::Histogram { tags, .. } => tags,
-            Metric::Set { tags, .. } => tags,
+    pub fn into_absolute(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            timestamp: self.timestamp,
+            tags: self.tags.clone(),
+            kind: MetricKind::Absolute,
+            value: self.value.clone(),
         }
     }
 
-    pub fn tags_mut(&mut self) -> &mut Option<HashMap<String, String>> {
-        match self {
-            Metric::Counter { tags, .. } => tags,
-            Metric::Gauge { tags, .. } => tags,
-            Metric::Histogram { tags, .. } => tags,
-            Metric::Set { tags, .. } => tags,
+    pub fn add(&mut self, other: &Self) {
+        if other.kind.is_absolute() {
+            return;
         }
-    }
 
-    pub fn merge(&mut self, other: &Metric) {
-        match (self, other) {
+        match (&mut self.value, &other.value) {
             (
-                Metric::Counter {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::Counter {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
+                MetricValue::Counter { ref mut value, .. },
+                MetricValue::Counter { value: value2, .. },
+            ) => {
+                *value += value2;
+            }
+            (
+                MetricValue::Gauge { ref mut value, .. },
+                MetricValue::Gauge { value: value2, .. },
+            ) => {
+                *value += value2;
+            }
+            (
+                MetricValue::Set { ref mut values, .. },
+                MetricValue::Set {
+                    values: values2, ..
                 },
             ) => {
-                if name == new_name {
-                    *val += *new_val;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
+                for val in values2 {
+                    values.insert(val.to_string());
                 }
             }
             (
-                Metric::Gauge {
-                    ref mut name,
-                    ref mut val,
-                    direction: None,
-                    ref mut timestamp,
-                    ref mut tags,
+                MetricValue::Distribution {
+                    ref mut values,
+                    ref mut sample_rates,
+                    ..
                 },
-                Metric::Gauge {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    direction: new_direction,
-                    tags: new_tags,
+                MetricValue::Distribution {
+                    values: values2,
+                    sample_rates: sample_rates2,
+                    ..
                 },
             ) => {
-                if name == new_name {
-                    if new_direction.is_none() {
-                        *val = *new_val;
-                    } else {
-                        let delta = match new_direction {
-                            None => 0.0,
-                            Some(Direction::Plus) => *val,
-                            Some(Direction::Minus) => -*val,
-                        };
-                        *val += delta;
-                    };
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
-            }
-            (
-                Metric::Set {
-                    ref mut name,
-                    ref mut val,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::Set {
-                    name: new_name,
-                    val: new_val,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name {
-                    *val = new_val.clone();
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                }
-            }
-            (
-                Metric::Histogram {
-                    ref mut name,
-                    ref mut val,
-                    ref mut sample_rate,
-                    ref mut timestamp,
-                    ref mut tags,
-                },
-                Metric::Histogram {
-                    name: new_name,
-                    val: new_val,
-                    sample_rate: new_sample_rate,
-                    timestamp: new_timestamp,
-                    tags: new_tags,
-                },
-            ) => {
-                if name == new_name && val == new_val {
-                    *sample_rate += *new_sample_rate;
-                    *timestamp = *new_timestamp;
-                    *tags = new_tags.clone();
-                };
+                values.extend_from_slice(&values2);
+                sample_rates.extend_from_slice(&sample_rates2);
             }
             _ => {}
         }
@@ -180,146 +129,139 @@ mod test {
 
     #[test]
     fn merge_counters() {
-        let mut counter1 = Metric::Counter {
+        let mut counter = Metric {
             name: "counter".into(),
-            val: 1.0,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 1.0 },
         };
 
-        let counter2 = Metric::Counter {
+        let delta = Metric {
             name: "counter".into(),
-            val: 2.0,
             timestamp: Some(ts()),
             tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 2.0 },
         };
 
-        counter1.merge(&counter2);
+        counter.add(&delta);
         assert_eq!(
-            counter1,
-            Metric::Counter {
+            counter,
+            Metric {
                 name: "counter".into(),
-                val: 3.0,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-            }
-        )
-    }
-
-    #[test]
-    fn merge_incompatible_counters() {
-        let mut counter1 = Metric::Counter {
-            name: "first".into(),
-            val: 1.0,
-            timestamp: None,
-            tags: None,
-        };
-
-        let counter2 = Metric::Counter {
-            name: "second".into(),
-            val: 2.0,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-        };
-
-        counter1.merge(&counter2);
-        assert_eq!(
-            counter1,
-            Metric::Counter {
-                name: "first".into(),
-                val: 1.0,
                 timestamp: None,
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 3.0 },
             }
         )
     }
 
     #[test]
     fn merge_gauges() {
-        let mut gauge1 = Metric::Gauge {
+        let mut gauge = Metric {
             name: "gauge".into(),
-            val: 1.0,
-            direction: None,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Gauge { value: 1.0 },
         };
 
-        let gauge2 = Metric::Gauge {
+        let delta = Metric {
             name: "gauge".into(),
-            val: 2.0,
-            direction: None,
             timestamp: Some(ts()),
             tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Gauge { value: -2.0 },
         };
 
-        gauge1.merge(&gauge2);
+        gauge.add(&delta);
         assert_eq!(
-            gauge1,
-            Metric::Gauge {
+            gauge,
+            Metric {
                 name: "gauge".into(),
-                val: 2.0,
-                direction: None,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: -1.0 },
             }
         )
     }
 
     #[test]
     fn merge_sets() {
-        let mut set1 = Metric::Set {
+        let mut set = Metric {
             name: "set".into(),
-            val: "old".into(),
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["old".into()].into_iter().collect(),
+            },
         };
 
-        let set2 = Metric::Set {
+        let delta = Metric {
             name: "set".into(),
-            val: "new".into(),
             timestamp: Some(ts()),
             tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["new".into()].into_iter().collect(),
+            },
         };
 
-        set1.merge(&set2);
+        set.add(&delta);
         assert_eq!(
-            set1,
-            Metric::Set {
+            set,
+            Metric {
                 name: "set".into(),
-                val: "new".into(),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Set {
+                    values: vec!["old".into(), "new".into()].into_iter().collect()
+                },
             }
         )
     }
 
     #[test]
     fn merge_histograms() {
-        let mut hist1 = Metric::Histogram {
+        let mut dist = Metric {
             name: "hist".into(),
-            val: 1.0,
-            sample_rate: 10,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0],
+                sample_rates: vec![10],
+            },
         };
 
-        let hist2 = Metric::Histogram {
+        let delta = Metric {
             name: "hist".into(),
-            val: 1.0,
-            sample_rate: 20,
             timestamp: Some(ts()),
             tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0],
+                sample_rates: vec![20],
+            },
         };
 
-        hist1.merge(&hist2);
+        dist.add(&delta);
         assert_eq!(
-            hist1,
-            Metric::Histogram {
+            dist,
+            Metric {
                 name: "hist".into(),
-                val: 1.0,
-                sample_rate: 30,
-                timestamp: Some(ts()),
-                tags: Some(tags()),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![1.0, 1.0],
+                    sample_rates: vec![10, 20],
+                },
             }
         )
     }
