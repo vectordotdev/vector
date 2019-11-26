@@ -143,7 +143,7 @@ At this point we recommend reaching out to the community for help.
 
 
 [docs.monitoring#rate-limiting]: /docs/administration/monitoring#rate-limiting
-[urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
+[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_issues]: https://github.com/timberio/vector/issues

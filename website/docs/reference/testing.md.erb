@@ -1,0 +1,51 @@
+---
+title: Unit Tests
+description: Unit test configuration options
+---
+
+It's possible to define unit tests within a Vector configuration file that cover
+a network of transforms within the topology. The intention of these tests is to
+improve the maintainability of configs containing larger and more complex
+combinations of transforms.
+
+Executing tests within a config file can be done with the `test` subcommand:
+
+```bash
+vector test /etc/vector/*.toml
+```
+
+## Configuration
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+<TabItem value="common">
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+<%= config_example(metadata.testing.tests.options, path: "tests", array: true, common: true) %>
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+<%= config_example(metadata.testing.tests.options, path: "tests", array: true, common: false) %>
+```
+
+</TabItem>
+
+</Tabs>
+
+## Options
+
+<%= options(metadata.testing.tests.options, heading_depth: 3) %>

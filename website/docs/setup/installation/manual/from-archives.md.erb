@@ -68,7 +68,7 @@ import Tabs from '@theme/Tabs';
     <TabItem value="latest">
 
     ```powershell
-    Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.latest/vector-x86_64-pc-windows-msvc.zip") %> -OutFile vector-x86_64-pc-windows-msvc.zip
+    Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version}/vector-x86_64-pc-windows-msvc.zip") %> -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>

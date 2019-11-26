@@ -13,7 +13,7 @@ use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{generate, list, metrics, runtime, topology, trace};
+use vector::{generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -80,6 +80,9 @@ struct RootOpts {
 enum SubCommand {
     /// Validate the target config, then exit.
     Validate(Validate),
+
+    /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
+    Test(unit_test::Opts),
 
     /// List available components, then exit.
     List(list::Opts),
@@ -196,6 +199,7 @@ fn main() {
         std::process::exit(match s {
             SubCommand::Validate(v) => validate(&v),
             SubCommand::List(l) => list::cmd(&l),
+            SubCommand::Test(t) => unit_test::cmd(&t),
             SubCommand::Generate(g) => generate::cmd(&g),
         })
     });

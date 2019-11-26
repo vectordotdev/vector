@@ -44,7 +44,7 @@
 
 .vector-components--filters--section--title {
   border-right: 1px solid var(--ifm-hr-border-color) ;
-  flex: 0 0 13%;
+  flex: 0 0 17%;
   min-width: 120px;
   padding-top: calc( var(--ifm-spacing-vertical) / 4 );
   padding-right: 1em;

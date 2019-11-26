@@ -156,12 +156,12 @@ function DocItem(props) {
                     <DocContent />
                   </div>
                 </article>
-                {!metadata.hide_pagination && (
-                  <div className="margin-vert--lg">
-                    <DocPaginator metadata={metadata} />
-                  </div>
-                )}
               </div>
+              {!metadata.hide_pagination && (
+                <div className={styles.paginator}>
+                  <DocPaginator metadata={metadata} />
+                </div>
+              )}
             </div>
             {DocContent.rightToc && (
               <div className="col col--3">

@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::Metric,
+    event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -142,47 +142,50 @@ impl CloudWatchMetricsSvc {
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
         let metric_data: Vec<_> = events
             .into_iter()
-            .filter_map(|event| match event {
-                Metric::Counter {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    value: Some(val),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                Metric::Gauge {
-                    name,
-                    val,
-                    direction: None,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    value: Some(val),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                Metric::Histogram {
-                    name,
-                    val,
-                    sample_rate,
-                    timestamp,
-                    tags,
-                } => Some(MetricDatum {
-                    metric_name: name.to_string(),
-                    values: Some(vec![val]),
-                    counts: Some(vec![f64::from(sample_rate)]),
-                    timestamp: timestamp.map(timestamp_to_string),
-                    dimensions: tags.map(tags_to_dimensions),
-                    ..Default::default()
-                }),
-                _ => None,
+            .filter_map(|event| {
+                let metric_name = event.name.to_string();
+                let timestamp = event.timestamp.map(timestamp_to_string);
+                let dimensions = event.tags.clone().map(tags_to_dimensions);
+                match event.kind {
+                    MetricKind::Incremental => match event.value {
+                        MetricValue::Counter { value } => Some(MetricDatum {
+                            metric_name,
+                            value: Some(value),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        MetricValue::Distribution {
+                            values,
+                            sample_rates,
+                        } => Some(MetricDatum {
+                            metric_name,
+                            values: Some(values.to_vec()),
+                            counts: Some(sample_rates.iter().cloned().map(f64::from).collect()),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        MetricValue::Set { values } => Some(MetricDatum {
+                            metric_name,
+                            value: Some(values.len() as f64),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        _ => None,
+                    },
+                    MetricKind::Absolute => match event.value {
+                        MetricValue::Gauge { value } => Some(MetricDatum {
+                            metric_name,
+                            value: Some(value),
+                            timestamp,
+                            dimensions,
+                            ..Default::default()
+                        }),
+                        _ => None,
+                    },
+                }
             })
             .collect();
 
@@ -256,7 +259,7 @@ fn tags_to_dimensions(tags: HashMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::Metric;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -280,27 +283,30 @@ mod tests {
     #[test]
     fn encode_events_basic_counter() {
         let events = vec![
-            Metric::Counter {
+            Metric {
                 name: "exception_total".into(),
-                val: 1.0,
                 timestamp: None,
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             },
-            Metric::Counter {
+            Metric {
                 name: "bytes_out".into(),
-                val: 2.5,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 2.5 },
             },
-            Metric::Counter {
+            Metric {
                 name: "healthcheck".into(),
-                val: 1.0,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: Some(
                     vec![("region".to_owned(), "local".to_owned())]
                         .into_iter()
                         .collect(),
                 ),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
             },
         ];
 
@@ -337,12 +343,12 @@ mod tests {
 
     #[test]
     fn encode_events_absolute_gauge() {
-        let events = vec![Metric::Gauge {
+        let events = vec![Metric {
             name: "temperature".into(),
-            val: 10.0,
-            direction: None,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: 10.0 },
         }];
 
         assert_eq!(
@@ -359,13 +365,16 @@ mod tests {
     }
 
     #[test]
-    fn encode_events_histogram() {
-        let events = vec![Metric::Histogram {
+    fn encode_events_distribution() {
+        let events = vec![Metric {
             name: "latency".into(),
-            val: 11.0,
-            sample_rate: 100,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![11.0, 12.0],
+                sample_rates: vec![100, 50],
+            },
         }];
 
         assert_eq!(
@@ -374,8 +383,33 @@ mod tests {
                 namespace: "vector".into(),
                 metric_data: vec![MetricDatum {
                     metric_name: "latency".into(),
-                    values: Some(vec![11.0]),
-                    counts: Some(vec![100.0]),
+                    values: Some(vec![11.0, 12.0]),
+                    counts: Some(vec![100.0, 50.0]),
+                    ..Default::default()
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn encode_events_set() {
+        let events = vec![Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["alice".into(), "bob".into()].into_iter().collect(),
+            },
+        }];
+
+        assert_eq!(
+            svc().encode_events(events),
+            PutMetricDataInput {
+                namespace: "vector".into(),
+                metric_data: vec![MetricDatum {
+                    metric_name: "users".into(),
+                    value: Some(2.0),
                     ..Default::default()
                 }],
             }
@@ -417,9 +451,8 @@ mod integration_tests {
         let mut events = Vec::new();
 
         for i in 0..100 {
-            let event = Event::Metric(Metric::Counter {
+            let event = Event::Metric(Metric {
                 name: format!("counter-{}", 0),
-                val: i as f64,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -430,30 +463,35 @@ mod integration_tests {
                     .into_iter()
                     .collect(),
                 ),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: i as f64 },
             });
             events.push(event);
         }
 
         let gauge_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::Gauge {
+            let event = Event::Metric(Metric {
                 name: format!("gauge-{}", gauge_name),
-                val: i as f64,
-                direction: None,
                 timestamp: None,
                 tags: None,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: i as f64 },
             });
             events.push(event);
         }
 
-        let histogram_name = random_string(10);
+        let distribution_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::Histogram {
-                name: format!("histogram-{}", histogram_name),
-                val: i as f64,
-                sample_rate: 100,
+            let event = Event::Metric(Metric {
+                name: format!("distribution-{}", distribution_name),
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![i as f64],
+                    sample_rates: vec![100],
+                },
             });
             events.push(event);
         }

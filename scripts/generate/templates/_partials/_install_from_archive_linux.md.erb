@@ -12,7 +12,7 @@
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 <%= metadata.links.fetch("urls.vector_downloads.latest/#{archive_name}") %> | \
+      curl -sSfL --proto '=https' --tlsv1.2 <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version}/#{archive_name}") %> | \
       tar xzf - -C vector --strip-components=2
     ```
 

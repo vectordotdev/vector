@@ -149,7 +149,7 @@ function Navbar() {
             </div>
             <Link className="navbar__brand" to={baseUrl}>
               {logo != null && (
-                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} width="155px" />
+                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
               )}
               {title != null && (
                 <strong
@@ -199,7 +199,7 @@ function Navbar() {
           <div className="navbar-sidebar__brand">
             <Link className="navbar__brand" onClick={hideSidebar} to={baseUrl}>
               {logo != null && (
-                <img className="navbar__logo" src={logoUrl} alt={logo.alt} />
+                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
               )}
               {title != null && <strong>{title}</strong>}
             </Link>
