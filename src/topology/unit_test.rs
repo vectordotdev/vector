@@ -593,11 +593,13 @@ mod tests {
     insert_at = "foo"
     type = "metric"
     [tests.input.metric]
-      type = "counter"
+      kind = "incremental"
       name = "foometric"
-      val = 7
       [tests.input.metric.tags]
         tagfoo = "valfoo"
+      [tests.input.metric.value]
+        type = "counter"
+        value = 100.0
 
   [[tests.outputs]]
     extract_from = "foo"
