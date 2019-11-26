@@ -11,7 +11,7 @@ through_description = "the docker engine daemon"
 [sources.docker.options.include_containers]
 type = "[string]"
 common = true
-examples = ["nostalgic_stallman", "9b6247364a03"]
+examples = [["my_container_name", "container_prefix", "9b6247364a03"]]
 null = true
 description = """\
 A list of container IDs _or_ names to match against. Prefix matches are \
@@ -22,7 +22,7 @@ container ID or name. If not provided, all containers will be included. \
 [sources.docker.options.include_labels]
 type = "[string]"
 common = true
-examples = ["label_key=label_value"]
+examples = [["label_key1=label_value1", "label_key2=label_value2"]]
 null = true
 description = """\
 A list of container object labels to match against when filtering running \

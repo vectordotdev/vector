@@ -55,8 +55,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  include_containers = "nostalgic_stallman"
-  include_containers = "9b6247364a03"
+  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"]
 
   # A list of container object labels to match against when filtering running
   # containers. This should follow the described label's synatx in docker object
@@ -65,7 +64,7 @@ data_dir = "/var/lib/vector"
   # * optional
   # * no default
   # * type: [string]
-  include_labels = "label_key=label_value"
+  include_labels = ["label_key1=label_value1", "label_key2=label_value2"]
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
