@@ -3,7 +3,7 @@ use crate::{
     event::proto,
     sinks::tcp::TcpSink,
     sinks::util::SinkExt,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
@@ -24,6 +24,10 @@ impl VectorSinkConfig {
     pub fn new(address: String) -> Self {
         Self { address }
     }
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<VectorSinkConfig>("vector")
 }
 
 #[typetag::serde(name = "vector")]

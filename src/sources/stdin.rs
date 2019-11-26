@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -26,6 +26,10 @@ impl Default for StdinConfig {
 
 fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
+}
+
+inventory::submit! {
+    SourceDescription::new::<StdinConfig>("stdin")
 }
 
 #[typetag::serde(name = "stdin")]

@@ -24,7 +24,7 @@ RUN apt-get update && \
 #       this target. Unfortunately, this is not the case for other targets,
 #       hence the reason we only support this target currently.
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV PATH="$PATH:/root/.cargo/bin"
 RUN cargo install cargo-deb
 

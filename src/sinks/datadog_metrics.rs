@@ -1,12 +1,12 @@
 use crate::{
     buffers::Acker,
-    event::Metric,
+    event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         retries::FixedRetryPolicy,
-        BatchServiceSink, MetricBuffer, SinkExt,
+        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{Future, Poll};
@@ -44,8 +44,8 @@ pub struct DatadogConfig {
     #[serde(default = "default_host")]
     pub host: String,
     pub api_key: String,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -85,6 +85,10 @@ pub enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogPoint(i64, f64);
 
+inventory::submit! {
+    SinkDescription::new::<DatadogConfig>("datadog")
+}
+
 #[typetag::serde(name = "datadog")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
@@ -104,8 +108,7 @@ impl SinkConfig for DatadogConfig {
 
 impl DatadogSvc {
     pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
-        let batch_size = config.batch_size.unwrap_or(20);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let batch = config.batch.unwrap_or(20, 1);
 
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
@@ -148,11 +151,8 @@ impl DatadogSvc {
             .timeout(Duration::from_secs(timeout))
             .service(datadog_http_service);
 
-        let sink = BatchServiceSink::new(service, acker).batched_with_max(
-            MetricBuffer::new(),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        );
+        let sink =
+            BatchServiceSink::new(service, acker).batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }
@@ -217,65 +217,52 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: String) -> String {
+fn encode_namespace(namespace: &str, name: &str) -> String {
     if !namespace.is_empty() {
         format!("{}.{}", namespace, name)
     } else {
-        name
+        name.to_string()
     }
 }
 
 fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
     let series: Vec<_> = events
         .into_iter()
-        .filter_map(|event| match event {
-            Metric::Counter {
-                name,
-                val,
-                timestamp,
-                tags,
-            } => Some(DatadogMetric {
-                metric: encode_namespace(namespace, name),
-                r#type: DatadogMetricType::Count,
-                interval: Some(interval),
-                points: vec![DatadogPoint(encode_timestamp(timestamp), val)],
-                tags: tags.map(encode_tags),
-            }),
-            Metric::Gauge {
-                name,
-                val,
-                direction: None,
-                timestamp,
-                tags,
-            } => Some(DatadogMetric {
-                metric: encode_namespace(namespace, name),
-                r#type: DatadogMetricType::Gauge,
-                interval: None,
-                points: vec![DatadogPoint(encode_timestamp(timestamp), val)],
-                tags: tags.map(encode_tags),
-            }),
-            Metric::Histogram {
-                name,
-                val,
-                sample_rate,
-                timestamp,
-                tags,
-            } => {
-                let mut points = Vec::new();
-                for _ in 0..sample_rate {
-                    let point = DatadogPoint(encode_timestamp(timestamp), val);
-                    points.push(point);
-                }
-                Some(DatadogMetric {
-                    metric: encode_namespace(namespace, name),
-                    r#type: DatadogMetricType::Count,
-                    interval: Some(interval),
-                    points,
-                    tags: tags.map(encode_tags),
-                })
+        .filter_map(|event| {
+            let fullname = encode_namespace(namespace, &event.name);
+            let ts = encode_timestamp(event.timestamp);
+            let tags = event.tags.clone().map(encode_tags);
+            match event.kind {
+                MetricKind::Incremental => match event.value {
+                    MetricValue::Counter { value } => Some(vec![DatadogMetric {
+                        metric: fullname,
+                        r#type: DatadogMetricType::Count,
+                        interval: Some(interval),
+                        points: vec![DatadogPoint(ts, value)],
+                        tags,
+                    }]),
+                    MetricValue::Set { values } => Some(vec![DatadogMetric {
+                        metric: fullname,
+                        r#type: DatadogMetricType::Gauge,
+                        interval: None,
+                        points: vec![DatadogPoint(ts, values.len() as f64)],
+                        tags: tags.clone(),
+                    }]),
+                    _ => None,
+                },
+                MetricKind::Absolute => match event.value {
+                    MetricValue::Gauge { value } => Some(vec![DatadogMetric {
+                        metric: fullname,
+                        r#type: DatadogMetricType::Gauge,
+                        interval: None,
+                        points: vec![DatadogPoint(ts, value)],
+                        tags,
+                    }]),
+                    _ => None,
+                },
             }
-            _ => None,
         })
+        .flatten()
         .collect();
 
     DatadogRequest { series }
@@ -284,7 +271,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::Metric;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
 
@@ -321,17 +308,26 @@ mod tests {
         let now = Utc::now().timestamp();
         let interval = 60;
         let events = vec![
-            Metric::Counter {
+            Metric {
                 name: "total".into(),
-                val: 1.5,
                 timestamp: None,
                 tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.5 },
             },
-            Metric::Counter {
+            Metric {
                 name: "check".into(),
-                val: 1.0,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
+            },
+            Metric {
+                name: "unsupported".into(),
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 1.0 },
             },
         ];
         let input = encode_events(events, interval, "ns");
@@ -345,13 +341,22 @@ mod tests {
 
     #[test]
     fn encode_gauge() {
-        let events = vec![Metric::Gauge {
-            name: "volume".into(),
-            val: -1.1,
-            direction: None,
-            timestamp: Some(ts()),
-            tags: None,
-        }];
+        let events = vec![
+            Metric {
+                name: "unsupported".into(),
+                timestamp: Some(ts()),
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Gauge { value: 0.1 },
+            },
+            Metric {
+                name: "volume".into(),
+                timestamp: Some(ts()),
+                tags: None,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: -1.1 },
+            },
+        ];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();
 
@@ -362,20 +367,22 @@ mod tests {
     }
 
     #[test]
-    fn encode_histogram() {
-        let events = vec![Metric::Histogram {
-            name: "login".into(),
-            val: 1.0,
-            sample_rate: 2,
+    fn encode_set() {
+        let events = vec![Metric {
+            name: "users".into(),
             timestamp: Some(ts()),
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["alice".into(), "bob".into()].into_iter().collect(),
+            },
         }];
         let input = encode_events(events, 60, "");
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
             json,
-            r#"{"series":[{"metric":"login","type":"count","interval":60,"points":[[1542182950,1.0],[1542182950,1.0]],"tags":null}]}"#
+            r#"{"series":[{"metric":"users","type":"gauge","interval":null,"points":[[1542182950,2.0]],"tags":null}]}"#
         );
     }
 }

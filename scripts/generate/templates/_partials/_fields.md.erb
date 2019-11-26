@@ -1,0 +1,27 @@
+<Fields filters={<%= filters.to_json %>}>
+
+<%- fields.each do |field| -%>
+<%- full_path = [path, field.name].compact.join(".") -%>
+
+<Field
+  enumValues={<%= field.enum.to_json %>}
+  examples={<%= field.examples.to_json %>}
+  name={<%= field.name.to_json %>}
+  path={<%= path.to_json %>}
+  required={<%= field.required?.to_json %>}
+  type={<%= field.type.to_json %>}
+  >
+
+<%= "#" * heading_depth %> <%= field.name %>
+
+<%= field.description %>[[references:<%= field.name %>]]
+
+<%- if field.fields? -%>
+<%= fields(field.fields_list, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
+<%- end -%>
+
+</Field>
+
+<%- end -%>
+
+</Fields>
