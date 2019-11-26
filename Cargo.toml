@@ -83,6 +83,10 @@ prost = "0.5"
 prost-derive = "0.5"
 prost-types = "0.5"
 
+# GCP
+goauth = "0.6.0"
+smpl_jwt = "0.4.0"
+
 # External libs
 derivative = "1.0"
 chrono = "0.4.6"
