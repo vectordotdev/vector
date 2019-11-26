@@ -97,6 +97,7 @@ module.exports = {
             "setup/guides",
             "setup/guides/getting-started",
             "setup/guides/troubleshooting",
+            "setup/guides/unit-testing",
           ]
         },
       ],

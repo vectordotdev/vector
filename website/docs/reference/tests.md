@@ -149,6 +149,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </Tabs>
 
+For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -719,3 +721,4 @@ The name of a transform, at the end of the test events extracted from this trans
 [docs.data-model#histograms]: /docs/about/data-model#histograms
 [docs.data-model#sets]: /docs/about/data-model#sets
 [docs.data-model#tags]: /docs/about/data-model#tags
+[docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing
