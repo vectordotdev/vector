@@ -130,7 +130,7 @@ jobs:
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
             rm rust-toolchain
-            cargo test --no-default-features --features "$FEATURES" -- --test-threads=1
+            cargo test --no-default-features --features "$FEATURES" -- --test-threads 4
 
   test-stable:
     resource_class: xlarge
@@ -184,7 +184,7 @@ jobs:
           docker_layer_caching: true
       - run:
           name: Test
-          command: cargo test --all --features docker --jobs 8 -- --test-threads 4
+          command: cargo test --all --features docker --jobs 4 -- --test-threads 4
       - store_test_results:
           path: ./test-results
 
