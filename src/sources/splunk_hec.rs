@@ -2,15 +2,15 @@ use crate::{
     event::{self, flatten::flatten, Event, LogEvent, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::{buf::IntoBuf, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{future, sync::mpsc, Async, Future, Sink, Stream};
-use hyper::service::Service;
-use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
+use futures::{sync::mpsc, Async, Future, Sink, Stream};
+use hyper::{Body, Response, StatusCode};
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value};
+use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use std::{
     io::Read,
@@ -18,41 +18,14 @@ use std::{
 };
 use stream_cancel::{Trigger, Tripwire};
 use string_cache::DefaultAtom as Atom;
+use warp::{body::FullBody, filters::BoxedFilter, path, Filter, Rejection, Reply};
 
 // Event fields unique to splunk_hec source
 lazy_static! {
-    pub static ref CHANNEL: Atom = Atom::from("channel");
-    pub static ref INDEX: Atom = Atom::from("index");
-    pub static ref SOURCE: Atom = Atom::from("source");
-    pub static ref SOURCETYPE: Atom = Atom::from("sourcetype");
-}
-
-/// Cached bodies for common responses
-mod splunk_response {
-    use bytes::Bytes;
-    use lazy_static::lazy_static;
-    use serde_json::{json, Value};
-
-    fn json_to_bytes(value: Value) -> Bytes {
-        serde_json::to_string(&value).unwrap().into()
-    }
-
-    lazy_static! {
-        pub static ref INVALID_AUTHORIZATION: Bytes =
-            json_to_bytes(json!({"text":"Invalid authorization","code":3}));
-        pub static ref MISSING_CREDENTIALS: Bytes =
-            json_to_bytes(json!({"text":"Token is required","code":2}));
-        pub static ref NO_DATA: Bytes = json_to_bytes(json!({"text":"No data","code":5}));
-        pub static ref SUCCESS: Bytes = json_to_bytes(json!({"text":"Success","code":0}));
-        pub static ref SERVER_ERROR: Bytes =
-            json_to_bytes(json!({"text":"Internal server error","code":8}));
-        pub static ref SERVER_SHUTDOWN: Bytes =
-            json_to_bytes(json!({"text":"Server is shuting down","code":9}));
-        pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
-            json_to_bytes(json!({"text":"unsupported content encoding"}));
-        pub static ref NO_CHANNEL: Bytes =
-            json_to_bytes(json!({"text":"Data channel is missing","code":10}));
-    }
+    pub static ref CHANNEL: Atom = Atom::from("splunk_channel");
+    pub static ref INDEX: Atom = Atom::from("splunk_index");
+    pub static ref SOURCE: Atom = Atom::from("splunk_source");
+    pub static ref SOURCETYPE: Atom = Atom::from("splunk_sourcetype");
 }
 
 /// Accepts HTTP requests.
@@ -81,13 +54,25 @@ impl SourceConfig for SplunkConfig {
 
         let source = Arc::new(SplunkSource::new(self, out, trigger));
 
-        let service = move || future::ok::<_, String>(Connection::new(source.clone()));
+        let event_service = SplunkSource::event_service(source.clone());
+        let raw_service = SplunkSource::raw_service(source.clone());
+        let health_service = SplunkSource::health_service(source.clone());
+        let options = SplunkSource::options();
+
+        let services = path!("services" / "collector")
+            .and(
+                event_service
+                    .or(raw_service)
+                    .unify()
+                    .or(health_service)
+                    .unify()
+                    .or(options)
+                    .unify(),
+            )
+            .or_else(finish_err);
 
         // Build server
-        let server = Server::bind(&self.address)
-            .serve(service)
-            .with_graceful_shutdown(tripwire)
-            .map_err(|error| error!(message="Splunk HEC source stopped", %error));
+        let (_, server) = warp::serve(services).bind_with_graceful_shutdown(self.address, tripwire);
 
         Ok(Box::new(server))
     }
@@ -120,10 +105,159 @@ impl SplunkSource {
         }
     }
 
+    fn event_service(source: Arc<Self>) -> BoxedFilter<(Response<Body>,)> {
+        warp::post2()
+            .and(
+                warp::path::end()
+                    .or(path!("event").and(warp::path::end()))
+                    .or(path!("event" / "1.0").and(warp::path::end())),
+            )
+            .and(source.authorization())
+            .and(warp::header::optional::<String>("x-splunk-request-channel"))
+            .and(warp::header::optional::<String>("host"))
+            .and(source.gzip())
+            .and(warp::body::concat())
+            .and_then(
+                move |_,
+                      _,
+                      channel: Option<String>,
+                      host: Option<String>,
+                      gzip: bool,
+                      body: FullBody| {
+                    // Construct event parser
+                    if gzip {
+                        Box::new(
+                            EventStream::new(GzDecoder::new(body.reader()), channel, host)
+                                .forward(source.sink_with_shutdown())
+                                .map(|_| ()),
+                        )
+                            as Box<dyn Future<Item = (), Error = Rejection> + Send>
+                    } else {
+                        Box::new(
+                            EventStream::new(body.reader(), channel, host)
+                                .forward(source.sink_with_shutdown())
+                                .map(|_| ()),
+                        )
+                            as Box<dyn Future<Item = (), Error = Rejection> + Send>
+                    }
+                },
+            )
+            .map(finish_ok)
+            .boxed()
+    }
+
+    fn raw_service(source: Arc<Self>) -> BoxedFilter<(Response<Body>,)> {
+        warp::post2()
+            .and(
+                (path!("raw" / "1.0").and(warp::path::end()))
+                    .or(path!("raw").and(warp::path::end())),
+            )
+            .and(source.authorization())
+            .and(
+                warp::header::optional::<String>("x-splunk-request-channel").and_then(
+                    |channel: Option<String>| {
+                        if let Some(channel) = channel {
+                            Ok(channel)
+                        } else {
+                            Err(Rejection::from(ApiError::MissingChannel))
+                        }
+                    },
+                ),
+            )
+            .and(warp::header::optional::<String>("host"))
+            .and(source.gzip())
+            .and(warp::body::concat())
+            .and_then(
+                move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
+                    // Construct event parser
+                    futures::stream::once(raw_event(body, gzip, channel, host))
+                        .forward(source.sink_with_shutdown())
+                        .map(|_| ())
+                },
+            )
+            .map(finish_ok)
+            .boxed()
+    }
+
+    fn health_service(source: Arc<Self>) -> BoxedFilter<(Response<Body>,)> {
+        let credentials = source.credentials.clone();
+        let authorize =
+            warp::header::optional("Authorization").and_then(move |token: Option<String>| {
+                match token {
+                    Some(token) if token.as_bytes() == credentials => Ok(()),
+                    _ => Err(Rejection::from(ApiError::BadRequest)),
+                }
+            });
+
+        warp::get2()
+            .and(
+                (path!("health" / "1.0").and(warp::path::end()))
+                    .or(path!("health").and(warp::path::end())),
+            )
+            .and(authorize)
+            .and_then(move |_, _| {
+                match source.out.clone().poll_ready() {
+                    Ok(Async::Ready(())) => Ok(warp::reply().into_response()),
+                    // Since channel of mpsc::Sender increase by one with each sender, technically
+                    // channel will never be full, and this will never be returned.
+                    // This behavior dosn't fulfill one of purposes of healthcheck.
+                    Ok(Async::NotReady) => Ok(warp::reply::with_status(
+                        warp::reply(),
+                        StatusCode::SERVICE_UNAVAILABLE,
+                    )
+                    .into_response()),
+                    Err(_) => Err(Rejection::from(ApiError::ServerShutdown)),
+                }
+            })
+            .boxed()
+    }
+
+    fn options() -> BoxedFilter<(Response<Body>,)> {
+        let post = warp::options()
+            .and(
+                warp::path::end()
+                    .or(path!("event").and(warp::path::end()))
+                    .or(path!("event" / "1.0").and(warp::path::end()))
+                    .or(path!("raw" / "1.0").and(warp::path::end()))
+                    .or(path!("raw").and(warp::path::end())),
+            )
+            .map(|_| warp::reply::with_header(warp::reply(), "Allow", "POST").into_response());
+
+        let get = warp::options()
+            .and(
+                (path!("health").and(warp::path::end()))
+                    .or(path!("health" / "1.0").and(warp::path::end())),
+            )
+            .map(|_| warp::reply::with_header(warp::reply(), "Allow", "GET").into_response());
+
+        post.or(get).unify().boxed()
+    }
+
+    /// Authorize request
+    fn authorization(&self) -> BoxedFilter<((),)> {
+        let credentials = self.credentials.clone();
+        warp::header::optional("Authorization")
+            .and_then(move |token: Option<String>| match token {
+                Some(token) if token.as_bytes() == credentials => Ok(()),
+                Some(_) => Err(Rejection::from(ApiError::InvalidAuthorization)),
+                None => Err(Rejection::from(ApiError::MissingAuthorization)),
+            })
+            .boxed()
+    }
+
+    /// Is body encoded with gzip
+    fn gzip(&self) -> BoxedFilter<(bool,)> {
+        warp::header::optional::<String>("Content-Encoding")
+            .and_then(|encoding: Option<String>| match encoding {
+                Some(s) if s.as_bytes() == b"gzip" => Ok(true),
+                Some(_) => Err(Rejection::from(ApiError::UnsupportedEncoding)),
+                None => Ok(false),
+            })
+            .boxed()
+    }
+
     /// Sink shutdowns this source once source output is closed
-    fn sink_with_shutdown(
-        &self,
-    ) -> impl Sink<SinkItem = Event, SinkError = Response<Body>> + 'static {
+    fn sink_with_shutdown(&self) -> impl Sink<SinkItem = Event, SinkError = Rejection> + 'static {
         let trigger = self.trigger.clone();
         self.out.clone().sink_map_err(move |_| {
             // Sink has been closed so server should stop listening
@@ -136,242 +270,8 @@ impl SplunkSource {
                 // If locking fails, that means someone else is stopping it.
                 .ok();
 
-            response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                splunk_response::SERVER_SHUTDOWN.clone(),
-            )
+            ApiError::ServerShutdown.into()
         })
-    }
-
-    /// Ok if request is authorized to be done
-    fn authorize(&self, req: &Request<Body>) -> Result<(), Response<Body>> {
-        match req.headers().get("Authorization") {
-            Some(credentials) if credentials.as_bytes() == self.credentials => Ok(()),
-            Some(_) => Err(response(
-                StatusCode::UNAUTHORIZED,
-                splunk_response::INVALID_AUTHORIZATION.clone(),
-            )),
-            None => Err(response(
-                StatusCode::UNAUTHORIZED,
-                splunk_response::MISSING_CREDENTIALS.clone(),
-            )),
-        }
-    }
-}
-
-/// One http connection
-struct Connection {
-    source: Arc<SplunkSource>,
-}
-
-impl Connection {
-    fn new(source: Arc<SplunkSource>) -> Self {
-        Connection { source }
-    }
-
-    fn is_gzip(req: &Request<Body>) -> Result<bool, Response<Body>> {
-        match req.headers().get("Content-Encoding") {
-            Some(s) if s.as_bytes() == b"gzip" => Ok(true),
-            Some(_) => Err(response(
-                StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                splunk_response::UNSUPPORTED_MEDIA_TYPE.clone(),
-            )),
-            None => Ok(false),
-        }
-    }
-
-    fn channel(req: &Request<Body>) -> Option<HeaderValue> {
-        req.headers()
-            .get("x-splunk-request-channel")
-            .map(Clone::clone)
-    }
-
-    fn host(req: &Request<Body>) -> Option<HeaderValue> {
-        req.headers().get("host").map(Clone::clone)
-    }
-
-    fn body_to_bytes(req: Request<Body>) -> impl Future<Item = Bytes, Error = crate::Error> {
-        req.into_body()
-            .map_err(|error| Box::new(error) as crate::Error)
-            .concat2()
-            .map(|chunk| chunk.into_bytes())
-    }
-
-    fn stream_events(
-        read: impl Read,
-        sink: impl Sink<SinkItem = Event, SinkError = Response<Body>>,
-        channel: Option<HeaderValue>,
-        host: Option<HeaderValue>,
-    ) -> impl Future<Item = Response<Body>, Error = crate::Error> {
-        EventStream::new(read, channel, host)
-            .forward(sink)
-            .then(Self::ok_success())
-    }
-
-    fn ok_success<T>(
-    ) -> impl FnOnce(Result<T, Response<Body>>) -> future::FutureResult<Response<Body>, crate::Error>
-    {
-        |result| {
-            future::ok(match result {
-                Ok(_) => response(StatusCode::OK, splunk_response::SUCCESS.clone()),
-                Err(response) => response,
-            })
-        }
-    }
-
-    /// Api point corespoding to '/services/collector/event/1.0'
-    fn event_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
-        // Process header
-        self.source.authorize(&req)?;
-        let gzip = Self::is_gzip(&req)?;
-        let channel = Self::channel(&req);
-        let host = Self::host(&req);
-
-        // Construct event parser
-        let sink = self.source.sink_with_shutdown();
-        if gzip {
-            Ok(RequestFuture::from_future(
-                Self::body_to_bytes(req)
-                    .map(|bytes| GzDecoder::new(bytes.into_buf()))
-                    .and_then(move |read| Self::stream_events(read, sink, channel, host)),
-            ))
-        } else {
-            Ok(RequestFuture::from_future(
-                Self::body_to_bytes(req)
-                    .map(|bytes| bytes.into_buf())
-                    .and_then(move |read| Self::stream_events(read, sink, channel, host)),
-            ))
-        }
-    }
-
-    /// Api point corespoding to '/services/collector/raw/1.0'
-    fn raw_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
-        // Process header
-        self.source.authorize(&req)?;
-        let gzip = Self::is_gzip(&req)?;
-        let channel = Self::channel(&req).ok_or_else(|| {
-            response(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL.clone())
-        })?;
-        let host = Self::host(&req);
-
-        // Construct raw parser
-        let sink = self.source.sink_with_shutdown();
-        Ok(RequestFuture::from_future(
-            Self::body_to_bytes(req).and_then(move |bytes| {
-                futures::stream::once(raw_event(bytes, gzip, channel, host))
-                    .forward(sink)
-                    .then(Self::ok_success())
-            }),
-        ))
-    }
-
-    /// Api point corespoding to '/services/collector/health/1.0'
-    fn health_api(&self, req: Request<Body>) -> Result<RequestFuture, Response<Body>> {
-        // Process header
-        self.source
-            .authorize(&req)
-            .map_err(|_| empty_response(StatusCode::BAD_REQUEST))?;
-
-        Ok(match self.source.out.clone().poll_ready() {
-            Ok(Async::Ready(())) => empty_response(StatusCode::OK),
-            // Since channel of mpsc::Sender increase by one with each sender, technically
-            // channel will never be full, and this will never be returned.
-            // This behavior dosn't fulfill one of purposes of healthcheck.
-            Ok(Async::NotReady) => empty_response(StatusCode::SERVICE_UNAVAILABLE),
-            Err(_) => response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                splunk_response::SERVER_SHUTDOWN.clone(),
-            ),
-        }
-        .into())
-    }
-}
-
-/// Responds to incoming requests
-impl Service for Connection {
-    type ReqBody = Body;
-    type ResBody = Body;
-    type Error = crate::Error;
-    type Future = RequestFuture;
-    fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
-        trace!(request = ?req);
-        match (req.method(), req.uri().path()) {
-            // Accepts multiple log messages in inline and json format
-            (&Method::POST, "/services/collector/event/1.0")
-            | (&Method::POST, "/services/collector/event")
-            | (&Method::POST, "/services/collector") => self.event_api(req).into(),
-            // Accepts log message in raw format
-            (&Method::POST, "/services/collector/raw/1.0")
-            | (&Method::POST, "/services/collector/raw") => self.raw_api(req).into(),
-            // Accepts healthcheck requests
-            (&Method::GET, "/services/collector/health/1.0")
-            | (&Method::GET, "/services/collector/health") => self.health_api(req).into(),
-            // Accepts querying for options
-            (&Method::OPTIONS, "/services/collector/event/1.0")
-            | (&Method::OPTIONS, "/services/collector/event")
-            | (&Method::OPTIONS, "/services/collector")
-            | (&Method::OPTIONS, "/services/collector/raw/1.0")
-            | (&Method::OPTIONS, "/services/collector/raw") => {
-                empty_response_with_header(StatusCode::OK, &[("Allow", "POST")]).into()
-            }
-            // Accepts querying for options
-            (&Method::OPTIONS, "/services/collector/health/1.0")
-            | (&Method::OPTIONS, "/services/collector/health") => {
-                empty_response_with_header(StatusCode::OK, &[("Allow", "GET")]).into()
-            }
-            // Unknown request
-            _ => empty_response(StatusCode::NOT_FOUND).into(),
-        }
-    }
-}
-
-/// Returned by Connector as a response to a request.
-enum RequestFuture {
-    /// Response is already known
-    Done(Option<Response<Body>>),
-    /// Response is yet to be computed
-    Future(Box<dyn Future<Item = Response<Body>, Error = crate::Error> + Send>),
-}
-
-impl RequestFuture {
-    fn from_future(
-        f: impl Future<Item = Response<Body>, Error = crate::Error> + 'static + Send,
-    ) -> Self {
-        RequestFuture::Future(Box::new(f) as _)
-    }
-}
-
-impl Future for RequestFuture {
-    type Item = Response<Body>;
-    type Error = crate::Error;
-    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        match self {
-            RequestFuture::Done(done) => {
-                Ok(Async::Ready(done.take().expect("cannot poll Future twice")))
-            }
-            RequestFuture::Future(future) => future.poll(),
-        }
-        .map(|asyn| {
-            asyn.map(|response| {
-                trace!(?response);
-                response
-            })
-        })
-    }
-}
-
-impl From<Response<Body>> for RequestFuture {
-    fn from(r: Response<Body>) -> Self {
-        RequestFuture::Done(Some(r))
-    }
-}
-
-impl From<Result<RequestFuture, Response<Body>>> for RequestFuture {
-    fn from(r: Result<RequestFuture, Response<Body>>) -> Self {
-        match r {
-            Ok(future) => future,
-            Err(response) => response.into(),
-        }
     }
 }
 
@@ -391,42 +291,59 @@ struct EventStream<R: Read> {
 }
 
 impl<R: Read> EventStream<R> {
-    fn new(data: R, channel: Option<HeaderValue>, host: Option<HeaderValue>) -> Self {
+    fn new(data: R, channel: Option<String>, host: Option<String>) -> Self {
         EventStream {
             data,
             events: 0,
             channel: channel.map(|value| value.as_bytes().into()),
             time: None,
             extractors: [
-                DefaultExtractor::new_with(&event::HOST, host.map(|value| value.as_bytes().into())),
-                DefaultExtractor::new(&INDEX),
-                DefaultExtractor::new(&SOURCE),
-                DefaultExtractor::new(&SOURCETYPE),
+                DefaultExtractor::new_with(
+                    "host",
+                    &event::HOST,
+                    host.map(|value| value.as_bytes().into()),
+                ),
+                DefaultExtractor::new("index", &INDEX),
+                DefaultExtractor::new("source", &SOURCE),
+                DefaultExtractor::new("sourcetype", &SOURCETYPE),
             ],
+        }
+    }
+
+    /// As serde_json::from_reader, but doesn't require that all data has to be consumed,
+    /// nor that it has to exist.
+    fn from_reader_take<T>(&mut self) -> Result<Option<T>, serde_json::Error>
+    where
+        T: de::DeserializeOwned,
+    {
+        use serde_json::de::Read;
+        let mut reader = IoRead::new(&mut self.data);
+        match reader.peek()? {
+            None => Ok(None),
+            Some(_) => {
+                Deserialize::deserialize(&mut Deserializer::new(reader)).map(|data| Some(data))
+            }
         }
     }
 }
 
 impl<R: Read> Stream for EventStream<R> {
     type Item = Event;
-    type Error = Response<Body>;
-    fn poll(&mut self) -> Result<Async<Option<Event>>, Response<Body>> {
+    type Error = Rejection;
+    fn poll(&mut self) -> Result<Async<Option<Event>>, Rejection> {
         // Parse JSON object
-        let mut json = match from_reader_take::<_, Value>(&mut self.data) {
+        let mut json = match self.from_reader_take::<Value>() {
             Ok(Some(json)) => json,
             Ok(None) => {
                 return if self.events == 0 {
-                    Err(response(
-                        StatusCode::BAD_REQUEST,
-                        splunk_response::NO_DATA.clone(),
-                    ))
+                    Err(ApiError::NoData.into())
                 } else {
                     Ok(Async::Ready(None))
-                }
+                };
             }
             Err(error) => {
                 error!(message = "Malformed request body",%error);
-                return Err(event_error("Invalid data format", 6, self.events));
+                Err(ApiError::InvalidDataFormat { event: self.events })?
             }
         };
 
@@ -439,23 +356,19 @@ impl<R: Read> Stream for EventStream<R> {
             Some(event) => match event.take() {
                 Value::String(string) => {
                     if string.is_empty() {
-                        return Err(event_error("Event field cannot be blank", 13, self.events));
+                        Err(ApiError::EmptyEventField { event: self.events })?;
                     }
                     log.insert_explicit(event::MESSAGE.clone(), string.into())
                 }
                 Value::Object(object) => {
                     if object.is_empty() {
-                        return Err(event_error("Event field cannot be blank", 13, self.events));
+                        Err(ApiError::EmptyEventField { event: self.events })?;
                     }
                     flatten(log, object);
                 }
-                _ => {
-                    return Err(event_error("Invalid data format", 6, self.events));
-                }
+                _ => Err(ApiError::InvalidDataFormat { event: self.events })?,
             },
-            None => {
-                return Err(event_error("Event field is required", 12, self.events));
-            }
+            None => Err(ApiError::MissingEventField { event: self.events })?,
         }
 
         // Process channel field
@@ -490,12 +403,10 @@ impl<R: Read> Stream for EventStream<R> {
                         .into(),
                     );
                 } else {
-                    return Err(event_error("Invalid data format", 6, self.events));
+                    Err(ApiError::InvalidDataFormat { event: self.events })?;
                 }
             }
-            Some(None) => {
-                return Err(event_error("Invalid data format", 6, self.events));
-            }
+            Some(None) => Err(ApiError::InvalidDataFormat { event: self.events })?,
         }
 
         // Add time field
@@ -516,61 +427,65 @@ impl<R: Read> Stream for EventStream<R> {
 
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
-    field: &'static Atom,
+    field: &'static str,
+    to_field: &'static Atom,
     value: Option<ValueKind>,
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static Atom) -> Self {
-        DefaultExtractor { field, value: None }
-    }
-
-    fn new_with(field: &'static Atom, value: impl Into<Option<ValueKind>>) -> Self {
+    fn new(field: &'static str, to_field: &'static Atom) -> Self {
         DefaultExtractor {
             field,
+            to_field,
+            value: None,
+        }
+    }
+
+    fn new_with(
+        field: &'static str,
+        to_field: &'static Atom,
+        value: impl Into<Option<ValueKind>>,
+    ) -> Self {
+        DefaultExtractor {
+            field,
+            to_field,
             value: value.into(),
         }
     }
 
     fn extract(&mut self, log: &mut LogEvent, value: &mut Value) {
         // Process json_field
-        if let Some(Value::String(new_value)) = value.get_mut(self.field.as_ref()).map(Value::take)
-        {
+        if let Some(Value::String(new_value)) = value.get_mut(self.field).map(Value::take) {
             self.value = Some(new_value.into());
         }
 
         // Add data field
         if let Some(index) = self.value.as_ref() {
-            log.insert_explicit(self.field.clone(), index.clone());
+            log.insert_explicit(self.to_field.clone(), index.clone());
         }
     }
 }
 
 /// Creates event from raw request
 fn raw_event(
-    bytes: Bytes,
+    bytes: FullBody,
     gzip: bool,
-    channel: HeaderValue,
-    host: Option<HeaderValue>,
-) -> Result<Event, Response<Body>> {
+    channel: String,
+    host: Option<String>,
+) -> Result<Event, Rejection> {
     // Process gzip
-    let bytes = if gzip {
+    let message: ValueKind = if gzip {
         let mut data = Vec::new();
-        match GzDecoder::new(bytes.into_buf()).read_to_end(&mut data) {
-            Ok(0) => {
-                return Err(response(
-                    StatusCode::BAD_REQUEST,
-                    splunk_response::NO_DATA.clone(),
-                ))
-            }
+        match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
+            Ok(0) => Err(ApiError::NoData)?,
             Ok(_) => data.into(),
             Err(error) => {
                 error!(message = "Malformed request body",%error);
-                return Err(event_error("Invalid data format", 6, 0));
+                Err(ApiError::InvalidDataFormat { event: 0 })?
             }
         }
     } else {
-        bytes
+        bytes.bytes().into()
     };
 
     // Construct event
@@ -578,7 +493,7 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert_explicit(event::MESSAGE.clone(), bytes.into());
+    log.insert_explicit(event::MESSAGE.clone(), message);
 
     // Add channel
     log.insert_explicit(CHANNEL.clone(), channel.as_bytes().into());
@@ -591,18 +506,95 @@ fn raw_event(
     Ok(event)
 }
 
-/// As serde_json::from_reader, but doesn't require that all data has to be consumed,
-/// nor that it has to exist.
-pub fn from_reader_take<R, T>(rdr: R) -> Result<Option<T>, serde_json::Error>
-where
-    R: Read,
-    T: de::DeserializeOwned,
-{
-    use serde_json::de::Read;
-    let mut reader = IoRead::new(rdr);
-    match reader.peek()? {
-        None => Ok(None),
-        Some(_) => Deserialize::deserialize(&mut Deserializer::new(reader)).map(|data| Some(data)),
+#[derive(Debug, Snafu)]
+enum ApiError {
+    MissingAuthorization,
+    InvalidAuthorization,
+    UnsupportedEncoding,
+    MissingChannel,
+    NoData,
+    InvalidDataFormat { event: usize },
+    ServerShutdown,
+    EmptyEventField { event: usize },
+    MissingEventField { event: usize },
+    BadRequest,
+}
+
+impl From<ApiError> for Rejection {
+    fn from(error: ApiError) -> Self {
+        warp::reject::custom(error)
+    }
+}
+
+/// Cached bodies for common responses
+mod splunk_response {
+    use bytes::Bytes;
+    use lazy_static::lazy_static;
+    use serde_json::{json, Value};
+
+    fn json_to_bytes(value: Value) -> Bytes {
+        serde_json::to_string(&value).unwrap().into()
+    }
+
+    lazy_static! {
+        pub static ref INVALID_AUTHORIZATION: Bytes =
+            json_to_bytes(json!({"text":"Invalid authorization","code":3}));
+        pub static ref MISSING_CREDENTIALS: Bytes =
+            json_to_bytes(json!({"text":"Token is required","code":2}));
+        pub static ref NO_DATA: Bytes = json_to_bytes(json!({"text":"No data","code":5}));
+        pub static ref SUCCESS: Bytes = json_to_bytes(json!({"text":"Success","code":0}));
+        pub static ref SERVER_ERROR: Bytes =
+            json_to_bytes(json!({"text":"Internal server error","code":8}));
+        pub static ref SERVER_SHUTDOWN: Bytes =
+            json_to_bytes(json!({"text":"Server is shuting down","code":9}));
+        pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
+            json_to_bytes(json!({"text":"unsupported content encoding"}));
+        pub static ref NO_CHANNEL: Bytes =
+            json_to_bytes(json!({"text":"Data channel is missing","code":10}));
+    }
+}
+
+fn finish_ok(_: ()) -> Response<Body> {
+    response_json(StatusCode::OK, splunk_response::SUCCESS.as_ref())
+}
+
+fn finish_err(rejection: Rejection) -> Result<(Response<Body>,), Rejection> {
+    if let Some(error) = rejection.find_cause::<ApiError>() {
+        Ok((match error {
+            ApiError::MissingAuthorization => response_json(
+                StatusCode::UNAUTHORIZED,
+                splunk_response::MISSING_CREDENTIALS.as_ref(),
+            ),
+            ApiError::InvalidAuthorization => response_json(
+                StatusCode::UNAUTHORIZED,
+                splunk_response::INVALID_AUTHORIZATION.as_ref(),
+            ),
+            ApiError::UnsupportedEncoding => response_json(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                splunk_response::UNSUPPORTED_MEDIA_TYPE.as_ref(),
+            ),
+            ApiError::MissingChannel => response_json(
+                StatusCode::BAD_REQUEST,
+                splunk_response::NO_CHANNEL.as_ref(),
+            ),
+            ApiError::NoData => {
+                response_json(StatusCode::BAD_REQUEST, splunk_response::NO_DATA.as_ref())
+            }
+            ApiError::ServerShutdown => response_json(
+                StatusCode::SERVICE_UNAVAILABLE,
+                splunk_response::SERVER_SHUTDOWN.as_ref(),
+            ),
+            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, *event),
+            ApiError::EmptyEventField { event } => {
+                event_error("Event field cannot be blank", 13, *event)
+            }
+            ApiError::MissingEventField { event } => {
+                event_error("Event field is required", 12, *event)
+            }
+            ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
+        },))
+    } else {
+        Err(rejection)
     }
 }
 
@@ -613,25 +605,9 @@ fn empty_response(code: StatusCode) -> Response<Body> {
     res
 }
 
-/// Response without body
-fn empty_response_with_header(
-    code: StatusCode,
-    header: &[(&'static str, &'static str)],
-) -> Response<Body> {
-    let mut res = Response::default();
-    *res.status_mut() = code;
-    let headers = res.headers_mut();
-    for &(key, value) in header {
-        headers.insert(key, HeaderValue::from_static(value));
-    }
-    res
-}
-
 /// Response with body
-fn response(code: StatusCode, body: impl Into<Body>) -> Response<Body> {
-    let mut res = Response::new(body.into());
-    *res.status_mut() = code;
-    res
+fn response_json(code: StatusCode, body: impl Serialize) -> Response<Body> {
+    warp::reply::with_status(warp::reply::json(&body), code).into_response()
 }
 
 /// Error happened during parsing of events
@@ -642,10 +618,10 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
         "invalid-event-number":event
     });
     match serde_json::to_string(&body) {
-        Ok(string) => response(StatusCode::BAD_REQUEST, string),
+        Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
         Err(error) => {
             error!("Error encoding json body: {}", error);
-            response(
+            response_json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 splunk_response::SERVER_ERROR.clone(),
             )
@@ -901,12 +877,12 @@ mod tests {
         let events = rt.block_on(collect_n(source, 3)).unwrap();
 
         assert_eq!(events[0].as_log()[&event::MESSAGE], "first".into());
-        assert_eq!(events[0].as_log()[&"source".into()], "main".into());
+        assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(events[1].as_log()[&event::MESSAGE], "second".into());
-        assert_eq!(events[1].as_log()[&"source".into()], "main".into());
+        assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(events[2].as_log()[&event::MESSAGE], "third".into());
-        assert_eq!(events[2].as_log()[&"source".into()], "secondary".into());
+        assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
     }
 }
