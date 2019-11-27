@@ -60,17 +60,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
       # REQUIRED - Type
       type = "check_fields" # example
       
-      # OPTIONAL - `<field name>`.eq
+      # OPTIONAL - <field name>.eq
       name = "message.eq"
-    value = "this is the content to match against" # example
+      value = "this is the content to match against"
       
-      # OPTIONAL - `<field name>`.exists
+      # OPTIONAL - <field name>.exists
       name = "host.exists"
-    value = true # example
+      value = true
       
-      # OPTIONAL - `<field name>`.neq
+      # OPTIONAL - <field name>.neq
       name = "method.neq"
-    value = "POST" # example
+      value = "POST"
     
     # REQUIRED - Extract from
     extract_from = "bar" # example
@@ -108,17 +108,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
       # REQUIRED - Type
       type = "check_fields" # example
       
-      # OPTIONAL - `<field name>`.eq
+      # OPTIONAL - <field name>.eq
       name = "message.eq"
-    value = "this is the content to match against" # example
+      value = "this is the content to match against"
       
-      # OPTIONAL - `<field name>`.exists
+      # OPTIONAL - <field name>.exists
       name = "host.exists"
-    value = true # example
+      value = true
       
-      # OPTIONAL - `<field name>`.neq
+      # OPTIONAL - <field name>.neq
       name = "method.neq"
-    value = "POST" # example
+      value = "POST"
     
     # REQUIRED - Extract from
     extract_from = "bar" # example
@@ -137,9 +137,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # OPTIONAL - Log fields
     [tests.input.log_fields]
       name = "message"
-    value = "some message contents" # example
-      name = "host"
-    value = "myhost" # example
+      value = "some message contents"
     
     # OPTIONAL - Metric
     [tests.input.metric]
@@ -164,9 +162,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
       # OPTIONAL - Tags
       [tests.input.metric.tags]
         name = "host"
-      value = "foohost" # example
-        name = "region"
-      value = "us-east-1" # example
+        value = "foohost"
 ```
 
 </TabItem>
@@ -254,7 +250,7 @@ Specifies the log fields when the input type is 'log'.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"message","value":"some message contents"},{"name":"host","value":"myhost"}]}
-  name={"`<field-name>`"}
+  name={"<field-name>"}
   nullable={false}
   path={"input.log_fields"}
   relevantWhen={null}
@@ -264,7 +260,7 @@ Specifies the log fields when the input type is 'log'.
   unit={null}
   >
 
-##### `<field-name>`
+##### <field-name>
 
 A key/value pair representing a field to be added to the input event.
 
@@ -395,7 +391,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"host","value":"foohost"},{"name":"region","value":"us-east-1"}]}
-  name={"`<tag-name>`"}
+  name={"<tag-name>"}
   nullable={false}
   path={"input.metric.tags"}
   relevantWhen={null}
@@ -405,7 +401,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-###### `<tag-name>`
+###### <tag-name>
 
 Key/value pairs representing [metric tags][docs.data-model#tags].
 
@@ -615,7 +611,7 @@ A table that defines a collection of conditions to check against the output of a
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"message.eq","value":"this is the content to match against"}]}
-  name={"`<field_name>`.eq"}
+  name={"<field_name>.eq"}
   nullable={true}
   path={"outputs.conditions"}
   relevantWhen={null}
@@ -625,7 +621,7 @@ A table that defines a collection of conditions to check against the output of a
   unit={null}
   >
 
-##### `<field_name>`.eq
+##### <field_name>.eq
 
 Check whether a fields contents exactly matches the value specified.
 
@@ -638,7 +634,7 @@ Check whether a fields contents exactly matches the value specified.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"host.exists","value":true}]}
-  name={"`<field_name>`.exists"}
+  name={"<field_name>.exists"}
   nullable={true}
   path={"outputs.conditions"}
   relevantWhen={null}
@@ -648,7 +644,7 @@ Check whether a fields contents exactly matches the value specified.
   unit={null}
   >
 
-##### `<field_name>`.exists
+##### <field_name>.exists
 
 Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
@@ -661,7 +657,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"method.neq","value":"POST"}]}
-  name={"`<field_name>`.neq"}
+  name={"<field_name>.neq"}
   nullable={true}
   path={"outputs.conditions"}
   relevantWhen={null}
@@ -671,7 +667,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   unit={null}
   >
 
-##### `<field_name>`.neq
+##### <field_name>.neq
 
 Check whether a fields contents does not match the value specified.
 
