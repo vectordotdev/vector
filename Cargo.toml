@@ -96,7 +96,7 @@ rand = "0.5.5"
 regex = "1.0.5"
 bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
-prometheus = "0.4.2"
+prometheus = "0.7.0"
 hyper = "0.12.35"
 hyper-openssl = "0.7"
 hyper-tls = "0.3.2"

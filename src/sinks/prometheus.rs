@@ -174,6 +174,28 @@ impl PrometheusSink {
         }
     }
 
+    fn with_absolute_counter(
+        &mut self,
+        name: &str,
+        labels: &HashMap<&str, &str>,
+        f: impl Fn(&prometheus::CounterVec),
+    ) {
+        if let Some(counter) = self.counters.get(name) {
+            if let Err(e) = self.registry.unregister(Box::new(counter.clone())) {
+                error!("Error unregistering Prometheus counter: {}", e);
+            }
+        };
+        let namespace = &self.config.namespace;
+        let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+        let keys: Vec<_> = labels.keys().copied().collect();
+        let counter = prometheus::CounterVec::new(opts, &keys[..]).unwrap();
+        if let Err(e) = self.registry.register(Box::new(counter.clone())) {
+            error!("Error registering Prometheus counter: {}", e);
+        };
+        f(&counter);
+        self.counters.insert(name.to_string(), counter);
+    }
+
     fn with_gauge(
         &mut self,
         name: &str,
@@ -415,6 +437,18 @@ impl Sink for PrometheusSink {
                 }
             }
             MetricKind::Absolute => match metric.value {
+                MetricValue::Counter { value } => {
+                    self.with_absolute_counter(&name, &labels, |counter| {
+                        if let Ok(c) = counter.get_metric_with(&labels) {
+                            c.inc_by(value);
+                        } else {
+                            error!(
+                                "Error getting Prometheus counter with labels: {:?}",
+                                &labels
+                            );
+                        }
+                    })
+                }
                 MetricValue::Gauge { value } => self.with_gauge(&name, &labels, |gauge| {
                     if let Ok(g) = gauge.get_metric_with(&labels) {
                         g.set(value);

@@ -51,6 +51,7 @@ scopes:
   - kafka source
   - socket source
   - splunk_hec source
+  - prometheus source
   - statsd source
   - stdin source
   - syslog source
