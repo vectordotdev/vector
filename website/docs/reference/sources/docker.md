@@ -101,9 +101,9 @@ For example:
 
 ```javascript
 {
-  "container_id": "9b6247364a03",
   "com.example.vendor": "Timber Inc.",
   "container_created_at": "2019-11-01T21:15:47+00:00",
+  "container_id": "9b6247364a03",
   "container_name": "evil_ptolemy",
   "image": "ubuntu:latest",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
@@ -114,23 +114,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
-<Field
-  enumValues={null}
-  examples={["9b6247364a03","715ebfcee040"]}
-  name={"container_id"}
-  path={null}
-  required={true}
-  type={"string"}
-  >
-
-### container_id
-
-The Docker container ID that the log was collected from.
-
-
-</Field>
 
 
 <Field
@@ -162,6 +145,23 @@ The Docker container ID that the log was collected from.
 ### container_created_at
 
 A UTC timestamp representing when the container was created.
+
+
+</Field>
+
+
+<Field
+  enumValues={null}
+  examples={["9b6247364a03","715ebfcee040"]}
+  name={"container_id"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### container_id
+
+The Docker container ID that the log was collected from.
 
 
 </Field>
