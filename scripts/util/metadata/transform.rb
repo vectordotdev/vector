@@ -30,7 +30,7 @@ class Transform < Component
     if types_coercion
       wildcard_option =
         {
-          "name" => "`<field-name>`",
+          "name" => "<field-name>",
           "category" => "requests",
           "enum" => {
             "bool" => "Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.",
@@ -60,7 +60,7 @@ class Transform < Component
           "common" => true,
           "description" => "Key/Value pairs representing mapped log field types.",
           "null" => true,
-          "options" => {"`<field-name>`" => wildcard_option},
+          "options" => {"<field-name>" => wildcard_option},
           "type" => "table"
         })
     end

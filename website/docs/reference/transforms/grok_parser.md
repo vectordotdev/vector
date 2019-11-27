@@ -42,13 +42,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+    status = "int"
 ```
 
 ## Options
@@ -156,7 +150,7 @@ Key/Value pairs representing mapped log field types.
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
-  name={"`<field-name>`"}
+  name={"<field-name>"}
   nullable={false}
   path={"types"}
   relevantWhen={null}
@@ -166,7 +160,7 @@ Key/Value pairs representing mapped log field types.
   unit={null}
   >
 
-#### `<field-name>`
+#### <field-name>
 
 A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
 

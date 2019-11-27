@@ -107,7 +107,7 @@ output = """\
 }
 """
 
-[sources.journald.output.log.fields."`<record-key>`"]
+[sources.journald.output.log.fields."<record-key>"]
 type = "*"
 examples = [
   {_SYSTEMD_UNIT = "ntpd.service"},

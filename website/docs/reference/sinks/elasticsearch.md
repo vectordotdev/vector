@@ -123,12 +123,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}" # example
-    X-Powered-By = "Vector" # example
+    Authorization = "${TOKEN_ENV_VAR}"
   
   # OPTIONAL - Query
   [sinks.my_sink_id.query]
-    X-Powered-By = "Vector" # example
+    X-Powered-By = "Vector"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -452,7 +451,7 @@ Options for custom headers.
   defaultValue={null}
   enumValues={null}
   examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
-  name={"`<header-name>`"}
+  name={"<header-name>"}
   nullable={false}
   path={"headers"}
   relevantWhen={null}
@@ -462,7 +461,7 @@ Options for custom headers.
   unit={null}
   >
 
-#### `<header-name>`
+#### <header-name>
 
 A custom header to be added to each outgoing Elasticsearch request.
 
@@ -594,7 +593,7 @@ Custom parameters to Elasticsearch query string.
   defaultValue={null}
   enumValues={null}
   examples={[{"X-Powered-By":"Vector"}]}
-  name={"`<parameter-name>`"}
+  name={"<parameter-name>"}
   nullable={false}
   path={"query"}
   relevantWhen={null}
@@ -604,7 +603,7 @@ Custom parameters to Elasticsearch query string.
   unit={null}
   >
 
-#### `<parameter-name>`
+#### <parameter-name>
 
 A custom parameter to be added to each Elasticsearch request.
 
