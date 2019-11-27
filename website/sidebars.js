@@ -212,9 +212,15 @@ module.exports = {
             
           ],
         },
-        "reference",
-        "reference/tests",
-        "reference/global-options",
+        {
+          type: 'category',
+          label: 'Advanced',
+          items: [
+            "reference/global-options",
+            "reference/env-vars",
+            "reference/tests",
+          ]
+        },
       ],
     },
     {
@@ -227,7 +233,6 @@ module.exports = {
         "administration/tuning",
         "administration/updating",
         "administration/validating",
-        "administration/env-vars",
       ],
     },
     {
