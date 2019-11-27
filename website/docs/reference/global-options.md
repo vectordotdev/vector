@@ -22,7 +22,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-data_dir = "/var/lib/vector" # example, no default
+# OPTIONAL - Data dir
+  data_dir = "/var/lib/vector" # example, no default
+  
+  # OPTIONAL - Dns servers
   dns_servers = ["0.0.0.0:53"] # example, no default
 ```
 

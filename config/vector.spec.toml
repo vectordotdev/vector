@@ -23,6 +23,10 @@
 # ------------------------------------------------------------------------------
 # Global options are relevant to Vector as a whole and apply to global behavior.
 
+#
+# Data dir
+#
+
 # The directory used for persisting Vector state, such as on-disk buffers, file
 # checkpoints, and more. Please make sure the Vector project has write
 # permissions to this dir.
@@ -31,6 +35,10 @@
 # * no default
 # * type: string
 data_dir = "/var/lib/vector"
+
+#
+# Dns servers
+#
 
 # The list of DNS servers Vector will use to resolve DNS requests. When set
 # Vector will ignore the system configuration and use only the list of DNS
@@ -1710,28 +1718,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  rate_limit_num = 5
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
   # * type: int
   request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_rate_limit_num = 5
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -1743,21 +1766,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 5
 
   #
   # Buffer
@@ -1984,28 +1992,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  rate_limit_num = 5
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
   # * type: int
   request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_rate_limit_num = 5
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -2017,21 +2040,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 5
 
   #
   # Buffer
@@ -2222,28 +2230,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  rate_limit_num = 5
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
   # * type: int
   request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_rate_limit_num = 5
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -2255,21 +2278,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 5
 
   #
   # Buffer
@@ -2455,28 +2463,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  rate_limit_num = 5
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
   # * type: int
   request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_rate_limit_num = 5
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 9223372036854775807
+  # * type: int
+  request_retry_attempts = 9223372036854775807
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -2488,21 +2511,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 9223372036854775807
-  # * type: int
-  retry_attempts = 9223372036854775807
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 9223372036854775807
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 9223372036854775807
 
   #
   # requests
@@ -2800,28 +2808,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  rate_limit_num = 5
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
   # * type: int
   request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_rate_limit_num = 5
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -2833,21 +2856,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 60
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 5
 
 # Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 [sinks.elasticsearch]
@@ -2974,28 +2982,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  rate_limit_num = 5
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 5
   # * type: int
   request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_rate_limit_num = 5
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -3007,21 +3030,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 60
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 5
 
   #
   # Basic auth
@@ -3342,28 +3350,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 10
-  # * type: int
-  rate_limit_num = 10
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 10
   # * type: int
   request_in_flight_limit = 10
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 10
+  # * type: int
+  request_rate_limit_num = 10
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 10
+  # * type: int
+  request_retry_attempts = 10
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -3375,21 +3398,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 10
-  # * type: int
-  retry_attempts = 10
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 10
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 10
 
   #
   # Basic auth
@@ -3872,28 +3880,43 @@ end
   # Requests
   #
 
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 10
-  # * type: int
-  rate_limit_num = 10
-
   # The maximum number of in-flight requests allowed at any given time.
   # 
   # * optional
   # * default: 10
   # * type: int
   request_in_flight_limit = 10
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 10
+  # * type: int
+  request_rate_limit_num = 10
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
 
   # The maximum time a request can take before being aborted. It is highly
   # recommended that you do not lower value below the service's internal timeout,
@@ -3905,21 +3928,6 @@ end
   # * type: int
   # * unit: seconds
   request_timeout_secs = 60
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * type: int
-  # * unit: seconds
-  retry_backoff_secs = 5
 
   #
   # Buffer
