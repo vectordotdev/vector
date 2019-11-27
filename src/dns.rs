@@ -104,6 +104,13 @@ impl Iterator for LookupIp {
 pub enum DnsError {
     #[snafu(display("Unable to parse dns servers: {}", errors.join(", ")))]
     ServerList { errors: Vec<String> },
+    #[cfg(windows)]
+    #[snafu(display("Unable to read system dns config: {}", source))]
+    ReadSystemConf {
+        #[snafu(source(from(trust_dns_resolver::error::ResolveError, ResolveError::from)))]
+        source: ResolveError,
+    },
+    #[cfg(unix)]
     #[snafu(display("Unable to read system dns config: {}", source))]
     ReadSystemConf { source: std::io::Error },
     #[snafu(display("Unable to resolve name: {}", source))]
