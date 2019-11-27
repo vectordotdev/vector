@@ -43,12 +43,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "syslog" # example, must be: "syslog"
+  # REQUIRED - Mode
   mode = "tcp" # example, enum
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "syslog" # example, must be: "syslog"
+  
+  # OPTIONAL - Address
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
+  
+  # OPTIONAL - Path
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
@@ -59,17 +63,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "syslog" # example, must be: "syslog"
+  # REQUIRED - Mode
   mode = "tcp" # example, enum
   
-  # OPTIONAL - General
+  # REQUIRED - Type
+  type = "syslog" # example, must be: "syslog"
+  
+  # OPTIONAL - Address
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
-  max_length = 102400 # default, bytes
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
   
   # OPTIONAL - Context
   host_key = "host" # default
+  
+  # OPTIONAL - Max length
+  max_length = 102400 # default, bytes
+  
+  # OPTIONAL - Path
+  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
 </TabItem>
@@ -227,6 +237,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["app-name"]}
   name={"appname"}
@@ -244,6 +255,7 @@ The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a appnam
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["1"]}
   name={"facility"}
@@ -261,6 +273,7 @@ The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a facil
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
@@ -278,6 +291,7 @@ The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostn
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
   name={"message"}
@@ -296,6 +310,7 @@ The raw message, unaltered.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["ID47"]}
   name={"msgid"}
@@ -313,6 +328,7 @@ The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a msgid is
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[8710]}
   name={"procid"}
@@ -330,6 +346,7 @@ The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a procid 
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["notice"]}
   name={"severity"}
@@ -347,6 +364,7 @@ The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a sever
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
@@ -364,6 +382,7 @@ The timestamp extracted from the incoming line. If a timestamp is not found, the
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[1]}
   name={"version"}

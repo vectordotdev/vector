@@ -10,7 +10,13 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Output (metric)
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+## Output
 
 <%= source_output(:metric, component.output.metric, heading_depth: 3) %>
 

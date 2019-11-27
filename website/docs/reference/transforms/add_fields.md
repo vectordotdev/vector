@@ -25,9 +25,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "add_fields" # example, must be: "add_fields"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Type
+  type = "add_fields" # example, must be: "add_fields"
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]

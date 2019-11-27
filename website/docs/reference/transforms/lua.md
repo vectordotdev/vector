@@ -25,9 +25,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "lua" # example, must be: "lua"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Source
   source = """
 require("script") # a `script.lua` file must be in your[`search_dirs`](#search_dirs)
 
@@ -40,7 +41,10 @@ if event["host"] == nil then
 end
 """
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "lua" # example, must be: "lua"
+  
+  # OPTIONAL - Search dirs
   search_dirs = ["/etc/vector/lua"] # example, no default
 ```
 

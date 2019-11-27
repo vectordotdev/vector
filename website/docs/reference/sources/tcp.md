@@ -43,8 +43,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "tcp" # example, must be: "tcp"
+  # REQUIRED - Address
   address = "0.0.0.0:9000" # example
+  
+  # REQUIRED - Type
+  type = "tcp" # example, must be: "tcp"
 ```
 
 </TabItem>
@@ -54,16 +57,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "tcp" # example, must be: "tcp"
+  # REQUIRED - Address
   address = "0.0.0.0:9000" # example
   
-  # OPTIONAL - General
-  max_length = 102400 # default, bytes
-  shutdown_timeout_secs = 30 # default, seconds
+  # REQUIRED - Type
+  type = "tcp" # example, must be: "tcp"
   
   # OPTIONAL - Context
   host_key = "host" # default
+  
+  # OPTIONAL - Max length
+  max_length = 102400 # default, bytes
+  
+  # OPTIONAL - Shutdown timeout secs
+  shutdown_timeout_secs = 30 # default, seconds
 ```
 
 </TabItem>
@@ -201,6 +208,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
@@ -219,6 +227,7 @@ The upstream hostname.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
@@ -237,6 +246,7 @@ The raw message, unaltered.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

@@ -25,13 +25,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "regex_parser" # example, must be: "regex_parser"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Regex
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$" # example
   
-  # OPTIONAL - General
+  # REQUIRED - Type
+  type = "regex_parser" # example, must be: "regex_parser"
+  
+  # OPTIONAL - Drop field
   drop_field = true # default
+  
+  # OPTIONAL - Field
   field = "message" # default
   
   # OPTIONAL - Types

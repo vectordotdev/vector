@@ -43,16 +43,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "file" # example, must be: "file"
+  # REQUIRED - Include
   include = ["/var/log/nginx/*.log"] # example
   
-  # OPTIONAL - General
+  # REQUIRED - Type
+  type = "file" # example, must be: "file"
+  
+  # OPTIONAL - Ignore older
   ignore_older = 86400 # example, no default, seconds
-  start_at_beginning = true # default
   
   # OPTIONAL - Priority
   oldest_first = true # default
+  
+  # OPTIONAL - Start at beginning
+  start_at_beginning = true # default
 ```
 
 </TabItem>
@@ -62,21 +66,30 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "file" # example, must be: "file"
+  # REQUIRED - Include
   include = ["/var/log/nginx/*.log"] # example
   
-  # OPTIONAL - General
-  data_dir = "/var/lib/vector" # example, no default
-  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
-  glob_minimum_cooldown = 1000 # default, milliseconds
-  ignore_older = 86400 # example, no default, seconds
-  max_line_bytes = 102400 # default, bytes
-  start_at_beginning = true # default
+  # REQUIRED - Type
+  type = "file" # example, must be: "file"
   
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
+  
+  # OPTIONAL - Data dir
+  data_dir = "/var/lib/vector" # example, no default
+  
+  # OPTIONAL - Exclude
+  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
+  
+  # OPTIONAL - Glob minimum cooldown
+  glob_minimum_cooldown = 1000 # default, milliseconds
+  
+  # OPTIONAL - Ignore older
+  ignore_older = 86400 # example, no default, seconds
+  
+  # OPTIONAL - Max line bytes
+  max_line_bytes = 102400 # default, bytes
   
   # OPTIONAL - Multi-line
   message_start_indicator = "^(INFO|ERROR)" # example, no default
@@ -86,11 +99,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
   max_read_bytes = 2048 # default, bytes
   oldest_first = true # default
   
+  # OPTIONAL - Start at beginning
+  start_at_beginning = true # default
+  
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
-    strategy = "checksum" # default, enum
+    # OPTIONAL - Fingerprint bytes
     fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
+    
+    # OPTIONAL - Ignored header bytes
     ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
+    
+    # OPTIONAL - Strategy
+    strategy = "checksum" # default, enum
 ```
 
 </TabItem>
@@ -199,29 +220,6 @@ Configuration for how the file source should identify files.
 
 <Field
   common={false}
-  defaultValue={"checksum"}
-  enumValues={{"checksum":"Read[`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
-  examples={["checksum","device_and_inode"]}
-  name={"strategy"}
-  nullable={true}
-  path={"fingerprinting"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### strategy
-
-The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={256}
   enumValues={null}
   examples={[256]}
@@ -261,6 +259,29 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 #### ignored_header_bytes
 
 The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"checksum"}
+  enumValues={{"checksum":"Read[`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
+  examples={["checksum","device_and_inode"]}
+  name={"strategy"}
+  nullable={true}
+  path={"fingerprinting"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
 
 
 </Field>
@@ -522,6 +543,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["/var/log/nginx.log"]}
   name={"file"}
@@ -539,6 +561,7 @@ The _full_ path of the file tha the log originated from. See [Checkpointing](#ch
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
@@ -556,6 +579,7 @@ The current hostname, equivalent to the `gethostname` command.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
@@ -573,6 +597,7 @@ The raw log message, unaltered.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

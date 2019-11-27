@@ -43,9 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "blackhole" # example, must be: "blackhole"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Print amount
   print_amount = 1000 # example
+  
+  # REQUIRED - Type
+  type = "blackhole" # example, must be: "blackhole"
 ```
 
 </TabItem>
@@ -55,12 +60,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "blackhole" # example, must be: "blackhole"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Print amount
   print_amount = 1000 # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "blackhole" # example, must be: "blackhole"
+  
+  # OPTIONAL - Healthcheck
   healthcheck = true # default
 ```
 

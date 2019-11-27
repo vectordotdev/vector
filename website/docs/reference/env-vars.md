@@ -31,12 +31,18 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
   name={"AWS_ACCESS_KEY_ID"}
+  nullable={false}
   path={null}
-  required={false}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -48,12 +54,18 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 
 <Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
-  examples={["wJalrXUtnFEMI/K7MDENG"]}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
   name={"AWS_SECRET_ACCESS_KEY"}
+  nullable={false}
   path={null}
-  required={false}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### AWS_SECRET_ACCESS_KEY
@@ -65,12 +77,64 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 
 <Field
+  common={false}
+  defaultValue={"unix:///var/run/docker.sock"}
+  enumValues={null}
+  examples={["unix://path/to/socket","tcp://host:2375/path"]}
+  name={"DOCKER_HOST"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### DOCKER_HOST
+
+The docker host to connect to.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"DOCKER_VERIFY_TLS"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### DOCKER_VERIFY_TLS
+
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={["debug"]}
   name={"LOG"}
+  nullable={false}
   path={null}
-  required={false}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### LOG
@@ -82,12 +146,18 @@ Sets Vector's log level. See the [log section in the monitoring guide][docs.moni
 
 
 <Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
-  examples={["debug"]}
+  examples={[true,false]}
   name={"RUST_BACKTRACE"}
+  nullable={false}
   path={null}
-  required={false}
-  type={"string"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"bool"}
+  unit={null}
   >
 
 ### RUST_BACKTRACE

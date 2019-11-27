@@ -92,6 +92,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={null}
   name={"counter"}
@@ -108,6 +109,7 @@ A single value that can _only_ be incremented, it cannot be incremented.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["login.count"]}
   name={"name"}
@@ -125,6 +127,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
   name={"tags"}
@@ -142,6 +145,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
@@ -159,6 +163,7 @@ Time metric was created/ingested.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[10.2]}
   name={"val"}
@@ -181,6 +186,7 @@ Amount to increment.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={null}
   name={"gauge"}
@@ -197,6 +203,7 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
 
 
 <Field
+  defaultValue={null}
   enumValues={["plus","minus"]}
   examples={["plus","minus"]}
   name={"direction"}
@@ -214,6 +221,7 @@ The direction to increase or decrease the gauge value.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["memory_rss"]}
   name={"name"}
@@ -231,6 +239,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
   name={"tags"}
@@ -248,6 +257,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
@@ -265,6 +275,7 @@ Time metric was created/ingested.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[554222.0]}
   name={"val"}
@@ -287,6 +298,7 @@ Specific value.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={null}
   name={"histogram"}
@@ -303,6 +315,7 @@ Also called a "timer". A[`histogram`](#histogram) represents the frequency distr
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["duration_ms"]}
   name={"name"}
@@ -320,6 +333,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[1]}
   name={"sample_rate"}
@@ -337,6 +351,7 @@ The bucket/distribution the metric is a part of.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
   name={"tags"}
@@ -354,6 +369,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
@@ -371,6 +387,7 @@ Time metric was created/ingested.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[2.6]}
   name={"val"}
@@ -393,6 +410,7 @@ Specific value.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={null}
   name={"set"}
@@ -409,6 +427,7 @@ A set represents a count of unique values, AKA the cardinality.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["unique_users"]}
   name={"name"}
@@ -426,6 +445,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
   name={"tags"}
@@ -443,6 +463,7 @@ The metric name.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
@@ -460,6 +481,7 @@ Time metric was created/ingested.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[12]}
   name={"val"}

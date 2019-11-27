@@ -10,6 +10,12 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
 ## Output
 
 Given the following log line:
@@ -50,7 +56,6 @@ A few things to note about the output:
 3. All values are strings, we have plans to add type coercion.
 4. [Special wrapper characters](#special-characters) were dropped, such as
    wrapping `[...]` and `"..."` characters.
-
 
 ## How It Works [[sort]]
 

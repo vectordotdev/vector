@@ -216,8 +216,8 @@ module.exports = {
           type: 'category',
           label: 'Advanced',
           items: [
-            "reference/global-options",
             "reference/env-vars",
+            "reference/global-options",
             "reference/tests",
           ]
         },

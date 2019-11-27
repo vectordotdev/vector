@@ -25,9 +25,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "coercer" # example, must be: "coercer"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Type
+  type = "coercer" # example, must be: "coercer"
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]

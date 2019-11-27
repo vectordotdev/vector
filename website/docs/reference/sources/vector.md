@@ -43,8 +43,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "vector" # example, must be: "vector"
+  # REQUIRED - Address
   address = "0.0.0.0:9000" # example
+  
+  # REQUIRED - Type
+  type = "vector" # example, must be: "vector"
 ```
 
 </TabItem>
@@ -54,11 +57,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "vector" # example, must be: "vector"
+  # REQUIRED - Address
   address = "0.0.0.0:9000" # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "vector" # example, must be: "vector"
+  
+  # OPTIONAL - Shutdown timeout secs
   shutdown_timeout_secs = 30 # default, seconds
 ```
 

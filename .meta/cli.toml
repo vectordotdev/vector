@@ -1,9 +1,9 @@
-[[cli.options]]
+[[cli.global_options]]
 gnu = "color"
 type = "string"
 description = "Read configuration from the specified file"
 
-[[cli.options]]
+[[cli.global_options]]
 default = "/etc/vector/vector.toml"
 gnu = "config"
 posix = "c"

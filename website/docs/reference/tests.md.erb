@@ -35,7 +35,7 @@ vector test /etc/vector/*.toml
   type = "regex_parser"
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 
-<%= config_example(metadata.testing.tests.options, path: "tests", array: true, common: true) %>
+<%= config_example(metadata.testing.tests.options_list, path: "tests", array: true, common: true) %>
 ```
 
 </TabItem>
@@ -48,7 +48,7 @@ vector test /etc/vector/*.toml
   type = "regex_parser"
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 
-<%= config_example(metadata.testing.tests.options, path: "tests", array: true, common: false) %>
+<%= config_example(metadata.testing.tests.options_list, path: "tests", array: true, common: false) %>
 ```
 
 </TabItem>
@@ -57,4 +57,4 @@ vector test /etc/vector/*.toml
 
 ## Options
 
-<%= options(metadata.testing.tests.options, heading_depth: 3) %>
+<%= options(metadata.testing.tests.options_list, heading_depth: 3) %>

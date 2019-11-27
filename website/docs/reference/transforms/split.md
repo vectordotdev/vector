@@ -25,14 +25,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "split" # example, must be: "split"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Field names
   field_names = ["timestamp", "level", "message"] # example
   
-  # OPTIONAL - General
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Type
+  type = "split" # example, must be: "split"
+  
+  # OPTIONAL - Drop field
   drop_field = true # default
+  
+  # OPTIONAL - Field
   field = "message" # default
+  
+  # OPTIONAL - Separator
   separator = "," # default
   
   # OPTIONAL - Types

@@ -43,9 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "vector" # example, must be: "vector"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Address
   address = "92.12.333.224:5000" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Type
+  type = "vector" # example, must be: "vector"
 ```
 
 </TabItem>
@@ -55,19 +60,30 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "vector" # example, must be: "vector"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Address
   address = "92.12.333.224:5000" # example
   
-  # OPTIONAL - General
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Type
+  type = "vector" # example, must be: "vector"
+  
+  # OPTIONAL - Healthcheck
   healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum
+    # OPTIONAL - Max size
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    
+    # OPTIONAL - Num items
     num_items = 500 # default, events, relevant when type = "memory"
+    
+    # OPTIONAL - Type
+    type = "memory" # default, enum
+    
+    # OPTIONAL - When full
     when_full = "block" # default, enum
 ```
 
@@ -131,52 +147,6 @@ Configures the sink specific buffer.
 
 <Field
   common={false}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  name={"type"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  name={"when_full"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -216,6 +186,52 @@ The maximum size of the buffer on the disk.
 #### num_items
 
 The maximum number of [events][docs.data-model#event] allowed in the buffer.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  name={"type"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  name={"when_full"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
 
 
 </Field>
