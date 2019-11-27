@@ -60,6 +60,12 @@ pub struct TaskExecutor {
     inner: tokio::runtime::TaskExecutor,
 }
 
+impl TaskExecutor {
+    pub fn spawn(&self, f: impl Future<Item = (), Error = ()> + Send + 'static) {
+        self.execute(f).unwrap()
+    }
+}
+
 impl<F> Executor<F> for TaskExecutor
 where
     F: Future<Item = (), Error = ()> + Send + 'static,

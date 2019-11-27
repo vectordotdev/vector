@@ -1,243 +1,165 @@
-use crate::topology::config::GlobalOptions;
-use futures::{Async, Future, Poll};
-use hyper::client::connect::dns::{Name, Resolve};
-use snafu::Snafu;
-use std::io;
-use std::net::{AddrParseError, IpAddr, SocketAddr, ToSocketAddrs};
-use std::vec::IntoIter;
+use crate::runtime::TaskExecutor;
+use futures::{future, Future};
+use snafu::{futures01::FutureExt, ResultExt};
+use std::{
+    fmt,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+};
 use trust_dns_resolver::{
     config::{LookupIpStrategy, NameServerConfig, Protocol, ResolverConfig, ResolverOpts},
-    error::ResolveErrorKind,
-    AsyncResolver, BackgroundLookupIp,
+    lookup_ip::LookupIpIntoIter,
+    system_conf, AsyncResolver,
 };
 
 /// Default port for DNS service.
 const DNS_PORT: u16 = 53;
 
-/// Default version will behave identically to std::net::ToSocketAddrs implementations.
-#[derive(Clone, Default)]
-pub struct DnsResolver {
-    resolver: Option<AsyncResolver>,
+pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Send + 'static>;
+
+#[derive(Debug, Clone)]
+pub struct Resolver {
+    inner: AsyncResolver,
 }
 
-impl DnsResolver {
-    /// Returned future should be spinned up.
-    pub fn new(
-        config: &GlobalOptions,
-    ) -> Result<(Self, Option<impl Future<Item = (), Error = ()>>), DnsError> {
-        if config.dns_servers.is_empty() {
-            return Ok((DnsResolver::default(), None));
-        }
+pub enum LookupIp {
+    Single(Option<IpAddr>),
+    Query(LookupIpIntoIter),
+}
 
-        let mut resolve_config = ResolverConfig::new();
+impl Resolver {
+    pub fn new(dns_servers: Vec<String>, exec: TaskExecutor) -> Result<Self, DnsError> {
+        let (config, opt) = if !dns_servers.is_empty() {
+            let mut config = ResolverConfig::new();
 
-        let mut errors = Vec::new();
+            let mut errors = Vec::new();
 
-        for s in config.dns_servers.iter() {
-            let parsed = s
-                .parse::<SocketAddr>()
-                .or_else(|_| s.parse::<IpAddr>().map(|ip| SocketAddr::new(ip, DNS_PORT)));
-            match parsed {
-                Ok(socket_addr) => resolve_config.add_name_server(NameServerConfig {
-                    socket_addr,
-                    protocol: Protocol::Udp,
-                    tls_dns_name: None,
-                }),
-                Err(error) => errors.push((s.clone(), error)),
+            for s in dns_servers.iter() {
+                let parsed = s
+                    .parse::<SocketAddr>()
+                    .or_else(|_| s.parse::<IpAddr>().map(|ip| SocketAddr::new(ip, DNS_PORT)));
+
+                match parsed {
+                    Ok(socket_addr) => config.add_name_server(NameServerConfig {
+                        socket_addr,
+                        protocol: Protocol::Udp,
+                        tls_dns_name: None,
+                    }),
+                    Err(error) => errors.push(format!(
+                        "Unable to parse dns server: {}, because {}",
+                        s, error
+                    )),
+                }
             }
-        }
 
-        if !errors.is_empty() {
-            return Err(DnsError::InputError { servers: errors });
-        }
+            if !errors.is_empty() {
+                return Err(DnsError::ServerList { errors });
+            }
 
-        let mut options = ResolverOpts::default();
-        options.attempts = 2;
-        options.validate = false;
-        options.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
-        options.num_concurrent_reqs = 1;
+            let mut opts = ResolverOpts::default();
+            opts.attempts = 2;
+            opts.validate = false;
+            opts.ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
+            // FIXME: multipe requests fails when this is commented out
+            opts.num_concurrent_reqs = 1;
 
-        let (resolver, worker) = AsyncResolver::new(resolve_config, options);
-
-        Ok((
-            DnsResolver {
-                resolver: Some(resolver),
-            },
-            Some(worker),
-        ))
-    }
-
-    /// Resolves host:port address
-    pub fn resolve_address(
-        &self,
-        s: &str,
-    ) -> Result<impl Future<Item = IntoIter<SocketAddr>, Error = io::Error>, DnsError> {
-        // Try to parse as a regular SocketAddr first
-        let (future, port) = if let Some(address) = s.parse::<SocketAddr>().ok() {
-            (ResolveFuture::IpAddr(address.ip()), address.port())
+            (config, opts)
         } else {
-            // 's' should contain name:port
-            let mut parts = s.rsplitn(2, ':');
-            let port = parts
-                .next()
-                .ok_or_else(|| DnsError::MissingPort {
-                    address: s.to_owned(),
-                })?
-                .parse::<u16>()
-                .map_err(|source| DnsError::InvalidPort {
-                    address: s.to_owned(),
-                    source,
-                })?;
-            let name = parts
-                .next()
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| DnsError::MissingHost {
-                    address: s.to_owned(),
-                })?
-                .parse::<Name>()
-                .map_err(|source| DnsError::InvalidHost {
-                    address: s.to_owned(),
-                    source,
-                })?;
-
-            (self.construct_future(name), port)
+            system_conf::read_system_conf().context(ReadSystemConf)?
         };
 
-        Ok(future.map(move |address| {
-            address
-                .map(|addr| (addr, port).into())
-                .collect::<Vec<SocketAddr>>()
-                .into_iter()
-        }))
+        let (inner, bg_task) = AsyncResolver::new(config, opt);
+
+        exec.spawn(bg_task);
+
+        Ok(Self { inner })
     }
 
-    /// Resolves host
-    pub fn resolve_host(&self, host: &str) -> Result<ResolveFuture, DnsError> {
-        let name = host
-            .parse::<Name>()
-            .map_err(|error| DnsError::InvalidHost {
-                address: host.to_owned(),
-                source: error,
-            })?;
-
-        Ok(self.construct_future(name))
-    }
-
-    fn construct_future(&self, name: Name) -> ResolveFuture {
-        // try to parse as a regular IpAddr first
-        name.as_str()
-            .parse::<IpAddr>()
-            .ok()
-            .map(ResolveFuture::IpAddr)
-            // Else start resolution
-            .unwrap_or_else(|| match self.resolver.as_ref() {
-                Some(resolver) => ResolveFuture::Custom(resolver.lookup_ip(name.as_str()), name),
-                None => ResolveFuture::System(name),
-            })
-    }
-}
-
-impl Resolve for DnsResolver {
-    type Addrs = IntoIter<IpAddr>;
-    /// A Future of the resolved set of addresses.
-    type Future = ResolveFuture;
-    /// Resolve a hostname.
-    fn resolve(&self, name: Name) -> Self::Future {
-        self.construct_future(name)
-    }
-}
-
-pub enum ResolveFuture {
-    /// Resolved
-    IpAddr(IpAddr),
-    /// Resolving using custom DNS servers
-    Custom(BackgroundLookupIp, Name),
-    /// Resolve using system resolver servers
-    System(Name),
-}
-
-impl ResolveFuture {
-    fn system_resolve(name: &Name) -> Poll<IntoIter<IpAddr>, io::Error> {
-        let poll = tokio_threadpool::blocking(|| {
-            (name.as_str(), 0).to_socket_addrs().map(|ips| {
-                ips.map(|socket_addr| socket_addr.ip())
-                    .collect::<Vec<_>>()
-                    .into_iter()
-            })
-        });
-        match poll {
-            Poll::Ok(Async::NotReady) => Poll::Ok(Async::NotReady),
-            Poll::Ok(Async::Ready(Ok(ips))) => Poll::Ok(Async::Ready(ips)),
-            Poll::Ok(Async::Ready(Err(error))) => Poll::Err(error),
-            Poll::Err(error) => Poll::Err(io::Error::new(io::ErrorKind::Other, error)),
+    pub fn lookup_ip(&self, name: impl AsRef<str>) -> ResolverFuture {
+        if let Ok(ip) = IpAddr::from_str(name.as_ref()) {
+            return Box::new(future::ok(LookupIp::Single(Some(ip))));
         }
+
+        Box::new(
+            self.inner
+                .lookup_ip(name.as_ref())
+                .context(UnableLookup)
+                .map(|lu| LookupIp::Query(lu.into_iter())),
+        )
     }
 }
 
-impl Future for ResolveFuture {
-    type Item = IntoIter<IpAddr>;
-    type Error = io::Error;
+impl Iterator for LookupIp {
+    type Item = IpAddr;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ResolveFuture::IpAddr(addr) => Poll::Ok(Async::Ready(vec![addr.clone()].into_iter())),
-            ResolveFuture::Custom(future, name) => match future.poll() {
-                Poll::Ok(Async::NotReady) => Poll::Ok(Async::NotReady),
-                Poll::Ok(Async::Ready(ips)) => {
-                    Poll::Ok(Async::Ready(ips.iter().collect::<Vec<_>>().into_iter()))
-                }
-                Poll::Err(error) => {
-                    match error.kind() {
-                        ResolveErrorKind::NoRecordsFound { .. } => debug!("No records found"),
-                        _ => {
-                            error!(message = "Error while resolving Domain Name", error = ?error);
-                        }
-                    }
-                    ResolveFuture::system_resolve(name)
-                }
-            },
-            ResolveFuture::System(name) => ResolveFuture::system_resolve(name),
+            LookupIp::Single(ip) => ip.take(),
+            LookupIp::Query(iter) => iter.next(),
         }
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, snafu::Snafu)]
 pub enum DnsError {
-    #[snafu(display("Invalid DNS server IPs: {:?}", servers.iter().map(|(s,e)| format!("({:?} : {})",s,e)).collect::<Vec<_>>()))]
-    InputError {
-        servers: Vec<(String, AddrParseError)>,
+    #[snafu(display("Unable to parse dns servers: {}", errors.join(", ")))]
+    ServerList { errors: Vec<String> },
+    #[snafu(display("Unable to read system dns config: {}", source))]
+    ReadSystemConf { source: std::io::Error },
+    #[snafu(display("Unable to resolve name: {}", source))]
+    UnableLookup {
+        #[snafu(source(from(trust_dns_resolver::error::ResolveError, ResolveError::from)))]
+        source: ResolveError,
     },
-    #[snafu(display("Missing port in address {:?}", address))]
-    MissingPort { address: String },
-    #[snafu(display("Missing host in address {:?}", address))]
-    MissingHost { address: String },
-    #[snafu(display("Invalid port in address {:?}, source: {}", address, source))]
-    InvalidPort {
-        address: String,
-        source: std::num::ParseIntError,
+    #[snafu(display("Invalid dns name: {}", source))]
+    InvalidName {
+        #[snafu(source(from(trust_dns_proto::error::ProtoError, ProtoError::from)))]
+        source: ProtoError,
     },
-    #[snafu(display("Invalid host in {:?}, source: {}", address, source))]
-    InvalidHost {
-        address: String,
-        source: hyper::client::connect::dns::InvalidNameError,
-    },
-    #[snafu(display("{}", source))]
-    IO { source: io::Error },
 }
 
-impl From<io::Error> for DnsError {
-    fn from(error: io::Error) -> Self {
-        DnsError::IO { source: error }
+// TODO: Upstream this change, we require this newtype to impl `std::error::Error`.
+#[derive(Debug)]
+pub struct ResolveError(trust_dns_resolver::error::ResolveError);
+
+impl fmt::Display for ResolveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ResolveError {}
+
+impl From<trust_dns_resolver::error::ResolveError> for ResolveError {
+    fn from(t: trust_dns_resolver::error::ResolveError) -> Self {
+        ResolveError(t)
+    }
+}
+
+// TODO: Upstream this change, we require this newtype to impl `std::error::Error`.
+#[derive(Debug)]
+pub struct ProtoError(trust_dns_proto::error::ProtoError);
+
+impl fmt::Display for ProtoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for ProtoError {}
+
+impl From<trust_dns_proto::error::ProtoError> for ProtoError {
+    fn from(t: trust_dns_proto::error::ProtoError) -> Self {
+        ProtoError(t)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::DnsResolver;
+    use super::Resolver;
     use crate::runtime::Runtime;
     use crate::test_util::{next_addr, runtime};
     use crate::topology::config::GlobalOptions;
-    use futures::Future;
     use std::collections::BTreeMap;
     use std::net::{IpAddr, SocketAddr, UdpSocket};
     use std::str::FromStr;
@@ -349,25 +271,12 @@ mod tests {
         subdomains: &[(&'static str, IpAddr)],
         domain: &'static str,
         rt: &mut Runtime,
-    ) -> DnsResolver {
+    ) -> Resolver {
         let server = dns_server(subdomains, domain, rt);
         let mut config = GlobalOptions::default();
         config.dns_servers = vec![format!("{}", server)];
 
-        let (dns, worker) = DnsResolver::new(&config).unwrap();
-        worker.map(|worker| rt.spawn(worker));
-        dns
-    }
-
-    fn future_ready<F: Future>(mut future: F) -> F::Item
-    where
-        F::Error: std::fmt::Debug,
-    {
-        match future.poll() {
-            Ok(Async::Ready(item)) => item,
-            Ok(Async::NotReady) => panic!("Future was not ready"),
-            Err(error) => panic!("Future was not ready, but errored: {:?}", error),
-        }
+        Resolver::new(config.dns_servers.clone(), rt.executor()).unwrap()
     }
 
     #[test]
@@ -381,33 +290,7 @@ mod tests {
         assert_eq!(
             target,
             runtime
-                .block_on(
-                    resolver
-                        .resolve_host(join("name", domain).as_str())
-                        .unwrap(),
-                )
-                .unwrap()
-                .next()
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn resolve_address() {
-        let mut runtime = runtime();
-        let domain = "vector.test";
-
-        let target = "10.45.12.35".parse().unwrap();
-        let resolver = resolver_for(&[("address", target)], domain, &mut runtime);
-
-        assert_eq!(
-            SocketAddr::from((target, 9000)),
-            runtime
-                .block_on(
-                    resolver
-                        .resolve_address((join("address", domain) + ":9000").as_str())
-                        .unwrap(),
-                )
+                .block_on(resolver.lookup_ip(join("name", domain).as_str()))
                 .unwrap()
                 .next()
                 .unwrap()
@@ -434,13 +317,12 @@ mod tests {
             format!("{}", server2),
         ];
 
-        let (resolver, worker) = DnsResolver::new(&config).unwrap();
-        worker.map(|worker| runtime.spawn(worker));
+        let resolver = Resolver::new(config.dns_servers.clone(), runtime.executor()).unwrap();
 
         assert_eq!(
             target_a,
             runtime
-                .block_on(resolver.resolve_host(join("a", domain_a).as_str()).unwrap())
+                .block_on(resolver.lookup_ip(join("a", domain_a).as_str()))
                 .unwrap()
                 .next()
                 .unwrap()
@@ -449,7 +331,7 @@ mod tests {
         assert_eq!(
             target_b,
             runtime
-                .block_on(resolver.resolve_host(join("b", domain_b).as_str()).unwrap())
+                .block_on(resolver.lookup_ip(join("b", domain_b).as_str()))
                 .unwrap()
                 .next()
                 .unwrap()
@@ -458,7 +340,7 @@ mod tests {
         assert_eq!(
             target_c,
             runtime
-                .block_on(resolver.resolve_host(join("c", domain_c).as_str()).unwrap())
+                .block_on(resolver.lookup_ip(join("c", domain_c).as_str()))
                 .unwrap()
                 .next()
                 .unwrap()
@@ -466,52 +348,31 @@ mod tests {
     }
 
     #[test]
-    fn resolve_address_missing_port() {
-        assert!(DnsResolver::default()
-            .resolve_address("vector.test")
-            .is_err());
+    fn resolve_ipv4() {
+        let mut rt = runtime();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+
+        let mut res = rt.block_on(resolver.lookup_ip("127.0.0.1")).unwrap();
+
+        assert_eq!(res.next(), Some(IpAddr::from_str("127.0.0.1").unwrap()));
     }
 
     #[test]
-    fn resolve_address_missing_host() {
-        assert!(DnsResolver::default().resolve_address(":9900").is_err());
-    }
+    fn resolve_ipv6() {
+        let mut rt = runtime();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-    #[test]
-    fn resolve_address_socket_v4() {
+        let mut res = rt.block_on(resolver.lookup_ip("::0")).unwrap();
+
+        assert_eq!(res.next(), Some(IpAddr::from_str("::0").unwrap()));
+
+        let mut res = rt
+            .block_on(resolver.lookup_ip("2001:0db8:85a3:0000:0000:8a2e:0370:7334"))
+            .unwrap();
+
         assert_eq!(
-            future_ready(
-                DnsResolver::default()
-                    .resolve_address("89.03.02.84:9900")
-                    .unwrap()
-            )
-            .next()
-            .unwrap(),
-            SocketAddr::from_str("89.03.02.84:9900").unwrap()
-        );
-    }
-
-    #[test]
-    fn resolve_address_socket_v6() {
-        assert_eq!(
-            future_ready(
-                DnsResolver::default()
-                    .resolve_address("[::0]:9900")
-                    .unwrap()
-            )
-            .next()
-            .unwrap(),
-            SocketAddr::from_str("[::0]:9900").unwrap()
-        );
-    }
-
-    #[test]
-    fn resolve_host_v4() {
-        assert_eq!(
-            future_ready(DnsResolver::default().resolve_host("89.03.02.84").unwrap())
-                .next()
-                .unwrap(),
-            IpAddr::from_str("89.03.02.84").unwrap()
+            res.next(),
+            Some(IpAddr::from_str("2001:0db8:85a3:0000:0000:8a2e:0370:7334").unwrap())
         );
     }
 }
