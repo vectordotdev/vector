@@ -19,7 +19,6 @@ This section will cover adminsitrating and operating Vector.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/administration/env-vars">Env vars</Jump>
 <Jump to="/docs/administration/monitoring">Monitoring</Jump>
 <Jump to="/docs/administration/process-management">Process management</Jump>
 <Jump to="/docs/administration/tuning">Tuning</Jump>

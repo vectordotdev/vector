@@ -31,6 +31,7 @@ class Metadata
 
   attr_reader :blog_posts,
     :companies,
+    :env_vars,
     :installation,
     :links,
     :log_fields,
@@ -45,6 +46,7 @@ class Metadata
 
   def initialize(hash, docs_root, pages_root)
     @companies = hash.fetch("companies")
+    @env_vars = Field.build_struct(hash["env_vars"] || {})
     @installation = OpenStruct.new()
     @log_fields = Field.build_struct(hash["log_fields"] || {})
     @metric_fields = Field.build_struct(hash["metric_fields"] || {})
@@ -155,6 +157,10 @@ class Metadata
 
   def components
     @components ||= sources_list + transforms_list + sinks_list
+  end
+
+  def env_vars_list
+    @env_vars_list ||= env_vars.to_h.values.sort
   end
 
   def latest_patch_releases

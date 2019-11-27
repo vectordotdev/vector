@@ -1,5 +1,8 @@
 [links]
 
+[links.pages]
+aws_components = "/components?providers%5B%5D=aws"
+
 [links.urls]
 add_company = "https://github.com/timberio/vector/blob/master/.meta/companies.toml"
 aws_athena = "https://aws.amazon.com/athena/"
