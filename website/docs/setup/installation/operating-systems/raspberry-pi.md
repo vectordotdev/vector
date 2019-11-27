@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="amd64"
+  defaultValue="arm64"
   urlKey="os"
   values={[
     { label: 'ARM64', value: 'arm64', },
