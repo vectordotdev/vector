@@ -97,6 +97,14 @@ class Release
     type == "pre"
   end
 
+  def to_h
+    {
+      date: date,
+      last_version: last_version,
+      version: version,
+    }
+  end
+
   def type
     @type ||= last_version.bump_type(version)
   end

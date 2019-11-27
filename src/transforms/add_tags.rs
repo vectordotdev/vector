@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,10 @@ pub struct AddTagsConfig {
 
 pub struct AddTags {
     tags: IndexMap<Atom, String>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<AddTagsConfig>("add_tags")
 }
 
 #[typetag::serde(name = "add_tags")]
@@ -46,7 +50,7 @@ impl AddTags {
 impl Transform for AddTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         if !self.tags.is_empty() {
-            let tags = event.as_mut_metric().tags_mut();
+            let ref mut tags = event.as_mut_metric().tags;
 
             if tags.is_none() {
                 *tags = Some(HashMap::new());
@@ -65,18 +69,22 @@ impl Transform for AddTags {
 #[cfg(test)]
 mod tests {
     use super::AddTags;
-    use crate::{event::Event, event::Metric, transforms::Transform};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue},
+        event::Event,
+        transforms::Transform,
+    };
     use indexmap::IndexMap;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn add_tags() {
-        let event = Event::Metric(Metric::Gauge {
+        let event = Event::Metric(Metric {
             name: "bar".into(),
-            val: 10.0,
-            direction: None,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: 10.0 },
         });
 
         let map: IndexMap<Atom, String> = vec![
@@ -88,7 +96,7 @@ mod tests {
 
         let mut transform = AddTags::new(map);
         let metric = transform.transform(event).unwrap().into_metric();
-        let tags = metric.tags().as_ref().unwrap();
+        let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 2);
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));

@@ -28,7 +28,7 @@ enum State {
 
 impl File {
     pub fn new(path: Bytes, encoding: Encoding) -> Self {
-        let path = BytesPath(path);
+        let path = BytesPath::new(path);
         let parent = path.as_ref().parent().map(|p| p.to_path_buf());
 
         let dir_fut = if let Some(parent) = parent {
@@ -157,13 +157,36 @@ impl Sink for File {
 }
 
 #[derive(Debug, Clone)]
-struct BytesPath(Bytes);
+struct BytesPath {
+    #[cfg(unix)]
+    path: Bytes,
+    #[cfg(windows)]
+    path: path::PathBuf,
+}
+
+impl BytesPath {
+    #[cfg(unix)]
+    fn new(path: Bytes) -> BytesPath {
+        BytesPath { path }
+    }
+    #[cfg(windows)]
+    fn new(path: Bytes) -> BytesPath {
+        let utf8_string = String::from_utf8_lossy(&path[..]);
+        let path = path::PathBuf::from(utf8_string.as_ref());
+        BytesPath { path }
+    }
+}
 
 impl AsRef<path::Path> for BytesPath {
+    #[cfg(unix)]
     fn as_ref(&self) -> &path::Path {
         use std::os::unix::ffi::OsStrExt;
-        let os_str = ffi::OsStr::from_bytes(&self.0[..]);
+        let os_str = ffi::OsStr::from_bytes(&self.path);
         &path::Path::new(os_str)
+    }
+    #[cfg(windows)]
+    fn as_ref(&self) -> &path::Path {
+        &self.path.as_ref()
     }
 }
 

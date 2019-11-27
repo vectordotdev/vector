@@ -1,7 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
 use bytes::{Bytes, BytesMut};
@@ -30,6 +30,10 @@ impl VectorConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<VectorConfig>("vector")
 }
 
 #[typetag::serde(name = "vector")]

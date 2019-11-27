@@ -1,0 +1,221 @@
+[testing.tests]
+type = "[table]"
+common = true
+null = false
+description = "A table that defines a unit test."
+
+[testing.tests.options.name]
+type = "string"
+examples = ["foo test"]
+common = true
+null = false
+description = "A unique identifier for this test."
+
+[testing.tests.options.input]
+type = "table"
+common = true
+null = false
+description = "A table that defines a unit test input event."
+
+[testing.tests.options.input.options.insert_at]
+type = "string"
+examples = ["foo"]
+common = true
+null = false
+description = """\
+The name of a transform, the input event will be delivered to this transform in \
+order to begin the test.\
+"""
+
+[testing.tests.options.input.options.type]
+type = "string"
+examples = ["raw", "log", "metric"]
+null = false
+common = true
+description = "The event type."
+
+[testing.tests.options.input.options.type.enum]
+raw = "Creates a log event where the message contents are specified in the field 'value'."
+log = "Creates a log event where log fields are specified in the table 'log_fields'."
+metric = "Creates a metric event, where its type and fields are specified in the table 'metric'."
+
+[testing.tests.options.input.options.value]
+type = "string"
+examples = ["some message contents"]
+relevant_when = {type = "raw"}
+null = true
+common = true
+description = "Specifies the log message field contents when the input type is 'raw'."
+
+[testing.tests.options.input.options.log_fields]
+type = "table"
+null = true
+common = false
+relevant_when = {type = "log"}
+description = "Specifies the log fields when the input type is 'log'."
+
+[testing.tests.options.input.options.log_fields.options."`<field-name>`"]
+type = "*"
+null = false
+examples = [
+  {name = "message", value = "some message contents"},
+  {name = "host", value = "myhost"},
+]
+description = """\
+A key/value pair representing a field to be added to the input event.\
+"""
+
+[testing.tests.options.input.options.metric]
+type = "table"
+null = true
+common = false
+relevant_when = {type = "metric"}
+description = "Specifies the metric type when the input type is 'metric'."
+
+[testing.tests.options.input.options.metric.options.type]
+type = "string"
+null = false
+examples = ["counter"]
+common = true
+description = "The metric type."
+
+[testing.tests.options.input.options.metric.options.type.enum]
+counter = "A [counter metric type][docs.data-model#counters]."
+gauge = "A [gauge metric type][docs.data-model#gauges]."
+histogram = "A [histogram metric type][docs.data-model#histograms]."
+set = "A [set metric type][docs.data-model#sets]."
+
+[testing.tests.options.input.options.metric.options.name]
+type = "string"
+examples = ["duration_total"]
+null = false
+common = true
+description = """\
+The name of the metric. Defaults to `<field>_total` for `counter` and \
+`<field>` for `gauge`.\
+"""
+
+[testing.tests.options.input.options.metric.options.tags]
+type = "table"
+null = true
+common = true
+description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
+
+[testing.tests.options.input.options.metric.options.tags.options."`<tag-name>`"]
+type = "string"
+examples = [
+  {name = "host", value = "foohost"},
+  {name = "region", value = "us-east-1"},
+]
+null = false
+common = true
+description = """\
+Key/value pairs representing [metric tags][docs.data-model#tags].\
+"""
+
+[testing.tests.options.input.options.metric.options.val]
+type = "float"
+examples = [10.2]
+optional = false
+null = false
+description = """\
+Amount to increment/decrement or gauge.\
+"""
+
+[testing.tests.options.input.options.metric.options.timestamp]
+type = "string"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+null = false
+description = """\
+Time metric was created/ingested.\
+"""
+
+[testing.tests.options.input.options.metric.options.sample_rate]
+type = "float"
+examples = [1]
+null = true
+description = """\
+The bucket/distribution the metric is a part of.\
+"""
+
+[testing.tests.options.input.options.metric.options.direction]
+type = "string"
+null = true
+description = """\
+The direction to increase or decrease the gauge value.\
+"""
+
+[testing.tests.options.input.options.metric.options.direction.enum]
+plus = "Increase the gauge"
+minus = "Decrease the gauge"
+
+[testing.tests.options.outputs]
+type = "[table]"
+common = true
+null = false
+description = "A table that defines a unit test expected output."
+
+[testing.tests.options.outputs.options.extract_from]
+type = "string"
+examples = ["bar"]
+common = true
+null = false
+description = """\
+The name of a transform, at the end of the test events extracted from this \
+transform will be checked against a table of conditions.\
+"""
+
+[testing.tests.options.outputs.options.conditions]
+type = "[table]"
+common = true
+null = false
+description = """\
+A table that defines a collection of conditions to check against the output of a \
+transform. A test is considered to have passed when each condition has resolved \
+true for one or more events extracted from the target transform.\
+"""
+
+[testing.tests.options.outputs.options.conditions.options.type]
+type = "string"
+null = false
+examples = ["check_fields"]
+common = true
+description = """\
+The type of the condition to execute. Currently only the `check_fields` type is \
+available.\
+"""
+
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.eq"]
+type = "string"
+null = true
+examples = [
+  { name = "message.eq", value = "this is the content to match against" }
+]
+common = true
+description = """\
+Check whether a fields contents exactly matches the value specified.\
+"""
+
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.neq"]
+type = "string"
+null = true
+examples = [
+  { name = "method.neq", value = "POST" }
+]
+common = true
+description = """\
+Check whether a fields contents does not match the value specified.\
+"""
+
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.exists"]
+type = "bool"
+null = true
+examples = [
+  { name = "host.exists", value = true }
+]
+common = true
+description = """\
+Check whether a field exists or does not exist, depending on the provided value\
+being `true` or `false` respectively.\
+"""
