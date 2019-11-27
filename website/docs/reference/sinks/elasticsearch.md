@@ -657,7 +657,7 @@ When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of
 
 ### request_in_flight_limit
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -680,7 +680,7 @@ The maximum number of in-flight requests allowed at any given time.
 
 ### request_rate_limit_duration_secs
 
-The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option
+The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -703,7 +703,7 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window.
+The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -726,7 +726,7 @@ The maximum number of requests allowed within the[`request_rate_limit_duration_s
 
 ### request_retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -749,7 +749,7 @@ The maximum number of retries to make for failed requests.
 
 ### request_retry_backoff_secs
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -1030,6 +1030,25 @@ document][docs.data_model].
 
 
 
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][urls.new_elasticsearch_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
+
 ### Template Syntax
 
 The[`index`](#index) options
@@ -1061,4 +1080,5 @@ You can read more about the complete syntax in the
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
 [urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
+[urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

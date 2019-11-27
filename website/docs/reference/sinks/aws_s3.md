@@ -528,7 +528,7 @@ The [AWS region][urls.aws_s3_regions] of the target S3 bucket.
 
 ### request_in_flight_limit
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -551,7 +551,7 @@ The maximum number of in-flight requests allowed at any given time.
 
 ### request_rate_limit_duration_secs
 
-The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option
+The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -574,7 +574,7 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window.
+The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -597,7 +597,7 @@ The maximum number of requests allowed within the[`request_rate_limit_duration_s
 
 ### request_retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -620,7 +620,7 @@ The maximum number of retries to make for failed requests.
 
 ### request_retry_backoff_secs
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -842,6 +842,25 @@ options and allows you to dynamically partition data on the fly.
 You'll notice that Vector's [template sytax](#template-syntax) is supported
 for these options, enabling you to use field values as the partition's key.
 
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][urls.new_aws_s3_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
+
 ### Template Syntax
 
 The[`key_prefix`](#key_prefix) options
@@ -879,6 +898,7 @@ You can read more about the complete syntax in the
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
