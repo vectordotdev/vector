@@ -11,6 +11,7 @@ class Component
 
   attr_reader :beta,
     :common,
+    :env_vars,
     :function_category,
     :id,
     :name,
@@ -23,11 +24,12 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
+    @env_vars = Option.build_struct(hash["env_vars"] || {})
     @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
-    @options = OpenStruct.new()
+    @options = Option.build_struct(hash["options"] || {})
 
     # Operating Systems
 
@@ -41,19 +43,13 @@ class Component
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
 
-    # Options
-
-    (hash["options"] || {}).each do |option_name, option_hash|
-      option = Option.new(
-        option_hash.merge({"name" => option_name}
-      ))
-
-      @options.send("#{option_name}=", option)
-    end
+    # Resources
 
     @resources = (hash.delete("resources") || []).collect do |resource_hash|
       OpenStruct.new(resource_hash)
     end
+
+    # Default options
 
     @options.type =
       Option.new({
@@ -96,6 +92,10 @@ class Component
 
   def context_options
     options_list.select(&:context?)
+  end
+
+  def env_vars_list
+    @env_vars_list ||= env_vars.to_h.values.sort
   end
 
   def event_types

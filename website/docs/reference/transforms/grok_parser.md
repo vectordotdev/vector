@@ -25,13 +25,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "grok_parser" # example, must be: "grok_parser"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Pattern
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # example
   
-  # OPTIONAL - General
+  # REQUIRED - Type
+  type = "grok_parser" # example, must be: "grok_parser"
+  
+  # OPTIONAL - Drop field
   drop_field = true # default
+  
+  # OPTIONAL - Field
   field = "message" # default
   
   # OPTIONAL - Types

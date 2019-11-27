@@ -43,13 +43,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  # REQUIRED - Endpoint
+  endpoint = "127.0.0.0:5000" # example
+  
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Region
   region = "us-east-1" # example
+  
+  # REQUIRED - Stream name
   stream_name = "my-stream" # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  
+  # REQUIRED - requests
+  encoding = "json" # example, enum
+  
+  # OPTIONAL - Partition key field
   partition_key_field = "user_id" # example, no default
 ```
 
@@ -60,20 +72,33 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  # REQUIRED - Endpoint
+  endpoint = "127.0.0.0:5000" # example
+  
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Region
   region = "us-east-1" # example
+  
+  # REQUIRED - Stream name
   stream_name = "my-stream" # example
   
-  # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
-  healthcheck = true # default
-  partition_key_field = "user_id" # example, no default
+  # REQUIRED - Type
+  type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  
+  # REQUIRED - requests
+  encoding = "json" # example, enum
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
+  
+  # OPTIONAL - Healthcheck
+  healthcheck = true # default
+  
+  # OPTIONAL - Partition key field
+  partition_key_field = "user_id" # example, no default
   
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
@@ -85,9 +110,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum
+    # OPTIONAL - Max size
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    
+    # OPTIONAL - Num items
     num_items = 500 # default, events, relevant when type = "memory"
+    
+    # OPTIONAL - Type
+    type = "memory" # default, enum
+    
+    # OPTIONAL - When full
     when_full = "block" # default, enum
 ```
 
@@ -174,52 +206,6 @@ Configures the sink specific buffer.
 
 <Field
   common={false}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  name={"type"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  name={"when_full"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -264,21 +250,90 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 </Field>
 
 
-</Fields>
+<Field
+  common={false}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  name={"type"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
 
 </Field>
 
 
 <Field
   common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  name={"when_full"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
+  name={"encoding"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### encoding
+
+The encoding format used to serialize the events before outputting.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000"]}
   name={"endpoint"}
-  nullable={true}
+  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -524,6 +579,59 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs strea
 
 </Fields>
 
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+
+
+</Field>
+
+
+</Fields>
+
 ## Output
 
 The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
@@ -697,6 +805,7 @@ attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry
 [docs.guarantees]: /docs/about/guarantees
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields
+[pages.aws_components]: /components?providers%5B%5D=aws
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

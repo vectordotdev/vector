@@ -30,8 +30,7 @@ class Metadata
   end
 
   attr_reader :blog_posts,
-    :companies,
-    :env_vars,
+  :env_vars,
     :installation,
     :links,
     :log_fields,
@@ -45,17 +44,15 @@ class Metadata
     :transforms
 
   def initialize(hash, docs_root, pages_root)
-    @companies = hash.fetch("companies")
-    @env_vars = Field.build_struct(hash["env_vars"] || {})
     @installation = OpenStruct.new()
     @log_fields = Field.build_struct(hash["log_fields"] || {})
     @metric_fields = Field.build_struct(hash["metric_fields"] || {})
-    @options = OpenStruct.new()
+    @options = Option.build_struct(hash.fetch("options"))
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
-    @testing = OpenStruct.new()
+    @testing = Option.build_struct(hash.fetch("testing"))
 
     # installation
 
@@ -123,26 +120,6 @@ class Metadata
       @sinks.send("#{sink_name}=", sink)
     end
 
-    # options
-
-    hash.fetch("options").each do |option_name, option_hash|
-      option = Option.new(
-        option_hash.merge({"name" => option_name}
-      ))
-
-      @options.send("#{option_name}=", option)
-    end
-
-    # testing
-
-    hash.fetch("testing").each do |option_name, option_hash|
-      option = Option.new(
-        option_hash.merge({"name" => option_name})
-      )
-
-      @testing.send("#{option_name}=", option)
-    end
-
     # links
 
     @links = Links.new(hash.fetch("links"), docs_root, pages_root)
@@ -153,6 +130,16 @@ class Metadata
       Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
         Post.new(path)
       end.sort
+
+    # env vars
+
+    @env_vars = Option.build_struct(hash["env_vars"] || {})
+
+    components.each do |component|
+      component.env_vars.to_h.each do |key, val|
+        @env_vars.send("#{key}=", val)
+      end
+    end
   end
 
   def components

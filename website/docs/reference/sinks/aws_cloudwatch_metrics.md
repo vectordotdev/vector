@@ -43,10 +43,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  # REQUIRED - Endpoint
+  endpoint = "127.0.0.0:5000" # example
+  
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Namespace
   namespace = "service" # example
+  
+  # REQUIRED - Region
   region = "us-east-1" # example
+  
+  # REQUIRED - Type
+  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
 ```
 
 </TabItem>
@@ -56,14 +66,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  # REQUIRED - Endpoint
+  endpoint = "127.0.0.0:5000" # example
+  
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Namespace
   namespace = "service" # example
+  
+  # REQUIRED - Region
   region = "us-east-1" # example
   
-  # OPTIONAL
-  endpoint = "127.0.0.0:5000" # example, no default
+  # REQUIRED - Type
+  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  
+  # OPTIONAL - Healthcheck
   healthcheck = true # default
 ```
 
@@ -81,15 +99,15 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000"]}
   name={"endpoint"}
-  nullable={true}
+  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -167,6 +185,59 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
 ### region
 
 The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.
+
+
+</Field>
+
+
+</Fields>
+
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
 
 
 </Field>
@@ -260,6 +331,7 @@ event-by-event basis. It does not batch data.
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#metric]: /docs/about/data-model#metric
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
+[pages.aws_components]: /components?providers%5B%5D=aws
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

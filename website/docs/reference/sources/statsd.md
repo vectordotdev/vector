@@ -28,8 +28,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "statsd" # example, must be: "statsd"
+  # REQUIRED - Address
   address = "127.0.0.1:8126" # example
+  
+  # REQUIRED - Type
+  type = "statsd" # example, must be: "statsd"
 ```
 
 ## Options
@@ -66,7 +69,7 @@ UDP socket address to bind to.
 
 </Fields>
 
-## Output (metric)
+## Output
 
 This component outputs [`metric` events][docs.data-model.metric].
 

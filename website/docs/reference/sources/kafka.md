@@ -43,13 +43,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "kafka" # example, must be: "kafka"
+  # REQUIRED - Bootstrap servers
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
+  
+  # REQUIRED - Group
   group_id = "consumer-group-name" # example
+  
+  # REQUIRED - Topics
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "kafka" # example, must be: "kafka"
+  
+  # OPTIONAL - Key field
   key_field = "user_id" # example, no default
 ```
 
@@ -60,15 +66,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "kafka" # example, must be: "kafka"
+  # REQUIRED - Bootstrap servers
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
+  
+  # REQUIRED - Group
   group_id = "consumer-group-name" # example
+  
+  # REQUIRED - Topics
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "kafka" # example, must be: "kafka"
+  
+  # OPTIONAL - Auto offset reset
   auto_offset_reset = "smallest" # default
+  
+  # OPTIONAL - Key field
   key_field = "user_id" # example, no default
+  
+  # OPTIONAL - Session timeout ms
   session_timeout_ms = 5000 # default, milliseconds
 ```
 
@@ -245,6 +261,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
@@ -263,6 +280,7 @@ The raw event message, unaltered.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

@@ -75,7 +75,7 @@ At the very minimum, a Vector configuration file must be composed of a
 [source][docs.sources] and a [sink][docs.sinks], [transforms][docs.transforms]
 are optional. To get started:
 
-1.  Choose a source
+1.  Choose a [source][docs.sources]
 
     To begin, you'll need to ingest data into Vector. This happens through one
     or more [sources][docs.sources]. For example:
@@ -88,7 +88,7 @@ are optional. To get started:
       include = "/var/log/nginx*.log"
     ```
 
-2.  Optionally choose a transform
+2.  Optionally choose a [transform][docs.transforms]
 
     Next, you'll want to choose a [transform][docs.transforms]. Transforms are
     optional, but most configuration include at least one since they help to
@@ -112,7 +112,7 @@ are optional. To get started:
     Notice how we connected the new transform to our source via the `inputs`
     option.
 
-3.  Choose a sink
+3.  Choose a [sink][docs.sinks]
 
     Finally, you'll want to choose a sink. Sinks are responsible for emitting data
     out of Vector. For this example, we'll use the
@@ -203,7 +203,7 @@ For example:
   index = "user-{{ user_id }}-%Y-%m-%d"
 ```
 
-The above `index` value will be calculate for _each_ event. For example, given
+The above `index` value will be calculated for _each_ event. For example, given
 the following event:
 
 ```json

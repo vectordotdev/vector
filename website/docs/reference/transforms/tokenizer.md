@@ -25,13 +25,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "tokenizer" # example, must be: "tokenizer"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Field names
   field_names = ["timestamp", "level", "message"] # example
   
-  # OPTIONAL - General
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Type
+  type = "tokenizer" # example, must be: "tokenizer"
+  
+  # OPTIONAL - Drop field
   drop_field = true # default
+  
+  # OPTIONAL - Field
   field = "message" # default
   
   # OPTIONAL - Types
@@ -215,7 +221,6 @@ A few things to note about the output:
 3. All values are strings, we have plans to add type coercion.
 4. [Special wrapper characters](#special-characters) were dropped, such as
    wrapping `[...]` and `"..."` characters.
-
 
 ## How It Works
 

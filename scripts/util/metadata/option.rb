@@ -5,6 +5,22 @@ class Option
 
   TYPES = ["*", "bool", "float", "[float]", "int", "string", "[string]", "table", "[table]"].freeze
 
+  class << self
+    def build_struct(hash)
+      options = OpenStruct.new()
+
+      hash.each do |option_name, option_hash|
+        option = new(
+          option_hash.merge({"name" => option_name}
+        ))
+
+        options.send("#{option_name}=", option)
+      end
+
+      options
+    end
+  end
+
   attr_reader :name,
     :category,
     :default,
@@ -21,26 +37,15 @@ class Option
     :unit
 
   def initialize(hash)
-    # Options can have sub-options (tables)
-    options_hashes = hash["options"]
-
-    if !options_hashes.nil?
-      @options =
-        options_hashes.collect do |sub_name, sub_hash|
-          self.class.new(sub_hash.merge("name" => sub_name))
-        end
-    else
-      @options = []
-    end
-
     @common = hash["common"] == true
     @default = hash["default"]
-    @display = hash["display"]
     @description = hash.fetch("description")
+    @display = hash["display"]
     @enum = hash["enum"]
     @examples = hash["examples"] || []
     @name = hash.fetch("name")
     @null = hash.fetch("null")
+    @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
     @templateable = hash["templateable"] == true
@@ -164,6 +169,10 @@ class Option
 
   def optional?
     !required?
+  end
+
+  def options_list
+    @options_list ||= @options.to_h.values.sort
   end
 
   def partition_key?

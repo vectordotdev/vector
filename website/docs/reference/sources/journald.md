@@ -43,11 +43,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
+  # REQUIRED - Type
   type = "journald" # example, must be: "journald"
   
-  # OPTIONAL
+  # OPTIONAL - Current boot only
   current_boot_only = true # default
+  
+  # OPTIONAL - Units
   units = ["ntpd", "sysinit.target"] # default
 ```
 
@@ -58,14 +60,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
+  # REQUIRED - Type
   type = "journald" # example, must be: "journald"
   
-  # OPTIONAL
+  # OPTIONAL - Batch size
   batch_size = 16 # default
+  
+  # OPTIONAL - Current boot only
   current_boot_only = true # default
+  
+  # OPTIONAL - Data dir
   data_dir = "/var/lib/vector" # example, no default
+  
+  # OPTIONAL - Local only
   local_only = true # default
+  
+  # OPTIONAL - Units
   units = ["ntpd", "sysinit.target"] # default
 ```
 
@@ -269,6 +279,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"_SYSTEMD_UNIT":"ntpd.service"},{"_BOOT_ID":"124c781146e841ae8d9b4590df8b9231"}]}
   name={"`<record-key>`"}
@@ -287,6 +298,7 @@ Additional Journald fields are passed through as log fields.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
@@ -304,6 +316,7 @@ The value of the journald `_HOSTNAME` field.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
@@ -321,6 +334,7 @@ The value of the journald `MESSAGE` field.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

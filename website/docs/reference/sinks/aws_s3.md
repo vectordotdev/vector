@@ -43,11 +43,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_s3" # example, must be: "aws_s3"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Bucket
   bucket = "my-bucket" # example
+  
+  # REQUIRED - Endpoint
+  endpoint = "127.0.0.0:5000" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Region
   region = "us-east-1" # example
+  
+  # REQUIRED - Type
+  type = "aws_s3" # example, must be: "aws_s3"
+  
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
   
   # OPTIONAL - Object Names
   key_prefix = "date=%F/" # default
@@ -60,19 +72,30 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_s3" # example, must be: "aws_s3"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Bucket
   bucket = "my-bucket" # example
+  
+  # REQUIRED - Endpoint
+  endpoint = "127.0.0.0:5000" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Region
   region = "us-east-1" # example
   
-  # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
-  healthcheck = true # default
+  # REQUIRED - Type
+  type = "aws_s3" # example, must be: "aws_s3"
+  
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, seconds
+  
+  # OPTIONAL - Healthcheck
+  healthcheck = true # default
   
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -90,9 +113,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum
+    # OPTIONAL - Max size
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    
+    # OPTIONAL - Num items
     num_items = 500 # default, events, relevant when type = "memory"
+    
+    # OPTIONAL - Type
+    type = "memory" # default, enum
+    
+    # OPTIONAL - When full
     when_full = "block" # default, enum
 ```
 
@@ -202,52 +232,6 @@ Configures the sink specific buffer.
 
 <Field
   common={false}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  name={"type"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  name={"when_full"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -292,21 +276,90 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 </Field>
 
 
-</Fields>
+<Field
+  common={false}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  name={"type"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
 
 </Field>
 
 
 <Field
   common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  name={"when_full"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
+  name={"encoding"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### encoding
+
+The encoding format used to serialize the events before outputting.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000"]}
   name={"endpoint"}
-  nullable={true}
+  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -598,6 +651,59 @@ The amount of time to wait before attempting a failed request again. See [Retry 
 
 </Fields>
 
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+
+
+</Field>
+
+
+</Fields>
+
 ## Output
 
 The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
@@ -785,6 +891,7 @@ You can read more about the complete syntax in the
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.guarantees]: /docs/about/guarantees
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
+[pages.aws_components]: /components?providers%5B%5D=aws
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

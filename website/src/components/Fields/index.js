@@ -28,7 +28,7 @@ function Fields({children, filters}) {
 
   return (
     <div className="fields">
-      {childrenArray.length > 1  && filters !== false ?
+      {childrenArray.length > 1 && filters !== false ?
         (<div className="filters">
           <span className="result-count">{filteredChildren.length} items</span>
           <div className=" search">

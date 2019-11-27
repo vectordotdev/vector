@@ -22,6 +22,7 @@ class Field
   end
 
   attr_reader :name,
+    :default,
     :description,
     :enum,
     :examples,
@@ -31,13 +32,18 @@ class Field
 
   def initialize(hash)
     @name = hash.fetch("name")
+    @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @optional = hash.fetch("optional")
     @type = hash.fetch("type")
 
+    if @type == "bool"
+      @examples = [true, false]
+    end
+
     if @type != "struct"
-      @examples = hash["examples"] || @enum || raise("#{self.class.name}#examples must be an array of examples")
+      @examples = @examples || hash["examples"] || @enum || raise("#{self.class.name}#examples must be an array of examples")
     end
 
     # Coercion

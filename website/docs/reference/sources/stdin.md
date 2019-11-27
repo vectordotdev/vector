@@ -53,14 +53,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
+  # REQUIRED - Type
   type = "stdin" # example, must be: "stdin"
-  
-  # OPTIONAL - General
-  max_length = 102400 # default, bytes
   
   # OPTIONAL - Context
   host_key = "host" # default
+  
+  # OPTIONAL - Max length
+  max_length = 102400 # default, bytes
 ```
 
 </TabItem>
@@ -152,6 +152,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
@@ -170,6 +171,7 @@ The local hostname.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
@@ -188,6 +190,7 @@ The raw message, unaltered.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

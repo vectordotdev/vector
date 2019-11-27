@@ -50,34 +50,40 @@ import CodeHeader from '@site/src/components/CodeHeader';
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - General
+  # REQUIRED - Name
   name = "foo test" # example
   
   # REQUIRED - Outputs
   [[tests.outputs]]
-    # REQUIRED - General
-    extract_from = "bar" # example
-    
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
-      # REQUIRED
+      # REQUIRED - Type
       type = "check_fields" # example
       
-      # OPTIONAL
+      # OPTIONAL - `<field name>`.eq
       name = "message.eq"
     value = "this is the content to match against" # example
+      
+      # OPTIONAL - `<field name>`.exists
       name = "host.exists"
     value = true # example
+      
+      # OPTIONAL - `<field name>`.neq
       name = "method.neq"
     value = "POST" # example
+    
+    # REQUIRED - Extract from
+    extract_from = "bar" # example
   
   # REQUIRED - Input
   [tests.input]
-    # REQUIRED
-    type = "raw" # example, enum
+    # REQUIRED - Insert at
     insert_at = "foo" # example
     
-    # OPTIONAL
+    # REQUIRED - Type
+    type = "raw" # example, enum
+    
+    # OPTIONAL - Value
     value = "some message contents" # example, no default, relevant when type = "raw"
 ```
 
@@ -92,34 +98,40 @@ import CodeHeader from '@site/src/components/CodeHeader';
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - General
+  # REQUIRED - Name
   name = "foo test" # example
   
   # REQUIRED - Outputs
   [[tests.outputs]]
-    # REQUIRED - General
-    extract_from = "bar" # example
-    
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
-      # REQUIRED
+      # REQUIRED - Type
       type = "check_fields" # example
       
-      # OPTIONAL
+      # OPTIONAL - `<field name>`.eq
       name = "message.eq"
     value = "this is the content to match against" # example
+      
+      # OPTIONAL - `<field name>`.exists
       name = "host.exists"
     value = true # example
+      
+      # OPTIONAL - `<field name>`.neq
       name = "method.neq"
     value = "POST" # example
+    
+    # REQUIRED - Extract from
+    extract_from = "bar" # example
   
   # REQUIRED - Input
   [tests.input]
-    # REQUIRED - General
-    type = "raw" # example, enum
+    # REQUIRED - Insert at
     insert_at = "foo" # example
     
-    # OPTIONAL - General
+    # REQUIRED - Type
+    type = "raw" # example, enum
+    
+    # OPTIONAL - Value
     value = "some message contents" # example, no default, relevant when type = "raw"
     
     # OPTIONAL - Log fields
@@ -131,14 +143,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL - Metric
     [tests.input.metric]
-      # REQUIRED - General
-      type = "counter" # example, enum
+      # REQUIRED - Name
       name = "duration_total" # example
+      
+      # REQUIRED - Timestamp
       timestamp = "2019-11-01T21:15:47.443232Z" # example
+      
+      # REQUIRED - Type
+      type = "counter" # example, enum
+      
+      # REQUIRED - Val
       val = 10.2 # example
       
-      # OPTIONAL - General
+      # OPTIONAL - Direction
       direction = "plus" # example, no default, enum
+      
+      # OPTIONAL - Sample rate
       sample_rate = 1 # example, no default
       
       # OPTIONAL - Tags
@@ -160,29 +180,6 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["foo test"]}
-  name={"name"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### name
-
-A unique identifier for this test.
-
-
-</Field>
 
 
 <Field
@@ -225,52 +222,6 @@ A table that defines a unit test input event.
 #### insert_at
 
 The name of a transform, the input event will be delivered to this transform in order to begin the test.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
-  examples={["raw","log","metric"]}
-  name={"type"}
-  nullable={false}
-  path={"input"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The event type.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["some message contents"]}
-  name={"value"}
-  nullable={true}
-  path={"input"}
-  relevantWhen={{"type":"raw"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### value
-
-Specifies the log message field contents when the input type is 'raw'.
 
 
 </Field>
@@ -349,23 +300,23 @@ Specifies the metric type when the input type is 'metric'.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
-  examples={["counter"]}
-  name={"type"}
-  nullable={false}
+  enumValues={{"plus":"Increase the gauge","minus":"Decrease the gauge"}}
+  examples={["plus","minus"]}
+  name={"direction"}
+  nullable={true}
   path={"input.metric"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   >
 
-##### type
+##### direction
 
-The metric type.
+The direction to increase or decrease the gauge value.
 
 
 </Field>
@@ -389,6 +340,29 @@ The metric type.
 ##### name
 
 The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[1]}
+  name={"sample_rate"}
+  nullable={true}
+  path={"input.metric"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"float"}
+  unit={null}
+  >
+
+##### sample_rate
+
+The bucket/distribution the metric is a part of.
 
 
 </Field>
@@ -448,29 +422,6 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[10.2]}
-  name={"val"}
-  nullable={false}
-  path={"input.metric"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"float"}
-  unit={null}
-  >
-
-##### val
-
-Amount to increment/decrement or gauge.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["2019-11-01T21:15:47.443232Z"]}
   name={"timestamp"}
   nullable={false}
@@ -491,46 +442,97 @@ Time metric was created/ingested.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={[1]}
-  name={"sample_rate"}
-  nullable={true}
+  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
+  examples={["counter"]}
+  name={"type"}
+  nullable={false}
   path={"input.metric"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
-  type={"float"}
+  type={"string"}
   unit={null}
   >
 
-##### sample_rate
+##### type
 
-The bucket/distribution the metric is a part of.
+The metric type.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
-  enumValues={{"plus":"Increase the gauge","minus":"Decrease the gauge"}}
-  examples={["plus","minus"]}
-  name={"direction"}
-  nullable={true}
+  enumValues={null}
+  examples={[10.2]}
+  name={"val"}
+  nullable={false}
   path={"input.metric"}
   relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"float"}
+  unit={null}
+  >
+
+##### val
+
+Amount to increment/decrement or gauge.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
+  examples={["raw","log","metric"]}
+  name={"type"}
+  nullable={false}
+  path={"input"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The event type.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some message contents"]}
+  name={"value"}
+  nullable={true}
+  path={"input"}
+  relevantWhen={{"type":"raw"}}
   required={false}
   templateable={false}
   type={"string"}
   unit={null}
   >
 
-##### direction
+#### value
 
-The direction to increase or decrease the gauge value.
+Specifies the log message field contents when the input type is 'raw'.
 
 
 </Field>
@@ -541,7 +543,25 @@ The direction to increase or decrease the gauge value.
 </Field>
 
 
-</Fields>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["foo test"]}
+  name={"name"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### name
+
+A unique identifier for this test.
+
 
 </Field>
 
@@ -572,29 +592,6 @@ A table that defines a unit test expected output.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["bar"]}
-  name={"extract_from"}
-  nullable={false}
-  path={"outputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### extract_from
-
-The name of a transform, at the end of the test events extracted from this transform will be checked against a table of conditions.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   name={"conditions"}
   nullable={false}
@@ -617,29 +614,6 @@ A table that defines a collection of conditions to check against the output of a
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["check_fields"]}
-  name={"type"}
-  nullable={false}
-  path={"outputs.conditions"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### type
-
-The type of the condition to execute. Currently only the `check_fields` type is available.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={[{"name":"message.eq","value":"this is the content to match against"}]}
   name={"`<field_name>`.eq"}
   nullable={true}
@@ -654,6 +628,29 @@ The type of the condition to execute. Currently only the `check_fields` type is 
 ##### `<field_name>`.eq
 
 Check whether a fields contents exactly matches the value specified.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"name":"host.exists","value":true}]}
+  name={"`<field_name>`.exists"}
+  nullable={true}
+  path={"outputs.conditions"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+##### `<field_name>`.exists
+
+Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
 
 </Field>
@@ -686,26 +683,49 @@ Check whether a fields contents does not match the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"host.exists","value":true}]}
-  name={"`<field_name>`.exists"}
-  nullable={true}
+  examples={["check_fields"]}
+  name={"type"}
+  nullable={false}
   path={"outputs.conditions"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
-  type={"bool"}
+  type={"string"}
   unit={null}
   >
 
-##### `<field_name>`.exists
+##### type
 
-Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
+The type of the condition to execute. Currently only the `check_fields` type is available.
 
 
 </Field>
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["bar"]}
+  name={"extract_from"}
+  nullable={false}
+  path={"outputs"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### extract_from
+
+The name of a transform, at the end of the test events extracted from this transform will be checked against a table of conditions.
+
 
 </Field>
 

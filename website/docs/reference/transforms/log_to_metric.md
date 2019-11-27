@@ -19,74 +19,35 @@ The `log_to_metric` transform accepts [`log`][docs.data-model#log] events and al
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "log_to_metric" # example, must be: "log_to_metric"
+  # REQUIRED - Inputs
   inputs = ["my-source-id"] # example
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
-    # REQUIRED
-    type = "counter" # example, enum
+    # REQUIRED - Field
     field = "duration" # example
+    
+    # REQUIRED - Name
     name = "duration_total" # example
     
-    # OPTIONAL
+    # REQUIRED - Type
+    type = "counter" # example, enum
+    
+    # OPTIONAL - General
     [transforms.my_transform_id.metrics.tags]
       host = "${HOSTNAME}" # example
       region = "us-east-1" # example
       status = "{{status}}" # example
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
-
-```toml
-[transforms.my_transform_id]
-  # REQUIRED - General
-  type = "log_to_metric" # example, must be: "log_to_metric"
-  inputs = ["my-source-id"] # example
   
-  # REQUIRED - Metrics
-  [[transforms.my_transform_id.metrics]]
-    # REQUIRED
-    type = "counter" # example, enum
-    field = "duration" # example
-    name = "duration_total" # example
-    
-    # OPTIONAL
-    increment_by_value = true # default, relevant when type = "counter"
-    [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}" # example
-      region = "us-east-1" # example
-      status = "{{status}}" # example
+  # REQUIRED - Type
+  type = "log_to_metric" # example, must be: "log_to_metric"
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -117,29 +78,6 @@ import Field from '@site/src/components/Field';
 A table of key/value pairs representing the keys to be added to the event.
 
 <Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
-  examples={["counter","gauge","histogram","set"]}
-  name={"type"}
-  nullable={false}
-  path={"metrics"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The metric type.
-
-
-</Field>
 
 
 <Field
@@ -261,6 +199,29 @@ Key/value pairs representing [metric tags][docs.data-model#tags]. Environment va
 </Field>
 
 
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
+  examples={["counter","gauge","histogram","set"]}
+  name={"type"}
+  nullable={false}
+  path={"metrics"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The metric type.
+
+
+</Field>
+
+
 </Fields>
 
 </Field>
@@ -269,6 +230,8 @@ Key/value pairs representing [metric tags][docs.data-model#tags]. Environment va
 </Fields>
 
 ## Output
+
+import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
@@ -281,6 +244,8 @@ Key/value pairs representing [metric tags][docs.data-model#tags]. Environment va
     { label: 'Sets', value: 'sets', },
   ]
 }>
+
+import TabItem from '@theme/TabItem';
 
 <TabItem value="timings">
 

@@ -39,6 +39,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"my-key":"my-value"}]}
   name={"`<key>`"}
@@ -56,6 +57,7 @@ In addition to the defined fields, you are welcome to add your own fields.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
@@ -73,6 +75,7 @@ Represents the originating host of the log. This is commonly used in [sources][d
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
   name={"message"}
@@ -90,6 +93,7 @@ Represents the log message. This is the key used when ingesting raw string data.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

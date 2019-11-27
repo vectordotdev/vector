@@ -43,18 +43,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "clickhouse" # example, must be: "clickhouse"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Host
   host = "http://localhost:8123" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Table
   table = "mytable" # example
   
-  # OPTIONAL - General
+  # REQUIRED - Type
+  type = "clickhouse" # example, must be: "clickhouse"
+  
+  # OPTIONAL - Database
   database = "mydatabase" # example, no default
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
+    # REQUIRED - Password
     password = "password" # example
+    
+    # REQUIRED - User
     user = "username" # example
 ```
 
@@ -65,19 +74,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "clickhouse" # example, must be: "clickhouse"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Host
   host = "http://localhost:8123" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Table
   table = "mytable" # example
   
-  # OPTIONAL - General
-  database = "mydatabase" # example, no default
-  healthcheck = true # default
+  # REQUIRED - Type
+  type = "clickhouse" # example, must be: "clickhouse"
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
+  
+  # OPTIONAL - Database
+  database = "mydatabase" # example, no default
+  
+  # OPTIONAL - Healthcheck
+  healthcheck = true # default
   
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
@@ -92,23 +109,44 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
+    # REQUIRED - Password
     password = "password" # example
+    
+    # REQUIRED - User
     user = "username" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum
+    # OPTIONAL - Max size
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    
+    # OPTIONAL - Num items
     num_items = 500 # default, events, relevant when type = "memory"
+    
+    # OPTIONAL - Type
+    type = "memory" # default, enum
+    
+    # OPTIONAL - When full
     when_full = "block" # default, enum
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
+    # OPTIONAL - Ca path
     ca_path = "/path/to/certificate_authority.crt" # example, no default
+    
+    # OPTIONAL - Crt path
     crt_path = "/path/to/host_certificate.crt" # example, no default
+    
+    # OPTIONAL - Key pass
     key_pass = "PassWord1" # example, no default
+    
+    # OPTIONAL - Key path
     key_path = "/path/to/host_certificate.key" # example, no default
+    
+    # OPTIONAL - Verify certificate
     verify_certificate = true # default
+    
+    # OPTIONAL - Verify hostname
     verify_hostname = true # default
 ```
 
@@ -268,52 +306,6 @@ Configures the sink specific buffer.
 
 <Field
   common={false}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  name={"type"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  name={"when_full"}
-  nullable={false}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -353,6 +345,52 @@ The maximum size of the buffer on the disk.
 #### num_items
 
 The maximum number of [events][docs.data-model#event] allowed in the buffer.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  name={"type"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  name={"when_full"}
+  nullable={false}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
 
 
 </Field>
@@ -688,29 +726,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["/path/to/host_certificate.key"]}
-  name={"key_path"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### key_path
-
-Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set,[`crt_path`](#crt_path) must also be set.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={["PassWord1"]}
   name={"key_pass"}
   nullable={true}
@@ -725,6 +740,29 @@ Absolute path to a certificate key file used to identify this connection, in DER
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless[`key_pass`](#key_pass) above is set.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  name={"key_path"}
+  nullable={true}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### key_path
+
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set,[`crt_path`](#crt_path) must also be set.
 
 
 </Field>

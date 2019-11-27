@@ -28,11 +28,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
+  # REQUIRED - Type
   type = "docker" # example, must be: "docker"
   
-  # OPTIONAL
+  # OPTIONAL - Include containers
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
+  
+  # OPTIONAL - Include labels
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
 
@@ -94,6 +96,59 @@ A list of container object labels to match against when filtering running contai
 
 </Fields>
 
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={"unix:///var/run/docker.sock"}
+  enumValues={null}
+  examples={["unix://path/to/socket","tcp://host:2375/path"]}
+  name={"DOCKER_HOST"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### DOCKER_HOST
+
+The docker host to connect to. See [Connecting to the Docker daemon](#connecting-to-the-docker-daemon) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"DOCKER_VERIFY_TLS"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### DOCKER_VERIFY_TLS
+
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate. See [Connecting to the Docker daemon](#connecting-to-the-docker-daemon) for more info.
+
+
+</Field>
+
+
+</Fields>
+
 ## Output
 
 This component outputs [`log` events][docs.data-model.log].
@@ -117,6 +172,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
   name={"`<label-key>`"}
@@ -134,6 +190,7 @@ More detail on the output schema is below.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"container_created_at"}
@@ -151,6 +208,7 @@ A UTC timestamp representing when the container was created.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["9b6247364a03","715ebfcee040"]}
   name={"container_id"}
@@ -168,6 +226,7 @@ The Docker container ID that the log was collected from.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["evil_ptolemy","nostalgic_stallman"]}
   name={"container_name"}
@@ -185,6 +244,7 @@ The Docker container name that the log was collected from.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["ubuntu:latest","busybox","timberio/vector:latest-alpine"]}
   name={"image"}
@@ -202,6 +262,7 @@ The image name that the container is based on.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
@@ -219,6 +280,7 @@ The raw log message, unaltered.
 
 
 <Field
+  defaultValue={null}
   enumValues={["stdout","stderr"]}
   examples={["stdout","stderr"]}
   name={"stream"}
@@ -236,6 +298,7 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 
 
 <Field
+  defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}

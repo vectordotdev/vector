@@ -43,13 +43,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "datadog_metrics" # example, must be: "datadog_metrics"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Api key
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Namespace
   namespace = "service" # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "datadog_metrics" # example, must be: "datadog_metrics"
+  
+  # OPTIONAL - Host
   host = "https://api.datadoghq.com" # default
 ```
 
@@ -60,19 +66,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "datadog_metrics" # example, must be: "datadog_metrics"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Api key
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Namespace
   namespace = "service" # example
   
-  # OPTIONAL - General
-  healthcheck = true # default
-  host = "https://api.datadoghq.com" # default
+  # REQUIRED - Type
+  type = "datadog_metrics" # example, must be: "datadog_metrics"
   
   # OPTIONAL - Batching
   batch_size = 20 # default, bytes
   batch_timeout = 1 # default, seconds
+  
+  # OPTIONAL - Healthcheck
+  healthcheck = true # default
+  
+  # OPTIONAL - Host
+  host = "https://api.datadoghq.com" # default
   
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds

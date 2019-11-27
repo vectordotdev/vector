@@ -43,10 +43,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "prometheus" # example, must be: "prometheus"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Address
   address = "0.0.0.0:9598" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Namespace
   namespace = "service" # example
+  
+  # REQUIRED - Type
+  type = "prometheus" # example, must be: "prometheus"
 ```
 
 </TabItem>
@@ -56,14 +63,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "prometheus" # example, must be: "prometheus"
-  inputs = ["my-source-id"] # example
+  # REQUIRED - Address
   address = "0.0.0.0:9598" # example
+  
+  # REQUIRED - Inputs
+  inputs = ["my-source-id"] # example
+  
+  # REQUIRED - Namespace
   namespace = "service" # example
   
-  # OPTIONAL
+  # REQUIRED - Type
+  type = "prometheus" # example, must be: "prometheus"
+  
+  # OPTIONAL - Buckets
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
+  
+  # OPTIONAL - Healthcheck
   healthcheck = true # default
 ```
 
