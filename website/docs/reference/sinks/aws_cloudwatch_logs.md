@@ -113,12 +113,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # default
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
+  request_rate_limit_duration_secs = 1 # default, seconds
+  request_rate_limit_num = 5 # default
+  request_retry_attempts = 5 # default
+  request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-  retry_attempts = 5 # default
-  retry_backoff_secs = 5 # default, seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -452,52 +452,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={false}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  name={"rate_limit_duration"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-### rate_limit_duration
-
-The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"rate_limit_num"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-### rate_limit_num
-
-The maximum number of requests allowed within the[`rate_limit_duration`](#rate_limit_duration) window. See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -545,6 +499,98 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 <Field
   common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"request_rate_limit_duration_secs"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+### request_rate_limit_duration_secs
+
+The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"request_rate_limit_num"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### request_rate_limit_num
+
+The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"request_retry_attempts"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### request_retry_attempts
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"request_retry_backoff_secs"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+### request_retry_backoff_secs
+
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -561,52 +607,6 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 ### request_timeout_secs
 
 The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"retry_attempts"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-### retry_attempts
-
-The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"retry_backoff_secs"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-### retry_backoff_secs
-
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -811,11 +811,11 @@ for these options, enabling you to use field values as the partition's key.
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the[`rate_limit_duration`](#rate_limit_duration) and[`rate_limit_num`](#rate_limit_num)
-options to ensure Vector does not exceed the specified number of requests in
-the specified window. You can further control the pace at which this window is
-saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which will guarantee no
-more than the specified number of requests are in-flight at any given time.
+downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
@@ -825,7 +825,7 @@ with the Vector team by [opening an issie][urls.new_aws_cloudwatch_logs_sink_iss
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the[`retry_attempts`](#retry_attempts) and[`retry_backoff_secs`](#retry_backoff_secs) options.
+attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
 
 ### Template Syntax
 

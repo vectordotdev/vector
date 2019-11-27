@@ -105,28 +105,30 @@ You'll notice that Vector's [template sytax](#template-syntax) is supported
 for these options, enabling you to use field values as the partition's key.
 <%- end -%>
 <%- end -%>
-<%- if component.options.rate_limit_duration -%>
+<%- if component.options.request_rate_limit_duration_secs -%>
 
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
-options to ensure Vector does not exceed the specified number of requests in
-the specified window. You can further control the pace at which this window is
-saturated with the `request_in_flight_limit` option, which will guarantee no
-more than the specified number of requests are in-flight at any given time.
+downstream service. Start with the `request_rate_limit_duration_secs` and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the `request_in_flight_limit` option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
 with the Vector team by [opening an issie][urls.new_<%= component.id %>_issue].
 <%- end -%>
-<%- if component.options.retry_attempts -%>
+<%- if component.options.request_retry_attempts -%>
 
 ### Retry Policy
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+attempts and backoff rate with the `request_retry_attempts` and
+`request_retry_backoff_secs` options.
 <%- end -%>
 <%- if component.sink? && component.streaming? -%>
 
