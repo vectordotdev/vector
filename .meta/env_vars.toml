@@ -1,0 +1,35 @@
+[env_vars.AWS_ACCESS_KEY_ID]
+type = "string"
+examples = ["AKIAIOSFODNN7EXAMPLE"]
+optional = true
+description = """\
+Used for AWS authentication when communicating with AWS services. See relevant \
+[AWS components][pages.aws_components] for more info.\
+"""
+
+[env_vars.AWS_SECRET_ACCESS_KEY]
+type = "string"
+examples = ["wJalrXUtnFEMI/K7MDENG"]
+optional = true
+description = """\
+Used for AWS authentication when communicating with AWS services. See relevant \
+[AWS components][pages.aws_components] for more info.\
+"""
+
+[env_vars.LOG]
+type = "string"
+examples = ["debug"]
+optional = true
+description = """\
+Sets Vector's log level. See the [log section in the monitoring \
+guide][docs.monitoring#level] for more information on the available levels.\
+"""
+
+[env_vars.RUST_BACKTRACE]
+type = "string"
+examples = ["debug"]
+optional = true
+description = """\
+Enables backtraces when errors are logged. Use this when debugging only since \
+it can degrade performance.\
+"""

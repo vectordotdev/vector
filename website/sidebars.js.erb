@@ -133,9 +133,15 @@ module.exports = {
             <% end %>
           ],
         },
-        <%= metadata.links.fetch_id("docs.reference").to_json %>,
-        <%= metadata.links.fetch_id("docs.reference.tests").to_json %>,
-        <%= metadata.links.fetch_id("docs.reference.global-options").to_json %>,
+        {
+          type: 'category',
+          label: 'Advanced',
+          items: [
+            <%= metadata.links.fetch_id("docs.reference.global-options").to_json %>,
+            <%= metadata.links.fetch_id("docs.reference.env-vars").to_json %>,
+            <%= metadata.links.fetch_id("docs.reference.tests").to_json %>,
+          ]
+        },
       ],
     },
     {
@@ -148,7 +154,6 @@ module.exports = {
         <%= metadata.links.fetch_id("docs.administration.tuning").to_json %>,
         <%= metadata.links.fetch_id("docs.administration.updating").to_json %>,
         <%= metadata.links.fetch_id("docs.administration.validating").to_json %>,
-        <%= metadata.links.fetch_id("docs.administration.env-vars").to_json %>,
       ],
     },
     {

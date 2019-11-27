@@ -68,11 +68,14 @@ class Links
     id_parts = id.split(".", 2)
     category = id_parts[0]
     suffix = id_parts[1]
-    suffix_parts = suffix.split("#", 2)
-    name = suffix_parts[0]
-    section = suffix_parts[1]
+    hash_parts = suffix.split("#", 2)
+    name = hash_parts[0]
+    hash = hash_parts[1]
+    query_parts = name.split("?", 2)
+    name = query_parts[0]
+    query = query_parts[1]
 
-    base_value =
+    value =
       case category
       when "assets"
         fetch_asset(name)
@@ -94,7 +97,8 @@ class Links
         )
       end
 
-    value = [base_value, section].compact.join("#")
+    value = [value, query].compact.join("?")
+    value = [value, hash].compact.join("#")
     @values[id] ||= value
     value
   end
@@ -106,6 +110,10 @@ class Links
 
   private
     def fetch!(namespace, items, name)
+      if @links[namespace] && @links[namespace][name]
+        return @links[namespace][name]
+      end
+      
       normalized_name = name.downcase.gsub(".", "/").gsub("-", "_").split("#", 2).first
 
       found_items =
