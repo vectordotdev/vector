@@ -68,11 +68,7 @@ class Field
   end
 
   def <=>(other)
-    if wildcard? && !other.wildcard?
-      1
-    else
-      name <=> other.name
-    end
+    name <=> other.name
   end
 
   def eql?(other)
