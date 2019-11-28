@@ -179,15 +179,6 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
     fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
         let (events, key) = req.into_parts();
 
-        let TowerRequestSettings {
-            in_flight_limit: _,
-            timeout,
-            rate_limit_duration,
-            rate_limit_num,
-            retry_attempts: _,
-            retry_backoff: _,
-        } = self.request_settings;
-
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
@@ -195,12 +186,16 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
                 let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
 
                 let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key).unwrap();
-                let timeout = Timeout::new(cloudwatch, timeout);
+                let timeout = Timeout::new(cloudwatch, self.request_settings.timeout);
 
                 let buffer = Buffer::new(timeout, 1);
                 let retry = Retry::new(policy, buffer);
 
-                let rate = RateLimit::new(retry, Rate::new(rate_limit_num, rate_limit_duration));
+                let rate = Rate::new(
+                    self.request_settings.rate_limit_num,
+                    self.request_settings.rate_limit_duration,
+                );
+                let rate = RateLimit::new(retry, rate);
                 let concurrency = ConcurrencyLimit::new(rate, 1);
 
                 Buffer::new(concurrency, 1)
