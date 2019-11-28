@@ -12,45 +12,37 @@ import TabItem from '@theme/TabItem';
 
 ## Install
 
-1.  Download the [Vector `.deb file`][urls.vector_downloads.<%= metadata.latest_version %>/vector-amd64.deb]:
+<Tabs
+  block={true}
+  defaultValue="amd64"
+  urlKey="arch"
+  values={[
+    { label: 'Deb (x86_64)', value: 'amd64', },
+    { label: 'Deb (ARM64)', value: 'arm64', },
+    { label: 'Deb (ARMv7)', value: 'armhf', },
+    ]}>
 
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
+<TabItem value="amd64">
 
-    <TabItem value="latest">
+<%= install_from_deb_linux("vector-amd64.deb") %>
 
-    ```bash
-    curl -O [[[urls.vector_downloads.<%= metadata.latest_version %>/vector-amd64.deb]]]
-    ```
+</TabItem>
 
-    </TabItem>
-    <TabItem value="nightly">
+<TabItem value="arm64">
 
-    ```bash
-    curl -O [[[urls.vector_downloads.nightly/latest/vector-amd64.deb]]]
-    ```
+<%= install_from_deb_linux("vector-arm64.deb") %>
 
-    </TabItem>
-    </Tabs>
+</TabItem>
 
-2.  Install the Vector `.deb` package directly:
+<TabItem value="armhf">
 
-    ```bash
-    sudo dpkg -i vector-amd64.deb
-    ```
+<%= install_from_deb_linux("vector-armhf.deb") %>
 
-3.  Start Vector:
+</TabItem>
 
-    ```bash
-    sudo systemctl start vector
-    ```
+</Tabs>
 
-    That's it! Proceed to [configure](#configuring) Vector for your use case.
+That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 ### Previous Versions
 

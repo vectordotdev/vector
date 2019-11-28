@@ -7,7 +7,7 @@ require_relative "templates/config_example"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 
-# Renders teampltes in the templates sub-dir
+# Renders templates in the templates sub-dir
 #
 # ==== Partials
 #
@@ -19,7 +19,7 @@ require_relative "templates/config_spec"
 #
 # ==== Sub-Objects
 #
-# There are times whewre it makes sense to represent logic in a sub-object.
+# There are times where it makes sense to represent logic in a sub-object.
 # This is usually true for complicated partials. For example, the
 # `config_schema` partial also instantiates an `Templates::ConfigSchema` object
 # that is made available to the `config_schema` partial. This reduces the
@@ -249,6 +249,10 @@ class Templates
 
   def install_from_archive_linux(archive_name)
     render("#{partials_path}/_install_from_archive_linux.md", binding).strip
+  end
+
+  def install_from_deb_linux(deb_name)
+    render("#{partials_path}/_install_from_deb_linux.md", binding).strip
   end
 
   def manual_installation_next_steps(type)

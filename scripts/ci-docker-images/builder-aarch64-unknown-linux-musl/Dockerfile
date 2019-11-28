@@ -18,6 +18,8 @@ ARG MUSL_VERSION=1.1.22
 ARG TARGET="aarch64-unknown-linux-musl"
 # Target architecture for LLVM
 ARG LLVM_TARGET="AArch64"
+# Target architecture for Linux kernel headres
+ARG LINUX_TARGET="arm64"
 # We also need GCC for the target architecture to compile compier-rt. Because
 # GCC target triples are different from LLVM, we need to specify it explicitly.
 # Example: "arm-linux-gnueabihf".
@@ -141,13 +143,14 @@ RUN cd $MUSL_DIR && \
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
+ARG LINUX_TARGET
 ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 RUN make -j$(nproc) headers_install \
   KBUILD_VERBOSE=1 \
   HOSTCC="/usr/bin/gcc" \
-  ARCH="arm64" \
+  ARCH="$LINUX_TARGET" \
   CC="$CC" \
   INSTALL_HDR_PATH=$LIBS_PREFIX
 
@@ -258,8 +261,9 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
 RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
 
-# Use stdatomic.h header provided by Clang because it is not present in musl.
+# Use some headers provided by Clang because which are not present in musl.
 RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/emmintrin.h $LIBS_PREFIX/include/emmintrin.h
 
 # Some build scripts hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
@@ -272,7 +276,7 @@ RUN echo > dummy.c && \
   rm dummy.c dummy.o
 
 # The actual builder.
-FROM ubuntu:18.04
+FROM ubuntu:19.10
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
@@ -331,3 +335,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
 
 COPY builder-aarch64-unknown-linux-musl/start.sh /start.sh
 ENTRYPOINT ["/start.sh"]
+
+ENV TARGET="$TARGET"
+
+# Install `cargo-deb from Git until
+# https://github.com/mmstick/cargo-deb/pull/112 is published on crates.io
+RUN cargo install --git https://github.com/mmstick/cargo-deb --rev cc879930c06fa22e99f2839bad620ac0d0da879e cargo-deb
+
+RUN apt-get install -y rename cmark-gfm
