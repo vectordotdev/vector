@@ -7,6 +7,7 @@ use crate::{
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{Future, Poll};
+use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
@@ -34,14 +35,13 @@ pub struct CloudWatchMetricsSinkConfig {
     pub request: TowerRequestConfig,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(5),
-    request_timeout_secs: Some(30),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(150),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_timeout_secs: Some(30),
+        request_rate_limit_num: Some(150),
+        ..Default::default()
+    };
+}
 
 inventory::submit! {
     SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")

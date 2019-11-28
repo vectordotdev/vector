@@ -7,6 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_kinesis::{
@@ -40,14 +41,12 @@ pub struct KinesisSinkConfig {
     pub request: TowerRequestConfig,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(5),
-    request_timeout_secs: Some(30),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(5),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_timeout_secs: Some(30),
+        ..Default::default()
+    };
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

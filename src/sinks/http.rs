@@ -16,6 +16,7 @@ use http::{
 };
 use hyper::{Body, Request};
 use indexmap::IndexMap;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
@@ -51,14 +52,14 @@ pub struct HttpSinkConfig {
     pub tls: Option<TlsOptions>,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(10),
-    request_timeout_secs: Some(30),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(10),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(10),
+        request_timeout_secs: Some(30),
+        request_rate_limit_num: Some(10),
+        ..Default::default()
+    };
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

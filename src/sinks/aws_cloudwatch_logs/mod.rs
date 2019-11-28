@@ -14,6 +14,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rusoto_core::{
     request::{BufferedHttpResponse, HttpClient},
     Region, RusotoError,
@@ -65,14 +66,11 @@ pub struct CloudwatchLogsSinkConfig {
     pub request: TowerRequestConfig,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(5),
-    request_timeout_secs: None,
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(5),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
+}
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,

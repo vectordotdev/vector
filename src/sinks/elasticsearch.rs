@@ -16,6 +16,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request,
 };
+use lazy_static::lazy_static;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -51,14 +52,11 @@ pub struct ElasticSearchConfig {
     pub tls: Option<TlsOptions>,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(5),
-    request_timeout_secs: Some(60),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(5),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]

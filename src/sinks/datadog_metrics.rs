@@ -12,6 +12,7 @@ use futures::{Future, Poll};
 use http::{uri::InvalidUri, Method, StatusCode, Uri};
 use hyper;
 use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
@@ -48,14 +49,12 @@ pub struct DatadogConfig {
     pub request: TowerRequestConfig,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(5),
-    request_timeout_secs: Some(60),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(5),
-    request_retry_attempts: Some(5),
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_retry_attempts: Some(5),
+        ..Default::default()
+    };
+}
 
 pub fn default_host() -> String {
     String::from("https://api.datadoghq.com")

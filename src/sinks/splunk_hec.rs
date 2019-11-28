@@ -13,6 +13,7 @@ use futures::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
@@ -40,14 +41,13 @@ pub struct HecSinkConfig {
     pub tls: Option<TlsOptions>,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(10),
-    request_timeout_secs: Some(60),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(10),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(10),
+        request_rate_limit_num: Some(10),
+        ..Default::default()
+    };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

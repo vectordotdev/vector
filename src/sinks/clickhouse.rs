@@ -15,6 +15,7 @@ use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
@@ -34,14 +35,11 @@ pub struct ClickhouseConfig {
     pub tls: Option<TlsOptions>,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(5),
-    request_timeout_secs: Some(60),
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(5),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
+}
 
 inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")

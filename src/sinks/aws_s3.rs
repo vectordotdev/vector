@@ -12,6 +12,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
@@ -52,14 +53,13 @@ pub struct S3SinkConfig {
     pub request: TowerRequestConfig,
 }
 
-const REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-    request_in_flight_limit: Some(25),
-    request_timeout_secs: None,
-    request_rate_limit_duration_secs: Some(1),
-    request_rate_limit_num: Some(25),
-    request_retry_attempts: None,
-    request_retry_backoff_secs: None,
-};
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(25),
+        request_rate_limit_num: Some(25),
+        ..Default::default()
+    };
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
