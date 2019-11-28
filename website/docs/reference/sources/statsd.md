@@ -28,11 +28,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Address
-  address = "127.0.0.1:8126" # example
-  
-  # REQUIRED - Type
   type = "statsd" # example, must be: "statsd"
+  address = "127.0.0.1:8126" # example
 ```
 
 ## Options

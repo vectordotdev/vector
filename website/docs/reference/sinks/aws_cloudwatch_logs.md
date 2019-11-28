@@ -43,31 +43,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Group name
-  group_name = "{{ file }}" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Stream name
-  stream_name = "{{ instance_id }}" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
+  inputs = ["my-source-id"] # example
+  endpoint = "127.0.0.0:5000" # example
+  group_name = "{{ file }}" # example
+  region = "us-east-1" # example
+  stream_name = "{{ instance_id }}" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
-  # OPTIONAL - Create missing group
+  # OPTIONAL - General
   create_missing_group = true # default
-  
-  # OPTIONAL - Create missing stream
   create_missing_stream = true # default
 ```
 
@@ -78,39 +66,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Group name
-  group_name = "{{ file }}" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Stream name
-  stream_name = "{{ instance_id }}" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
+  inputs = ["my-source-id"] # example
+  endpoint = "127.0.0.0:5000" # example
+  group_name = "{{ file }}" # example
+  region = "us-east-1" # example
+  stream_name = "{{ instance_id }}" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
+  # OPTIONAL - General
+  create_missing_group = true # default
+  create_missing_stream = true # default
+  healthcheck = true # default
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Create missing group
-  create_missing_group = true # default
-  
-  # OPTIONAL - Create missing stream
-  create_missing_stream = true # default
-  
-  # OPTIONAL - Healthcheck
-  healthcheck = true # default
   
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
@@ -122,16 +96,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
 

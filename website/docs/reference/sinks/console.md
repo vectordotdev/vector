@@ -43,16 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "console" # example, must be: "console"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
-  # OPTIONAL - Target
+  # OPTIONAL - General
   target = "stdout" # default, enum
 ```
 
@@ -63,19 +61,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "console" # example, must be: "console"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
-  # OPTIONAL - Healthcheck
+  # OPTIONAL - General
   healthcheck = true # default
-  
-  # OPTIONAL - Target
   target = "stdout" # default, enum
 ```
 

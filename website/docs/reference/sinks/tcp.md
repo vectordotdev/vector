@@ -43,14 +43,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Address
-  address = "92.12.333.224:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "tcp" # example, must be: "tcp"
+  inputs = ["my-source-id"] # example
+  address = "92.12.333.224:5000" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
@@ -63,56 +59,32 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Address
-  address = "92.12.333.224:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "tcp" # example, must be: "tcp"
+  inputs = ["my-source-id"] # example
+  address = "92.12.333.224:5000" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
-  # OPTIONAL - Healthcheck
+  # OPTIONAL - General
   healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    # OPTIONAL - Ca path
     ca_path = "/path/to/certificate_authority.crt" # example, no default
-    
-    # OPTIONAL - Crt path
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    
-    # OPTIONAL - Enabled
     enabled = true # default
-    
-    # OPTIONAL - Key pass
     key_pass = "PassWord1" # example, no default
-    
-    # OPTIONAL - Key path
     key_path = "/path/to/host_certificate.key" # example, no default
-    
-    # OPTIONAL - Verify certificate
     verify_certificate = true # default
-    
-    # OPTIONAL - Verify hostname
     verify_hostname = true # default
 ```
 

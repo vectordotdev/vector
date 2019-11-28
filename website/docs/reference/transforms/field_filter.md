@@ -25,16 +25,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Field
-  field = "file" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
   type = "field_filter" # example, must be: "field_filter"
-  
-  # REQUIRED - Value
+  inputs = ["my-source-id"] # example
+  field = "file" # example
   value = "/var/log/nginx.log" # example
 ```
 

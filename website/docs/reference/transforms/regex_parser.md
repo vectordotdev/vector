@@ -25,19 +25,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Inputs
+  # REQUIRED - General
+  type = "regex_parser" # example, must be: "regex_parser"
   inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Regex
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$" # example
   
-  # REQUIRED - Type
-  type = "regex_parser" # example, must be: "regex_parser"
-  
-  # OPTIONAL - Drop field
+  # OPTIONAL - General
   drop_field = true # default
-  
-  # OPTIONAL - Field
   field = "message" # default
   
   # OPTIONAL - Types
@@ -160,7 +154,7 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
   unit={null}
   >
 
-#### &lt;field-name&gt;
+#### <field-name>
 
 A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
 

@@ -43,17 +43,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Host
-  host = "my-splunk-host.com" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Token
-  token = "A94A8FE5CCB19BA61C4C08" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "splunk_hec" # example, must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
+  host = "my-splunk-host.com" # example
+  token = "A94A8FE5CCB19BA61C4C08" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -66,27 +60,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Host
-  host = "my-splunk-host.com" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Token
-  token = "A94A8FE5CCB19BA61C4C08" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "splunk_hec" # example, must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
+  host = "my-splunk-host.com" # example
+  token = "A94A8FE5CCB19BA61C4C08" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
   
+  # OPTIONAL - General
+  healthcheck = true # default
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Healthcheck
-  healthcheck = true # default
   
   # OPTIONAL - Requests
   request_in_flight_limit = 10 # default
@@ -98,36 +86,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    # OPTIONAL - Ca path
     ca_path = "/path/to/certificate_authority.crt" # example, no default
-    
-    # OPTIONAL - Crt path
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    
-    # OPTIONAL - Key pass
     key_pass = "PassWord1" # example, no default
-    
-    # OPTIONAL - Key path
     key_path = "/path/to/host_certificate.key" # example, no default
-    
-    # OPTIONAL - Verify certificate
     verify_certificate = true # default
-    
-    # OPTIONAL - Verify hostname
     verify_hostname = true # default
 ```
 

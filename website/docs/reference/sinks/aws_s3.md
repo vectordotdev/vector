@@ -43,20 +43,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Bucket
-  bucket = "my-bucket" # example
-  
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "aws_s3" # example, must be: "aws_s3"
+  inputs = ["my-source-id"] # example
+  bucket = "my-bucket" # example
+  endpoint = "127.0.0.0:5000" # example
+  region = "us-east-1" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -72,30 +64,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Bucket
-  bucket = "my-bucket" # example
-  
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "aws_s3" # example, must be: "aws_s3"
+  inputs = ["my-source-id"] # example
+  bucket = "my-bucket" # example
+  endpoint = "127.0.0.0:5000" # example
+  region = "us-east-1" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
   
+  # OPTIONAL - General
+  healthcheck = true # default
+  
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, seconds
-  
-  # OPTIONAL - Healthcheck
-  healthcheck = true # default
   
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -113,16 +97,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
 

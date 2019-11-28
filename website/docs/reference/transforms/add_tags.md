@@ -25,11 +25,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "add_tags" # example, must be: "add_tags"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
@@ -83,7 +81,7 @@ A table of key/value pairs representing the tags to be added to the metric.
   unit={null}
   >
 
-#### `&lt;tag-name&gt;`
+#### `<tag-name>`
 
 The name of the tag to add. Due to the nature of metric tags, the value must be a string.
 

@@ -43,14 +43,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Path
-  path = "vector-%Y-%m-%d.log" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "file" # example, must be: "file"
+  inputs = ["my-source-id"] # example
+  path = "vector-%Y-%m-%d.log" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -63,22 +59,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Path
-  path = "vector-%Y-%m-%d.log" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "file" # example, must be: "file"
+  inputs = ["my-source-id"] # example
+  path = "vector-%Y-%m-%d.log" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
   
-  # OPTIONAL - Healthcheck
+  # OPTIONAL - General
   healthcheck = true # default
-  
-  # OPTIONAL - Idle timeout secs
   idle_timeout_secs = "30" # default
 ```
 

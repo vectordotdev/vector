@@ -43,11 +43,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Address
-  address = "0.0.0.0:9000" # example
-  
-  # REQUIRED - Type
   type = "tcp" # example, must be: "tcp"
+  address = "0.0.0.0:9000" # example
 ```
 
 </TabItem>
@@ -57,20 +54,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Address
+  # REQUIRED - General
+  type = "tcp" # example, must be: "tcp"
   address = "0.0.0.0:9000" # example
   
-  # REQUIRED - Type
-  type = "tcp" # example, must be: "tcp"
+  # OPTIONAL - General
+  max_length = 102400 # default, bytes
+  shutdown_timeout_secs = 30 # default, seconds
   
   # OPTIONAL - Context
   host_key = "host" # default
-  
-  # OPTIONAL - Max length
-  max_length = 102400 # default, bytes
-  
-  # OPTIONAL - Shutdown timeout secs
-  shutdown_timeout_secs = 30 # default, seconds
 ```
 
 </TabItem>

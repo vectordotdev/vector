@@ -25,19 +25,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Inputs
+  # REQUIRED - General
+  type = "grok_parser" # example, must be: "grok_parser"
   inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Pattern
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # example
   
-  # REQUIRED - Type
-  type = "grok_parser" # example, must be: "grok_parser"
-  
-  # OPTIONAL - Drop field
+  # OPTIONAL - General
   drop_field = true # default
-  
-  # OPTIONAL - Field
   field = "message" # default
   
   # OPTIONAL - Types
@@ -160,7 +154,7 @@ Key/Value pairs representing mapped log field types.
   unit={null}
   >
 
-#### &lt;field-name&gt;
+#### <field-name>
 
 A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
 

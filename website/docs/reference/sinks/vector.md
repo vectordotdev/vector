@@ -43,14 +43,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Address
-  address = "92.12.333.224:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
   type = "vector" # example, must be: "vector"
+  inputs = ["my-source-id"] # example
+  address = "92.12.333.224:5000" # example
 ```
 
 </TabItem>
@@ -60,30 +55,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Address
+  # REQUIRED - General
+  type = "vector" # example, must be: "vector"
+  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
   
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
-  type = "vector" # example, must be: "vector"
-  
-  # OPTIONAL - Healthcheck
+  # OPTIONAL - General
   healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
 

@@ -25,14 +25,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Fields
-  fields = ["field1", "field2"] # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
   type = "remove_fields" # example, must be: "remove_fields"
+  inputs = ["my-source-id"] # example
+  fields = ["field1", "field2"] # example
 ```
 
 ## Options

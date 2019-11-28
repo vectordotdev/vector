@@ -25,22 +25,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Field names
+  # REQUIRED - General
+  type = "split" # example, must be: "split"
+  inputs = ["my-source-id"] # example
   field_names = ["timestamp", "level", "message"] # example
   
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
-  type = "split" # example, must be: "split"
-  
-  # OPTIONAL - Drop field
+  # OPTIONAL - General
   drop_field = true # default
-  
-  # OPTIONAL - Field
   field = "message" # default
-  
-  # OPTIONAL - Separator
   separator = "," # default
   
   # OPTIONAL - Types
@@ -186,7 +178,7 @@ Key/Value pairs representing mapped log field types.
   unit={null}
   >
 
-#### &lt;field-name&gt;
+#### <field-name>
 
 A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
 

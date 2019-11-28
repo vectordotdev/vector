@@ -43,20 +43,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Bootstrap servers
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Key field
-  key_field = "user_id" # example
-  
-  # REQUIRED - Topic
-  topic = "topic-1234" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "kafka" # example, must be: "kafka"
+  inputs = ["my-source-id"] # example
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
+  key_field = "user_id" # example
+  topic = "topic-1234" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
@@ -69,56 +61,32 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Bootstrap servers
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Key field
-  key_field = "user_id" # example
-  
-  # REQUIRED - Topic
-  topic = "topic-1234" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "kafka" # example, must be: "kafka"
+  inputs = ["my-source-id"] # example
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
+  key_field = "user_id" # example
+  topic = "topic-1234" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
-  # OPTIONAL - Healthcheck
+  # OPTIONAL - General
   healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    # OPTIONAL - Ca path
     ca_path = "/path/to/certificate_authority.crt" # example, no default
-    
-    # OPTIONAL - Crt path
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    
-    # OPTIONAL - Enabled
     enabled = true # default
-    
-    # OPTIONAL - Key pass
     key_pass = "PassWord1" # example, no default
-    
-    # OPTIONAL - Key path
     key_path = "/path/to/host_certificate.key" # example, no default
 ```
 

@@ -43,25 +43,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Stream name
-  stream_name = "my-stream" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  inputs = ["my-source-id"] # example
+  endpoint = "127.0.0.0:5000" # example
+  region = "us-east-1" # example
+  stream_name = "my-stream" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
-  # OPTIONAL - Partition key field
+  # OPTIONAL - General
   partition_key_field = "user_id" # example, no default
 ```
 
@@ -72,33 +64,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Stream name
-  stream_name = "my-stream" # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "aws_kinesis_streams" # example, must be: "aws_kinesis_streams"
+  inputs = ["my-source-id"] # example
+  endpoint = "127.0.0.0:5000" # example
+  region = "us-east-1" # example
+  stream_name = "my-stream" # example
   
   # REQUIRED - requests
   encoding = "json" # example, enum
   
+  # OPTIONAL - General
+  healthcheck = true # default
+  partition_key_field = "user_id" # example, no default
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Healthcheck
-  healthcheck = true # default
-  
-  # OPTIONAL - Partition key field
-  partition_key_field = "user_id" # example, no default
   
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
@@ -110,16 +92,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
 

@@ -25,11 +25,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "add_fields" # example, must be: "add_fields"
+  inputs = ["my-source-id"] # example
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
@@ -90,7 +88,7 @@ A table of key/value pairs representing the keys to be added to the event.
   unit={null}
   >
 
-#### `&lt;field-name&gt;`
+#### `<field-name>`
 
 The name of the field to add. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
 
