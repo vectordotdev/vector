@@ -15,6 +15,7 @@ use hyper_tls::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use tower::Service;
 
@@ -220,6 +221,10 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
 }
 
 fn stats(values: &Vec<f64>, counts: &Vec<u32>) -> Option<DatadogStats> {
+    if values.len() != counts.len() {
+        return None;
+    }
+
     let mut samples = Vec::new();
     for (v, c) in values.iter().zip(counts.iter()) {
         for _ in 0..*c {
@@ -231,7 +236,20 @@ fn stats(values: &Vec<f64>, counts: &Vec<u32>) -> Option<DatadogStats> {
         return None;
     }
 
-    samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    if samples.len() == 1 {
+        let val = samples[0];
+        return Some(DatadogStats {
+            min: val,
+            max: val,
+            median: val,
+            avg: val,
+            sum: val,
+            count: 1.0,
+            quantiles: vec![(0.95, val)],
+        });
+    }
+
+    samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
 
     let length = samples.len() as f64;
     let min = samples.first().unwrap();
@@ -475,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dense_percentiles() {
+    fn test_dense_stats() {
         // https://github.com/DataDog/dd-agent/blob/master/tests/core/test_histogram.py
         let values = (0..20).into_iter().map(f64::from).collect();
         let counts = vec![1; 20];
@@ -495,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sparse_percentiles() {
+    fn test_sparse_stats() {
         let values = (1..5).into_iter().map(f64::from).collect();
         let counts = (1..5).into_iter().collect();
 
@@ -511,6 +529,52 @@ mod tests {
                 quantiles: vec![(0.95, 4.0)],
             })
         );
+    }
+
+    #[test]
+    fn test_single_value_stats() {
+        let values = vec![10.0];
+        let counts = vec![1];
+
+        assert_eq!(
+            stats(&values, &counts),
+            Some(DatadogStats {
+                min: 10.0,
+                max: 10.0,
+                median: 10.0,
+                avg: 10.0,
+                sum: 10.0,
+                count: 1.0,
+                quantiles: vec![(0.95, 10.0)],
+            })
+        );
+    }
+    #[test]
+    fn test_nan_stats() {
+        let values = vec![1.0, std::f64::NAN];
+        let counts = vec![1, 1];
+        assert!(stats(&values, &counts).is_some());
+    }
+
+    #[test]
+    fn test_unequal_stats() {
+        let values = vec![1.0];
+        let counts = vec![1, 2, 3];
+        assert!(stats(&values, &counts).is_none());
+    }
+
+    #[test]
+    fn test_empty_stats() {
+        let values = vec![];
+        let counts = vec![];
+        assert!(stats(&values, &counts).is_none());
+    }
+
+    #[test]
+    fn test_zero_counts_stats() {
+        let values = vec![1.0, 2.0];
+        let counts = vec![0, 0];
+        assert!(stats(&values, &counts).is_none());
     }
 
     #[test]
