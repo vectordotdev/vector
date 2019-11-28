@@ -43,7 +43,7 @@ type = "table"
 null = true
 description = "Options for custom headers."
 
-[sinks.http.options.headers.options."`<header-key>`"]
+[sinks.http.options.headers.options."`[header-key]`"]
 type = "string"
 examples = [
   {"Authorization" = "${TOKEN_ENV_VAR}"},

@@ -272,13 +272,13 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={[{"_SYSTEMD_UNIT":"ntpd.service"},{"_BOOT_ID":"124c781146e841ae8d9b4590df8b9231"}]}
-  name={"`<record-key>`"}
+  name={"`[record-key]`"}
   path={null}
   required={false}
   type={"*"}
   >
 
-### `<record-key>`
+### `[record-key]`
 
 Additional Journald fields are passed through as log fields.
 

@@ -81,7 +81,7 @@ description = """\
 The image name that the container is based on.\
 """
 
-[sources.docker.output.log.fields."`<label-key>`"]
+[sources.docker.output.log.fields."`[label-key]`"]
 type = "string"
 examples = [
   {"com.example.vendor" = "Timber Inc."},

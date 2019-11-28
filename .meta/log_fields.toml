@@ -24,7 +24,7 @@ description = """\
 A normalized [Rust DateTime struct][urls.rust_date_time] in UTC.\
 """
 
-[log_fields."`<key>`"]
+[log_fields."`[key]`"]
 type = "*"
 examples = [
   {my-key = "my-value"}
