@@ -31,15 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
-    my_string_field = "string value" # example
-    my_env_var_field = "${ENV_VAR}" # example
-    my_int_field = 1 # example
-    my_float_field = 1.2 # example
-    my_bool_field = true # example
-    my_timestamp_field = 1979-05-27T00:32:00Z # example
-    my_nested_fields = key1 = "value1"
-  key2 = "value2" # example
-    my_list = ["first", "second", "third"] # example
+    my_string_field = "string value"
 ```
 
 ## Options
@@ -78,7 +70,7 @@ A table of key/value pairs representing the keys to be added to the event.
   defaultValue={null}
   enumValues={null}
   examples={[{"my_string_field":"string value"},{"my_env_var_field":"${ENV_VAR}"},{"my_int_field":1},{"my_float_field":1.2},{"my_bool_field":true},{"my_timestamp_field":"1979-05-27 00:32:00 -0700"},{"my_nested_fields":{"key1":"value1","key2":"value2"}},{"my_list":["first","second","third"]}]}
-  name={"`<field-name>`"}
+  name={"`[field-name]`"}
   nullable={false}
   path={"fields"}
   relevantWhen={null}
@@ -88,7 +80,7 @@ A table of key/value pairs representing the keys to be added to the event.
   unit={null}
   >
 
-#### `<field-name>`
+#### `[field-name]`
 
 The name of the field to add. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
 

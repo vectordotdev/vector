@@ -62,7 +62,7 @@ null = true
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
 
-[transforms.log_to_metric.options.metrics.options.tags.options."`<tag-name>`"]
+[transforms.log_to_metric.options.metrics.options.tags.options."`[tag-name]`"]
 type = "string"
 examples = [
   {"host" = "${HOSTNAME}"},

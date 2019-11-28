@@ -125,9 +125,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # OPTIONAL - Log fields
     [tests.input.log_fields]
       name = "message"
-    value = "some message contents" # example
-      name = "host"
-    value = "myhost" # example
+      value = "some message contents"
     
     # OPTIONAL - Metric
     [tests.input.metric]
@@ -144,9 +142,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
       # OPTIONAL - Tags
       [tests.input.metric.tags]
         name = "host"
-      value = "foohost" # example
-        name = "region"
-      value = "us-east-1" # example
+        value = "foohost"
 ```
 
 </TabItem>
@@ -234,7 +230,7 @@ Specifies the log fields when the input type is 'log'.
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"message","value":"some message contents"},{"name":"host","value":"myhost"}]}
-  name={"`<field-name>`"}
+  name={"`[field-name]`"}
   nullable={false}
   path={"input.log_fields"}
   relevantWhen={null}
@@ -244,7 +240,7 @@ Specifies the log fields when the input type is 'log'.
   unit={null}
   >
 
-##### `<field-name>`
+##### `[field-name]`
 
 A key/value pair representing a field to be added to the input event.
 
@@ -375,7 +371,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   defaultValue={null}
   enumValues={null}
   examples={[{"name":"host","value":"foohost"},{"name":"region","value":"us-east-1"}]}
-  name={"`<tag-name>`"}
+  name={"`[tag-name]`"}
   nullable={false}
   path={"input.metric.tags"}
   relevantWhen={null}
@@ -385,7 +381,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-###### `<tag-name>`
+###### `[tag-name]`
 
 Key/value pairs representing [metric tags][docs.data-model#tags].
 
