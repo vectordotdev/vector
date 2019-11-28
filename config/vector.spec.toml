@@ -684,6 +684,13 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The target field to strip ANSI characters from.
+  # 
+  # * optional
+  # * default: "message"
+  # * type: string
+  field = "message"
+
 # Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
   #
@@ -740,19 +747,18 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The target log field to compare against the `value`.
+  # 
+  # * required
+  # * type: string
+  field = "file"
+
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
   # 
   # * required
   # * type: string
   value = "/var/log/nginx.log"
-
-  # The target log field to compare against the `value`.
-  # 
-  # * optional
-  # * default: "message"
-  # * type: string
-  field = "file"
 
 # Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases.
 [transforms.geoip]

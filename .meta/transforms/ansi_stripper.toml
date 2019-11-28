@@ -7,7 +7,7 @@ input_types = ["log"]
 output_types = ["log"]
 resources = []
 
-[transforms.field_filter.options.field]
+[transforms.ansi_stripper.options.field]
 type = "string"
 common = true
 default = "message"

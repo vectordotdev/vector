@@ -25,8 +25,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED
   type = "ansi_stripper" # example, must be: "ansi_stripper"
   inputs = ["my-source-id"] # example
+  
+  # OPTIONAL
+  field = "message" # default
 ```
 
 ## Options
@@ -36,6 +40,29 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={"message"}
+  enumValues={null}
+  examples={["message"]}
+  name={"field"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### field
+
+The target field to strip ANSI characters from.
+
+
+</Field>
 
 
 </Fields>

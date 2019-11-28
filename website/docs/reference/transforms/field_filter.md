@@ -25,13 +25,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
   type = "field_filter" # example, must be: "field_filter"
   inputs = ["my-source-id"] # example
+  field = "file" # example
   value = "/var/log/nginx.log" # example
-  
-  # OPTIONAL
-  field = "file" # default
 ```
 
 ## Options
@@ -45,14 +42,14 @@ import Field from '@site/src/components/Field';
 
 <Field
   common={true}
-  defaultValue={"message"}
+  defaultValue={null}
   enumValues={null}
   examples={["file"]}
   name={"field"}
   nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
