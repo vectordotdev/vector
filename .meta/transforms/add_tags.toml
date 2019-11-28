@@ -16,7 +16,7 @@ A table of key/value pairs representing the tags to be added to the \
 metric.\
 """
 
-[transforms.add_tags.options.tags.options."<tag-name>"]
+[transforms.add_tags.options.tags.options."`<tag-name>`"]
 type = "string"
 null = false
 examples = [

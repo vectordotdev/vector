@@ -41,7 +41,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL - General
     [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}"
+      host = "${HOSTNAME}" # example
+      region = "us-east-1" # example
+      status = "{{status}}" # example
   
   # REQUIRED - Type
   type = "log_to_metric" # example, must be: "log_to_metric"
@@ -174,7 +176,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   defaultValue={null}
   enumValues={null}
   examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
-  name={"<tag-name>"}
+  name={"`<tag-name>`"}
   nullable={false}
   path={"metrics.tags"}
   relevantWhen={null}
@@ -184,7 +186,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-##### <tag-name>
+##### `&lt;tag-name&gt;`
 
 Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
 

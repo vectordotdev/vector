@@ -160,7 +160,7 @@ Key/Value pairs representing mapped log field types.
   unit={null}
   >
 
-#### <field-name>
+#### &lt;field-name&gt;
 
 A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
 

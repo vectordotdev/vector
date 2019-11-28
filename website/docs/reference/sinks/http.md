@@ -125,7 +125,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${TOKEN_ENV_VAR}" # example
+    X-Powered-By = "Vector" # example
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -449,7 +450,7 @@ Options for custom headers. See [Authentication](#authentication) for more info.
   defaultValue={null}
   enumValues={null}
   examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
-  name={"<header-key>"}
+  name={"`<header-key>`"}
   nullable={false}
   path={"headers"}
   relevantWhen={null}
@@ -459,7 +460,7 @@ Options for custom headers. See [Authentication](#authentication) for more info.
   unit={null}
   >
 
-#### <header-key>
+#### `&lt;header-key&gt;`
 
 A custom header to be added to each outgoing HTTP request.
 

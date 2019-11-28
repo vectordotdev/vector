@@ -16,7 +16,7 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.fields.options."<field-name>"]
+[transforms.add_fields.options.fields.options."`<field-name>`"]
 type = "*"
 null = false
 examples = [

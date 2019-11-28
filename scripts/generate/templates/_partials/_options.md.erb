@@ -18,7 +18,7 @@
   unit={<%= option.unit.to_json %>}
   >
 
-<%= "#" * heading_depth %> <%= option.name %>
+<%= "#" * heading_depth %> <%= option.name.html_escape %>
 
 <%= option.description %>[[references:<%= option.name %>]]
 

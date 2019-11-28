@@ -24,18 +24,21 @@ function Headings({headings, isChild}) {
   useTOCHighlight(LINK_CLASS_NAME, ACTIVE_LINK_CLASS_NAME, TOP_OFFSET);
 
   if (!headings.length) return null;
+  console.log(headings)
   return (
     <ul className={isChild ? '' : 'contents'}>
-      {headings.map(heading => (
-        <li key={heading.id}>
+      {headings.map(heading => {
+        let cleanValue = heading.value.replace('<code><', '<code>&lt;').replace('></code>', '&gt;</code>');
+
+        return <li key={heading.id}>
           <a
             href={`#${heading.id}`}
             className={LINK_CLASS_NAME}
-            dangerouslySetInnerHTML={{__html: heading.value}}
+            dangerouslySetInnerHTML={{__html: cleanValue}}
           />
           <Headings isChild headings={heading.children} />
         </li>
-      ))}
+      })}
     </ul>
   );
 }

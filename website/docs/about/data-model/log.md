@@ -42,13 +42,13 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[{"my-key":"my-value"}]}
-  name={"<key>"}
+  name={"`<key>`"}
   path={null}
   required={false}
   type={"*"}
   >
 
-### <key>
+### `<key>`
 
 In addition to the defined fields, you are welcome to add your own fields.
 

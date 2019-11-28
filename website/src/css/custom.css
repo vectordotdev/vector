@@ -908,6 +908,9 @@ div[class^='tableOfContents_'] ul.contents {
   font-size: 0.75rem;
   padding: 0;
 }
+div[class^='tableOfContents_'] ul.contents code {
+  color: inherit;
+}
 div[class^='tableOfContents_'] ul.contents li {
   margin-right: 0;
   margin-left: 0;
