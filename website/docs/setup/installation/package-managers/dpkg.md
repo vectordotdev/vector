@@ -20,7 +20,19 @@ import TabItem from '@theme/TabItem';
 
 ## Install
 
-1.  Download the [Vector `.deb file`][urls.vector_downloads.0.5.0/vector-amd64.deb]:
+<Tabs
+  block={true}
+  defaultValue="amd64"
+  urlKey="arch"
+  values={[
+    { label: 'Deb (x86_64)', value: 'amd64', },
+    { label: 'Deb (ARM64)', value: 'arm64', },
+    { label: 'Deb (ARMv7)', value: 'armhf', },
+    ]}>
+
+<TabItem value="amd64">
+
+1.  Download the Vector `.deb` package
 
     <Tabs
       className="mini"
@@ -33,32 +45,120 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.5.0/vector-amd64.deb
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.5.0/vector-amd64.deb 
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
     ```bash
-    curl -O https://packages.timber.io/vector/nightly/latest/vector-amd64.deb
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/nightly/latest/vector-amd64.deb
     ```
 
     </TabItem>
     </Tabs>
 
-2.  Install the Vector `.deb` package directly:
+2.  Install the downloaded package
 
     ```bash
     sudo dpkg -i vector-amd64.deb
     ```
 
-3.  Start Vector:
+3.  Start Vector
 
     ```bash
     sudo systemctl start vector
     ```
 
-    That's it! Proceed to [configure](#configuring) Vector for your use case.
+</TabItem>
+
+<TabItem value="arm64">
+
+1.  Download the Vector `.deb` package
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.5.0/vector-arm64.deb 
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/nightly/latest/vector-arm64.deb
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the downloaded package
+
+    ```bash
+    sudo dpkg -i vector-arm64.deb
+    ```
+
+3.  Start Vector
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+</TabItem>
+
+<TabItem value="armhf">
+
+1.  Download the Vector `.deb` package
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.5.0/vector-armhf.deb 
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/nightly/latest/vector-armhf.deb
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the downloaded package
+
+    ```bash
+    sudo dpkg -i vector-armhf.deb
+    ```
+
+3.  Start Vector
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+</TabItem>
+
+</Tabs>
+
+That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 ### Previous Versions
 
@@ -101,5 +201,4 @@ Vector.
 [docs.configuration]: /docs/setup/configuration
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
-[urls.vector_downloads.0.5.0/vector-amd64.deb]: https://packages.timber.io/vector/0.5.0/vector-amd64.deb
 [urls.vector_releases]: https://github.com/timberio/vector/releases

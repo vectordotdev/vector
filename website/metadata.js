@@ -53,17 +53,37 @@ module.exports = {
         "type": "archive"
       },
       {
+        "cpu": "x86_64",
         "file_name": "vector-amd64.deb",
         "latest": true,
-        "name": "Deb",
+        "name": "Deb (x86_64)",
         "nightly": true,
         "os": "Linux",
         "type": "package"
       },
       {
+        "cpu": "aarch64",
+        "file_name": "vector-arm64.deb",
+        "latest": false,
+        "name": "Deb (ARM64)",
+        "nightly": true,
+        "os": "Linux",
+        "type": "package"
+      },
+      {
+        "cpu": "armv7",
+        "file_name": "vector-armhf.deb",
+        "latest": false,
+        "name": "Deb (ARMv7)",
+        "nightly": true,
+        "os": "Linux",
+        "type": "package"
+      },
+      {
+        "cpu": "x86_64",
         "file_name": "vector-x86_64.rpm",
         "latest": true,
-        "name": "RPM",
+        "name": "RPM (x86_64)",
         "nightly": true,
         "os": "Linux",
         "type": "package"

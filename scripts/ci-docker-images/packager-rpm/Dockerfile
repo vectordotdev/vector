@@ -1,9 +1,9 @@
-FROM centos:latest
+FROM centos:7
 
-RUN yum -y install https://centos7.iuscommunity.org/ius-release.rpm
 RUN yum update -y && \
   yum install -y \
   curl \
+  git \
   git2u-all \
   make \
   rename \

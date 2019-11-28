@@ -8,8 +8,10 @@
 
 set -eu
 
+project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
+package_version="$($project_root/scripts/version.sh)"
 
 # RPM has a concept of releases, but we do not need this so every
 # release is 1.
@@ -18,7 +20,7 @@ export RELEASE=1
 # The RPM spec does not like a leading `v` or `-` in the version name.
 # Therefore we clean the version so that the `rpmbuild` command does
 # not fail.
-export CLEANED_VERSION=$VERSION
+export CLEANED_VERSION=$package_version
 CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 
 # The arch is the first part of the target
@@ -38,7 +40,10 @@ cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 # Perform the build.
 # Calling rpmbuild with --target tells RPM everything it needs to know
 # about where the build can run, including the architecture.
-rpmbuild --target $TARGET -ba distribution/rpm/vector.spec
+# However, `-musl` suffix needs to be replaced by `-gnu` because
+# RPM doesn't know about musl.
+RPM_TARGET=$(echo $TARGET | sed 's/-musl/-gnu/')
+rpmbuild --target $RPM_TARGET -ba distribution/rpm/vector.spec
 
 # Move the RPM into the artifacts dir
 ls "/root/rpmbuild/RPMS/$ARCH"

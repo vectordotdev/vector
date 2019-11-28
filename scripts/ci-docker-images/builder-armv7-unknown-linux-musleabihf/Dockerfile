@@ -18,6 +18,8 @@ ARG MUSL_VERSION=1.1.22
 ARG TARGET="armv7-unknown-linux-musleabihf"
 # Target architecture for LLVM
 ARG LLVM_TARGET="ARM"
+# Target architecture for Linux kernel headres
+ARG LINUX_TARGET="arm"
 # We also need GCC for the target architecture to compile compier-rt. Because
 # GCC target triples are different from LLVM, we need to specify it explicitly.
 # Example: "arm-linux-gnueabihf".
@@ -141,13 +143,14 @@ RUN cd $MUSL_DIR && \
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
+ARG LINUX_TARGET
 ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 RUN make -j$(nproc) headers_install \
   KBUILD_VERBOSE=1 \
   HOSTCC="/usr/bin/gcc" \
-  ARCH="arm" \
+  ARCH="$LINUX_TARGET" \
   CC="$CC" \
   INSTALL_HDR_PATH=$LIBS_PREFIX
 
@@ -272,7 +275,7 @@ RUN echo > dummy.c && \
   rm dummy.c dummy.o
 
 # The actual builder.
-FROM ubuntu:18.04
+FROM ubuntu:19.10
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
@@ -331,3 +334,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
 
 COPY builder-armv7-unknown-linux-musleabihf/start.sh /start.sh
 ENTRYPOINT ["/start.sh"]
+
+ENV TARGET="$TARGET"
+
+# Install `cargo-deb from Git until
+# https://github.com/mmstick/cargo-deb/pull/112 is published on crates.io
+RUN cargo install --git https://github.com/mmstick/cargo-deb --rev cc879930c06fa22e99f2839bad620ac0d0da879e cargo-deb
+
+RUN apt-get install -y rename cmark-gfm

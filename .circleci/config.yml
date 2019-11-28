@@ -37,9 +37,10 @@ jobs:
   #
 
   check-code:
-    resource_class: large
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
@@ -50,9 +51,10 @@ jobs:
             ./scripts/docker-run.sh checker make check-code
 
   check-fmt:
-    resource_class: large
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
@@ -63,9 +65,10 @@ jobs:
             ./scripts/docker-run.sh checker make check-fmt
 
   check-generate:
-    resource_class: large
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
@@ -74,9 +77,10 @@ jobs:
             ./scripts/docker-run.sh checker make check-generate
 
   check-version:
-    resource_class: large
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
@@ -273,92 +277,65 @@ jobs:
           paths:
             - "*-x86_64-pc-windows-msvc.zip"
 
-  build-x86_64-unknown-linux-gnu-archive-and-deb-package:
-    docker:
-      - image: timberiodev/vector-builder-x86_64-unknown-linux-gnu:latest
-    resource_class: xlarge
+  build-x86_64-unknown-linux-musl-archive-and-deb-package:
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - run:
-          name: Build archive
-          command: make build-archive
-      # We _must_ build the deb package on the same machine that created
-      # the binary. `cargo deb` performs dependency calculation via `ldd`
-      # and this process must happen on the same machine it was built in
-      # order to be accurate.
-      - run:
-          name: Build .deb package
+          name: Build archive and .deb package
+          environment:
+            PASS_RUST_LTO: "lto"
+            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
           command: |
-            export VERSION=$(make version)
-            make package-deb
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-x86_64-unknown-linux-gnu.tar.gz"
-            - "*-amd64.deb"
-
-  build-x86_64-unknown-linux-musl-archive:
-    docker:
-      - image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          name: Build archive
-          command: |
-            export RUST_LTO="lto"
-            export TARGET="x86_64-unknown-linux-musl"
-            make build-archive
+            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-x86_64-unknown-linux-musl.tar.gz"
+            - "*-amd64.deb"
 
-  build-aarch64-unknown-linux-musl-archive:
+  build-aarch64-unknown-linux-musl-archive-and-deb-package:
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
-    resource_class: large # xlarge is not supported with "machine" executor
+    resource_class: large
     steps:
       - checkout
       - run:
-          name: Build archive
+          name: Build archive and .deb package
+          environment:
+            PASS_RUST_LTO: "lto"
+            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
           command: |
-            docker run \
-              --privileged \
-              -e RUST_LTO="lto" \
-              -e TARGET="aarch64-unknown-linux-musl" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored" \
-              -w "$PWD" \
-              -v "$PWD":"$PWD" \
-              -t timberiodev/vector-builder-aarch64-unknown-linux-musl:latest \
-              make build-archive
+            ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-aarch64-unknown-linux-musl.tar.gz"
+            - "*-arm64.deb"
 
-  build-armv7-unknown-linux-musleabihf-archive:
+  build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
-    resource_class: large # xlarge is not supported with "machine" executor
+    resource_class: large
     steps:
       - checkout
       - run:
-          name: Build archive
+          name: Build archive and .deb package
+          environment:
+            PASS_RUST_LTO: "lto"
+            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
           command: |
-            docker run \
-              --privileged \
-              -e RUST_LTO="lto" \
-              -e TARGET="armv7-unknown-linux-musleabihf" \
-              -e FEATURES="jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored" \
-              -w "$PWD" \
-              -v "$PWD":"$PWD" \
-              -t timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest \
-              make build-archive
+            ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-armv7-unknown-linux-musleabihf.tar.gz"
+            - "*-armhf.deb"
 
   #
   # Checks
@@ -387,18 +364,19 @@ jobs:
   # This is how I'd like the .deb packager to work as well, and I have a
   # feeling if we ditched `cargo deb` we could achieve this.
   package-rpm:
-    docker:
-      - image: timberiodev/vector-packager-rpm:latest
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    resource_class: large
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Build x86_64-unknown-linux-gnu .rpm package
+          name: Build x86_64-unknown-linux-musl .rpm package
           command: |
-            export VERSION=$(make version)
-            make package-rpm
+            ./scripts/docker-run.sh packager-rpm make package-rpm
           environment:
-            TARGET: x86_64-unknown-linux-gnu
+            PASS_TARGET: x86_64-unknown-linux-musl
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -483,6 +461,7 @@ jobs:
   verify-zip-artifact-on-wine:
     resource_class: large
     machine:
+      image: ubuntu-1604:201903-01
       docker_layer_caching: true
     steps:
       - checkout
@@ -758,9 +737,9 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-fmt
     - check-generate
     - test-stable
-    - build-x86_64-unknown-linux-musl-archive
-    - build-aarch64-unknown-linux-musl-archive
-    - build-armv7-unknown-linux-musleabihf-archive
+    - build-x86_64-unknown-linux-musl-archive-and-deb-package
+    - build-aarch64-unknown-linux-musl-archive-and-deb-package
+    - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
     - build-x86_64-apple-darwin-archive
     - build-x86_64-pc-windows-msvc-archive
     - verify-deb-artifact-on-deb-8
@@ -796,43 +775,41 @@ workflows:
 
       # Build & verify
 
-      - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - build-x86_64-unknown-linux-musl-archive
-      - build-aarch64-unknown-linux-musl-archive
-      - build-armv7-unknown-linux-musleabihf-archive
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
       - package-rpm:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
 
       # Verify
 
       - verify-deb-artifact-on-deb-8:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-deb-9:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-deb-10:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-16-04:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-18-04:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           requires:
             - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm
@@ -844,7 +821,7 @@ workflows:
             - package-rpm
       - verify-systemd-on-debian:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
 
   release:
     jobs:
@@ -859,13 +836,11 @@ workflows:
 
       # Build & verify
 
-      - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package:
           <<: *release-filters
-      - build-x86_64-unknown-linux-musl-archive:
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package:
           <<: *release-filters
-      - build-aarch64-unknown-linux-musl-archive:
-          <<: *release-filters
-      - build-armv7-unknown-linux-musleabihf-archive:
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
@@ -874,34 +849,34 @@ workflows:
       - package-rpm:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
 
       # Verify
 
       - verify-deb-artifact-on-deb-8:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-deb-9:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-deb-10:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-16-04:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-18-04:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-19-04:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           <<: *release-filters
           requires:
@@ -909,8 +884,8 @@ workflows:
       - verify-docker:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
@@ -926,7 +901,7 @@ workflows:
       - verify-systemd-on-debian:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
 
       # Release
 
@@ -960,43 +935,41 @@ workflows:
 
       # Build & verify
 
-      - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-      - build-x86_64-unknown-linux-musl-archive
-      - build-aarch64-unknown-linux-musl-archive
-      - build-armv7-unknown-linux-musleabihf-archive
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
       - package-rpm:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
 
       # Verify
 
       - verify-deb-artifact-on-deb-8:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-deb-9:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-deb-10:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-16-04:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-18-04:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-19-04:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           requires:
             - build-x86_64-pc-windows-msvc-archive
       - verify-docker:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm
@@ -1008,7 +981,7 @@ workflows:
             - package-rpm
       - verify-systemd-on-debian:
           requires:
-            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
 
       # Release
 

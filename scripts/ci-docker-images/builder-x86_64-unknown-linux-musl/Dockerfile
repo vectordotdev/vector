@@ -1,18 +1,35 @@
+# A version like "1.38.0" or "nightly-2019-11-01".
 ARG RUST_VERSION=1.38.0
-# The version of musl should be the same as the one Rust is compiled with.
-# This version can be found in this file:
-# https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
-ARG MUSL_VERSION=1.1.22
 # We use Clang and libc++ from LLVM. The commit should match the one
 # used by Rust. For each Rust version it can be found here
 # https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
-# submodule "llvm-project".
+# submodule "llvm-project". Example "71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5".
 ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
+# The version of musl should be the same as the one Rust is compiled with.
+# This version can be found in this file:
+# https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
+# Exampel: "1.1.22".
+ARG MUSL_VERSION=1.1.22
+
+# LLVM target triple for Linux and MUSL. Full list of supported triples
+# can be found here:
+# https://forge.rust-lang.org/release/platform-support.html.
+# Example: "armv7-unknown-linux-musleabihf".
+ARG TARGET="x86_64-unknown-linux-musl"
+# Target architecture for LLVM
+ARG LLVM_TARGET="X86"
+# Target architecture for Linux kernel headres
+ARG LINUX_TARGET="x86"
+# We also need GCC for the target architecture to compile compier-rt. Because
+# GCC target triples are different from LLVM, we need to specify it explicitly.
+# Example: "arm-linux-gnueabihf".
+ARG GNU_TARGET=""
+
+ARG LTO=""
+
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
-ARG LINUX_HEADERS_VERSION=5.3.1
-# OpenSSL needs to be compiled against MUSL too, so we install it from source.
-ARG OPENSSL_VERSION=1.0.2t
+ARG LINUX_HEADERS_VERSION=5.3.10
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
@@ -38,22 +55,19 @@ ENV LLVM_DIR=$SRC_DIR/llvm-project
 FROM llvm-source AS clang-builder
 RUN apt-get update && apt-get -y install build-essential ninja-build cmake python3-distutils
 ARG CLANG_PREFIX
+ARG LLVM_TARGET
 WORKDIR $LLVM_DIR
 RUN mkdir build && \
   cd build && \
   cmake \
-  -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
-  -DLLVM_TARGETS_TO_BUILD="X86" \
+  -DLLVM_ENABLE_PROJECTS="clang;lld" \
+  -DLLVM_TARGETS_TO_BUILD="$LLVM_TARGET" \
   -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
-  -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-  -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-  -DCOMPILER_RT_BUILD_XRAY=OFF \
-  -DCOMPILER_RT_BUILD_PROFILE=OFF \
   -DCMAKE_BUILD_TYPE=release \
   -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
   -G Ninja \
   ../llvm && \
-  ninja install
+  cmake --build . --target install
 
 # Libs
 FROM llvm-source AS libs-builder
@@ -62,7 +76,7 @@ ARG CLANG_PREFIX
 COPY --from=clang-builder $CLANG_PREFIX $CLANG_PREFIX
 ENV PATH="$CLANG_PREFIX/bin:$PATH"
 
-# Get all sources at first, so that changes in compilation
+# Get all sources at first, so that changes in arguments
 # flags would not redownload them.
 RUN apt-get update && apt-get -y install curl xz-utils
 
@@ -78,26 +92,50 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
   tar xJf -
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
-ARG OPENSSL_VERSION
-RUN curl --proto '=https' --tlsv1.2 -sSf \
-  https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz| \
-  tar xzf -
-ENV OPENSSL_DIR=$SRC_DIR/openssl-$OPENSSL_VERSION
-
 # Install build dependencies.
-RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils 
 
+ARG TARGET
 ARG LIBS_PREFIX
+
+# Compile Clang runtime (https://compiler-rt.llvm.org).
+# We need crtbegin.o, crtend.o, and libclang_rt.builtins.a from there.
+# Because Clang toolchain is not fully bootstrapped yet (no standard library),
+# it is necessary to use GCC to compile it.
+ARG GNU_TARGET
+RUN apt-get install -y gcc${GNU_TARGET:+-${GNU_TARGET}} g++${GNU_TARGET:+-${GNU_TARGET}}
+WORKDIR $LLVM_DIR/compiler-rt
+ENV CC=${GNU_TARGET:+${GNU_TARGET}-}gcc
+ENV CXX=${GNU_TARGET:+${GNU_TARGET}-}g++
+ENV CFLAGS=""
+ENV CXXFLAGS=""
+ENV LDFLAGS=""
+RUN mkdir build && \
+  cd build && \
+  cmake \
+    -DCMAKE_BUILD_TYPE=release \
+    -DLLVM_CONFIG_PATH=$CLANG_PREFIX/bin/llvm-config \
+		-DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=$TARGET \
+    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+    -DCOMPILER_RT_BUILD_XRAY=OFF \
+    -DCOMPILER_RT_BUILD_PROFILE=OFF \
+    -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
+    -G Ninja \
+    .. && \
+  cmake --build . --target install
 
 # Compile musl.
 WORKDIR $MUSL_DIR
 ENV CC=clang
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
-ENV LDFLAGS="-static -nostdlib -nostartfiles"
+ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include -D_Noreturn="
+ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
+ENV CROSS_COMPILE=$CLANG_PREFIX/bin/
 RUN cd $MUSL_DIR && \
   mkdir build && \
   cd build && \
   ../configure \
+  --target=$TARGET \
   --prefix=$LIBS_PREFIX \
   --disable-shared \
   --disable-gcc-wrapper && \
@@ -105,17 +143,15 @@ RUN cd $MUSL_DIR && \
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
+ARG LINUX_TARGET
 ENV CC=clang
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
-ENV LDFLAGS="-static -nostdlib -nostartfiles $LIBS_PREFIX/lib/crt1.o -L$LIBS_PREFIX/lib"
-ENV LDLIBS="-lc"
+ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
+ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 RUN make -j$(nproc) headers_install \
   KBUILD_VERBOSE=1 \
-  HOSTCC="$CC" \
+  HOSTCC="/usr/bin/gcc" \
+  ARCH="$LINUX_TARGET" \
   CC="$CC" \
-  HOSTCFLAGS="$CFLAGS" \
-  HOSTLDFLAGS="$LDFLAGS" \
-  HOSTLDLIBS="$LDLIBS" \
   INSTALL_HDR_PATH=$LIBS_PREFIX
 
 # Compile libc++ with musl using Clang as the compiler. See
@@ -126,9 +162,9 @@ RUN make -j$(nproc) headers_install \
 WORKDIR $LLVM_DIR/libunwind
 ENV CC=clang
 ENV CXX=clang++
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LLVM_DIR/libcxx/include"
-ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc"
+ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -138,15 +174,15 @@ RUN mkdir build && \
   -DLLVM_PATH=$LLVM_DIR \
   -G Ninja \
   .. && \
-  ninja install
+  cmake --build . --target install
 
 # libc++abi
 WORKDIR $LLVM_DIR/libcxxabi
 ENV CC=clang
 ENV CXX=clang++
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LLVM_DIR/libcxx/include"
-ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lunwind -lc"
+ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lunwind -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -156,19 +192,18 @@ RUN mkdir build && \
   -DLIBCXXABI_LIBUNWIND_PATH=$LLVM_DIR/libunwind \
   -DLIBCXXABI_LIBCXX_INCLUDES=$LLVM_DIR/libcxx/include \
   -DLIBCXXABI_INSTALL_PREFIX=$LIBS_PREFIX/ \
-  -DLIBCXXABI_INSTALL_HEADER_PREFIX=$LIBS_PREFIX/include/c++/v1 \
   -DLLVM_PATH=$LLVM_DIR \
   -G Ninja \
   .. && \
-  ninja install
+  cmake --build . --target install
 
 # libc++
 WORKDIR $LLVM_DIR/libcxx
 ENV CC=clang
 ENV CXX=clang++
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
-ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++abi -lunwind -lc"
+ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++abi -lunwind -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -184,35 +219,18 @@ RUN mkdir build && \
   -DLLVM_PATH=$LLVM_DIR \
   -G Ninja \
   .. && \
-  ninja install
-
-# Install OpenSSL.
-WORKDIR $OPENSSL_DIR
-# OpenSSL tries to use secure_getenv function when compiled with MUSL here
-# https://github.com/openssl/openssl/blob/master/crypto/getenv.c. However, this
-# function was added to MUSL only in 1.23 release, while Rust still uses 1.22.
-# So until there is a Rust version using MUSL 1.23 we need to resort to patching
-# OpenSSL to disallow usage of unsupported secure_getenv function.
-COPY openssl-disable-secure-getenv.patch .
-RUN patch -p1 < openssl-disable-secure-getenv.patch
-ENV CC=clang
-ENV CXX=clang++
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
-ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
-ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++ -lc++abi -lunwind -lc"
-RUN ./config --prefix=$LIBS_PREFIX && \
-  make install
+  cmake --build . --target install
 
 # Create wrappers for Clang that automatically use correct libraries and start files.
 # See
 # https://blogs.gentoo.org/gsoc2016-native-clang/2016/05/31/build-gnu-free-executables-with-clang/
 # and
 # https://renenyffenegger.ch/notes/development/languages/C-C-plus-plus/GCC/options/no/compare-nostartfiles-nodefaultlibs-nolibc-nostdlib.
-ENV MUSL_CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV MUSL_CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
-ENV MUSL_LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lssl -lcrypto -lc++ -lc++abi -lunwind -lc"
-ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o"
+ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -l$(basename /opt/libs/lib/linux/libclang_rt.builtins* | tail -c+4 | head -c-3) -lc"
+ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
@@ -234,37 +252,45 @@ RUN chmod +x $LIBS_PREFIX/bin/*
 # use it as a drop-in replacement for the system-wide GCC.
 RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/cc
 RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/gcc
+RUN if [ -n "$GNU_TARGET" ]; then ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/$(echo $GNU_TARGET | sed 's/gnu/musl/g')-gcc; fi
 RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/musl-gcc
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/c++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/g++
+RUN if [ -n "$GNU_TARGET" ]; then ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/$(echo $GNU_TARGET | sed 's/gnu/musl/g')-g++; fi
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
-# Use stdatomic.h header provided by Clang because it is not present in musl.
-RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
 
-# Some build systems hardcode -lstdc++ linker flag on all Linux systems.
+# Use some headers provided by Clang because they are not present in musl.
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/emmintrin.h $LIBS_PREFIX/include/emmintrin.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/xmmintrin.h $LIBS_PREFIX/include/xmmintrin.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/mmintrin.h $LIBS_PREFIX/include/mmintrin.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/mm_malloc.h $LIBS_PREFIX/include/mm_malloc.h
+
+# Some build scripts hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
 # we can just provide dummy libstdc++ to be compatible with GNU systems.
 # For example, macOS provides similar experience, where
 # `clang++ -o program program.cpp -lstdc++` would still link to libc++.
 RUN echo > dummy.c && \
-  $CLANG_PREFIX/bin/clang -c dummy.c && \
+  $LIBS_PREFIX/bin/cc -c dummy.c && \
   $CLANG_PREFIX/bin/ar cr $LIBS_PREFIX/lib/libstdc++.a dummy.o && \
   rm dummy.c dummy.o
 
 # The actual builder.
-FROM ubuntu:18.04
+FROM ubuntu:19.10
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
-ARG RUST_PREFIX
 ARG RUST_VERSION
+ARG TARGET
+ARG RUST_PREFIX
 ENV RUSTUP_HOME=$RUST_PREFIX
 ENV CARGO_HOME=$RUST_PREFIX
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --default-toolchain $RUST_VERSION
+  sh -s -- -y --default-toolchain $RUST_VERSION --target $TARGET
 ENV PATH="$RUST_PREFIX/bin:$PATH"
-RUN rustup target add x86_64-unknown-linux-musl
 
 ARG CLANG_PREFIX
 COPY --from=clang-builder $CLANG_PREFIX $CLANG_PREFIX
@@ -274,7 +300,8 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev git
+# Essential tools needed for compiling native dependencies
+RUN apt-get update && apt-get install -y --install-recommends build-essential cmake git
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to
@@ -295,9 +322,24 @@ ENV AR_x86_64_unknown_linux_gnu=/usr/bin/ar
 
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
 
-# Set up pkg-config.
-ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
-ENV PKG_CONFIG_ALLOW_CROSS=1
+# Set up environment variables for Rust bindgen
+# See https://github.com/rust-lang/rust-bindgen/issues/1229#issuecomment-473493753
+ENV BINDGEN_EXTRA_CLANG_ARGS="--sysroot=/opt/libs -target $TARGET"
 
-# Set env vars for the scripts/build-archive.sh file
-ENV TARGET=x86_64-unknown-linux-musl
+# Set default Cargo target
+RUN mkdir -p ~/.cargo
+RUN printf "[build]\ntarget = \"$TARGET\"\n" > ~/.cargo/config
+
+# In case of non-native target, install QEMU-user to enable running `cargo test`
+RUN if [ -n "$GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
+
+# Add dependencies for running tests
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
+
+ENV TARGET="$TARGET"
+
+# Install `cargo-deb from Git until
+# https://github.com/mmstick/cargo-deb/pull/112 is published on crates.io
+RUN cargo install --git https://github.com/mmstick/cargo-deb --rev cc879930c06fa22e99f2839bad620ac0d0da879e cargo-deb
+
+RUN apt-get install -y rename cmark-gfm
