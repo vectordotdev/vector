@@ -26,7 +26,7 @@ class Object
       is_a?(Float)
   end
 
-  def to_toml(hash_style: :inline)
+  def to_toml(hash_style: :expanded)
     if is_a?(Hash)
       values = select { |_k, v| !v.nil? }.collect { |k, v| if k.include? "."
         "\"#{k}\" = #{v.to_toml}"

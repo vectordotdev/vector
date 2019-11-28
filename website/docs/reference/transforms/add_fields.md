@@ -31,7 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
-    {my_string_field = "string value"}
+    my_string_field = "string value"
 ```
 
 ## Options

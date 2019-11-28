@@ -97,11 +97,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    {Authorization = "${TOKEN_ENV_VAR}"}
+    Authorization = "${TOKEN_ENV_VAR}"
   
   # OPTIONAL - Query
   [sinks.my_sink_id.query]
-    {X-Powered-By = "Vector"}
+    X-Powered-By = "Vector"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]

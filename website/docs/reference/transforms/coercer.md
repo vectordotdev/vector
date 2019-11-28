@@ -31,7 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    {status = "int"}
+    status = "int"
 ```
 
 ## Options

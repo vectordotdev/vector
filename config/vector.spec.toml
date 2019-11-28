@@ -625,14 +625,15 @@ dns_servers = ["0.0.0.0:53"]
     # 
     # * required
     # * type: *
-    {my_string_field = "string value"}
-    {my_env_var_field = "${ENV_VAR}"}
-    {my_int_field = 1}
-    {my_float_field = 1.2}
-    {my_bool_field = true}
-    {my_timestamp_field = 1979-05-27T00:32:00Z}
-    {my_nested_fields = {key1 = "value1", key2 = "value2"}}
-    {my_list = ["first", "second", "third"]}
+    my_string_field = "string value"
+    my_env_var_field = "${ENV_VAR}"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00Z
+    my_nested_fields = key1 = "value1"
+    key2 = "value2"
+    my_list = ["first", "second", "third"]
 
 # Accepts `metric` events and allows you to add one or more metric tags.
 [transforms.add_tags]
@@ -664,8 +665,8 @@ dns_servers = ["0.0.0.0:53"]
     # 
     # * required
     # * type: string
-    {my_tag = "my value"}
-    {my_env_tag = "${ENV_VAR}"}
+    my_tag = "my value"
+    my_env_tag = "${ENV_VAR}"
 
 # Accepts `log` events and allows you to strips ANSI characters from the specified field.
 [transforms.ansi_stripper]
@@ -715,13 +716,13 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    {status = "int"}
-    {duration = "float"}
-    {success = "bool"}
-    {timestamp = "timestamp|%s"}
-    {timestamp = "timestamp|%+"}
-    {timestamp = "timestamp|%F"}
-    {timestamp = "timestamp|%a %b %e %T %Y"}
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]
@@ -845,13 +846,13 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    {status = "int"}
-    {duration = "float"}
-    {success = "bool"}
-    {timestamp = "timestamp|%s"}
-    {timestamp = "timestamp|%+"}
-    {timestamp = "timestamp|%F"}
-    {timestamp = "timestamp|%a %b %e %T %Y"}
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` events and allows you to parse a log field value as JSON.
 [transforms.json_parser]
@@ -973,9 +974,9 @@ dns_servers = ["0.0.0.0:53"]
       # 
       # * required
       # * type: string
-      {host = "${HOSTNAME}"}
-      {region = "us-east-1"}
-      {status = "{{status}}"}
+      host = "${HOSTNAME}"
+      region = "us-east-1"
+      status = "{{status}}"
 
 # Accepts `log` events and allows you to transform events with a full embedded Lua engine.
 [transforms.lua]
@@ -1070,13 +1071,13 @@ end
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    {status = "int"}
-    {duration = "float"}
-    {success = "bool"}
-    {timestamp = "timestamp|%s"}
-    {timestamp = "timestamp|%+"}
-    {timestamp = "timestamp|%F"}
-    {timestamp = "timestamp|%a %b %e %T %Y"}
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` events and allows you to remove one or more log fields.
 [transforms.remove_fields]
@@ -1216,13 +1217,13 @@ end
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    {status = "int"}
-    {duration = "float"}
-    {success = "bool"}
-    {timestamp = "timestamp|%s"}
-    {timestamp = "timestamp|%+"}
-    {timestamp = "timestamp|%F"}
-    {timestamp = "timestamp|%a %b %e %T %Y"}
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
@@ -1277,13 +1278,13 @@ end
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    {status = "int"}
-    {duration = "float"}
-    {success = "bool"}
-    {timestamp = "timestamp|%s"}
-    {timestamp = "timestamp|%+"}
-    {timestamp = "timestamp|%F"}
-    {timestamp = "timestamp|%a %b %e %T %Y"}
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 
 # ------------------------------------------------------------------------------
@@ -2597,8 +2598,8 @@ end
     # 
     # * required
     # * type: string
-    {Authorization = "${TOKEN_ENV_VAR}"}
-    {X-Powered-By = "Vector"}
+    Authorization = "${TOKEN_ENV_VAR}"
+    X-Powered-By = "Vector"
 
   #
   # Query
@@ -2609,7 +2610,7 @@ end
     # 
     # * required
     # * type: string
-    {X-Powered-By = "Vector"}
+    X-Powered-By = "Vector"
 
   #
   # Tls
@@ -2922,8 +2923,8 @@ end
     # 
     # * required
     # * type: string
-    {Authorization = "${TOKEN_ENV_VAR}"}
-    {X-Powered-By = "Vector"}
+    Authorization = "${TOKEN_ENV_VAR}"
+    X-Powered-By = "Vector"
 
   #
   # Tls
