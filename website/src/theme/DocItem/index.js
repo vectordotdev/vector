@@ -24,7 +24,6 @@ function Headings({headings, isChild}) {
   useTOCHighlight(LINK_CLASS_NAME, ACTIVE_LINK_CLASS_NAME, TOP_OFFSET);
 
   if (!headings.length) return null;
-  console.log(headings)
   return (
     <ul className={isChild ? '' : 'contents'}>
       {headings.map(heading => {
