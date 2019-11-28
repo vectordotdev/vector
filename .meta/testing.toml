@@ -54,7 +54,7 @@ common = false
 relevant_when = {type = "log"}
 description = "Specifies the log fields when the input type is 'log'."
 
-[testing.tests.options.input.options.log_fields.options."<field-name>"]
+[testing.tests.options.input.options.log_fields.options."`<field-name>`"]
 type = "*"
 null = false
 examples = [
@@ -101,7 +101,7 @@ null = true
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
 
-[testing.tests.options.input.options.metric.options.tags.options."<tag-name>"]
+[testing.tests.options.input.options.metric.options.tags.options."`<tag-name>`"]
 type = "string"
 examples = [
   {name = "host", value = "foohost"},
@@ -186,7 +186,7 @@ The type of the condition to execute. Currently only the `check_fields` type is 
 available.\
 """
 
-[testing.tests.options.outputs.options.conditions.options."<field_name>.eq"]
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.eq"]
 type = "string"
 null = true
 examples = [
@@ -197,7 +197,7 @@ description = """\
 Check whether a fields contents exactly matches the value specified.\
 """
 
-[testing.tests.options.outputs.options.conditions.options."<field_name>.neq"]
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.neq"]
 type = "string"
 null = true
 examples = [
@@ -208,7 +208,7 @@ description = """\
 Check whether a fields contents does not match the value specified.\
 """
 
-[testing.tests.options.outputs.options.conditions.options."<field_name>.exists"]
+[testing.tests.options.outputs.options.conditions.options."`<field_name>`.exists"]
 type = "bool"
 null = true
 examples = [

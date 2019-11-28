@@ -175,13 +175,13 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
-  name={"<label-key>"}
+  name={"`<label-key>`"}
   path={null}
   required={true}
   type={"string"}
   >
 
-### <label-key>
+### `<label-key>`
 
 [Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
 
