@@ -21,7 +21,7 @@ SHA1 = ENV.fetch("CIRCLE_SHA1")
 # Commit
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 release = metadata.releases.to_h.fetch(:"#{VERSION}")
 

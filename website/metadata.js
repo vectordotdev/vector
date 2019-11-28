@@ -238,9 +238,9 @@ module.exports = {
     "title": "Introducing Vector"
   },
   "latest_release": {
-    "date": "2019-10-09",
-    "last_version": "0.4.0",
-    "version": "0.5.0"
+    "date": "2019-11-28",
+    "last_version": "0.5.0",
+    "version": "0.6.0"
   },
   "posts": [
     {
@@ -956,6 +956,28 @@ module.exports = {
 
       ]
     },
+    "ansi_stripper": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to strips ANSI characters from the specified field.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "sanitize",
+      "id": "ansi_stripper_transform",
+      "name": "ansi_stripper",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "coercer": {
       "beta": false,
       "delivery_guarantee": null,
@@ -996,6 +1018,28 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "geoip": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "enrich",
+      "id": "geoip_transform",
+      "name": "geoip",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
 

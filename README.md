@@ -64,7 +64,7 @@ simple and unified.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.5.0][urls.v0.5.0], [changelog][urls.vector_changelog]
+* [**Releases**][urls.vector_releases] - [v0.6.0][urls.v0.6.0], [changelog][urls.vector_changelog]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -179,7 +179,7 @@ Or use your own [preferred method][docs.installation].
 [urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.5.0]: https://github.com/timberio/vector/releases/tag/v0.5.0
+[urls.v0.6.0]: https://github.com/timberio/vector/releases/tag/v0.6.0
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

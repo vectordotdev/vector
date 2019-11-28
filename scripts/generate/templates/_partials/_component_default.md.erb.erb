@@ -15,34 +15,20 @@
 
 <%%= fields(component.env_vars_list) %>
 
-<%%-end %>
-## Output
-
-<%- end -%>
-
+<%%- end -%>
 <%- if component.source? -%>
 ## Output
 
 <%- if component.output.log -%>
-<%= source_output(:log, component.output.log, heading_depth: 3) %>
+<%%= source_output(:log, component.output.log, heading_depth: 3) %>
 <%- else -%>
-<%= source_output(:metric, component.output.metric, heading_depth: 3) %>
+<%%= source_output(:metric, component.output.metric, heading_depth: 3) %>
 <%- end -%>
 
-<%- end -%>
 <%- elsif component.sink? && component.output -%>
 ## Output
 
-<%= sink_output(component) %>
-
-<%- end -%>
-<%- if component.respond_to?(:metric_fields_list) && component.metric_fields_list.any? -%>
-## Metric Fields
-
-The following schema represents [`metric` events][docs.data-model.metric] as
-they are output from this source.
-
-<%= fields(component.metric_fields_list, heading_depth: 3) %>
+<%%= sink_output(component) %>
 
 <%- end -%>
 ## How It Works [[sort]]

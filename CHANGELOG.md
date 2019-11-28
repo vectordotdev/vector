@@ -1,4 +1,4 @@
-# v0.5 Changelog
+# v0.6 Changelog
 
 <p align="center">
   <strong>
@@ -16,8 +16,8 @@
      CHANGELOG.md.erb
 -->
 
-* [**Unreleased**](#unreleased) - [download][urls.vector_nightly_builds], [install][docs.installation.manual], [compare][urls.compare_v0.5.0...master]
-* [**0.5.0**](#050---oct-9-2019) - [download][urls.v0.5.0], [install][docs.installation], [compare][urls.compare_v0.4.0...v0.5.0]
+* [**Unreleased**](#unreleased) - [download][urls.vector_nightly_builds], [install][docs.installation.manual], [compare][urls.compare_v0.6.0...master]
+* [**0.6.0**](#060---nov-28-2019) - [download][urls.v0.6.0], [install][docs.installation], [compare][urls.compare_v0.5.0...v0.6.0]
 
 ---
 
@@ -25,51 +25,161 @@
 
 Vector follows the [conventional commits specification][urls.conventional_commits] and unrelease changes are rolled up into a changelog when they are released:
 
-* [Compare `v0.5.0` to `master`][urls.compare_v0.5.0...master]
+* [Compare `v0.6.0` to `master`][urls.compare_v0.6.0...master]
 * [Download nightly builds][urls.vector_nightly_builds]
 
-## [0.5.0][urls.v0.5.0] - Oct 9, 2019
+## [0.6.0][urls.v0.6.0] - Nov 28, 2019
+
+### Breaking changes
+
+* *[config][docs.configuration]*: Require `encoding` option for console and file sinks ([#1033][urls.pr_1033])
+* *[metric data model][docs.data-model.metric]*: Reorganise metric model ([#1217][urls.pr_1217])
 
 ### New features
 
-* *[`clickhouse` sink][docs.sinks.clickhouse]*: Add support for basic auth ([#937][urls.pr_937])
-* *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Add support for tls options ([#953][urls.pr_953])
-* *[`kafka` sink][docs.sinks.kafka]*: Add support for tls (ssl) ([#912][urls.pr_912])
-* *[`kafka` sink][docs.sinks.kafka]*: Use pkcs#12 keys instead of jks ([#934][urls.pr_934])
-* *new sink*: Initial `statsd` implementation ([#821][urls.pr_821])
-* *new source*: Initial [`docker` source][docs.sources.docker] implementation ([#787][urls.pr_787])
-* *[observability][docs.monitoring]*: Add rate limited debug messages ([#971][urls.pr_971])
+* *[cli][docs.administration]*: Add `validate` sub command ([#1064][urls.pr_1064])
+* *[cli][docs.administration]*: Add `list` subcommand ([#1156][urls.pr_1156])
+* *[cli][docs.administration]*: Add `generate` subcommand ([#1168][urls.pr_1168])
+* *[cli][docs.administration]*: Add `test` sub-command ([#1220][urls.pr_1220])
+* *networking*: Custom dns resolution ([#1118][urls.pr_1118])
+* *new platform*: Support `armv7-unknown-linux` (raspberry pi, etc) platforms ([#1054][urls.pr_1054])
+* *new platform*: Support `aarch64-unknown-linux` (arm64, raspberry pi, etc) platforms ([#1193][urls.pr_1193])
+* *new platform*: Support `x86_64-pc-windows-msvc` (windows 7+) platform ([#1205][urls.pr_1205])
+* *new sink*: Initial `datadog_metrics` implementation ([#967][urls.pr_967])
+* *new transform*: Initial [`ansi_stripper` transform][docs.transforms.ansi_stripper] implementation ([#1188][urls.pr_1188])
+* *new transform*: Initial [`geoip` transform][docs.transforms.geoip] implementation ([#1015][urls.pr_1015])
 
 ### Enhancements
 
-* *[observability][docs.monitoring]*: Show information about why a retry needs to happen ([#835][urls.pr_835])
-* *security*: Unify the different tls options ([#972][urls.pr_972])
+* *[`blackhole` sink][docs.sinks.blackhole]*: Accept metric events, too ([#1237][urls.pr_1237])
+* *[cli][docs.administration]*: Show git version and target triple in `vector --version` output ([#1044][urls.pr_1044])
+* *[cli][docs.administration]*: Allow >1 config targets for validate command ([#1218][urls.pr_1218])
+* *[config][docs.configuration]*: Refactor the batching configuration ([#1154][urls.pr_1154])
+* *[config][docs.configuration]*: Support default environment variable values ([#1185][urls.pr_1185])
+* *[`datadog_metrics` sink][docs.sinks.datadog_metrics]*: Use metric buffer in datadog sink ([#1080][urls.pr_1080])
+* *[`docker` source][docs.sources.docker]*: Enrich events with metadata ([#1149][urls.pr_1149])
+* *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Wrap provider call with a tokio runtime ([#1104][urls.pr_1104])
+* *[`file` sink][docs.sinks.file]*: Automatically create missing directories ([#1094][urls.pr_1094])
+* *[`grok_parser` transform][docs.transforms.grok_parser]*: Update grok to version 1.0.1 ([#1124][urls.pr_1124])
+* *[`http` sink][docs.sinks.http]*: Add json encoding option ([#1174][urls.pr_1174])
+* *[`json_parser` transform][docs.transforms.json_parser]*: Add support for target field configuration ([#1165][urls.pr_1165])
+* *[`kafka` source][docs.sources.kafka]*: Add `commit_interval_ms` option ([#944][urls.pr_944])
+* *[`lua` transform][docs.transforms.lua]*: Allow iteration over fields ([#1111][urls.pr_1111])
+* *[metric data model][docs.data-model.metric]*: Metrics buffer & aggregation ([#930][urls.pr_930])
+* *[metric data model][docs.data-model.metric]*: Reorganise metric model ([#1217][urls.pr_1217])
+* *networking*: Add support for systemd socket activation ([#1045][urls.pr_1045])
+* *[observability][docs.monitoring]*: Ensure internal rate limiting is logged ([#1151][urls.pr_1151])
+* *operations*: Add `clean` target to makefile ([#1171][urls.pr_1171])
+* *platforms*: Update leveldb-sys up to 2.0.5 ([#1055][urls.pr_1055])
+* *platforms*: Use vendored openssl ([#1170][urls.pr_1170])
+* *platforms*: Make `openssl/vendored` feature optional ([#1239][urls.pr_1239])
+* *platforms*: Update `openssl` dependency ([#1240][urls.pr_1240])
+* *[`regex_parser` transform][docs.transforms.regex_parser]*: Set default `drop_field` to true ([e56f950][urls.commit_e56f9503f09a7f97d96093775856a019d738d402])
 
 ### Bug fixes
 
-* *[config][docs.configuration]*: Default data_dir to /var/lib/vector ([#995][urls.pr_995])
+* *[`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics]*: Fix metrics batch strategy in sinks ([#1141][urls.pr_1141])
+* *[cli][docs.administration]*: Make global options actually use default ([#1013][urls.pr_1013])
+* *[config][docs.configuration]*: Require `encoding` option for console and file sinks ([#1033][urls.pr_1033])
+* *docker platform*: Add ca certificates for docker image ([#1014][urls.pr_1014])
+* *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Flatten out region configuration in elasticsearch sink ([#1116][urls.pr_1116])
+* *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Stop accidentally requiring region for es ([#1161][urls.pr_1161])
+* *[`elasticsearch` sink][docs.sinks.elasticsearch]*: `host` is not required when provider is aws ([#1164][urls.pr_1164])
+* *[`file` source][docs.sources.file]*: Sleep to avoid split reads ([#1236][urls.pr_1236])
+* *[`grok_parser` transform][docs.transforms.grok_parser]*: Don't drop parsed field ([#1172][urls.pr_1172])
+* *[`journald` source][docs.sources.journald]*: Fix a couple minor issues with checkpointing ([#1086][urls.pr_1086])
+* *[`journald` source][docs.sources.journald]*: Rework option to limit records to current boot in journald source ([#1105][urls.pr_1105])
+* *[`journald` source][docs.sources.journald]*: Cursor/checkpoint fixes ([#1106][urls.pr_1106])
+* *[`journald` source][docs.sources.journald]*: Limit journald records to the current boot ([#1122][urls.pr_1122])
+* *[`journald` source][docs.sources.journald]*: Flush and reset any current filter before applying new filter ([#1135][urls.pr_1135])
+* *[`journald` source][docs.sources.journald]*: Re-fix journald cursor handling and libsystemd name ([#1202][urls.pr_1202])
+* *[`json_parser` transform][docs.transforms.json_parser]*: Fixes a bug droping parsed field ([#1167][urls.pr_1167])
+* *[observability][docs.monitoring]*: Improve topology tracing spans ([#1123][urls.pr_1123])
+* *platforms*: Don't put *.erb files to configs directory ([#1241][urls.pr_1241])
+* *[`stdin` source][docs.sources.stdin]*: Resolve inability to shutdown vector when std… ([#960][urls.pr_960])
+* *testing*: Increase wait timeouts in tests which otherwise fail on slow cpus ([#1181][urls.pr_1181])
 
 
+[docs.administration]: https://vector.dev/docs/administration
 [docs.configuration]: https://vector.dev/docs/setup/configuration
+[docs.data-model.metric]: https://vector.dev/docs/about/data-model/metric
 [docs.installation.manual]: https://vector.dev/docs/setup/installation/manual
 [docs.installation]: https://vector.dev/docs/setup/installation
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring
-[docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse
+[docs.sinks.aws_cloudwatch_metrics]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_metrics
+[docs.sinks.blackhole]: https://vector.dev/docs/reference/sinks/blackhole
+[docs.sinks.datadog_metrics]: https://vector.dev/docs/reference/sinks/datadog_metrics
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch
-[docs.sinks.kafka]: https://vector.dev/docs/reference/sinks/kafka
+[docs.sinks.file]: https://vector.dev/docs/reference/sinks/file
+[docs.sinks.http]: https://vector.dev/docs/reference/sinks/http
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker
-[urls.compare_v0.4.0...v0.5.0]: https://github.com/timberio/vector/compare/v0.4.0...v0.5.0
-[urls.compare_v0.5.0...master]: https://github.com/timberio/vector/compare/v0.5.0...master
+[docs.sources.file]: https://vector.dev/docs/reference/sources/file
+[docs.sources.journald]: https://vector.dev/docs/reference/sources/journald
+[docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka
+[docs.sources.stdin]: https://vector.dev/docs/reference/sources/stdin
+[docs.transforms.ansi_stripper]: https://vector.dev/docs/reference/transforms/ansi_stripper
+[docs.transforms.geoip]: https://vector.dev/docs/reference/transforms/geoip
+[docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser
+[docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser
+[docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua
+[docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser
+[urls.commit_e56f9503f09a7f97d96093775856a019d738d402]: https://github.com/timberio/vector/commit/e56f9503f09a7f97d96093775856a019d738d402
+[urls.compare_v0.5.0...v0.6.0]: https://github.com/timberio/vector/compare/v0.5.0...v0.6.0
+[urls.compare_v0.6.0...master]: https://github.com/timberio/vector/compare/v0.6.0...master
 [urls.conventional_commits]: https://www.conventionalcommits.org
-[urls.pr_787]: https://github.com/timberio/vector/pull/787
-[urls.pr_821]: https://github.com/timberio/vector/pull/821
-[urls.pr_835]: https://github.com/timberio/vector/pull/835
-[urls.pr_912]: https://github.com/timberio/vector/pull/912
-[urls.pr_934]: https://github.com/timberio/vector/pull/934
-[urls.pr_937]: https://github.com/timberio/vector/pull/937
-[urls.pr_953]: https://github.com/timberio/vector/pull/953
-[urls.pr_971]: https://github.com/timberio/vector/pull/971
-[urls.pr_972]: https://github.com/timberio/vector/pull/972
-[urls.pr_995]: https://github.com/timberio/vector/pull/995
-[urls.v0.5.0]: https://github.com/timberio/vector/releases/tag/v0.5.0
+[urls.pr_1013]: https://github.com/timberio/vector/pull/1013
+[urls.pr_1014]: https://github.com/timberio/vector/pull/1014
+[urls.pr_1015]: https://github.com/timberio/vector/pull/1015
+[urls.pr_1033]: https://github.com/timberio/vector/pull/1033
+[urls.pr_1044]: https://github.com/timberio/vector/pull/1044
+[urls.pr_1045]: https://github.com/timberio/vector/pull/1045
+[urls.pr_1054]: https://github.com/timberio/vector/pull/1054
+[urls.pr_1055]: https://github.com/timberio/vector/pull/1055
+[urls.pr_1064]: https://github.com/timberio/vector/pull/1064
+[urls.pr_1080]: https://github.com/timberio/vector/pull/1080
+[urls.pr_1086]: https://github.com/timberio/vector/pull/1086
+[urls.pr_1094]: https://github.com/timberio/vector/pull/1094
+[urls.pr_1104]: https://github.com/timberio/vector/pull/1104
+[urls.pr_1105]: https://github.com/timberio/vector/pull/1105
+[urls.pr_1106]: https://github.com/timberio/vector/pull/1106
+[urls.pr_1111]: https://github.com/timberio/vector/pull/1111
+[urls.pr_1116]: https://github.com/timberio/vector/pull/1116
+[urls.pr_1118]: https://github.com/timberio/vector/pull/1118
+[urls.pr_1122]: https://github.com/timberio/vector/pull/1122
+[urls.pr_1123]: https://github.com/timberio/vector/pull/1123
+[urls.pr_1124]: https://github.com/timberio/vector/pull/1124
+[urls.pr_1135]: https://github.com/timberio/vector/pull/1135
+[urls.pr_1141]: https://github.com/timberio/vector/pull/1141
+[urls.pr_1149]: https://github.com/timberio/vector/pull/1149
+[urls.pr_1151]: https://github.com/timberio/vector/pull/1151
+[urls.pr_1154]: https://github.com/timberio/vector/pull/1154
+[urls.pr_1156]: https://github.com/timberio/vector/pull/1156
+[urls.pr_1161]: https://github.com/timberio/vector/pull/1161
+[urls.pr_1164]: https://github.com/timberio/vector/pull/1164
+[urls.pr_1165]: https://github.com/timberio/vector/pull/1165
+[urls.pr_1167]: https://github.com/timberio/vector/pull/1167
+[urls.pr_1168]: https://github.com/timberio/vector/pull/1168
+[urls.pr_1170]: https://github.com/timberio/vector/pull/1170
+[urls.pr_1171]: https://github.com/timberio/vector/pull/1171
+[urls.pr_1172]: https://github.com/timberio/vector/pull/1172
+[urls.pr_1174]: https://github.com/timberio/vector/pull/1174
+[urls.pr_1181]: https://github.com/timberio/vector/pull/1181
+[urls.pr_1185]: https://github.com/timberio/vector/pull/1185
+[urls.pr_1188]: https://github.com/timberio/vector/pull/1188
+[urls.pr_1193]: https://github.com/timberio/vector/pull/1193
+[urls.pr_1202]: https://github.com/timberio/vector/pull/1202
+[urls.pr_1205]: https://github.com/timberio/vector/pull/1205
+[urls.pr_1217]: https://github.com/timberio/vector/pull/1217
+[urls.pr_1218]: https://github.com/timberio/vector/pull/1218
+[urls.pr_1220]: https://github.com/timberio/vector/pull/1220
+[urls.pr_1236]: https://github.com/timberio/vector/pull/1236
+[urls.pr_1237]: https://github.com/timberio/vector/pull/1237
+[urls.pr_1239]: https://github.com/timberio/vector/pull/1239
+[urls.pr_1240]: https://github.com/timberio/vector/pull/1240
+[urls.pr_1241]: https://github.com/timberio/vector/pull/1241
+[urls.pr_930]: https://github.com/timberio/vector/pull/930
+[urls.pr_944]: https://github.com/timberio/vector/pull/944
+[urls.pr_960]: https://github.com/timberio/vector/pull/960
+[urls.pr_967]: https://github.com/timberio/vector/pull/967
+[urls.v0.6.0]: https://github.com/timberio/vector/releases/tag/v0.6.0
 [urls.vector_nightly_builds]: http://packages.timber.io/vector/nightly/latest/

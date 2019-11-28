@@ -197,6 +197,12 @@ class Metadata
     end
   end
 
+  def platforms
+    @platforms ||= installation.containers +
+      installation.operating_systems +
+      installation.package_managers
+  end
+
   def previous_minor_releases(release)
     releases_list.select do |other_release|
       other_release.version < release.version &&

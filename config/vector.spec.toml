@@ -625,15 +625,14 @@ dns_servers = ["0.0.0.0:53"]
     # 
     # * required
     # * type: *
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00Z
-    my_nested_fields = key1 = "value1"
-    key2 = "value2"
-    my_list = ["first", "second", "third"]
+    {my_string_field = "string value"}
+    {my_env_var_field = "${ENV_VAR}"}
+    {my_int_field = 1}
+    {my_float_field = 1.2}
+    {my_bool_field = true}
+    {my_timestamp_field = 1979-05-27T00:32:00Z}
+    {my_nested_fields = {key1 = "value1", key2 = "value2"}}
+    {my_list = ["first", "second", "third"]}
 
 # Accepts `metric` events and allows you to add one or more metric tags.
 [transforms.add_tags]
@@ -665,8 +664,24 @@ dns_servers = ["0.0.0.0:53"]
     # 
     # * required
     # * type: string
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
+    {my_tag = "my value"}
+    {my_env_tag = "${ENV_VAR}"}
+
+# Accepts `log` events and allows you to strips ANSI characters from the specified field.
+[transforms.ansi_stripper]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `ansi_stripper`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "ansi_stripper"
+  type = "ansi_stripper"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
 
 # Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
@@ -700,13 +715,13 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    {status = "int"}
+    {duration = "float"}
+    {success = "bool"}
+    {timestamp = "timestamp|%s"}
+    {timestamp = "timestamp|%+"}
+    {timestamp = "timestamp|%F"}
+    {timestamp = "timestamp|%a %b %e %T %Y"}
 
 # Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]
@@ -724,18 +739,58 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The target log field to compare against the `value`.
-  # 
-  # * required
-  # * type: string
-  field = "file"
-
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
   # 
   # * required
   # * type: string
   value = "/var/log/nginx.log"
+
+  # The target log field to compare against the `value`.
+  # 
+  # * optional
+  # * default: "message"
+  # * type: string
+  field = "file"
+
+# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases.
+[transforms.geoip]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `geoip`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "geoip"
+  type = "geoip"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Path to the MaxMind GeoIP2 or GeoLite2 binary database file (`.mmdb).
+  # 
+  # * required
+  # * type: string
+  database = "/path/to/GeoLite2-City.mmdb"
+  database = "/path/to/GeoLite2-Country.mmdb"
+
+  # The field name that contains the IP address. This field should contain a
+  # valid IPv4 or IPv6 address.
+  # 
+  # * required
+  # * type: string
+  source = "ip_address"
+  source = "x-forwarded-for"
+
+  # The default field to insert the resulting GeoIP data into. See output for
+  # more info.
+  # 
+  # * optional
+  # * default: "geoip"
+  # * type: string
+  target = "geoip"
 
 # Accepts `log` events and allows you to parse a log field value with Grok.
 [transforms.grok_parser]
@@ -790,13 +845,13 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    {status = "int"}
+    {duration = "float"}
+    {success = "bool"}
+    {timestamp = "timestamp|%s"}
+    {timestamp = "timestamp|%+"}
+    {timestamp = "timestamp|%F"}
+    {timestamp = "timestamp|%a %b %e %T %Y"}
 
 # Accepts `log` events and allows you to parse a log field value as JSON.
 [transforms.json_parser]
@@ -918,9 +973,9 @@ dns_servers = ["0.0.0.0:53"]
       # 
       # * required
       # * type: string
-      host = "${HOSTNAME}"
-      region = "us-east-1"
-      status = "{{status}}"
+      {host = "${HOSTNAME}"}
+      {region = "us-east-1"}
+      {status = "{{status}}"}
 
 # Accepts `log` events and allows you to transform events with a full embedded Lua engine.
 [transforms.lua]
@@ -1015,13 +1070,13 @@ end
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    {status = "int"}
+    {duration = "float"}
+    {success = "bool"}
+    {timestamp = "timestamp|%s"}
+    {timestamp = "timestamp|%+"}
+    {timestamp = "timestamp|%F"}
+    {timestamp = "timestamp|%a %b %e %T %Y"}
 
 # Accepts `log` events and allows you to remove one or more log fields.
 [transforms.remove_fields]
@@ -1161,13 +1216,13 @@ end
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    {status = "int"}
+    {duration = "float"}
+    {success = "bool"}
+    {timestamp = "timestamp|%s"}
+    {timestamp = "timestamp|%+"}
+    {timestamp = "timestamp|%F"}
+    {timestamp = "timestamp|%a %b %e %T %Y"}
 
 # Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
@@ -1222,13 +1277,13 @@ end
     # * required
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+    {status = "int"}
+    {duration = "float"}
+    {success = "bool"}
+    {timestamp = "timestamp|%s"}
+    {timestamp = "timestamp|%+"}
+    {timestamp = "timestamp|%F"}
+    {timestamp = "timestamp|%a %b %e %T %Y"}
 
 
 # ------------------------------------------------------------------------------
@@ -2542,8 +2597,8 @@ end
     # 
     # * required
     # * type: string
-    Authorization = "${TOKEN_ENV_VAR}"
-    X-Powered-By = "Vector"
+    {Authorization = "${TOKEN_ENV_VAR}"}
+    {X-Powered-By = "Vector"}
 
   #
   # Query
@@ -2554,7 +2609,7 @@ end
     # 
     # * required
     # * type: string
-    X-Powered-By = "Vector"
+    {X-Powered-By = "Vector"}
 
   #
   # Tls
@@ -2867,8 +2922,8 @@ end
     # 
     # * required
     # * type: string
-    Authorization = "${TOKEN_ENV_VAR}"
-    X-Powered-By = "Vector"
+    {Authorization = "${TOKEN_ENV_VAR}"}
+    {X-Powered-By = "Vector"}
 
   #
   # Tls

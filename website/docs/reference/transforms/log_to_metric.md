@@ -38,7 +38,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL
     [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}"
+      {host = "${HOSTNAME}"}
 ```
 
 ## Options

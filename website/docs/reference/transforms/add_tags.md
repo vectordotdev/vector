@@ -31,7 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
-    my_tag = "my value"
+    {my_tag = "my value"}
 ```
 
 ## Options
