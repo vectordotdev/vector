@@ -50,40 +50,34 @@ import CodeHeader from '@site/src/components/CodeHeader';
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - Name
+  # REQUIRED - General
   name = "foo test" # example
   
   # REQUIRED - Outputs
   [[tests.outputs]]
+    # REQUIRED - General
+    extract_from = "bar" # example
+    
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
-      # REQUIRED - Type
+      # REQUIRED
       type = "check_fields" # example
       
-      # OPTIONAL - `<field name>`.eq
+      # OPTIONAL
       name = "message.eq"
     value = "this is the content to match against" # example
-      
-      # OPTIONAL - `<field name>`.exists
       name = "host.exists"
     value = true # example
-      
-      # OPTIONAL - `<field name>`.neq
       name = "method.neq"
     value = "POST" # example
-    
-    # REQUIRED - Extract from
-    extract_from = "bar" # example
   
   # REQUIRED - Input
   [tests.input]
-    # REQUIRED - Insert at
+    # REQUIRED
+    type = "raw" # example, enum
     insert_at = "foo" # example
     
-    # REQUIRED - Type
-    type = "raw" # example, enum
-    
-    # OPTIONAL - Value
+    # OPTIONAL
     value = "some message contents" # example, no default, relevant when type = "raw"
 ```
 
@@ -98,40 +92,34 @@ import CodeHeader from '@site/src/components/CodeHeader';
   regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - Name
+  # REQUIRED - General
   name = "foo test" # example
   
   # REQUIRED - Outputs
   [[tests.outputs]]
+    # REQUIRED - General
+    extract_from = "bar" # example
+    
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
-      # REQUIRED - Type
+      # REQUIRED
       type = "check_fields" # example
       
-      # OPTIONAL - `<field name>`.eq
+      # OPTIONAL
       name = "message.eq"
     value = "this is the content to match against" # example
-      
-      # OPTIONAL - `<field name>`.exists
       name = "host.exists"
     value = true # example
-      
-      # OPTIONAL - `<field name>`.neq
       name = "method.neq"
     value = "POST" # example
-    
-    # REQUIRED - Extract from
-    extract_from = "bar" # example
   
   # REQUIRED - Input
   [tests.input]
-    # REQUIRED - Insert at
+    # REQUIRED - General
+    type = "raw" # example, enum
     insert_at = "foo" # example
     
-    # REQUIRED - Type
-    type = "raw" # example, enum
-    
-    # OPTIONAL - Value
+    # OPTIONAL - General
     value = "some message contents" # example, no default, relevant when type = "raw"
     
     # OPTIONAL - Log fields
@@ -143,22 +131,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL - Metric
     [tests.input.metric]
-      # REQUIRED - Name
-      name = "duration_total" # example
-      
-      # REQUIRED - Timestamp
-      timestamp = "2019-11-01T21:15:47.443232Z" # example
-      
-      # REQUIRED - Type
+      # REQUIRED - General
       type = "counter" # example, enum
-      
-      # REQUIRED - Val
+      name = "duration_total" # example
+      timestamp = "2019-11-01T21:15:47.443232Z" # example
       val = 10.2 # example
       
-      # OPTIONAL - Direction
+      # OPTIONAL - General
       direction = "plus" # example, no default, enum
-      
-      # OPTIONAL - Sample rate
       sample_rate = 1 # example, no default
       
       # OPTIONAL - Tags
@@ -264,7 +244,7 @@ Specifies the log fields when the input type is 'log'.
   unit={null}
   >
 
-##### `&lt;field-name&gt;`
+##### `<field-name>`
 
 A key/value pair representing a field to be added to the input event.
 
@@ -405,7 +385,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-###### `&lt;tag-name&gt;`
+###### `<tag-name>`
 
 Key/value pairs representing [metric tags][docs.data-model#tags].
 
@@ -625,7 +605,7 @@ A table that defines a collection of conditions to check against the output of a
   unit={null}
   >
 
-##### `&lt;field_name&gt;`.eq
+##### `<field_name>`.eq
 
 Check whether a fields contents exactly matches the value specified.
 
@@ -648,7 +628,7 @@ Check whether a fields contents exactly matches the value specified.
   unit={null}
   >
 
-##### `&lt;field_name&gt;`.exists
+##### `<field_name>`.exists
 
 Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
@@ -671,7 +651,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   unit={null}
   >
 
-##### `&lt;field_name&gt;`.neq
+##### `<field_name>`.neq
 
 Check whether a fields contents does not match the value specified.
 

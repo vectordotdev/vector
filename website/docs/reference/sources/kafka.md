@@ -43,19 +43,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Bootstrap servers
+  # REQUIRED
+  type = "kafka" # example, must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
-  
-  # REQUIRED - Group
   group_id = "consumer-group-name" # example
-  
-  # REQUIRED - Topics
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
   
-  # REQUIRED - Type
-  type = "kafka" # example, must be: "kafka"
-  
-  # OPTIONAL - Key field
+  # OPTIONAL
   key_field = "user_id" # example, no default
 ```
 
@@ -66,25 +60,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Bootstrap servers
+  # REQUIRED
+  type = "kafka" # example, must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
-  
-  # REQUIRED - Group
   group_id = "consumer-group-name" # example
-  
-  # REQUIRED - Topics
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
   
-  # REQUIRED - Type
-  type = "kafka" # example, must be: "kafka"
-  
-  # OPTIONAL - Auto offset reset
+  # OPTIONAL
   auto_offset_reset = "smallest" # default
-  
-  # OPTIONAL - Key field
   key_field = "user_id" # example, no default
-  
-  # OPTIONAL - Session timeout ms
   session_timeout_ms = 5000 # default, milliseconds
 ```
 

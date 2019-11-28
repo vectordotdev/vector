@@ -43,16 +43,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Mode
+  # REQUIRED
+  type = "syslog" # example, must be: "syslog"
   mode = "tcp" # example, enum
   
-  # REQUIRED - Type
-  type = "syslog" # example, must be: "syslog"
-  
-  # OPTIONAL - Address
+  # OPTIONAL
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
-  
-  # OPTIONAL - Path
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
@@ -63,23 +59,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Mode
+  # REQUIRED - General
+  type = "syslog" # example, must be: "syslog"
   mode = "tcp" # example, enum
   
-  # REQUIRED - Type
-  type = "syslog" # example, must be: "syslog"
-  
-  # OPTIONAL - Address
+  # OPTIONAL - General
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
+  max_length = 102400 # default, bytes
+  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
   
   # OPTIONAL - Context
   host_key = "host" # default
-  
-  # OPTIONAL - Max length
-  max_length = 102400 # default, bytes
-  
-  # OPTIONAL - Path
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
 </TabItem>

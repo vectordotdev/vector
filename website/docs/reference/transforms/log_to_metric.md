@@ -25,28 +25,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - Inputs
+  # REQUIRED - General
+  type = "log_to_metric" # example, must be: "log_to_metric"
   inputs = ["my-source-id"] # example
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
-    # REQUIRED - Field
+    # REQUIRED
+    type = "counter" # example, enum
     field = "duration" # example
-    
-    # REQUIRED - Name
     name = "duration_total" # example
     
-    # REQUIRED - Type
-    type = "counter" # example, enum
-    
-    # OPTIONAL - General
+    # OPTIONAL
     [transforms.my_transform_id.metrics.tags]
       host = "${HOSTNAME}" # example
       region = "us-east-1" # example
       status = "{{status}}" # example
-  
-  # REQUIRED - Type
-  type = "log_to_metric" # example, must be: "log_to_metric"
 ```
 
 ## Options
@@ -186,7 +180,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   unit={null}
   >
 
-##### `&lt;tag-name&gt;`
+##### `<tag-name>`
 
 Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
 

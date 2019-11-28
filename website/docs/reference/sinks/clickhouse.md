@@ -43,27 +43,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Host
-  host = "http://localhost:8123" # example
-  
-  # REQUIRED - Inputs
+  # REQUIRED - General
+  type = "clickhouse" # example, must be: "clickhouse"
   inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Table
+  host = "http://localhost:8123" # example
   table = "mytable" # example
   
-  # REQUIRED - Type
-  type = "clickhouse" # example, must be: "clickhouse"
-  
-  # OPTIONAL - Database
+  # OPTIONAL - General
   database = "mydatabase" # example, no default
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    # REQUIRED - Password
     password = "password" # example
-    
-    # REQUIRED - User
     user = "username" # example
 ```
 
@@ -74,27 +65,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Host
-  host = "http://localhost:8123" # example
-  
-  # REQUIRED - Inputs
+  # REQUIRED - General
+  type = "clickhouse" # example, must be: "clickhouse"
   inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Table
+  host = "http://localhost:8123" # example
   table = "mytable" # example
   
-  # REQUIRED - Type
-  type = "clickhouse" # example, must be: "clickhouse"
+  # OPTIONAL - General
+  database = "mydatabase" # example, no default
+  healthcheck = true # default
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Database
-  database = "mydatabase" # example, no default
-  
-  # OPTIONAL - Healthcheck
-  healthcheck = true # default
   
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
@@ -109,44 +92,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    # REQUIRED - Password
     password = "password" # example
-    
-    # REQUIRED - User
     user = "username" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    # OPTIONAL - Ca path
     ca_path = "/path/to/certificate_authority.crt" # example, no default
-    
-    # OPTIONAL - Crt path
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    
-    # OPTIONAL - Key pass
     key_pass = "PassWord1" # example, no default
-    
-    # OPTIONAL - Key path
     key_path = "/path/to/host_certificate.key" # example, no default
-    
-    # OPTIONAL - Verify certificate
     verify_certificate = true # default
-    
-    # OPTIONAL - Verify hostname
     verify_hostname = true # default
 ```
 

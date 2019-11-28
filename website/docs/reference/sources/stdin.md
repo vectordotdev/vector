@@ -53,14 +53,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "stdin" # example, must be: "stdin"
+  
+  # OPTIONAL - General
+  max_length = 102400 # default, bytes
   
   # OPTIONAL - Context
   host_key = "host" # default
-  
-  # OPTIONAL - Max length
-  max_length = 102400 # default, bytes
 ```
 
 </TabItem>

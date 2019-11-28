@@ -43,13 +43,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "http" # example, must be: "http"
-  
-  # REQUIRED - Uri
+  inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
   
   # REQUIRED - requests
@@ -57,10 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    # REQUIRED - Password
     password = "password" # example
-    
-    # REQUIRED - User
     user = "username" # example
 ```
 
@@ -71,27 +64,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Type
+  # REQUIRED - General
   type = "http" # example, must be: "http"
-  
-  # REQUIRED - Uri
+  inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
   
+  # OPTIONAL - General
+  healthcheck = true # default
+  healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 5 # default, seconds
-  
-  # OPTIONAL - Healthcheck
-  healthcheck = true # default
-  
-  # OPTIONAL - Healthcheck uri
-  healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
   
   # OPTIONAL - Requests
   request_in_flight_limit = 10 # default
@@ -103,24 +90,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    # REQUIRED - Password
     password = "password" # example
-    
-    # REQUIRED - User
     user = "username" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    # OPTIONAL - Max size
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    
-    # OPTIONAL - Num items
-    num_items = 500 # default, events, relevant when type = "memory"
-    
-    # OPTIONAL - Type
     type = "memory" # default, enum
-    
-    # OPTIONAL - When full
+    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
   
   # OPTIONAL - Headers
@@ -130,22 +107,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    # OPTIONAL - Ca path
     ca_path = "/path/to/certificate_authority.crt" # example, no default
-    
-    # OPTIONAL - Crt path
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    
-    # OPTIONAL - Key pass
     key_pass = "PassWord1" # example, no default
-    
-    # OPTIONAL - Key path
     key_path = "/path/to/host_certificate.key" # example, no default
-    
-    # OPTIONAL - Verify certificate
     verify_certificate = true # default
-    
-    # OPTIONAL - Verify hostname
     verify_hostname = true # default
 ```
 
@@ -460,7 +426,7 @@ Options for custom headers. See [Authentication](#authentication) for more info.
   unit={null}
   >
 
-#### `&lt;header-key&gt;`
+#### `<header-key>`
 
 A custom header to be added to each outgoing HTTP request.
 

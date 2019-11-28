@@ -52,7 +52,7 @@ class Option
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    @category = hash["category"] || ((@options.empty? || inline?) ? "General" : @name.humanize)
+    @category = hash["category"] || ((@options.to_h.values.empty? || inline?) ? "General" : @name.humanize)
 
     if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")

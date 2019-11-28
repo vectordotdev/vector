@@ -43,13 +43,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Type
+  # REQUIRED
   type = "journald" # example, must be: "journald"
   
-  # OPTIONAL - Current boot only
+  # OPTIONAL
   current_boot_only = true # default
-  
-  # OPTIONAL - Units
   units = ["ntpd", "sysinit.target"] # default
 ```
 
@@ -60,22 +58,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Type
+  # REQUIRED
   type = "journald" # example, must be: "journald"
   
-  # OPTIONAL - Batch size
+  # OPTIONAL
   batch_size = 16 # default
-  
-  # OPTIONAL - Current boot only
   current_boot_only = true # default
-  
-  # OPTIONAL - Data dir
   data_dir = "/var/lib/vector" # example, no default
-  
-  # OPTIONAL - Local only
   local_only = true # default
-  
-  # OPTIONAL - Units
   units = ["ntpd", "sysinit.target"] # default
 ```
 

@@ -43,20 +43,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Include
+  # REQUIRED - General
+  type = "file" # example, must be: "file"
   include = ["/var/log/nginx/*.log"] # example
   
-  # REQUIRED - Type
-  type = "file" # example, must be: "file"
-  
-  # OPTIONAL - Ignore older
+  # OPTIONAL - General
   ignore_older = 86400 # example, no default, seconds
+  start_at_beginning = true # default
   
   # OPTIONAL - Priority
   oldest_first = true # default
-  
-  # OPTIONAL - Start at beginning
-  start_at_beginning = true # default
 ```
 
 </TabItem>
@@ -66,30 +62,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Include
+  # REQUIRED - General
+  type = "file" # example, must be: "file"
   include = ["/var/log/nginx/*.log"] # example
   
-  # REQUIRED - Type
-  type = "file" # example, must be: "file"
+  # OPTIONAL - General
+  data_dir = "/var/lib/vector" # example, no default
+  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
+  glob_minimum_cooldown = 1000 # default, milliseconds
+  ignore_older = 86400 # example, no default, seconds
+  max_line_bytes = 102400 # default, bytes
+  start_at_beginning = true # default
   
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
-  
-  # OPTIONAL - Data dir
-  data_dir = "/var/lib/vector" # example, no default
-  
-  # OPTIONAL - Exclude
-  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
-  
-  # OPTIONAL - Glob minimum cooldown
-  glob_minimum_cooldown = 1000 # default, milliseconds
-  
-  # OPTIONAL - Ignore older
-  ignore_older = 86400 # example, no default, seconds
-  
-  # OPTIONAL - Max line bytes
-  max_line_bytes = 102400 # default, bytes
   
   # OPTIONAL - Multi-line
   message_start_indicator = "^(INFO|ERROR)" # example, no default
@@ -99,19 +86,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   max_read_bytes = 2048 # default, bytes
   oldest_first = true # default
   
-  # OPTIONAL - Start at beginning
-  start_at_beginning = true # default
-  
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
-    # OPTIONAL - Fingerprint bytes
-    fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
-    
-    # OPTIONAL - Ignored header bytes
-    ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
-    
-    # OPTIONAL - Strategy
     strategy = "checksum" # default, enum
+    fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
+    ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
 ```
 
 </TabItem>

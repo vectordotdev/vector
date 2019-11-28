@@ -28,13 +28,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - Type
+  # REQUIRED
   type = "docker" # example, must be: "docker"
   
-  # OPTIONAL - Include containers
+  # OPTIONAL
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
-  
-  # OPTIONAL - Include labels
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
 

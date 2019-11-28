@@ -43,20 +43,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Inputs
-  inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Namespace
-  namespace = "service" # example
-  
-  # REQUIRED - Region
-  region = "us-east-1" # example
-  
-  # REQUIRED - Type
   type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"] # example
+  endpoint = "127.0.0.0:5000" # example
+  namespace = "service" # example
+  region = "us-east-1" # example
 ```
 
 </TabItem>
@@ -66,22 +57,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - Endpoint
-  endpoint = "127.0.0.0:5000" # example
-  
-  # REQUIRED - Inputs
+  # REQUIRED
+  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
-  
-  # REQUIRED - Namespace
+  endpoint = "127.0.0.0:5000" # example
   namespace = "service" # example
-  
-  # REQUIRED - Region
   region = "us-east-1" # example
   
-  # REQUIRED - Type
-  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
-  
-  # OPTIONAL - Healthcheck
+  # OPTIONAL
   healthcheck = true # default
 ```
 
