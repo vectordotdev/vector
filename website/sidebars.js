@@ -125,6 +125,8 @@ module.exports = {
               "reference/sources/socket",
             
               "reference/sources/splunk_hec",
+
+              "reference/sources/prometheus",
             
               "reference/sources/statsd",
             

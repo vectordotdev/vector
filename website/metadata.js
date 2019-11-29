@@ -18126,6 +18126,31 @@ module.exports = {
       "beta": false,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec].",
+    "prometheus": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "receive",
+      "id": "prometheus_source",
+      "name": "prometheus",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "statsd": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams metric events to [StatsD][urls.statsd] metrics service.",
       "event_types": [
         "log"
       ],

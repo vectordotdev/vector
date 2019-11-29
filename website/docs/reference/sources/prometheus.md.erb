@@ -1,0 +1,34 @@
+<%- component = metadata.sources.prometheus -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+## Output
+
+<%= source_output(:metric, component.output.metric, heading_depth: 3) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Timestamp
+
+You'll notice that each metric contains a `timestamp` field. This is an optional
+descriptive field that represents when the metric was received. It helps to
+more closely represent the metric's time in situations here it can be used. See
+the [metric][docs.data-model.metric] data model page for more info.
+
+

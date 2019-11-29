@@ -1,0 +1,62 @@
+[sources.prometheus]
+beta = true
+common = false
+delivery_guarantee = "best_effort"
+function_category = "receive"
+guides = []
+output_types = ["metric"]
+resources = []
+through_description = "the Prometheus text exposition format"
+
+[sources.prometheus.options.host]
+type = "string"
+common = true
+null = false
+examples = ["http://localhost:9090"]
+description = "Host address to scrape metrics from."
+
+[sources.prometheus.options.scrape_interval_secs]
+type = "int"
+common = true
+null = false
+examples = [1]
+description = "The interval between scrapes in seconds."
+
+[[sources.prometheus.output.metric.examples]]
+label = "Counter"
+input = """\
+# TYPE promhttp_metric_handler_requests_total counter\
+promhttp_metric_handler_requests_total{code="200"} 100\
+"""
+output = """\
+{
+  "name": "promhttp_metric_handler_requests_total",
+  "kind": "absolute",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "tags": {
+    "code": "200"
+  },
+  "value": {
+    "type": "counter",
+    "value": 100.0
+  }
+}\
+"""
+
+[[sources.prometheus.output.metric.examples]]
+label = "Gauge"
+input = """\
+prometheus_remote_storage_samples_in_total 57011636\
+"""
+output = """\
+{
+  "name": "prometheus_remote_storage_samples_in_total",
+  "kind": "absolute",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "tags": null,
+  "value": {
+    "type": "gauge",
+    "value": 57011636.0
+  }
+}\
+"""
