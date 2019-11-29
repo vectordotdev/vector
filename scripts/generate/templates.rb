@@ -486,6 +486,12 @@ class Templates
         path = DOCS_BASE_PATH + f.gsub(DOCS_ROOT, '').split(".").first
         name = File.basename(f).split(".").first.gsub("-", " ").humanize
 
+        front_matter = FrontMatterParser::Parser.parse_file(f).front_matter
+        sidebar_label = front_matter.fetch("sidebar_label", "hidden")
+        if sidebar_label != "hidden"
+          name = sidebar_label
+        end
+
         "<Jump to=\"#{path}\">#{name}</Jump>"
       end.
       join("\n")
