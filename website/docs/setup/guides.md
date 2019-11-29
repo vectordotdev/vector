@@ -16,6 +16,7 @@ import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/setup/guides/getting-started">Getting started</Jump>
 <Jump to="/docs/setup/guides/troubleshooting">Troubleshooting</Jump>
+<Jump to="/docs/setup/guides/unit-testing">Unit testing</Jump>
 
 
 
