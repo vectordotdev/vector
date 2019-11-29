@@ -8,6 +8,26 @@ install-rust: &install-rust
     command: |
       curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
+upgrade-docker: &upgrade-docker
+  run:
+    name: Upgrade Docker
+    command: |
+      sudo apt-get remove docker docker-engine docker.io containerd runc
+      sudo apt-get update
+      sudo apt-get install \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg-agent \
+        software-properties-common
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+      sudo add-apt-repository \
+       "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+       $(lsb_release -cs) \
+       stable"
+      sudo apt-get update
+      sudo apt-get install docker-ce docker-ce-cli containerd.io
+
 install-vector: &install-vector
   run:
     name: Execute install.sh
@@ -482,13 +502,14 @@ jobs:
             EOF
 
   verify-docker:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    resource_class: large
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
       - checkout
       - *restore-artifacts-from-workspace
+      - *upgrade-docker
       - run:
           name: Build & verify Docker
           command: |
@@ -659,13 +680,16 @@ jobs:
   #
 
   release-docker:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    resource_class: large
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - checkout
       - *restore-artifacts-from-workspace
+      - *upgrade-docker
       - run:
           name: Release Docker
           command: |
@@ -817,6 +841,8 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm
@@ -892,7 +918,8 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
@@ -977,6 +1004,8 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm

@@ -16,12 +16,13 @@ source_url: https://github.com/timberio/vector/tree/master/distribution/docker
 
 Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
 available on [Docker Hub][urls.docker_hub_vector] which come pre-installed
-with Vector and any recommended system dependencies.
+with Vector and any recommended system dependencies. These images are available
+for x86_64, ARM64, and ARMv7 architectures.
 
 ## Running
 
 ```bash
-docker run timberio/vector:latest-alpine
+docker run timberio/vector:0.5.0-alpine
 ```
 
 * The `vector` binary is located at `/usr/local/bin/vector`, which should be in your `$PATH`.
@@ -38,7 +39,7 @@ To use your own configuration file:
 2. Run the Vector Docker image with the following command:
 
    ```bash
-   docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest-alpine
+   docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:0.5.0-alpine
    ```
 
    Modify `$PWD` to the directory where you store your local `vector.toml` file.
@@ -53,7 +54,7 @@ smaller in size than other Docker images and statically links libraries. This
 is the image we recommend due to it's small size and reliability.
 
 ```bash
-docker run timberio/vector:latest-alpine
+docker run timberio/vector:0.5.0-alpine
 ```
 
 ### debian
@@ -62,7 +63,7 @@ This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
 ```bash
-docker run timberio/vector:latest-debian
+docker run timberio/vector:0.5.0-debian
 ```
 
 ## Versions
@@ -92,24 +93,36 @@ Vector's releases nightly versions that contain the latest changes.
 docker run timberio/vector:nightly-alpine
 ```
 
-## Updating
-
-Simply run the with the `latest` tag:
+Historical nightly versions are also available:
 
 ```bash
-docker run timberio/vector:latest-alpine
+docker run timberio/vector:nightly-<YYYY-MM-DD>-alpine
 ```
 
-Or specify the exact version:
+## Updating
+
+Simply run with newer version in the tag:
 
 ```bash
 docker run timberio/vector:X.X.X-alpine
 ```
 
-Or specify the nigtly version:
+Or pull the newest latest version:
 
 ```bash
-docker run timberio/vector:nightly-alpine
+docker pull timberio/vector:latest-alpine && docker run timberio/vector:latest-alpine
+```
+
+Or run with newer nightly date in the tag:
+
+```bash
+docker run timberio/vector:nightly-<YYYY-MM-DD>-alpine
+```
+
+Or pull the newest nightly version:
+
+```bash
+docker pull timberio/vector:nightly-alpine && docker run timberio/vector:nightly-alpine
 ```
 
 ## Source Files
