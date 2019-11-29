@@ -11,7 +11,7 @@ import classnames from 'classnames';
 import queryString from 'query-string';
 
 function Tabs(props) {
-  const {block, centered, children, defaultValue, values, urlKey} = props;
+  const {block, centered, children, defaultValue, style, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -29,7 +29,9 @@ function Tabs(props) {
         <ul
           className={classnames('tabs', props.className, {
             'tabs--block': block,
-          })}>
+          })}
+          style={style}
+          >
           {values.map(({value, label}) => (
             <li
               className={classnames('tab-item', {

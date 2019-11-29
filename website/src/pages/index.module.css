@@ -240,9 +240,13 @@ html[data-theme="dark"] .hero {
  * Topology Section
  */
 
+ .topology {
+  text-align: center;
+ }
+
 .topologyDiagram {
   display: block;
-  margin: var(--ifm-heading-margin-bottom) auto 0 auto;
+  margin: var(--ifm-heading-margin-bottom) auto;
   max-height: 300px;
   max-width: 900px;
 }

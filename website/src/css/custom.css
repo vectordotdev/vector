@@ -962,15 +962,20 @@ ul.tabs.mini li.tab-item.tab-item--active {
   color: var(--ifm-color-primary);
 }
 ul.tabs.rounded {
-  border-radius: var(--ifm-global-radius);
+  border: 0px none;
+  border-radius: 2em;
+  display: inline-flex !important;
   font-size: 1em;
   font-weight: normal;
-  padding: 6px 7px;
+  margin: 0 auto;
+  padding: 6px;
 }
 ul.tabs.rounded li.tab-item {
   border: 0px none;
-  border-radius: calc( var(--ifm-global-radius) - 2px );
+  border-radius: 2em;
+  flex: 1 1 0%;
   padding: 0px 10px;
+  white-space: nowrap;
 }
 ul.tabs.rounded li.tab-item.tab-item--active {
   border: 0px none;

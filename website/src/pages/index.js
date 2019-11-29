@@ -312,27 +312,36 @@ function Topologies() {
   return (
     <section className="topologies">
       <div className="container">
-        <AnchoredH2 id="configuration">One Tool For Any Topology</AnchoredH2>
+        <AnchoredH2 id="topologies">One Tool For Any Topology</AnchoredH2>
         <div className="sub-title">One tool, one mental model, gets data from A to B</div>
 
         <Tabs
           centered={true}
-          className="mini"
+          className="rounded"
+          style={{minWidth: "500px"}}
           defaultValue="centralized"
           values={[
             { label: <><i className="feather icon-shuffle"></i> Distributed</>, value: 'distributed', },
             { label: <><i className="feather icon-box"></i> Centralized</>, value: 'centralized', },
             { label: <><i className="feather icon-shield"></i> Stream-based</>, value: 'stream-based', },
-          ]
-        }>
+          ]}>
           <TabItem value="distributed">
-            <SVG src="/img/topologies-distributed.svg" className={styles.topologyDiagram} />
+            <div className={styles.topology}>
+              <SVG src="/img/topologies-distributed.svg" className={styles.topologyDiagram} />
+              <Link to="/docs/setup/deployment/topologies#distributed">Learn more about the distributed topology</Link>
+            </div>
           </TabItem>
           <TabItem value="centralized">
-            <SVG src="/img/topologies-centralized.svg" className={styles.topologyDiagram} />
+            <div className={styles.topology}>
+              <SVG src="/img/topologies-centralized.svg" className={styles.topologyDiagram} />
+              <Link to="/docs/setup/deployment/topologies#centralized">Learn more about the centralized topology</Link>
+            </div>
           </TabItem>
           <TabItem value="stream-based">
-            <SVG src="/img/topologies-stream-based.svg" className={styles.topologyDiagram} />
+            <div className={styles.topology}>
+              <SVG src="/img/topologies-stream-based.svg" className={styles.topologyDiagram} />
+              <Link to="/docs/setup/deployment/topologies#stream-based">Learn more about the stream-based topology</Link>
+            </div>
           </TabItem>
         </Tabs>
       </div>
