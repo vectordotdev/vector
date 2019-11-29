@@ -38,3 +38,35 @@ common = true
 examples = ["topic-1234"]
 null = false
 description = "The Kafka topic name to write events to."
+
+[sinks.kafka.options.sasl]
+type = "table"
+null = true
+description = "Options for SASL/SCRAM authentication support"
+
+[sinks.kafka.options.sasl.options.enabled]
+type = "bool"
+null = true
+default = false
+description = "Enable SASL/SCRAM authentication to the remote."
+
+[sinks.kafka.options.sasl.options.username]
+type = "string"
+common = true
+examples = ["username"]
+null = false
+description = "The Kafka SASL/SCRAM authentication username."
+
+[sinks.kafka.options.sasl.options.password]
+type = "string"
+common = true
+examples = ["password"]
+null = false
+description = "The Kafka SASL/SCRAM authentication password."
+
+[sinks.kafka.options.sasl.options.mechanism]
+type = "string"
+common = true
+examples = ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+null = false
+description = "The Kafka SASL/SCRAM mechanisms."

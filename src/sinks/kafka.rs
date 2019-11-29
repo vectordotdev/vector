@@ -36,6 +36,7 @@ pub struct KafkaSinkConfig {
     key_field: Option<Atom>,
     encoding: Encoding,
     tls: Option<KafkaSinkTlsConfig>,
+    sasl: Option<KafkaSaslConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -50,6 +51,14 @@ pub struct KafkaSinkTlsConfig {
     enabled: Option<bool>,
     #[serde(flatten)]
     options: TlsOptions,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct KafkaSaslConfig {
+    enabled: Option<bool>,
+    username: Option<String>,
+    password: Option<String>,
+    mechanism: Option<String>,
 }
 
 pub struct KafkaSink {
@@ -91,12 +100,10 @@ impl KafkaSinkConfig {
         let mut client_config = rdkafka::ClientConfig::new();
         let bs = self.bootstrap_servers.join(",");
         client_config.set("bootstrap.servers", &bs);
+
+        let mut tls_enabled = false;
         if let Some(ref tls) = self.tls {
-            let enabled = tls.enabled.unwrap_or(false);
-            client_config.set(
-                "security.protocol",
-                if enabled { "ssl" } else { "plaintext" },
-            );
+            tls_enabled = tls.enabled.unwrap_or(true);
             if let Some(ref path) = tls.options.ca_path {
                 client_config.set("ssl.ca.location", pathbuf_to_string(&path)?);
             }
@@ -110,6 +117,27 @@ impl KafkaSinkConfig {
                 client_config.set("ssl.keystore.password", pass);
             }
         }
+
+        let mut sasl_enabled = false;
+        if let Some(ref sasl) = self.sasl {
+            sasl_enabled = sasl.enabled.unwrap_or(true);
+            if let Some(ref username) = sasl.username {
+                client_config.set("sasl.username", username);
+            }
+            if let Some(ref password) = sasl.password {
+                client_config.set("sasl.password", password);
+            }
+            if let Some(ref mechanism) = sasl.mechanism {
+                client_config.set("sasl.mechanism", mechanism);
+            }
+        }
+
+        let security_protocol = if tls_enabled && sasl_enabled { "sasl_ssl" }
+        else if tls_enabled && !sasl_enabled { "ssl" }
+        else if !tls_enabled && sasl_enabled { "sasl_plaintext" }
+        else { "plaintext" };
+        client_config.set("security.protocol", security_protocol);
+
         Ok(client_config)
     }
 }
@@ -337,6 +365,7 @@ mod integration_test {
             encoding: Encoding::Text,
             key_field: None,
             tls,
+            sasl: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
