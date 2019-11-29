@@ -42,7 +42,7 @@ pub struct ElasticSearchConfig {
     // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
 

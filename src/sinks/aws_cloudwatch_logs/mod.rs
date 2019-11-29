@@ -62,7 +62,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_stream: Option<bool>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
 }
 

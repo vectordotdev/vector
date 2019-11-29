@@ -47,7 +47,7 @@ pub struct HttpSinkConfig {
     pub encoding: Encoding,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }

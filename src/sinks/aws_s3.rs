@@ -49,7 +49,7 @@ pub struct S3SinkConfig {
     pub compression: Compression,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
 }
 

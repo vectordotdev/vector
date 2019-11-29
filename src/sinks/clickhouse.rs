@@ -30,7 +30,7 @@ pub struct ClickhouseConfig {
     pub basic_auth: Option<ClickHouseBasicAuthConfig>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }

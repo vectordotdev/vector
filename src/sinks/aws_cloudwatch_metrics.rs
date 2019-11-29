@@ -31,7 +31,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub region: RegionOrEndpoint,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
 }
 

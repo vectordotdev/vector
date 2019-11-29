@@ -37,7 +37,7 @@ pub struct KinesisSinkConfig {
     pub encoding: Encoding,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub request: TowerRequestConfig,
 }
 
