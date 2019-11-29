@@ -10,7 +10,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::{BufMut, BytesMut};
-use futures::{stream::iter_ok, Future, Sink};
+use futures::{stream::iter_ok, Future, Sink, Stream};
 use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr, scopes::Scope};
 use http::{Method, Uri};
 use hyper::{
@@ -21,7 +21,9 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tokio::timer::Interval;
 use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -148,11 +150,20 @@ impl PubsubConfig {
 
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client = Client::builder().build(https);
+        let creds = creds.clone();
         let healthcheck = client
             .request(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => Ok(()),
+                hyper::StatusCode::OK => {
+                    // If there are credentials configured, the
+                    // generated token needs to be periodically
+                    // regenerated.
+                    // This is a bit of a hack, but I'm not sure where
+                    // else to reliably spawn the regeneration task.
+                    creds.map(|creds| creds.spawn_regenerate_token());
+                    Ok(())
+                }
                 status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             });
 
@@ -177,26 +188,56 @@ impl PubsubConfig {
 #[derive(Clone)]
 struct PubsubCreds {
     creds: Credentials,
-    token: Token,
+    token: Arc<RwLock<Token>>,
 }
 
 impl PubsubCreds {
     fn new(path: &str) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentials)?;
-        let claims = JwtClaims::new(creds.iss(), &Scope::PubSub, creds.token_uri(), None, None);
-        let rsa_key = creds.rsa_key().context(InvalidRsaKey)?;
-        let jwt = Jwt::new(claims, rsa_key, None);
+        let jwt = make_jwt(&creds)?;
         let token = goauth::get_token_with_creds(&jwt, &creds).context(GetTokenFailed)?;
-        // FIXME: Schedule a token renewal in `token.expires_in() / 2` seconds
+        let token = Arc::new(RwLock::new(token));
         Ok(Self { creds, token })
     }
 
     fn apply<T>(&self, request: &mut Request<T>) {
-        let value = format!("{} {}", self.token.token_type(), self.token.access_token());
+        let token = self.token.read().unwrap();
+        let value = format!("{} {}", token.token_type(), token.access_token());
         request
             .headers_mut()
             .insert(AUTHORIZATION, HeaderValue::from_str(&value).unwrap());
     }
+
+    fn regenerate_token(&self) -> crate::Result<()> {
+        let jwt = make_jwt(&self.creds).unwrap(); // Errors caught above
+        let token = goauth::get_token_with_creds(&jwt, &self.creds)?;
+        *self.token.write().unwrap() = token;
+        Ok(())
+    }
+
+    fn spawn_regenerate_token(&self) {
+        let interval = self.token.read().unwrap().expires_in() as u64 / 2;
+        let copy = self.clone();
+        let renew_task = Interval::new_interval(Duration::from_secs(interval))
+            .for_each(move |_instant| {
+                debug!("Renewing GCP pubsub token");
+                if let Err(error) = copy.regenerate_token() {
+                    error!(message = "Failed to update GCP pubsub token", %error);
+                }
+                Ok(())
+            })
+            .map_err(
+                |error| error!(message = "GCP pubsub token regenerate interval failed", %error),
+            );
+
+        tokio::spawn(renew_task);
+    }
+}
+
+fn make_jwt(creds: &Credentials) -> crate::Result<Jwt<JwtClaims>> {
+    let claims = JwtClaims::new(creds.iss(), &Scope::PubSub, creds.token_uri(), None, None);
+    let rsa_key = creds.rsa_key().context(InvalidRsaKey)?;
+    Ok(Jwt::new(claims, rsa_key, None))
 }
 
 fn make_body(logs: Vec<u8>) -> Vec<u8> {
