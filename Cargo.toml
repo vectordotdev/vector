@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.4.0-dev"
+version = "0.6.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
@@ -23,6 +23,7 @@ assets = [
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
+extended-description-file = "target/debian-extended-description.txt"
 
 [workspace]
 members = [
@@ -83,7 +84,6 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # External libs
-atty = "0.2"
 derivative = "1.0"
 chrono = "0.4.6"
 rand = "0.5.5"
@@ -94,7 +94,7 @@ prometheus = "0.4.2"
 hyper = "0.12.35"
 hyper-tls = "0.3.2"
 native-tls = "0.2.3"
-openssl = "0.10.25"
+openssl = "0.10.26"
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
@@ -106,10 +106,10 @@ toml = "0.4"
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
-leveldb = { version = "0.8.4", optional = true }
+leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.2.1"
-rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", features = ["ssl"], optional = true }
+rdkafka = { git = "https://github.com/timberio/rust-rdkafka", features = ["ssl"], optional = true }
 hostname = "0.1.5"
 seahash = "3.0.6"
 jemallocator = { version = "0.3.0", optional = true }
@@ -121,12 +121,21 @@ grok = "~1.0.1"
 nom = "5.0.0"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 exitcode = "1.1.2"
-snafu = "0.4.3"
+snafu = { version = "0.4.3", features = ["futures-01"] }
 url = "1.7"
 base64 = "0.10.1"
-shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
+shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber", default-features = false, features = ["tls"] }
 owning_ref = "0.4.0"
+trust-dns-resolver = { version = "0.12", features = ["serde-config"]}
+trust-dns-proto = { version = "0.8" }
 listenfd = "0.3.3"
+inventory = "0.1"
+maxminddb = "0.13.0"
+strip-ansi-escapes = "0.1.0"
+colored = "1.9"
+
+[target.'cfg(unix)'.dependencies]
+atty = "0.2"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -139,15 +148,18 @@ reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
-elastic = { git = "https://github.com/elastic-rs/elastic" }
+elastic_responses = "0.20"
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
 proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
+trust-dns-server = "0.17.0"
+trust-dns = "0.17.0"
+trust-dns-proto = "0.8.0"
 
 [features]
-default = ["rdkafka", "leveldb", "jemallocator"]
+default = ["rdkafka", "leveldb", "leveldb/leveldb-sys-2", "shiplift/unix-socket", "jemallocator", "openssl/vendored"]
 docker = [
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
@@ -168,6 +180,7 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
+nightly = []
 
 [[bench]]
 name = "bench"

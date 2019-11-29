@@ -2,6 +2,7 @@ pub mod builder;
 pub mod config;
 mod fanout;
 mod task;
+pub mod unit_test;
 
 pub use self::config::Config;
 
@@ -164,6 +165,11 @@ impl RunningTopology {
     ) -> bool {
         if self.config.global.data_dir != new_config.global.data_dir {
             error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.data_dir);
+            return false;
+        }
+
+        if self.config.global.dns_servers != new_config.global.dns_servers {
+            error!("dns_servers cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.dns_servers);
             return false;
         }
 

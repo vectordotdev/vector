@@ -1,4 +1,9 @@
-use crate::{event::Event, sinks, sources, transforms};
+use crate::{
+    conditions,
+    event::{Event, Metric},
+    sinks, sources, transforms,
+};
+use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -6,6 +11,7 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
+pub mod component;
 mod validation;
 mod vars;
 
@@ -20,15 +26,19 @@ pub struct Config {
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
+    #[serde(default)]
+    pub tests: Vec<TestDefinition>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub dns_servers: Vec<String>,
 }
 
-fn default_data_dir() -> Option<PathBuf> {
+pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
@@ -119,6 +129,10 @@ pub trait SourceConfig: core::fmt::Debug {
     fn source_type(&self) -> &'static str;
 }
 
+pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
+
+inventory::collect!(SourceDescription);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
     #[serde(default)]
@@ -142,6 +156,10 @@ pub trait SinkConfig: core::fmt::Debug {
     fn sink_type(&self) -> &'static str;
 }
 
+pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
+
+inventory::collect!(SinkDescription);
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
     pub inputs: Vec<String>,
@@ -160,14 +178,68 @@ pub trait TransformConfig: core::fmt::Debug {
     fn transform_type(&self) -> &'static str;
 }
 
+pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
+
+inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestDefinition {
+    pub name: String,
+    pub input: TestInput,
+    pub outputs: Vec<TestOutput>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(untagged)]
+pub enum TestInputValue {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestInput {
+    pub insert_at: String,
+    #[serde(default = "default_test_input_type", rename = "type")]
+    pub type_str: String,
+    pub value: Option<String>,
+    pub log_fields: Option<IndexMap<String, TestInputValue>>,
+    pub metric: Option<Metric>,
+}
+
+fn default_test_input_type() -> String {
+    "raw".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestOutput {
+    pub extract_from: String,
+    pub conditions: Vec<TestCondition>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TestCondition {
+    String(String),
+    Embedded(Box<dyn conditions::ConditionConfig>),
+}
+
 // Helper methods for programming construction during tests
 impl Config {
     pub fn empty() -> Self {
         Self {
-            global: GlobalOptions { data_dir: None },
+            global: GlobalOptions {
+                data_dir: None,
+                dns_servers: Vec::new(),
+            },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
+            tests: Vec::new(),
         }
     }
 

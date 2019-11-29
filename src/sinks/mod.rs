@@ -32,6 +32,8 @@ pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
 enum BuildError {
     #[snafu(display("Unable to resolve DNS for {:?}", address))]
     DNSFailure { address: String },
+    #[snafu(display("DNS errored {}", source))]
+    DNSError { source: crate::dns::DnsError },
     #[snafu(display("Socket address problem: {}", source))]
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]

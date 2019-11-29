@@ -3,13 +3,14 @@
 require_relative "component"
 
 class Sink < Component
-  EGRESS_METHODS = ["batching", "exposing", "streaming"]
+  EGRESS_METHODS = ["batching", "exposing", "streaming"].freeze
 
   attr_reader :buffer,
     :delivery_guarantee,
     :egress_method,
     :input_types,
     :healthcheck,
+    :output,
     :service_limits_short_link,
     :service_provider,
     :tls,
@@ -26,6 +27,7 @@ class Sink < Component
     encodings = hash["encodings"]
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
+    @output = OpenStruct.new
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
     tls_options = hash["tls_options"]
@@ -43,15 +45,26 @@ class Sink < Component
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end
 
+    # output
+
+    output = hash["output"] || {}
+    @output.examples = (output["examples"] || []).collect do |e|
+      s = OpenStruct.new(e)
+      s.input = OpenStruct.new(s.input) if s.input
+      s.output = OpenStruct.new(s.output) if s.output
+      s
+    end
+
     # Healthcheck option
 
-    @options.healthcheck = Option.new({
-      "name" => "healthcheck",
-      "default" => true,
-      "description" => "Enables/disables the sink healthcheck upon start.",
-      "null" => false,
-      "type" => "bool"
-    })
+    @options.healthcheck =
+      Option.new({
+        "name" => "healthcheck",
+        "default" => true,
+        "description" => "Enables/disables the sink healthcheck upon start.",
+        "null" => false,
+        "type" => "bool"
+      })
 
     # Compression option
 
@@ -99,12 +112,33 @@ class Sink < Component
     # Endpoint option
 
     if service_provider == "AWS"
-      @options.hostname =
+      @env_vars.AWS_ACCESS_KEY_ID =
         Option.new({
-          "name" => "endpoint",
-          "examples" => ["127.0.0.0:5000"],
+          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
+          "examples" => ["AKIAIOSFODNN7EXAMPLE"],
+          "name" => "AWS_ACCESS_KEY_ID",
+          "null" => false,
+          "optional" => true,
+          "type" => "string"
+        })
+
+      @env_vars.AWS_SECRET_ACCESS_KEY =
+        Option.new({
+          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
+          "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
+          "name" => "AWS_SECRET_ACCESS_KEY",
+          "null" => false,
+          "optional" => true,
+          "type" => "string"
+        })
+
+      @options.endpoint =
+        Option.new({
           "description" => "Custom endpoint for use with AWS-compatible services.",
-          "null" => true,
+          "examples" => ["127.0.0.0:5000"],
+          "name" => "endpoint",
+          "null" => false,
+          "optional" => true,
           "type" => "string"
         })
     end
@@ -150,7 +184,7 @@ class Sink < Component
 
       buffer_options["num_items"] =
         {
-          "description" => "The maximum number of [events][docs.event] allowed in the buffer.",
+          "description" => "The maximum number of [events][docs.data-model#event] allowed in the buffer.",
           "default" => 500,
           "null" => true,
           "relevant_when" => {"type" => "memory"},

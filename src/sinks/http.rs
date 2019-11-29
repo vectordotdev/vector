@@ -5,9 +5,9 @@ use crate::{
         http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -45,10 +45,10 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -77,6 +77,7 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Ndjson,
+    Json,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -84,6 +85,10 @@ pub enum Encoding {
 pub struct BasicAuth {
     user: String,
     password: String,
+}
+
+inventory::submit! {
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
 #[typetag::serde(name = "http")]
@@ -122,8 +127,7 @@ fn http(
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
 
     let timeout = config.request_timeout_secs.unwrap_or(30);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
@@ -145,7 +149,7 @@ fn http(
     let http_service =
         HttpService::builder()
             .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
+            .build(move |mut body: Vec<u8>| {
                 let mut builder = hyper::Request::builder();
 
                 let method = match method {
@@ -160,6 +164,12 @@ fn http(
                 match encoding {
                     Encoding::Text => builder.header("Content-Type", "text/plain"),
                     Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+                    Encoding::Json => {
+                        body.insert(0, b'[');
+                        body.pop(); // remove trailing comma from last record
+                        body.push(b']');
+                        builder.header("Content-Type", "application/json")
+                    }
                 };
 
                 if gzip {
@@ -190,11 +200,7 @@ fn http(
 
     let encoding = config.encoding.clone();
     let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))
@@ -264,10 +270,12 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let event = event.into_log();
 
-    let mut body = match encoding {
+    let body = match encoding {
         Encoding::Text => {
             if let Some(v) = event.get(&event::MESSAGE) {
-                v.to_string_lossy().into_bytes()
+                let mut b = v.to_string_lossy().into_bytes();
+                b.push(b'\n');
+                b
             } else {
                 warn!(
                     message = "Event missing the message key; Dropping event.",
@@ -277,12 +285,22 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
             }
         }
 
-        Encoding::Ndjson => serde_json::to_vec(&event.unflatten())
-            .map_err(|e| panic!("Unable to encode into JSON: {}", e))
-            .ok()?,
-    };
+        Encoding::Ndjson => {
+            let mut b = serde_json::to_vec(&event.unflatten())
+                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                .ok()?;
+            b.push(b'\n');
+            b
+        }
 
-    body.push(b'\n');
+        Encoding::Json => {
+            let mut b = serde_json::to_vec(&event.unflatten())
+                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                .ok()?;
+            b.push(b',');
+            b
+        }
+    };
 
     Some(body)
 }
@@ -391,7 +409,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -449,7 +467,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -507,7 +525,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
         drop(trigger);
 
         let output_lines = rx

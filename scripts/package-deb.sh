@@ -12,8 +12,14 @@ project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 absolute_archive_path="$project_root/$archive_path"
-
+package_version="$($project_root/scripts/version.sh)"
 echo "Packaging .deb for $archive_name"
+
+# Rename the rust-toolchain file so that we can use our custom version of rustc installed
+# on release containers.
+on_exit="mv rust-toolchain.bak rust-toolchain"
+trap "$on_exit" EXIT
+mv rust-toolchain rust-toolchain.bak
 
 # Unarchive the tar since cargo deb wants direct access to the files.
 td=$(mktemp -d)
@@ -24,6 +30,12 @@ mv vector-$TARGET/bin/vector $project_root/target/$TARGET/release
 popd
 rm -rf $td
 
+# Create short plain-text extended description for the package
+cmark-gfm $project_root/README.md --to commonmark | # expand link aliases
+  sed '/^## /Q' | # select text before first header
+  cmark-gfm --to plaintext | # convert to plain text
+  fmt -uw 80 > $project_root/target/debian-extended-description.txt
+
 # Build the deb
 #
 #   --target
@@ -32,7 +44,7 @@ rm -rf $td
 #
 #   --no-build
 #     because this stop should follow a build
-cargo deb --target $TARGET --deb-version $VERSION --no-build
+cargo deb --target $TARGET --deb-version $package_version --no-build
 
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.

@@ -1,0 +1,46 @@
+This component outputs [`<%= type %>` events][docs.data-model.<%= type %>].
+<%- if examples.any? -%>
+<%- if examples.size > 1 -%>
+
+<Tabs
+  block={true}
+  defaultValue="<%= examples.first.label.parameterize %>"
+  values={<%= examples.collect { |e| {label: e.label, value: e.label.parameterize} }.to_json %>}>
+<%- end -%>
+<%- examples.each do |example| -%>
+<%- if examples.size > 1 -%>
+
+<TabItem value="<%= example.label.parameterize %>">
+<%- end -%>
+
+Given the following input:
+
+```
+<%= example.input %>
+```
+
+A [`<%= type %>` event][docs.data-model.<%= type %>] will be output with the
+following structure:
+
+```json
+<%= example.output %>
+```
+<%- if examples.size > 1 -%>
+
+</TabItem>
+<%- end -%>
+<%- end -%>
+<%- if examples.size > 1 -%>
+</Tabs>
+<%- end -%>
+
+<%- else -%>
+For example:
+
+<%= fields_example(fields, breakout_top_keys: breakout_top_keys) %>
+<%- end -%>
+<%- if fields.any? -%>
+More detail on the output schema is below.
+
+<%= fields(fields, heading_depth: heading_depth) %>
+<%- end -%>

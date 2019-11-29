@@ -3,7 +3,23 @@
 class Option
   include Comparable
 
-  TYPES = ["*", "bool", "float", "[float]", "int", "string", "[string]", "table", "[table]"]
+  TYPES = ["*", "bool", "float", "[float]", "int", "string", "[string]", "table", "[table]"].freeze
+
+  class << self
+    def build_struct(hash)
+      options = OpenStruct.new()
+
+      hash.each do |option_name, option_hash|
+        option = new(
+          option_hash.merge({"name" => option_name}
+        ))
+
+        options.send("#{option_name}=", option)
+      end
+
+      options
+    end
+  end
 
   attr_reader :name,
     :category,
@@ -21,33 +37,22 @@ class Option
     :unit
 
   def initialize(hash)
-    # Options can have sub-options (tables)
-    options_hashes = hash["options"]
-
-    if !options_hashes.nil?
-      @options =
-        options_hashes.collect do |sub_name, sub_hash|
-          self.class.new(sub_hash.merge("name" => sub_name))
-        end
-    else
-      @options = []
-    end
-
-    @name = hash.fetch("name")
+    @common = hash["common"] == true
     @default = hash["default"]
-    @display = hash["display"]
     @description = hash.fetch("description")
+    @display = hash["display"]
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @name = hash.fetch("name")
     @null = hash.fetch("null")
+    @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
-    @simple = hash["simple"] == true
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    @category = hash["category"] || ((@options.empty? || inline?) ? "General" : @name.humanize)
+    @category = hash["category"] || ((@options.to_h.values.empty? || inline?) ? "General" : @name.humanize)
 
     if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")
@@ -64,6 +69,8 @@ class Option
     if @examples.empty?
       if !@enum.nil?
         @examples = @enum.keys
+      elsif @type == "bool"
+        @examples = [true, false]
       elsif !@default.nil?
         @examples = [@default]
       end
@@ -80,20 +87,28 @@ class Option
     end
   end
 
-  def <=>(other_option)
-    name <=> other_option.name
+  def <=>(other)
+    name <=> other.name
   end
 
   def advanced?
     if options.any?
       options.any?(&:advanced?)
     else
-      !simple?
+      !common?
     end
   end
 
   def array?(inner_type)
     type == "[#{inner_type}]"
+  end
+
+  def common?
+    @common == true || required?
+  end
+
+  def common_options
+    @common_options ||= options.select(&:common?)
   end
 
   def config_file_sort_token
@@ -133,6 +148,10 @@ class Option
     category.downcase == "context"
   end
 
+  def eql?(other)
+    self.<=>(other) == 0
+  end
+
   def get_relevant_sections(sections)
     sections.select do |section|
       section.referenced_options.include?(name) ||
@@ -150,6 +169,10 @@ class Option
 
   def optional?
     !required?
+  end
+
+  def options_list
+    @options_list ||= @options.to_h.values.sort
   end
 
   def partition_key?
@@ -172,18 +195,6 @@ class Option
     default.nil? && null == false
   end
 
-  def simple?
-    if options.any?
-      @simple == true || (required? && simple_options.any?)
-    else
-      @simple == true || required?
-    end
-  end
-
-  def simple_options
-    @simple_options ||= options.select(&:simple?)
-  end
-
   def table?
     type == "table"
   end
@@ -192,7 +203,26 @@ class Option
     templateable == true
   end
 
+  def to_h
+    {
+      name: name,
+      category: category,
+      default: default,
+      description: description,
+      display: display,
+      enum: enum,
+      examples: examples,
+      null: null,
+      options: options,
+      partition_key: partition_key,
+      relevant_when: relevant_when,
+      templateable: templateable,
+      type: type,
+      unit: unit
+    }
+  end
+
   def wildcard?
-    name == "*"
+    name.start_with?("`<")
   end
 end

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::buffers::Acker;
-use vector::event::{Event, Metric, ValueKind, MESSAGE};
+use vector::event::{metric::MetricValue, Event, ValueKind, MESSAGE};
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
@@ -95,40 +95,40 @@ impl Transform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
             }
-            Event::Metric(Metric::Counter {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
-                *val += self.increase;
-            }
-            Event::Metric(Metric::Histogram {
-                name: _,
-                val,
-                sample_rate: _,
-                timestamp: _,
-                tags: _,
-            }) => {
-                *val += self.increase;
-            }
-            Event::Metric(Metric::Gauge {
-                name: _,
-                val,
-                direction: _,
-                timestamp: _,
-                tags: _,
-            }) => {
-                *val += self.increase;
-            }
-            Event::Metric(Metric::Set {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
-                val.push_str(&self.suffix);
-            }
+            Event::Metric(metric) => match metric.value {
+                MetricValue::Counter { ref mut value } => {
+                    *value += self.increase;
+                }
+                MetricValue::Distribution {
+                    ref mut values,
+                    ref mut sample_rates,
+                } => {
+                    values.push(self.increase);
+                    sample_rates.push(1);
+                }
+                MetricValue::AggregatedHistogram {
+                    ref mut count,
+                    ref mut sum,
+                    ..
+                } => {
+                    *count += 1;
+                    *sum += self.increase;
+                }
+                MetricValue::AggregatedSummary {
+                    ref mut count,
+                    ref mut sum,
+                    ..
+                } => {
+                    *count += 1;
+                    *sum += self.increase;
+                }
+                MetricValue::Gauge { ref mut value, .. } => {
+                    *value += self.increase;
+                }
+                MetricValue::Set { ref mut values, .. } => {
+                    values.insert(self.suffix.clone());
+                }
+            },
         };
         Some(event)
     }
