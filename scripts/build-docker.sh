@@ -4,13 +4,16 @@
 #
 # SUMMARY
 #
-#   Builds the Vector docker images
+#   Builds the Vector docker images and optionally
+#   pushes it to the Docker registry
 
 set -eux
 
 CHANNEL=$(scripts/util/release-channel.sh)
 VERSION=$(scripts/version.sh)
 DATE=$(date -u +%Y-%m-%d)
+PUSH=${PUSH:-}
+PLATFORM=${PLATFORM:-linux/amd64,linux/arm64,linux/arm}
 
 #
 # Functions
@@ -24,23 +27,7 @@ build() {
     --platform="$PLATFORM" \
     --tag timberio/vector:$version-$base \
     target/artifacts \
-    -f distribution/docker/$base/Dockerfile
-}
-
-verify() {
-  tag=$1
-  container_id=$(docker run -d $tag)
-  sleep 2
-  state=$(docker inspect $container_id -f {{.State.Running}})
-
-  if [[ "$state" != "true" ]]; then
-    echo "Docker container $tag failed to start"
-    exit 1
-  fi
-
-  docker stop $container_id
-
-  echo "Docker container $tag started successfully"
+    -f distribution/docker/$base/Dockerfile ${PUSH:+--push}
 }
 
 #
@@ -66,21 +53,3 @@ elif [[ "$CHANNEL" == "nightly" ]]; then
   build debian nightly
   build debian nightly-$DATE
 fi
-
-#
-# Verify
-#
-
-# Images built using `buildx` are invisible to `docker run`
-
-# if [[ "$CHANNEL" == "latest" ]]; then
-#   verify timberio/vector:$VERSION-alpine
-#   verify timberio/vector:latest-alpine
-#   verify timberio/vector:$VERSION-debian
-#   verify timberio/vector:latest-debian
-# elif [[ "$CHANNEL" == "nightly" ]]; then
-#   verify timberio/vector:nightly-alpine
-#   verify timberio/vector:nightly-$DATE-alpine
-#   verify timberio/vector:nightly-debian
-#   verify timberio/vector:nightly-$DATE-debian
-# fi
