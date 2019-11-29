@@ -129,6 +129,7 @@ jobs:
       - run:
           name: Build and test
           shell: bash
+          no_output_timeout: 30m
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
@@ -188,7 +189,8 @@ jobs:
           docker_layer_caching: true
       - run:
           name: Test
-          command: cargo test --all --features docker --jobs 4 -- --test-threads 4
+          no_output_timeout: 30m
+          command: cargo test --all --features docker --jobs 4
       - store_test_results:
           path: ./test-results
 
@@ -207,6 +209,7 @@ jobs:
       - *install-rust
       - run:
           name: Build archive
+          no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             make build-archive
@@ -256,6 +259,7 @@ jobs:
       - run:
           name: Build archive
           shell: bash
+          no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             function zip() {
@@ -286,6 +290,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
+          no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
@@ -306,6 +311,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
+          no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
@@ -326,6 +332,7 @@ jobs:
       - checkout
       - run:
           name: Build archive and .deb package
+          no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
