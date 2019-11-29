@@ -104,21 +104,29 @@ fn parse_tags(input: &str) -> Result<HashMap<String, String>, ParserError> {
     let input = input.trim();
     let mut result = HashMap::new();
 
+    if input.is_empty() {
+        return Ok(result);
+    }
+
     let pairs = input.split(',').collect::<Vec<_>>();
     for pair in pairs {
+        if pair.is_empty() {
+            continue;
+        }
         let pair = pair.trim();
         let parts = pair.split('=').collect::<Vec<_>>();
         if parts.len() != 2 {
             return Err(ParserError::Malformed("expected 2 values separated by '='"));
         }
-        let key = parts[0].to_string();
-        let mut value = parts[1];
+        let key = parts[0].trim().to_string();
+        let mut value = parts[1].trim();
         if value.starts_with('"') {
             value = &value[1..];
         };
         if value.ends_with('"') {
             value = &value[..value.len() - 1];
         };
+        let value = value.trim();
         let value = value.replace(r#"\\"#, "\\");
         let value = value.replace(r#"\n"#, "\n");
         let value = value.replace(r#"\""#, "\"");
@@ -141,7 +149,7 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
             ));
         };
 
-        let name = parts[0];
+        let name = parts[0].trim();
         let tags = parse_tags(parts[1])?;
         // second is value and optional timestamp
         let parts = &second[1..].trim().split(' ').collect::<Vec<_>>();
@@ -341,8 +349,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     }
 
                     let mut id: Vec<_> = tags.iter().collect();
+                    let (name, suffix) = (v[1], v[0]);
                     id.sort();
-                    let id = format!("{:?}{:?}", v[1], id);
+                    let id = format!("{:?}{:?}", name, id);
 
                     let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
                         name: v[1].to_owned(),
@@ -353,7 +362,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags,
                     });
 
-                    match v[0] {
+                    match suffix {
                         "bucket" => {
                             if let Some(b) = bucket {
                                 // last bucket is implicit, because we store its value in 'count'
@@ -553,6 +562,85 @@ mod test {
     }
 
     #[test]
+    fn test_counter_nan() {
+        let exp = r##"
+            # TYPE name counter
+            name{labelname="val1",basename="basevalue"} NaN
+            "##;
+
+        match parse(exp).unwrap()[0].value {
+            MetricValue::Counter { value } => {
+                assert!(value.is_nan());
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_counter_weird() {
+        let exp = r##"
+            # A normal comment.
+            #
+            # TYPE name counter
+            name {labelname="val2",basename="base\"v\\al\nue"} 0.23
+            # HELP name two-line\n doc  str\\ing
+            # HELP  name2  	doc str"ing 2
+            #    TYPE    name2 counter
+            name2{labelname="val2"	,basename   =   "basevalue2"		} +Inf
+            name2{ labelname = "val1" , }-Inf
+            "##;
+
+        assert_eq!(
+            parse(exp),
+            Ok(vec![
+                Metric {
+                    name: "name".into(),
+                    timestamp: None,
+                    tags: Some(
+                        vec![
+                            ("labelname".into(), "val2".into()),
+                            ("basename".into(), "base\"v\\al\nue".into())
+                        ]
+                        .into_iter()
+                        .collect()
+                    ),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 0.23 },
+                },
+                Metric {
+                    name: "name2".into(),
+                    timestamp: None,
+                    tags: Some(
+                        vec![
+                            ("labelname".into(), "val2".into()),
+                            ("basename".into(), "basevalue2".into())
+                        ]
+                        .into_iter()
+                        .collect()
+                    ),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter {
+                        value: std::f64::INFINITY
+                    },
+                },
+                Metric {
+                    name: "name2".into(),
+                    timestamp: None,
+                    tags: Some(
+                        vec![("labelname".into(), "val1".into()),]
+                            .into_iter()
+                            .collect()
+                    ),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter {
+                        value: std::f64::NEG_INFINITY
+                    },
+                },
+            ]),
+        );
+    }
+
+    #[test]
     fn test_counter_tags_and_timestamp() {
         let exp = r##"
             # HELP http_requests_total The total number of HTTP requests.
@@ -630,6 +718,24 @@ mod test {
                 tags: None,
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value: 12.47 },
+            }]),
+        );
+    }
+
+    #[test]
+    fn test_gauge_empty_labels() {
+        let exp = r##"
+            no_labels{} 3
+            "##;
+
+        assert_eq!(
+            parse(exp),
+            Ok(vec![Metric {
+                name: "no_labels".into(),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 3.0 },
             }]),
         );
     }

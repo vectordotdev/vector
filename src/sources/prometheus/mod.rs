@@ -159,9 +159,4 @@ mod test {
 
         block_on(topology.stop()).unwrap();
     }
-
-    #[test]
-    fn test_prometheus() {
-        assert!(true);
-    }
 }
