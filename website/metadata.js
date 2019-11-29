@@ -11,7 +11,7 @@ module.exports = {
         "cpu": "x86_64",
         "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
         "latest": true,
-        "name": "Linux (x86_64 w/ MUSL)",
+        "name": "Linux (x86_64)",
         "nightly": true,
         "os": "Linux",
         "type": "archive"
@@ -20,7 +20,7 @@ module.exports = {
         "cpu": "ARM64",
         "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
         "latest": false,
-        "name": "Linux (ARM64 w/ MUSL)",
+        "name": "Linux (ARM64)",
         "nightly": true,
         "os": "Linux",
         "type": "archive"
@@ -29,7 +29,7 @@ module.exports = {
         "cpu": "vector-armv7-unknown-linux-musleabihf",
         "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
         "latest": false,
-        "name": "Linux (ARMv7 w/ MUSL)",
+        "name": "Linux (ARMv7)",
         "nightly": true,
         "os": "Linux",
         "type": "archive"
@@ -47,7 +47,7 @@ module.exports = {
         "cpu": "x86_64",
         "file_name": "vector-x86_64-pc-windows-msvc.zip",
         "latest": false,
-        "name": "Windows (x86_64 w/ MSVC, 7+)",
+        "name": "Windows (x86_64, 7+)",
         "nightly": true,
         "os": "Windows",
         "type": "archive"
