@@ -10,7 +10,7 @@ a network of transforms within the topology. The purpose of these tests is to
 improve the maintainability of configs containing larger and more complex
 combinations of transforms.
 
-The full spec can be found [here][docs.reference.testing]. This guide will cover
+The full spec can be found [here][docs.reference.tests]. This guide will cover
 writing and executing a unit test for the following config:
 
 import CodeHeader from '@site/src/components/CodeHeader';
@@ -242,4 +242,4 @@ ensure that Uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
 
 
-[docs.reference.testing]: /docs/reference/testing
+[docs.reference.tests]: /docs/reference/tests
