@@ -11,7 +11,7 @@ import classnames from 'classnames';
 import queryString from 'query-string';
 
 function Tabs(props) {
-  const {block, children, defaultValue, values, urlKey} = props;
+  const {block, centered, children, defaultValue, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -25,21 +25,23 @@ function Tabs(props) {
 
   return (
     <div>
-      <ul
-        className={classnames('tabs', props.className, {
-          'tabs--block': block,
-        })}>
-        {values.map(({value, label}) => (
-          <li
-            className={classnames('tab-item', {
-              'tab-item--active': selectedValue === value,
-            })}
-            key={value}
-            onClick={() => setSelectedValue(value)}>
-            {label}
-          </li>
-        ))}
-      </ul>
+      <div className={centered ? "tabs--centered" : ""}>
+        <ul
+          className={classnames('tabs', props.className, {
+            'tabs--block': block,
+          })}>
+          {values.map(({value, label}) => (
+            <li
+              className={classnames('tab-item', {
+                'tab-item--active': selectedValue === value,
+              })}
+              key={value}
+              onClick={() => setSelectedValue(value)}>
+              {label}
+            </li>
+          ))}
+        </ul>
+      </div>
       <div className="margin-vert--md">
         {
           Children.toArray(children).filter(

@@ -237,6 +237,17 @@ html[data-theme="dark"] .hero {
 }
 
 /*
+ * Topology Section
+ */
+
+.topologyDiagram {
+  display: block;
+  margin: var(--ifm-heading-margin-bottom) auto 0 auto;
+  max-height: 300px;
+  max-width: 900px;
+}
+
+/*
  * Installation Section
  */
 

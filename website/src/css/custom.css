@@ -920,7 +920,7 @@ div[class^='tableOfContents_'] ul.contents > li ul {
 }
 
 ul.tabs {
-  background-color: var(--ifm-color-emphasis-50);
+  background-color: var(--ifm-panel-background);
   border-bottom: 1px solid var(--ifm-hr-border-color);
   font-size: 0.9em;
   font-weight: bold;
@@ -961,7 +961,28 @@ ul.tabs.mini li {
 ul.tabs.mini li.tab-item.tab-item--active {
   color: var(--ifm-color-primary);
 }
-
+ul.tabs.rounded {
+  border-radius: var(--ifm-global-radius);
+  font-size: 1em;
+  font-weight: normal;
+  padding: 6px 7px;
+}
+ul.tabs.rounded li.tab-item {
+  border: 0px none;
+  border-radius: calc( var(--ifm-global-radius) - 2px );
+  padding: 0px 10px;
+}
+ul.tabs.rounded li.tab-item.tab-item--active {
+  border: 0px none;
+  background: var(--ifm-color-primary);
+  color: var(--ifm-background-color);
+}
+.tabs--centered {
+  text-align: center;
+}
+.tabs--centered ul.tabs {
+  display: inline-block;
+}
 /*
  * Docs
  */

@@ -132,7 +132,7 @@ function Performance() {
   return (
     <section className={styles.performance}>
       <div className="container">
-        <AnchoredH2 id="performance">Uncompromising Performance</AnchoredH2>
+        <AnchoredH2 id="performance">Outperforms</AnchoredH2>
         <div className="sub-title">Higher throughout with a lower memory footprint</div>
 
         <PerformanceTests />
@@ -145,7 +145,7 @@ function Correctness() {
   return (
     <section className={styles.correctness}>
       <div className="container">
-        <AnchoredH2 id="correctness">Correctness</AnchoredH2>
+        <AnchoredH2 id="correctness">Correct</AnchoredH2>
         <div className="sub-title">Obsessed with the details and getting it right</div>
 
         <div className="table-responsive">
@@ -308,6 +308,38 @@ function Configuration() {
   );
 }
 
+function Topologies() {
+  return (
+    <section className="topologies">
+      <div className="container">
+        <AnchoredH2 id="configuration">One Tool For Any Topology</AnchoredH2>
+        <div className="sub-title">One tool, one mental model, gets data from A to B</div>
+
+        <Tabs
+          centered={true}
+          className="mini"
+          defaultValue="distributed"
+          values={[
+            { label: <><i className="feather icon-shuffle"></i> Distributed</>, value: 'distributed', },
+            { label: <><i className="feather icon-box"></i> Centralized</>, value: 'centralized', },
+            { label: <><i className="feather icon-shield"></i> Stream-based</>, value: 'stream-based', },
+          ]
+        }>
+          <TabItem value="distributed">
+            <SVG src="/img/topologies-distributed.svg" className={styles.topologyDiagram} />
+          </TabItem>
+          <TabItem value="centralized">
+            <SVG src="/img/topologies-centralized.svg" className={styles.topologyDiagram} />
+          </TabItem>
+          <TabItem value="stream-based">
+            <SVG src="/img/topologies-stream-based.svg" className={styles.topologyDiagram} />
+          </TabItem>
+        </Tabs>
+      </div>
+    </section>
+  )
+}
+
 function Installation() {
   return (
     <section className={styles.installation}>
@@ -338,7 +370,7 @@ function Installation() {
         <h3 className={styles.installSubTitle}>Install with a one-liner:</h3>
 
         <Tabs
-          block={true}
+          className="mini"
           defaultValue="humans"
           values={[
             { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
@@ -425,6 +457,7 @@ function Home() {
         <Correctness />
         <Configuration />
         <Integrations />
+        <Topologies />
         <Installation />
       </main>
     </Layout>

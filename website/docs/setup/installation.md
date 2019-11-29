@@ -25,7 +25,7 @@ method to install Vector:
 import Tabs from '@theme/Tabs';
 
 <Tabs
-  block={true}
+  className="mini"
   defaultValue="humans"
   values={[
     { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
