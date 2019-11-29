@@ -8,6 +8,26 @@ install-rust: &install-rust
     command: |
       curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
+upgrade-docker: &upgrade-docker
+  run:
+    name: Upgrade Docker
+    command: |
+      sudo apt-get remove docker docker-engine docker.io containerd runc
+      sudo apt-get update
+      sudo apt-get install \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg-agent \
+        software-properties-common
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+      sudo add-apt-repository \
+       "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+       $(lsb_release -cs) \
+       stable"
+      sudo apt-get update
+      sudo apt-get install docker-ce docker-ce-cli containerd.io
+
 install-vector: &install-vector
   run:
     name: Execute install.sh
@@ -71,6 +91,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
+      - *upgrade-docker
       - run:
           name: Check generate
           command: |
@@ -482,6 +503,7 @@ jobs:
     steps:
       - checkout
       - *restore-artifacts-from-workspace
+      - *upgrade-docker
       - run:
           name: Build & verify Docker
           command: |
@@ -661,6 +683,7 @@ jobs:
           docker_layer_caching: true
       - checkout
       - *restore-artifacts-from-workspace
+      - *upgrade-docker
       - run:
           name: Release Docker
           command: |
