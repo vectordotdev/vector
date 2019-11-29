@@ -91,7 +91,6 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - *upgrade-docker
       - run:
           name: Check generate
           command: |
