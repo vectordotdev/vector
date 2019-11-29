@@ -735,7 +735,7 @@ mod test {
     }
 
     #[test]
-    fn metric_buffer_aggregated_histograms() {
+    fn metric_buffer_aggregated_histograms_absolute() {
         let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
@@ -818,6 +818,82 @@ mod test {
                         sum: 10.0,
                     },
                 }
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_aggregated_histograms_incremental() {
+        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for _ in 0..3 {
+            let event = Event::Metric(Metric {
+                name: "buckets-2".into(),
+                timestamp: None,
+                tags: Some(tag("production")),
+                kind: MetricKind::Incremental,
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![1, 2, 4],
+                    count: 6,
+                    sum: 10.0,
+                },
+            });
+            events.push(event);
+        }
+
+        for i in 1..4 {
+            let event = Event::Metric(Metric {
+                name: "buckets-2".into(),
+                timestamp: None,
+                tags: Some(tag("production")),
+                kind: MetricKind::Incremental,
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![1.0, 4.0, 16.0],
+                    counts: vec![1 * i, 2 * i, 4 * i],
+                    count: 6 * i,
+                    sum: 10.0,
+                },
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+
+        assert_eq!(
+            sorted(&buffer[0].clone().finish()),
+            [
+                Metric {
+                    name: "buckets-2".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 2.0, 4.0],
+                        counts: vec![3, 6, 12],
+                        count: 18,
+                        sum: 30.0,
+                    },
+                },
+                Metric {
+                    name: "buckets-2".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 4.0, 16.0],
+                        counts: vec![6, 12, 24],
+                        count: 36,
+                        sum: 30.0,
+                    },
+                },
             ]
         );
     }
