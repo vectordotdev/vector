@@ -486,6 +486,7 @@ jobs:
           name: Build & verify Docker
           command: |
             export VERSION=$(make version)
+            export PLATFORM="linux/amd64,linux/arm64,linux/arm"
             make build-docker
           no_output_timeout: 30m
 
