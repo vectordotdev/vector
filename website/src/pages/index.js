@@ -318,7 +318,7 @@ function Topologies() {
         <Tabs
           centered={true}
           className="mini"
-          defaultValue="distributed"
+          defaultValue="centralized"
           values={[
             { label: <><i className="feather icon-shuffle"></i> Distributed</>, value: 'distributed', },
             { label: <><i className="feather icon-box"></i> Centralized</>, value: 'centralized', },
