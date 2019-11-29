@@ -16,7 +16,8 @@ source_url: https://github.com/timberio/vector/tree/master/distribution/docker
 
 Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
 available on [Docker Hub][urls.docker_hub_vector] which come pre-installed
-with Vector and any recommended system dependencies.
+with Vector and any recommended system dependencies. These images are available
+for x86_64, ARM64, and ARMv7 architectures.
 
 ## Running
 
