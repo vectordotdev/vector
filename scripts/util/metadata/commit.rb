@@ -127,6 +127,23 @@ class Commit
     component_type == "source"
   end
 
+  def to_h
+    {
+      author: author,
+      breaking_change: breaking_change,
+      date: date,
+      deletions_count: deletions_count,
+      description: description,
+      files_count: files_count,
+      insertions_count: insertions_count,
+      message: message,
+      pr_number: pr_number,
+      scope: scope.deep_to_h,
+      sha: sha,
+      type: type,
+    }
+  end
+
   def transform?
     component_type == "transform"
   end

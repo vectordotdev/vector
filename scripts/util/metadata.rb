@@ -233,6 +233,7 @@ class Metadata
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
       posts: posts.deep_to_h,
+      releases: releases.deep_to_h,
       sources: sources.deep_to_h,
       team: team.deep_to_h,
       transforms: transforms.deep_to_h,

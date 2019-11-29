@@ -99,6 +99,7 @@ class Release
 
   def to_h
     {
+      commits: commits.deep_to_h,
       date: date,
       last_version: last_version,
       version: version,
