@@ -663,7 +663,7 @@ jobs:
           name: Release Docker
           command: |
             export VERSION=$(make version)
-            make build-docker
+            make release-docker
           no_output_timeout: 30m
 
   release-github:
@@ -810,6 +810,8 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm
@@ -885,7 +887,8 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
@@ -970,6 +973,8 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm
