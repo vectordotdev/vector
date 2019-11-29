@@ -931,7 +931,7 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          cron: "0 17 * * *"
+          cron: "0 0 * * *"
           <<: *master-filters
 
     jobs:
