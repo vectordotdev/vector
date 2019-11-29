@@ -44,7 +44,8 @@ pub struct Map<S, R1, R2> {
 impl<S, R1, R2> Service<R1> for Map<S, R1, R2>
 where
     S: Service<R2>,
-    S::Error: Into<crate::Error> + Send + Sync + 'static,
+    // S::Error: Into<crate::Error> + Send + Sync + 'static,
+    crate::Error: From<S::Error>,
 {
     type Response = S::Response;
     type Error = crate::Error;

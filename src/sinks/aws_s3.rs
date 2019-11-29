@@ -29,11 +29,7 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct S3Sink {
     client: S3Client,
-    bucket: String,
-    gzip: bool,
-    filename_time_format: String,
-    filename_append_uuid: bool,
-    filename_extension: Option<String>,
+    // bucket: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -139,11 +135,6 @@ impl S3Sink {
 
         let s3 = S3Sink {
             client: Self::create_client(config.region.clone().try_into()?),
-            bucket: config.bucket.clone(),
-            gzip: compression,
-            filename_time_format: filename_time_format.clone(),
-            filename_append_uuid,
-            filename_extension: config.filename_extension.clone(),
         };
 
         let filename_extension = config.filename_extension.clone();
@@ -151,7 +142,7 @@ impl S3Sink {
 
         let svc = ServiceBuilder::new()
             .map(move |req| {
-                map_req(
+                build_request(
                     req,
                     filename_time_format.clone(),
                     filename_extension.clone(),
@@ -225,9 +216,8 @@ impl S3Sink {
 
 impl Service<Request> for S3Sink {
     type Response = PutObjectOutput;
-    // type Error = RusotoError<PutObjectError>;
-    type Error = crate::Error;
-    type Future = futures::future::MapErr<Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>, fn(RusotoError<PutObjectError>) -> crate::Error>;
+    type Error = RusotoError<PutObjectError>;
+    type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -243,11 +233,10 @@ impl Service<Request> for S3Sink {
                 ..Default::default()
             })
             .instrument(info_span!("request"))
-            .map_err(Into::into)
     }
 }
 
-fn map_req(
+fn build_request(
     req: PartitionInnerBuffer<Vec<u8>, Bytes>,
     time_format: String,
     extension: Option<String>,
