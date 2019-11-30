@@ -24,7 +24,7 @@ function ArchChoices({arch, docker, os, packageManager}) {
   )[0];
 
   const dockerSupported = containers.find(c => c.id == "docker").archs.includes(arch);
-  const packageManagerSupported = packageManagers.find(p => p.name == packageManager).archs.includes(arch);
+  const packageManagerSupported = packageManager && packageManagers.find(p => p.name == packageManager).archs.includes(arch);
 
   return (
     <div>
