@@ -12,7 +12,7 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        std::mem::discriminant(metric).hash(state);
+        std::mem::discriminant(&metric.value).hash(state);
         metric.name.hash(state);
         metric.kind.hash(state);
         metric
