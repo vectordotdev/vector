@@ -8,7 +8,11 @@ module.exports = {
           "ARMv7"
         ],
         "id": "docker",
-        "name": "Docker"
+        "name": "Docker",
+        "oss": [
+          "Linux",
+          "MacOS"
+        ]
       }
     ],
     "downloads": [

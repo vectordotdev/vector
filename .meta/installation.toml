@@ -2,6 +2,7 @@
 id = "docker"
 name = "Docker"
 archs = ["x86_64", "ARM64", "ARMv7"]
+oss = ["Linux", "MacOS"]
 
 
 [[installation.operating_systems]]

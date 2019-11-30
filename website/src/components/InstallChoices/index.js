@@ -23,7 +23,8 @@ function ArchChoices({arch, docker, os, packageManager}) {
       download.type == "archive")
   )[0];
 
-  const dockerSupported = containers.find(c => c.id == "docker").archs.includes(arch);
+  const dockerContainer = containers.find(c => c.id == "docker");
+  const dockerSupported = dockerContainer.archs.includes(arch) && dockerContainer.oss.includes(os);
   const packageManagerSupported = packageManager && packageManagers.find(p => p.name == packageManager).archs.includes(arch);
 
   return (
