@@ -2,6 +2,11 @@ module.exports = {
   "installation": {
     "containers": [
       {
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
         "id": "docker",
         "name": "Docker"
       }
@@ -105,47 +110,73 @@ module.exports = {
     "operating_systems": [
       {
         "id": "amazon-linux",
-        "name": "Amazon Linux"
+        "name": "Amazon Linux",
+        "os": "Linux",
+        "package_manager": "RPM"
       },
       {
         "id": "centos",
-        "name": "CentOS"
+        "name": "CentOS",
+        "os": "Linux",
+        "package_manager": "RPM"
       },
       {
         "id": "debian",
-        "name": "Debian"
+        "name": "Debian",
+        "os": "Linux",
+        "package_manager": "DPKG"
       },
       {
         "id": "macos",
-        "name": "MacOS"
+        "name": "MacOS",
+        "os": "Linux",
+        "package_manager": "Homebrew"
       },
       {
         "id": "raspberry-pi",
-        "name": "Raspberry Pi"
+        "name": "Raspberry Pi",
+        "os": "Linux",
+        "package_manager": "DPKG"
       },
       {
         "id": "rhel",
-        "name": "RHEL"
+        "name": "RHEL",
+        "os": "Linux",
+        "package_manager": "RPM"
       },
       {
         "id": "ubuntu",
-        "name": "Ubuntu"
+        "name": "Ubuntu",
+        "os": "Linux",
+        "package_manager": "DPKG"
       },
       {
         "id": "windows",
-        "name": "Windows"
+        "name": "Windows",
+        "os": "Windows"
       }
     ],
     "package_managers": [
       {
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
         "id": "dpkg",
         "name": "DPKG"
       },
       {
+        "archs": [
+          "x86_64"
+        ],
         "id": "homebrew",
         "name": "Homebrew"
       },
       {
+        "archs": [
+          "x86_64"
+        ],
         "id": "rpm",
         "name": "RPM"
       }

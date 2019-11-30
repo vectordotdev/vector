@@ -6,17 +6,16 @@ import TabItem from '@theme/TabItem';
 
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-function getDownloads() {
+function getInstallation() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {installation}} = siteConfig.customFields;
-  const {downloads} = installation;
 
-  return downloads;
+  return installation;
 }
 
 function ArchChoices({arch, docker, os, packageManager}) {
-  const downloads = getDownloads();
+  const {containers, downloads, package_managers: packageManagers} = getInstallation();
 
   const archiveDownload = downloads.filter(download => (
     download.arch.toLowerCase() == arch.toLowerCase() &&
@@ -24,34 +23,28 @@ function ArchChoices({arch, docker, os, packageManager}) {
       download.type == "archive")
   )[0];
 
-  const packageDownload = downloads.filter(download => (
-    download.arch.toLowerCase() == arch.toLowerCase() &&
-      download.os.toLowerCase() == os.toLowerCase() &&
-      download.package_manager &&
-      download.package_manager.toLowerCase() == packageManager.toLowerCase())
-  )[0];
-
-  const hasPackageManager = packageManager && (packageDownload !== undefined || packageManager.toLowerCase() == "homebrew");
+  const dockerSupported = containers.find(c => c.id == "docker").archs.includes(arch);
+  const packageManagerSupported = packageManagers.find(p => p.name == packageManager).archs.includes(arch);
 
   return (
     <div>
-      {hasPackageManager && <Jump to={`/docs/setup/installation/package-managers/${packageManager.toLowerCase()}?arch=${arch}`}>
+      {packageManagerSupported && <Jump to={`/docs/setup/installation/package-managers/${packageManager.toLowerCase()}?arch=${arch}`}>
         <i className="feather icon-package"></i> {packageManager} ({arch}) <span className="badge badge--primary">recommended</span>
       </Jump>}
-      {!hasPackageManager && docker && <Jump to="/docs/setup/installation/containers/docker">
+      {!packageManagerSupported && dockerSupported && <Jump to="/docs/setup/installation/containers/docker">
         <i className="feather icon-terminal"></i> Docker ({arch}) <span className="badge badge--primary">recommended</span>
       </Jump>}
-      {!hasPackageManager && !docker && <Jump to={`/docs/setup/installation/manual/from-archives?file_name=${archiveDownload.file_name}`}>
+      {!packageManagerSupported && !dockerSupported && <Jump to={`/docs/setup/installation/manual/from-archives?file_name=${archiveDownload.file_name}`}>
         <i className="feather icon-terminal"></i> From an Archive ({arch})  <span className="badge badge--primary">recommended</span>
       </Jump>}
 
       <p>Alternatively, you can use your preferred method:</p>
 
-      {(hasPackageManager && docker) && <Jump to="/docs/setup/installation/containers/docker" size="sm">
-        <i className="feather icon-terminal"></i> Docker ({arch})
+      {(packageManagerSupported && dockerSupported) && <Jump to="/docs/setup/installation/containers/docker" size="sm">
+        <i className="feather icon-package"></i> Docker ({arch})
       </Jump>}
 
-      {(hasPackageManager || docker) && <Jump to={`/docs/setup/installation/manual/from-archives?file_name=${archiveDownload.file_name}`} size="sm">
+      {(packageManagerSupported || dockerSupported) && <Jump to={`/docs/setup/installation/manual/from-archives?file_name=${archiveDownload.file_name}`} size="sm">
         <i className="feather icon-terminal"></i> From an Archive ({arch})
       </Jump>}
 
@@ -63,15 +56,14 @@ function ArchChoices({arch, docker, os, packageManager}) {
 }
 
 function InstallChoices({docker, os, packageManager}) {
-  const downloads = getDownloads();
+  const {downloads} = getInstallation();
   const archiveDownloads = downloads.filter(download => (download.os.toLowerCase() == os.toLowerCase() && download.type == "archive"));
   const archs = archiveDownloads.map(download => download.arch);
 
   return (
     <div>
       <Tabs
-        centered={true}
-        className="rounded"
+        block={true}
         defaultValue={archs[0]}
         urlKey="os"
         values={archs.map(arch => ({label: <><i className="feather icon-cpu"></i> {arch}</>, value: arch}))}>
