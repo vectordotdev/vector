@@ -7,6 +7,9 @@ description: Install Vector through the DKG package manager
 Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
 
+<%- downloads = metadata.downloads(package_manager: :dpkg) -%>
+<%- download_tabs = downloads.collect { |d| {label: d.arch, value: d.arch} } -%>
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -14,31 +17,54 @@ import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="amd64"
+  defaultValue="<%= download_tabs.first.fetch(:value) %>"
   urlKey="arch"
-  values={[
-    { label: 'Deb (x86_64)', value: 'amd64', },
-    { label: 'Deb (ARM64)', value: 'arm64', },
-    { label: 'Deb (ARMv7)', value: 'armhf', },
-    ]}>
+  values={<%= download_tabs.to_json %>}>
 
-<TabItem value="amd64">
+<%- downloads.each do |download| %>
+<TabItem value="<%= download.arch %>">
 
-<%= install_from_deb_linux("vector-amd64.deb") %>
+1.  Download the Vector `.deb` package
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version}/#{download.file_name}") %> 
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.nightly/latest/#{download.file_name}") %>
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the downloaded package
+
+    ```bash
+    sudo dpkg -i <%= download.file_name %>
+    ```
+
+3.  Start Vector
+
+    ```bash
+    sudo systemctl start vector
+    ```
 
 </TabItem>
 
-<TabItem value="arm64">
-
-<%= install_from_deb_linux("vector-arm64.deb") %>
-
-</TabItem>
-
-<TabItem value="armhf">
-
-<%= install_from_deb_linux("vector-armhf.deb") %>
-
-</TabItem>
+<%- end -%>
 
 </Tabs>
 

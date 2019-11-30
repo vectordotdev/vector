@@ -15,6 +15,7 @@ description: Install Vector through the DKG package manager
 Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
 
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -22,15 +23,12 @@ import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="amd64"
+  defaultValue="x86_64"
   urlKey="arch"
-  values={[
-    { label: 'Deb (x86_64)', value: 'amd64', },
-    { label: 'Deb (ARM64)', value: 'arm64', },
-    { label: 'Deb (ARMv7)', value: 'armhf', },
-    ]}>
+  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
 
-<TabItem value="amd64">
+
+<TabItem value="x86_64">
 
 1.  Download the Vector `.deb` package
 
@@ -72,7 +70,8 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="arm64">
+
+<TabItem value="ARM64">
 
 1.  Download the Vector `.deb` package
 
@@ -114,7 +113,8 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="armhf">
+
+<TabItem value="ARMv7">
 
 1.  Download the Vector `.deb` package
 
@@ -155,6 +155,7 @@ import TabItem from '@theme/TabItem';
     ```
 
 </TabItem>
+
 
 </Tabs>
 

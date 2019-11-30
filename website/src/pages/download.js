@@ -9,9 +9,38 @@ import TabItem from '@theme/TabItem'
 import Tabs from '@theme/Tabs'
 
 import classnames from 'classnames';
+import groupBy from 'lodash/groupBy';
 import styles from './download.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import {viewedNewRelease} from '@site/src/exports/newRelease';
+
+function Downloads({downloads, path}) {
+  const groupedDownloads = groupBy(downloads, ((download) => {
+    return (download.package_manager || download.os);
+  }));
+
+  return (
+    <ul className={styles.downloadFiles}>
+      {Object.keys(groupedDownloads).map((key, catIdx) => (
+        <li key={catIdx}>
+          <span>{key} <code>(.{groupedDownloads[key][0].file_type})</code>:</span>
+          <ul>
+            {groupedDownloads[key].map((download, downloadIdx) => (
+              <li>
+                <a key={downloadIdx} title={download.file_name} href={`https://packages.timber.io/vector/${path}/${download.file_name}`}>
+                  <i className="feather icon-download"></i> {download.arch}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+      <li>
+        <a href={`https://packages.timber.io/vector/${path}`} target="_blank">browse all files&hellip;</a>
+      </li>
+    </ul>
+  );
+}
 
 function Download() {
   const context = useDocusaurusContext();
@@ -19,8 +48,8 @@ function Download() {
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
   const {containers, downloads, package_managers: packageManagers, operating_systems: operatingSystems} = installation;
 
-  let latestDownloads = downloads.filter(download => download.latest);
-  let nightlyDownloads = downloads.filter(download => download.nightly);
+  const latestDownloads = downloads.filter(download => download.available_on_latest);
+  const nightlyDownloads = downloads.filter(download => download.available_on_nightly);
 
   viewedNewRelease();
 
@@ -72,121 +101,103 @@ function Download() {
               ]
             }>
             <TabItem value="latest">
-              <table className={styles.downloadTable}>
-                <tbody>
-                  <tr>
-                    <td>Version</td>
-                    <td>
-                      {latestRelease.version} • {latestRelease.date} • <a href={`https://github.com/timberio/vector/releases/tag/v${latestRelease.version}`} target="_blank">release notes</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>License</td>
-                    <td>
-                      <a href="https://github.com/timberio/vector/blob/master/LICENSE" target="_blank">Apache 2</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Downloads</td>
-                    <td>
-                      {latestDownloads.map((download, idx) => (
-                        <div key={idx}>
-                          <a href={`https://packages.timber.io/vector/${latestRelease.version}/${download.file_name}`}><i className="feather icon-download"></i> {download.name}</a>
-                        </div>
-                      ))}
-                      <div>
-                        <a href={`https://packages.timber.io/vector/${latestRelease.version}`} target="_blank">browse all files&hellip;</a>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Containers</td>
-                    <td>
-                      {containers.map((container, idx) => (
-                        <span key={idx}>
-                          {idx > 0 ? " • " : ""}
-                          <Link to={`/docs/setup/installation/containers/${container.id}`}> {container.name}</Link>
-                        </span>
-                      ))}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Package Managers</td>
-                    <td>
-                      {packageManagers.map((packageManager, idx) => (
-                        <span key={idx}>
-                          {idx > 0 ? " • " : ""}
-                          <Link to={`/docs/setup/installation/package-managers/${packageManager.id}`}>{packageManager.name}</Link>
-                        </span>
-                      ))}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Operating Systems</td>
-                    <td>
-                      {operatingSystems.map((operatingSystem, idx) => (
-                        <span key={idx}>
-                          {idx > 0 ? " • " : ""}
-                          <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}`}>{operatingSystem.name}</Link>
-                        </span>
-                      ))}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Manual</td>
-                    <td>
-                      <Link to="/docs/setup/installation/manual/from-archives">From archives</Link>
-                      &nbsp;•&nbsp;
-                      <Link to="/docs/setup/installation/manual/from-source">From source</Link>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className={styles.downloadTable}>
+                <div>
+                  <div>Version</div>
+                  <div>
+                    {latestRelease.version} • {latestRelease.date} • <a href={`https://github.com/timberio/vector/releases/tag/v${latestRelease.version}`} target="_blank">release notes</a>
+                  </div>
+                </div>
+                <div>
+                  <div>License</div>
+                  <div>
+                    <a href="https://github.com/timberio/vector/blob/master/LICENSE" target="_blank">Apache 2</a>
+                  </div>
+                </div>
+                <div>
+                  <div>Downloads</div>
+                  <div>
+                    <Downloads downloads={latestDownloads} path={latestRelease.version} />
+                  </div>
+                </div>
+                <div>
+                  <div>Containers</div>
+                  <div>
+                    {containers.map((container, idx) => (
+                      <span key={idx}>
+                        {idx > 0 ? " • " : ""}
+                        <Link to={`/docs/setup/installation/containers/${container.id}`}> {container.name}</Link>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div>Package Managers</div>
+                  <div>
+                    {packageManagers.map((packageManager, idx) => (
+                      <span key={idx}>
+                        {idx > 0 ? " • " : ""}
+                        <Link to={`/docs/setup/installation/package-managers/${packageManager.id}`}>{packageManager.name}</Link>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div>Operating Systems</div>
+                  <div>
+                    {operatingSystems.map((operatingSystem, idx) => (
+                      <span key={idx}>
+                        {idx > 0 ? " • " : ""}
+                        <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}`}>{operatingSystem.name}</Link>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div>Manual</div>
+                  <div>
+                    <Link to="/docs/setup/installation/manual/from-archives">From archives</Link>
+                    &nbsp;•&nbsp;
+                    <Link to="/docs/setup/installation/manual/from-source">From source</Link>
+                  </div>
+                </div>
+              </div>
             </TabItem>
             <TabItem value="nightly">
-              <table className={styles.downloadTable}>
-                <tbody>
-                  <tr>
-                    <td>Version</td>
-                    <td>
-                      Nightly • <a href="https://github.com/timberio/vector/compare/v{latestRelease.version}...master" target="_blank">unreleased changes</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>License</td>
-                    <td>
-                      <a href="https://github.com/timberio/vector/blob/master/LICENSE" target="_blank">Apache 2</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Downloads</td>
-                    <td>
-                      {nightlyDownloads.map((download, idx) => (
-                        <div key={idx}>
-                          <a href={`https://packages.timber.io/vector/nightly/latest/${download.file_name}`}><i className="feather icon-download"></i> {download.name}</a>
-                        </div>
-                      ))}
-                      <div>
-                        <a href={`https://packages.timber.io/vector/nightly/latest`} target="_blank">browse all files&hellip;</a>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Containers</td>
-                    <td>
-                      <Link to="/docs/setup/installation/containers/docker#nightlies">Docker</Link>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Manual</td>
-                    <td>
-                      <Link to="/docs/setup/installation/manual/from-archives">From archives</Link>
-                      &nbsp;•&nbsp;
-                      <Link to="/docs/setup/installation/manual/from-source">From source</Link>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className={styles.downloadTable}>
+                <div>
+                  <div>Version</div>
+                  <div>
+                    Nightly • <a href="https://github.com/timberio/vector/compare/v{latestRelease.version}...master" target="_blank">unreleased changes</a>
+                  </div>
+                </div>
+                <div>
+                  <div>License</div>
+                  <div>
+                    <a href="https://github.com/timberio/vector/blob/master/LICENSE" target="_blank">Apache 2</a>
+                  </div>
+                </div>
+                <div>
+                  <div>Downloads</div>
+                  <div>
+                    <Downloads downloads={nightlyDownloads} path="nightly/latest" />
+                  </div>
+                </div>
+                <div>
+                  <div>Containers</div>
+                  <div>
+                    <Link to="/docs/setup/installation/containers/docker#nightlies">Docker</Link>
+                  </div>
+                </div>
+                <div>
+                  <div>Manual</div>
+                  <div>
+                    <Link to="/docs/setup/installation/manual/from-archives">From archives</Link>
+                    &nbsp;•&nbsp;
+                    <Link to="/docs/setup/installation/manual/from-source">From source</Link>
+                  </div>
+                </div>
+              </div>
 
               <Alert type="warning">
                 Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.

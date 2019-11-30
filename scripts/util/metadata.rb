@@ -146,6 +146,15 @@ class Metadata
     @components ||= sources_list + transforms_list + sinks_list
   end
 
+  def downloads(arch: nil, os: nil, package_manager: nil, type: nil)
+    downloads = installation.downloads
+    downloads = downloads.select { |d| d.arch && d.arch.downcase == arch.to_s.downcase } if arch
+    downloads = downloads.select { |d| d.os && d.os.downcase == os.to_s.downcase } if os
+    downloads = downloads.select { |d| d.package_manager && d.package_manager.downcase == package_manager.to_s.downcase } if package_manager
+    downloads = downloads.select { |d| d.type && d.type.downcase == type.to_s.downcase } if type
+    downloads
+  end
+
   def env_vars_list
     @env_vars_list ||= env_vars.to_h.values.sort
   end
