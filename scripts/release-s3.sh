@@ -44,7 +44,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
     --acl public-read
 
   # Verify that the files exist and can be downloaded
-  cmp <(curl https://packages.timber.io/vector/nightly/$today/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux.musl.tar.gz"
+  cmp <(curl https://packages.timber.io/vector/nightly/$today/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   cmp <(curl https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   cmp <(curl -L https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
