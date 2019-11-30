@@ -911,7 +911,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
                         count: 6 * i,
                         sum: 10.0,
@@ -938,7 +938,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![2.0, 4.0, 8.0],
                         count: 6 * 2,
                         sum: 10.0,
@@ -950,7 +950,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![3.0, 6.0, 12.0],
                         count: 6 * 3,
                         sum: 10.0,
@@ -962,7 +962,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![4.0, 8.0, 16.0],
                         count: 6 * 4,
                         sum: 10.0,
