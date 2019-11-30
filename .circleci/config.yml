@@ -685,8 +685,6 @@ jobs:
       docker_layer_caching: true
     resource_class: large
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
       - checkout
       - *restore-artifacts-from-workspace
       - *upgrade-docker
