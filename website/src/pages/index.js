@@ -366,13 +366,16 @@ function Installation() {
 
         <div className={styles.installationChecks}>
           <div>
-            <i className="feather icon-package"></i> Fully static, no dependencies
+            <i className="feather icon-package"></i> Fully static, no deps
           </div>
           <div>
-            <i className="feather icon-feather"></i> Light-weight, weighing only 7mb
+            <i className="feather icon-cpu"></i> X86_64, ARM64, & ARMv7
           </div>
           <div>
-            <i className="feather icon-zap"></i> No runtime or garbage collection
+            <i className="feather icon-feather"></i> Light-weight, only 7mb
+          </div>
+          <div>
+            <i className="feather icon-zap"></i> No runtime, mem-safe
           </div>
         </div>
 

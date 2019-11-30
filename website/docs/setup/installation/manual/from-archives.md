@@ -12,6 +12,7 @@ description: Install Vector from pre-compiled archives
      website/docs/setup/installation/manual/from-archives.md.erb
 -->
 
+
 This page covers installing Vector from a pre-built archive. These archives
 contain the `vector` binary as well as supporting configuration files.
 
@@ -29,23 +30,17 @@ intricacies covered in the [Next Steps](#next-steps) section.
 ## Installation
 
 import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="linux_x86_64"
-  urlKey="os"
-  values={[
-    { label: 'Linux (x86_64)', value: 'linux_x86_64', },
-    { label: 'Linux (ARM64)', value: 'linux_arm64', },
-    { label: 'Linux (ARMv7)', value: 'linux_armv7', },
-    { label: 'MacOS (x86_64)', value: 'macos_x86_64', },
-    { label: 'Windows (x86_64)', value: 'windows_x86_64', },
-    { label: 'Other', value: 'other', },
-  ]}>
+  defaultValue="vector-x86_64-unknown-linux-musl.tar.gz"
+  urlKey="file_name"
+  values={[{"label":"Linux (x86_64)","value":"vector-x86_64-unknown-linux-musl.tar.gz"},{"label":"Linux (ARM64)","value":"vector-aarch64-unknown-linux-musl.tar.gz"},{"label":"Linux (ARMv7)","value":"vector-armv7-unknown-linux-musleabihf.tar.gz"},{"label":"MacOS (x86_64)","value":"vector-x86_64-apple-darwin.tar.gz"},{"label":"Windows (x86_64, 7+)","value":"vector-x86_64-pc-windows-msvc.zip"}]}>
 
-import TabItem from '@theme/TabItem';
 
-<TabItem value="linux_x86_64">
+<TabItem value="vector-x86_64-unknown-linux-musl.tar.gz">
+
 
 1.  Download & unpack the archive
     
@@ -99,7 +94,9 @@ import TabItem from '@theme/TabItem';
     ```
 
 </TabItem>
-<TabItem value="linux_arm64">
+
+<TabItem value="vector-aarch64-unknown-linux-musl.tar.gz">
+
 
 1.  Download & unpack the archive
     
@@ -153,7 +150,9 @@ import TabItem from '@theme/TabItem';
     ```
 
 </TabItem>
-<TabItem value="linux_armv7">
+
+<TabItem value="vector-armv7-unknown-linux-musleabihf.tar.gz">
+
 
 1.  Download & unpack the archive
     
@@ -207,7 +206,9 @@ import TabItem from '@theme/TabItem';
     ```
 
 </TabItem>
-<TabItem value="macos_x86_64">
+
+<TabItem value="vector-x86_64-apple-darwin.tar.gz">
+
 
 1.  Download & unpack the archive
     
@@ -261,7 +262,9 @@ import TabItem from '@theme/TabItem';
     ```
 
 </TabItem>
-<TabItem value="windows_x86_64">
+
+<TabItem value="vector-x86_64-pc-windows-msvc.zip">
+
 
 1.  Download Vector release archive (latest):
 
@@ -305,13 +308,6 @@ import TabItem from '@theme/TabItem';
     ```powerhsell
     bin\vector.exe --config config\vector.toml
     ```
-
-</TabItem>
-<TabItem value="other">
-
-To install Vector on targets not listed above we recommend that you [build
-Vector from source][docs.from_source]. You can also request a target by
-[opening an issue][urls.new_target].
 
 </TabItem>
 </Tabs>
@@ -383,8 +379,6 @@ Simply follow the same [installation instructions above](#installation).
 
 [docs.configuration]: /docs/setup/configuration
 [docs.containers]: /docs/setup/installation/containers
-[docs.from_source]: /docs/setup/installation/manual/from-source
 [docs.global-options#data-directory]: /docs/reference/global-options#data-directory
 [docs.global-options#data_dir]: /docs/reference/global-options#data_dir
 [docs.package_managers]: /docs/setup/installation/package-managers
-[urls.new_target]: https://github.com/timberio/vector/issues/new?labels=type%3A+task&labels=domain%3A+operations

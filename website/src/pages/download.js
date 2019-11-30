@@ -9,9 +9,35 @@ import TabItem from '@theme/TabItem'
 import Tabs from '@theme/Tabs'
 
 import classnames from 'classnames';
+import groupBy from 'lodash/groupBy';
 import styles from './download.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import {viewedNewRelease} from '@site/src/exports/newRelease';
+
+function Downloads({downloads, path}) {
+  const groupedDownloads = groupBy(downloads, ((download) => {
+    return (download.package_manager || download.os);
+  }));
+
+  return (
+    <div className={styles.downloadFiles}>
+      {Object.keys(groupedDownloads).map((key, catIdx) => (
+        <div key={catIdx}>
+          <span>{key} <code>(.{groupedDownloads[key][0].file_type})</code>:</span>
+          {groupedDownloads[key].map((download, downloadIdx) => (
+            <a key={downloadIdx} title={download.file_name} href={`https://packages.timber.io/vector/${path}/${download.file_name}`}>
+              <i className="feather icon-download"></i> {download.arch}
+            </a>
+          ))}
+        </div>
+      ))}
+      <div>
+        <span></span>
+        <a href={`https://packages.timber.io/vector/${path}`} target="_blank">browse all files&hellip;</a>
+      </div>
+    </div>
+  );
+}
 
 function Download() {
   const context = useDocusaurusContext();
@@ -19,8 +45,8 @@ function Download() {
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
   const {containers, downloads, package_managers: packageManagers, operating_systems: operatingSystems} = installation;
 
-  let latestDownloads = downloads.filter(download => download.latest);
-  let nightlyDownloads = downloads.filter(download => download.nightly);
+  const latestDownloads = downloads.filter(download => download.available_on_latest);
+  const nightlyDownloads = downloads.filter(download => download.available_on_nightly);
 
   viewedNewRelease();
 
@@ -89,14 +115,7 @@ function Download() {
                   <tr>
                     <td>Downloads</td>
                     <td>
-                      {latestDownloads.map((download, idx) => (
-                        <div key={idx}>
-                          <a href={`https://packages.timber.io/vector/${latestRelease.version}/${download.file_name}`}><i className="feather icon-download"></i> {download.name}</a>
-                        </div>
-                      ))}
-                      <div>
-                        <a href={`https://packages.timber.io/vector/${latestRelease.version}`} target="_blank">browse all files&hellip;</a>
-                      </div>
+                      <Downloads downloads={latestDownloads} path={latestRelease.version} />
                     </td>
                   </tr>
                   <tr>

@@ -247,14 +247,6 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip
   end
 
-  def install_from_archive_linux(archive_name)
-    render("#{partials_path}/_install_from_archive_linux.md", binding).strip
-  end
-
-  def install_from_deb_linux(deb_name)
-    render("#{partials_path}/_install_from_deb_linux.md", binding).strip
-  end
-
   def manual_installation_next_steps(type)
     if type != :source && type != :archives
       raise ArgumentError.new("type must be one of :source or :archives")

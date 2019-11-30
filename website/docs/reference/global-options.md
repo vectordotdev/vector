@@ -75,7 +75,7 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
 
 ### dns_servers
 
-The list of DNS servers Vector will use to resolve DNS requests. When set Vector will ignore the system configuration and use only the list of DNS servers provided. If this option is not set then Vector will attempt to use the system configuration. 
+The list of DNS servers Vector will use to resolve DNS requests. When set Vector will ignore the system configuration and use only the list of DNS servers provided. If this option is not set then Vector will attempt to use the system configuration.
 
 
 </Field>

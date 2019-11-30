@@ -19,82 +19,95 @@ package_managers = [
 ]
 
 [[installation.downloads]]
-cpu = "x86_64"
+available_on_latest = true
+available_on_nightly = true
+arch = "x86_64"
 file_name = "vector-x86_64-unknown-linux-musl.tar.gz"
-latest = true
+file_type = "tar.gz"
 name = "Linux (x86_64)"
-nightly = true
 os = "Linux"
 type = "archive"
 
 [[installation.downloads]]
-cpu = "ARM64"
+available_on_latest = true
+available_on_nightly = true
+arch = "ARM64"
 file_name = "vector-aarch64-unknown-linux-musl.tar.gz"
-latest = false
+file_type = "tar.gz"
 name = "Linux (ARM64)"
-nightly = true
 os = "Linux"
 type = "archive"
 
 [[installation.downloads]]
-cpu = "vector-armv7-unknown-linux-musleabihf"
+available_on_latest = true
+available_on_nightly = true
+arch = "ARMv7"
 file_name = "vector-armv7-unknown-linux-musleabihf.tar.gz"
-latest = false
+file_type = "tar.gz"
 name = "Linux (ARMv7)"
-nightly = true
 os = "Linux"
 type = "archive"
 
 [[installation.downloads]]
-cpu = "x86_64"
+available_on_latest = true
+available_on_nightly = true
+arch = "x86_64"
 file_name = "vector-x86_64-apple-darwin.tar.gz"
-latest = true
-name = "MacOS (x86_64, 10.7+)"
-nightly = true
+file_type = "tar.gz"
+name = "MacOS (x86_64)"
 os = "MacOS"
 type = "archive"
 
 [[installation.downloads]]
-cpu = "x86_64"
+available_on_latest = true
+available_on_nightly = true
+arch = "x86_64"
 file_name = "vector-x86_64-pc-windows-msvc.zip"
-latest = false
+file_type = "zip"
 name = "Windows (x86_64, 7+)"
-nightly = true
 os = "Windows"
 type = "archive"
 
 [[installation.downloads]]
-cpu = "x86_64"
+available_on_latest = true
+available_on_nightly = true
+arch = "x86_64"
 file_name = "vector-amd64.deb"
-latest = true
+file_type = "deb"
 name = "Deb (x86_64)"
-nightly = true
 os = "Linux"
+package_manager = "DPKG"
 type = "package"
 
 [[installation.downloads]]
-cpu = "aarch64"
+available_on_latest = true
+available_on_nightly = true
+arch = "ARM64"
 file_name = "vector-arm64.deb"
-latest = false
+file_type = "deb"
 name = "Deb (ARM64)"
-nightly = true
 os = "Linux"
+package_manager = "DPKG"
 type = "package"
 
 [[installation.downloads]]
-cpu = "armv7"
+available_on_latest = true
+available_on_nightly = true
+arch = "ARMv7"
 file_name = "vector-armhf.deb"
-latest = false
+file_type = "deb"
 name = "Deb (ARMv7)"
-nightly = true
 os = "Linux"
+package_manager = "DPKG"
 type = "package"
 
 [[installation.downloads]]
-cpu = "x86_64"
+available_on_latest = true
+available_on_nightly = true
+arch = "x86_64"
 file_name = "vector-x86_64.rpm"
-latest = true
+file_type = "rpm"
 name = "RPM (x86_64)"
-nightly = true
 os = "Linux"
+package_manager = "RPM"
 type = "package"

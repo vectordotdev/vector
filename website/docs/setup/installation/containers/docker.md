@@ -39,7 +39,9 @@ To use your own configuration file:
 2. Run the Vector Docker image with the following command:
 
    ```bash
-   docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:0.5.0-alpine
+   docker run \
+    -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+    timberio/vector:0.5.0-alpine
    ```
 
    Modify `$PWD` to the directory where you store your local `vector.toml` file.
@@ -110,7 +112,8 @@ docker run timberio/vector:X.X.X-alpine
 Or pull the newest latest version:
 
 ```bash
-docker pull timberio/vector:latest-alpine && docker run timberio/vector:latest-alpine
+docker pull timberio/vector:latest-alpine && \
+  docker run timberio/vector:latest-alpine
 ```
 
 Or run with newer nightly date in the tag:
@@ -122,7 +125,8 @@ docker run timberio/vector:nightly-<YYYY-MM-DD>-alpine
 Or pull the newest nightly version:
 
 ```bash
-docker pull timberio/vector:nightly-alpine && docker run timberio/vector:nightly-alpine
+docker pull timberio/vector:nightly-alpine && \
+  docker run timberio/vector:nightly-alpine
 ```
 
 ## Source Files

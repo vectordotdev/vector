@@ -80,7 +80,7 @@
 }
 
 .downloadTableContainer {
-  max-width: 600px;
+  max-width: 700px;
 }
 
 .downloadTable {
@@ -103,6 +103,17 @@
   width: 33%;
 }
 
+.downloadFiles > div > span {
+  display: inline-block;
+  margin-right: var(--ifm-spacing-horizontal);
+  text-align: right;
+  width: 150px;
+}
+
+.downloadFiles > div > a {
+  display: inline-block;
+  margin-right: calc( var(--ifm-spacing-horizontal) / 2 );
+}
 
 .downloadGetStartedContainer {
   max-width: 600px;
