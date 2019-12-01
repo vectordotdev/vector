@@ -2,6 +2,12 @@
 # Job Macros
 #
 
+docker-machine: &docker-machine
+  machine:
+    image: ubuntu-1604:201903-01
+    docker_layer_caching: true
+  resource_class: large
+
 install-rust: &install-rust
   run:
     name: Install Rust
@@ -37,10 +43,7 @@ jobs:
   #
 
   check-code:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -51,10 +54,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-code
 
   check-fmt:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -65,10 +65,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-fmt
 
   check-generate:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -77,10 +74,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-generate
 
   check-version:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -282,10 +276,7 @@ jobs:
             - "*-x86_64-pc-windows-msvc.zip"
 
   build-x86_64-unknown-linux-musl-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -303,10 +294,7 @@ jobs:
             - "*-amd64.deb"
 
   build-aarch64-unknown-linux-musl-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -324,10 +312,7 @@ jobs:
             - "*-arm64.deb"
 
   build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -370,11 +355,8 @@ jobs:
   #
   # This is how I'd like the .deb packager to work as well, and I have a
   # feeling if we ditched `cargo deb` we could achieve this.
-  package-rpm:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+  package-rpm-x86_64-unknown-linux-musl:
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -387,7 +369,40 @@ jobs:
       - persist_to_workspace:
           root: target/artifacts
           paths:
-            - "*.rpm"
+            - "*x86_64.rpm"
+
+  package-rpm-aarch64-unknown-linux-musl:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build aarch64-unknown-linux-musl .rpm package
+          command: |
+            ./scripts/docker-run.sh packager-rpm make package-rpm
+          environment:
+            PASS_TARGET: aarch64-unknown-linux-musl
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*aarch64.rpm"
+
+  package-rpm-armv7-unknown-linux-musleabihf:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build armv7-unknown-linux-musleabihf .rpm package
+          command: |
+            ./scripts/docker-run.sh packager-rpm make package-rpm
+          environment:
+            PASS_TARGET: armv7-unknown-linux-musleabihf
+            PASS_ARCH: armv7hl
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*armv7hl.rpm"
 
   #
   # Verifying
@@ -466,10 +481,7 @@ jobs:
           command: vector --version
 
   verify-zip-artifact-on-wine:
-    resource_class: large
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -482,10 +494,7 @@ jobs:
             EOF
 
   verify-docker:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -789,9 +798,15 @@ workflows:
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
       # Verify
 
@@ -823,13 +838,14 @@ workflows:
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
+
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -857,7 +873,11 @@ workflows:
           <<: *release-filters
       - build-x86_64-pc-windows-msvc-archive:
           <<: *release-filters
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
+          <<: *release-filters
+      - package-rpm-aarch64-unknown-linux-musl:
+          <<: *release-filters
+      - package-rpm-armv7-unknown-linux-musleabihf:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -901,15 +921,15 @@ workflows:
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-amazon-linux-2:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           <<: *release-filters
           requires:
@@ -952,9 +972,16 @@ workflows:
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+
 
       # Verify
 
@@ -986,13 +1013,13 @@ workflows:
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
