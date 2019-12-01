@@ -117,6 +117,7 @@ function DocItem(props) {
     status,
     title,
     unsupported_operating_systems: unsupportedOperatingSystems,
+    version
   } = metadata;
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
@@ -144,16 +145,25 @@ function DocItem(props) {
           <div className="row">
             <div className="col">
               <div className={styles.docItemContainer}>
-                {!metadata.hide_title && (
-                  <header>
-                    <div className="badges">
-                      {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
-                      {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
-                    </div>
-                    <h1 className={styles.docTitle}>{metadata.title}</h1>
-                  </header>
-                )}
                 <article>
+                  {version && (
+                    <span
+                      style={{verticalAlign: 'top'}}
+                      className="badge badge--info">
+                      Version: {version}
+                    </span>
+                  )}
+
+                  {!metadata.hide_title && (
+                    <header>
+                      <div className="badges">
+                        {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
+                        {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
+                      </div>
+                      <h1 className={styles.docTitle}>{metadata.title}</h1>
+                    </header>
+                  )}
+                  
                   <div className="markdown">
                     <DocContent />
                   </div>
