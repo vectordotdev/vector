@@ -65,4 +65,8 @@ class Transform < Component
         })
     end
   end
+
+  def description
+    @desription ||= "Accepts #{input_types.to_sentence} events and allows you to #{allow_you_to_description}."
+  end
 end
