@@ -988,6 +988,13 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 .tabs--centered ul.tabs {
   display: inline-block;
 }
+
+@media (max-width: 996px) {
+  ul.tabs.rounded {
+    display: block !important;
+  }
+}
+
 /*
  * Docs
  */

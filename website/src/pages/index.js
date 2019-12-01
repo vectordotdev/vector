@@ -318,7 +318,6 @@ function Topologies() {
         <Tabs
           centered={true}
           className="rounded"
-          style={{minWidth: "500px"}}
           defaultValue="centralized"
           values={[
             { label: <><i className="feather icon-shuffle"></i> Distributed</>, value: 'distributed', },
