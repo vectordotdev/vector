@@ -23,9 +23,54 @@ import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="ARM64"
+  defaultValue="x86_64"
   urlKey="arch"
-  values={[{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
+  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
+
+
+<TabItem value="x86_64">
+
+1.  Download the Vector `.rpm` file:
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    curl -O https://packages.timber.io/vector/0.5.0/vector-x86_64.rpm
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl -O https://packages.timber.io/vector/nightly/latest/vector-x86_64.rpm
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the Vector `.rpm` package directly:
+
+    ```bash
+    sudo rpm -i vector-x86_64.rpm
+    ```
+
+3.  Start Vector:
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+    That's it! Proceed to [configure](#configuring) Vector for your use case.
+
+</TabItem>
 
 
 <TabItem value="ARM64">

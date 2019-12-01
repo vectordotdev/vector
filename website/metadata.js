@@ -100,6 +100,17 @@ module.exports = {
         "type": "package"
       },
       {
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "file_name": "vector-x86_64.rpm",
+        "file_type": "rpm",
+        "name": "RPM (x86_64)",
+        "os": "Linux",
+        "package_manager": "RPM",
+        "type": "package"
+      },
+      {
         "arch": "ARM64",
         "available_on_latest": true,
         "available_on_nightly": true,
