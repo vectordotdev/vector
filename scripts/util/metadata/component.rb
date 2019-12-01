@@ -146,6 +146,7 @@ class Component
     {
       beta: beta?,
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
+      description: description,
       event_types: event_types,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,

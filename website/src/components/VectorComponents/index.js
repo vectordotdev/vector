@@ -25,10 +25,10 @@ function Component({delivery_guarantee, description, event_types, name, status, 
       </div>
       <div className="vector-component--badges">
         {event_types.includes("log") ?
-          <span className="badge badge--primary" title="This component works with log event types"><i className="feather icon-database"></i></span> :
+          <span className="badge badge--primary" title="This component works with log event types">L</span> :
           ''}
         {event_types.includes("metric") ?
-          <span className="badge badge--primary" title="This component works with metric event types"><i className="feather icon-bar-chart"></i></span> :
+          <span className="badge badge--primary" title="This component works with metric event types">M</span> :
           ''}
         {status == "beta" ?
           <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i></span> :
@@ -246,15 +246,13 @@ function VectorComponents(props) {
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyLog(event.currentTarget.checked)}
-                checked={onlyLog} />
-              <i className="feather icon-database"></i> Log
+                checked={onlyLog} /> Log
             </label>
             <label title="Show only components that work with metric event types.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyMetric(event.currentTarget.checked)}
-                checked={onlyMetric} />
-              <i className="feather icon-bar-chart"></i> Metric
+                checked={onlyMetric} /> Metric
             </label>
           </span>
           <span className="vector-components--filters--section">

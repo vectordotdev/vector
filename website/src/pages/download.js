@@ -16,14 +16,14 @@ import {viewedNewRelease} from '@site/src/exports/newRelease';
 
 function Downloads({downloads, path}) {
   const groupedDownloads = groupBy(downloads, ((download) => {
-    return (download.package_manager || download.os);
+    return [download.os, download.package_manager];
   }));
 
   return (
     <ul className={styles.downloadFiles}>
-      {Object.keys(groupedDownloads).map((key, catIdx) => (
+      {Object.keys(groupedDownloads).sort().map((key, catIdx) => (
         <li key={catIdx}>
-          <span>{key} <code>(.{groupedDownloads[key][0].file_type})</code>:</span>
+          <span>{groupedDownloads[key][0].os} <code>(.{groupedDownloads[key][0].file_type})</code>:</span>
           <ul>
             {groupedDownloads[key].map((download, downloadIdx) => (
               <li>
