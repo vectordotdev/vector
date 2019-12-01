@@ -23,7 +23,7 @@ function Downloads({downloads, path}) {
     <ul className={styles.downloadFiles}>
       {Object.keys(groupedDownloads).sort().map((key, catIdx) => (
         <li key={catIdx}>
-          <span>{groupedDownloads[key][0].os} <code>(.{groupedDownloads[key][0].file_type})</code>:</span>
+          <span>{groupedDownloads[key][0].os} <code>.{groupedDownloads[key][0].file_type}</code></span>
           <ul>
             {groupedDownloads[key].map((download, downloadIdx) => (
               <li>

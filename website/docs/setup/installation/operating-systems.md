@@ -18,7 +18,7 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/installation/operating-systems/centos">CentOS</Jump>
 <Jump to="/docs/setup/installation/operating-systems/debian">Debian</Jump>
 <Jump to="/docs/setup/installation/operating-systems/macos">MacOS</Jump>
-<Jump to="/docs/setup/installation/operating-systems/raspberry-pi">Raspberry Pi</Jump>
+<Jump to="/docs/setup/installation/operating-systems/raspbian">Raspbian</Jump>
 <Jump to="/docs/setup/installation/operating-systems/rhel">RHEL</Jump>
 <Jump to="/docs/setup/installation/operating-systems/ubuntu">Ubuntu</Jump>
 <Jump to="/docs/setup/installation/operating-systems/windows">Windows</Jump>

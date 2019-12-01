@@ -30,8 +30,8 @@ package_manager = "Homebrew"
 os = "Linux"
 
 [[installation.operating_systems]]
-id = "raspberry-pi"
-name = "Raspberry Pi"
+id = "Raspbian"
+name = "Raspbian"
 package_manager = "DPKG"
 os = "Linux"
 

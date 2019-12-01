@@ -138,6 +138,10 @@
   margin-bottom: calc( var(--ifm-spacing-vertical) / 4 );
 }
 
+.downloadFiles > li:hover {
+  background: var(--ifm-panel-background);
+}
+
 .downloadFiles > li:last-child {
   padding-left: calc( 150px + var(--ifm-spacing-horizontal) );
 }
@@ -145,8 +149,12 @@
 .downloadFiles > li > span {
   display: inline-block;
   margin-right: var(--ifm-spacing-horizontal);
-  text-align: right;
   width: 150px;
+}
+
+.downloadFiles > li > span > code {
+  float: right;
+  margin-left: 5px;
 }
 
 .downloadFiles > li > ul {
@@ -162,11 +170,21 @@
 
 @media (max-width: 996px) {
   .downloadFiles > li {
-    display: list-item;
+    margin-bottom: var(--ifm-spacing-vertical);
+  }
+  
+  .downloadFiles > li:last-child {
+    padding-left: 0;
   }
 
   .downloadFiles > li > span {
-    text-align: left;
+    display: block;
+    margin: 0;
+    width: auto;
+  }
+
+  .downloadFiles > li > span > code {
+    float: none;
   }
 }
 

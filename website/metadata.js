@@ -137,8 +137,8 @@ module.exports = {
         "package_manager": "Homebrew"
       },
       {
-        "id": "raspberry-pi",
-        "name": "Raspberry Pi",
+        "id": "Raspbian",
+        "name": "Raspbian",
         "os": "Linux",
         "package_manager": "DPKG"
       },
