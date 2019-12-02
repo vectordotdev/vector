@@ -30,7 +30,7 @@ package_manager = "Homebrew"
 os = "Linux"
 
 [[installation.operating_systems]]
-id = "Raspbian"
+id = "raspbian"
 name = "Raspbian"
 package_manager = "DPKG"
 os = "Linux"
