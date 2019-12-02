@@ -119,7 +119,7 @@ cp -av distribution/init.d/vector $archive_dir/etc/init.d
 _old_dir=$(pwd)
 cd $target_dir
 case $ARCHIVE_TYPE in
-  tar.gz) make_archive="tar -czvf" ;;
+  tar.gz) make_archive="tar -I 'gzip -9' -cvf" ;;
   zip) make_archive="zip -r" ;;
 esac
 $make_archive vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
