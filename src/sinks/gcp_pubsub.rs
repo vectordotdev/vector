@@ -43,6 +43,8 @@ pub struct PubsubConfig {
 
 #[derive(Debug, Snafu)]
 enum BuildError {
+    #[snafu(display("GCP pubsub sink requires one of api_key or credentials_path to be defined"))]
+    MissingAuth,
     #[snafu(display("Invalid GCP credentials"))]
     InvalidCredentials { source: GOErr },
     #[snafu(display("Invalid RSA key in GCP credentials"))]
@@ -64,6 +66,10 @@ lazy_static! {
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        if self.api_key.is_none() && self.credentials_path.is_none() {
+            return Err(BuildError::MissingAuth.into());
+        }
+
         let creds = match self.credentials_path.as_ref() {
             Some(path) => Some(PubsubCreds::new(path)?),
             None => None,
@@ -243,7 +249,7 @@ fn encode_event(event: Event) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{assert_downcast_matches, event::LogEvent};
     use std::iter::FromIterator;
 
     #[test]
@@ -269,5 +275,20 @@ mod tests {
             body,
             "{\"messages\":[{\"data\":\"eyJtZXNzYWdlIjoiaGVsbG8gd29ybGQifQ==\"},{\"data\":\"eyJtZXNzYWdlIjoia2lsbHJveSB3YXMgaGVyZSJ9\"}]}"
         );
+    }
+
+    #[test]
+    fn fails_missing_creds() {
+        let config: PubsubConfig = toml::from_str(
+            r#"
+           project = "project"
+           topic = "topic"
+        "#,
+        )
+        .unwrap();
+        match config.build(Acker::Null) {
+            Ok(_) => panic!("config.build failed to error"),
+            Err(err) => assert_downcast_matches!(err, BuildError, BuildError::MissingAuth),
+        }
     }
 }
