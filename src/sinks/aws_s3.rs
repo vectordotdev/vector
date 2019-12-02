@@ -3,8 +3,8 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, BatchConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
-        TowerRequestConfig, ServiceBuilderExt
+        retries::RetryLogic, BatchConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
+        ServiceBuilderExt, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -144,15 +144,10 @@ impl S3Sink {
                     bucket.clone(),
                 )
             })
-            // .concurrency_limit(in_flight_limit)
-            // .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            // .retry(policy)
-            // .timeout(Duration::from_secs(timeout))
+            .settings(request, S3RetryLogic)
             .service(s3);
 
-        // let sink = BatchServiceSink::new(svc, acker)
-        let sink = request
-            .batch_sink(S3RetryLogic, svc, acker)
+        let sink = crate::sinks::util::BatchServiceSink::new(svc, acker)
             .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
