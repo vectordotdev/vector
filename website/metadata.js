@@ -159,7 +159,7 @@ module.exports = {
         "package_manager": "Homebrew"
       },
       {
-        "id": "Raspbian",
+        "id": "raspbian",
         "name": "Raspbian",
         "os": "Linux",
         "package_manager": "DPKG"
