@@ -227,15 +227,16 @@ module.exports = {
     ]
   },
   "latest_post": {
-    "author": "Luke",
-    "date": "2019-06-28",
-    "id": "introducing-vector",
-    "path": "website/blog/2019-06-28-introducing-vector.md",
-    "permalink": "https://vector.dev/blog/introducing-vector",
+    "author": "Ashley",
+    "date": "2019-11-25",
+    "id": "unit-testing-vector-config-files",
+    "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
+    "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
     "tags": [
-      "announcement"
+      "type: announcement",
+      "domain: config"
     ],
-    "title": "Introducing Vector"
+    "title": "Unit Testing: Treating Your Vector Config Files As Code"
   },
   "latest_release": {
     "commits": [
@@ -3596,9 +3597,45 @@ module.exports = {
       "path": "website/blog/2019-06-28-introducing-vector.md",
       "permalink": "https://vector.dev/blog/introducing-vector",
       "tags": [
-        "announcement"
+        "type: announcement"
       ],
       "title": "Introducing Vector"
+    },
+    {
+      "author": "Alex",
+      "date": "2019-11-19",
+      "id": "arm-raspbian-iot-support",
+      "path": "website/blog/2019-11-19-arm-support.md",
+      "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
+      "tags": [
+        "type: announcement",
+        "platform: linux"
+      ],
+      "title": "ARMv7 & Arm64 support: Raspbian & IOT"
+    },
+    {
+      "author": "Alex",
+      "date": "2019-11-21",
+      "id": "windows-support",
+      "path": "website/blog/2019-11-21-windows-support.md",
+      "permalink": "https://vector.dev/blog/windows-support",
+      "tags": [
+        "type: announcement",
+        "platform: windows"
+      ],
+      "title": "Windows Support Is Here!"
+    },
+    {
+      "author": "Ashley",
+      "date": "2019-11-25",
+      "id": "unit-testing-vector-config-files",
+      "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
+      "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+      "tags": [
+        "type: announcement",
+        "domain: config"
+      ],
+      "title": "Unit Testing: Treating Your Vector Config Files As Code"
     }
   ],
   "releases": {

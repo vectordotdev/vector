@@ -445,10 +445,10 @@ function Home() {
             </a>
           )}
           {!newRelease && newPost && (
-            <a href="/" className={styles.indexAnnouncement}>
+            <Link to={`/blog/${newPost.id}`} className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
               {newPost.title}
-            </a>
+            </Link>
           )}
           <h1>Vector Makes Observability Data Simple</h1>
           <p className="hero__subtitle">
