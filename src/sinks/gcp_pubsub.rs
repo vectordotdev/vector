@@ -3,9 +3,8 @@ use crate::{
     event::Event,
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, SinkExt,
+        BatchConfig, Buffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -18,13 +17,13 @@ use hyper::{
     Body, Client, Request,
 };
 use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::timer::Interval;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -36,14 +35,8 @@ pub struct PubsubConfig {
 
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
 }
@@ -60,6 +53,12 @@ enum BuildError {
 
 inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
 }
 
 #[typetag::serde(name = "gcp_pubsub")]
@@ -92,19 +91,7 @@ impl PubsubConfig {
         creds: &Option<PubsubCreds>,
     ) -> crate::Result<super::RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
-
-        let timeout = self.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = self.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = self.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = self.request_retry_backoff_secs.unwrap_or(1);
-
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            HttpRetryLogic,
-        );
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = self.uri(":publish")?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -127,14 +114,8 @@ impl PubsubConfig {
                     request
                 });
 
-        let service = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(http_service);
-
-        let sink = BatchServiceSink::new(service, acker)
+        let sink = request
+            .batch_sink(HttpRetryLogic, http_service, acker)
             .batched_with_min(Buffer::new(false), &batch)
             .with_flat_map(|event| iter_ok(Some(encode_event(event))));
 
