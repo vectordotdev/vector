@@ -109,6 +109,28 @@ module.exports = {
         "os": "Linux",
         "package_manager": "RPM",
         "type": "package"
+      },
+      {
+        "arch": "ARM64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "file_name": "vector-aarch64.rpm",
+        "file_type": "rpm",
+        "name": "RPM (ARM64)",
+        "os": "Linux",
+        "package_manager": "RPM",
+        "type": "package"
+      },
+      {
+        "arch": "ARMv7",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "file_name": "vector-armv7hl.rpm",
+        "file_type": "rpm",
+        "name": "RPM (ARMv7)",
+        "os": "Linux",
+        "package_manager": "RPM",
+        "type": "package"
       }
     ],
     "operating_systems": [

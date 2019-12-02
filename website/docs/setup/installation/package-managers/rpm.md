@@ -25,7 +25,7 @@ import TabItem from '@theme/TabItem';
   block={true}
   defaultValue="x86_64"
   urlKey="arch"
-  values={[{"label":"x86_64","value":"x86_64"}]}>
+  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
 
 
 <TabItem value="x86_64">
@@ -60,6 +60,96 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     sudo rpm -i vector-x86_64.rpm
+    ```
+
+3.  Start Vector:
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+    That's it! Proceed to [configure](#configuring) Vector for your use case.
+
+</TabItem>
+
+
+<TabItem value="ARM64">
+
+1.  Download the Vector `.rpm` file:
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    curl -O https://packages.timber.io/vector/0.5.0/vector-aarch64.rpm
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl -O https://packages.timber.io/vector/nightly/latest/vector-aarch64.rpm
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the Vector `.rpm` package directly:
+
+    ```bash
+    sudo rpm -i vector-aarch64.rpm
+    ```
+
+3.  Start Vector:
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+    That's it! Proceed to [configure](#configuring) Vector for your use case.
+
+</TabItem>
+
+
+<TabItem value="ARMv7">
+
+1.  Download the Vector `.rpm` file:
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    curl -O https://packages.timber.io/vector/0.5.0/vector-armv7hl.rpm
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl -O https://packages.timber.io/vector/nightly/latest/vector-armv7hl.rpm
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the Vector `.rpm` package directly:
+
+    ```bash
+    sudo rpm -i vector-armv7hl.rpm
     ```
 
 3.  Start Vector:
