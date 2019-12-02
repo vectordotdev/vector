@@ -102,23 +102,31 @@ function DocItem(props) {
   const {url: siteUrl} = siteConfig;
   const {metadata, content: DocContent} = props;
   const {
-    delivery_guarantee: deliveryGuarantee,
     description,
     editUrl,
-    event_types: eventTypes,
     image: metaImage,
     issues_url: issuesUrl,
     keywords,
     lastUpdatedAt,
     lastUpdatedBy,
-    operating_systems: operatingSystems,
     permalink,
     source_url: sourceUrl,
-    status,
     title,
-    unsupported_operating_systems: unsupportedOperatingSystems,
     version
   } = metadata;
+  const {
+    frontMatter: {
+      delivery_guarantee: deliveryGuarantee,
+      event_types: eventTypes,
+      hide_title: hideTitle,
+      hide_table_of_contents: hideTableOfContents,
+      operating_systems: operatingSystems,
+      status,
+      unsupported_operating_systems: unsupportedOperatingSystems,
+    },
+  } = DocContent;
+
+  console.log(metadata)
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
 
