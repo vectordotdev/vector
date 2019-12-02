@@ -441,7 +441,7 @@ function Home() {
           {newRelease && (
             <a href="/" className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
-              v{newRelease.version} has been released! Download now.
+              v{newRelease.version} has been released! View release notes.
             </a>
           )}
           {!newRelease && newPost && (

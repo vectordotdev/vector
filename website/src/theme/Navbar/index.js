@@ -120,7 +120,7 @@ function Navbar() {
           'navbar-sidebar--show': sidebarShown,
         })}>
         <div className="navbar__inner">
-          <div className="navbar__items">
+          <div className="navbar__items navbar__items--left">
             <div
               aria-label="Navigation bar toggle"
               className="navbar__toggle"

@@ -121,7 +121,7 @@
     border-right: 1px solid var(--ifm-hr-border-color);
     flex: 0 0 25%;
     margin-left: calc( var(--ifm-spacing-horizontal) * -1 );
-    max-width: calc(250px - var(--ifm-spacing-horizontal));
+    max-width: calc( var(--ifm-sidebar-width) - var(--ifm-spacing-horizontal) );
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
   }
 
