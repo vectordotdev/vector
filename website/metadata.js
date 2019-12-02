@@ -2,137 +2,207 @@ module.exports = {
   "installation": {
     "containers": [
       {
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
         "id": "docker",
-        "name": "Docker"
+        "name": "Docker",
+        "oss": [
+          "Linux",
+          "MacOS"
+        ]
       }
     ],
     "downloads": [
       {
-        "cpu": "x86_64",
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
-        "latest": true,
-        "name": "Linux (x86_64 w/ MUSL)",
-        "nightly": true,
+        "file_type": "tar.gz",
+        "name": "Linux (x86_64)",
         "os": "Linux",
         "type": "archive"
       },
       {
-        "cpu": "ARM64",
+        "arch": "ARM64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
-        "latest": false,
-        "name": "Linux (ARM64 w/ MUSL)",
-        "nightly": true,
+        "file_type": "tar.gz",
+        "name": "Linux (ARM64)",
         "os": "Linux",
         "type": "archive"
       },
       {
-        "cpu": "vector-armv7-unknown-linux-musleabihf",
+        "arch": "ARMv7",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
-        "latest": false,
-        "name": "Linux (ARMv7 w/ MUSL)",
-        "nightly": true,
+        "file_type": "tar.gz",
+        "name": "Linux (ARMv7)",
         "os": "Linux",
         "type": "archive"
       },
       {
-        "cpu": "x86_64",
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-x86_64-apple-darwin.tar.gz",
-        "latest": true,
-        "name": "MacOS (x86_64, 10.7+)",
-        "nightly": true,
+        "file_type": "tar.gz",
+        "name": "MacOS (x86_64)",
         "os": "MacOS",
         "type": "archive"
       },
       {
-        "cpu": "x86_64",
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-x86_64-pc-windows-msvc.zip",
-        "latest": false,
-        "name": "Windows (x86_64 w/ MSVC, 7+)",
-        "nightly": true,
+        "file_type": "zip",
+        "name": "Windows (x86_64, 7+)",
         "os": "Windows",
         "type": "archive"
       },
       {
-        "cpu": "x86_64",
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-amd64.deb",
-        "latest": true,
+        "file_type": "deb",
         "name": "Deb (x86_64)",
-        "nightly": true,
         "os": "Linux",
+        "package_manager": "DPKG",
         "type": "package"
       },
       {
-        "cpu": "aarch64",
+        "arch": "ARM64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-arm64.deb",
-        "latest": false,
+        "file_type": "deb",
         "name": "Deb (ARM64)",
-        "nightly": true,
         "os": "Linux",
+        "package_manager": "DPKG",
         "type": "package"
       },
       {
-        "cpu": "armv7",
+        "arch": "ARMv7",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-armhf.deb",
-        "latest": false,
+        "file_type": "deb",
         "name": "Deb (ARMv7)",
-        "nightly": true,
         "os": "Linux",
+        "package_manager": "DPKG",
         "type": "package"
       },
       {
-        "cpu": "x86_64",
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-x86_64.rpm",
-        "latest": true,
+        "file_type": "rpm",
         "name": "RPM (x86_64)",
-        "nightly": true,
         "os": "Linux",
+        "package_manager": "RPM",
+        "type": "package"
+      },
+      {
+        "arch": "ARM64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "file_name": "vector-aarch64.rpm",
+        "file_type": "rpm",
+        "name": "RPM (ARM64)",
+        "os": "Linux",
+        "package_manager": "RPM",
+        "type": "package"
+      },
+      {
+        "arch": "ARMv7",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "file_name": "vector-armv7hl.rpm",
+        "file_type": "rpm",
+        "name": "RPM (ARMv7)",
+        "os": "Linux",
+        "package_manager": "RPM",
         "type": "package"
       }
     ],
     "operating_systems": [
       {
         "id": "amazon-linux",
-        "name": "Amazon Linux"
+        "name": "Amazon Linux",
+        "os": "Linux",
+        "package_manager": "RPM"
       },
       {
         "id": "centos",
-        "name": "CentOS"
+        "name": "CentOS",
+        "os": "Linux",
+        "package_manager": "RPM"
       },
       {
         "id": "debian",
-        "name": "Debian"
+        "name": "Debian",
+        "os": "Linux",
+        "package_manager": "DPKG"
       },
       {
         "id": "macos",
-        "name": "MacOS"
+        "name": "MacOS",
+        "os": "Linux",
+        "package_manager": "Homebrew"
       },
       {
-        "id": "raspberry-pi",
-        "name": "Raspberry Pi"
+        "id": "raspbian",
+        "name": "Raspbian",
+        "os": "Linux",
+        "package_manager": "DPKG"
       },
       {
         "id": "rhel",
-        "name": "RHEL"
+        "name": "RHEL",
+        "os": "Linux",
+        "package_manager": "RPM"
       },
       {
         "id": "ubuntu",
-        "name": "Ubuntu"
+        "name": "Ubuntu",
+        "os": "Linux",
+        "package_manager": "DPKG"
       },
       {
         "id": "windows",
-        "name": "Windows"
+        "name": "Windows",
+        "os": "Windows"
       }
     ],
     "package_managers": [
       {
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
         "id": "dpkg",
         "name": "DPKG"
       },
       {
+        "archs": [
+          "x86_64"
+        ],
         "id": "homebrew",
         "name": "Homebrew"
       },
       {
+        "archs": [
+          "x86_64"
+        ],
         "id": "rpm",
         "name": "RPM"
       }
@@ -171,6 +241,7 @@ module.exports = {
     "aws_cloudwatch_logs": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
       "event_types": [
         "log"
       ],
@@ -192,6 +263,7 @@ module.exports = {
     "aws_cloudwatch_metrics": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
+      "description": "Streams metric events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
       "event_types": [
         "metric"
       ],
@@ -213,6 +285,7 @@ module.exports = {
     "aws_kinesis_streams": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
       "event_types": [
         "log"
       ],
@@ -234,6 +307,7 @@ module.exports = {
     "aws_s3": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
       "event_types": [
         "log"
       ],
@@ -255,6 +329,7 @@ module.exports = {
     "blackhole": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes.",
       "event_types": [
         "log",
         "metric"
@@ -277,6 +352,7 @@ module.exports = {
     "clickhouse": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].",
       "event_types": [
         "log"
       ],
@@ -298,6 +374,7 @@ module.exports = {
     "console": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Streams log and metric events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.",
       "event_types": [
         "log",
         "metric"
@@ -320,6 +397,7 @@ module.exports = {
     "datadog_metrics": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Batches metric events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
       "event_types": [
         "metric"
       ],
@@ -341,6 +419,7 @@ module.exports = {
     "elasticsearch": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).",
       "event_types": [
         "log"
       ],
@@ -362,6 +441,7 @@ module.exports = {
     "file": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Streams log events to a file.",
       "event_types": [
         "log"
       ],
@@ -383,6 +463,7 @@ module.exports = {
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to a generic HTTP endpoint.",
       "event_types": [
         "log"
       ],
@@ -404,6 +485,7 @@ module.exports = {
     "kafka": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
+      "description": "Streams log events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].",
       "event_types": [
         "log"
       ],
@@ -425,6 +507,7 @@ module.exports = {
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Exposes metric events to [Prometheus][urls.prometheus] metrics service.",
       "event_types": [
         "metric"
       ],
@@ -446,6 +529,7 @@ module.exports = {
     "splunk_hec": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to a [Splunk HTTP Event Collector][urls.splunk_hec].",
       "event_types": [
         "log"
       ],
@@ -467,6 +551,7 @@ module.exports = {
     "statsd": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Streams metric events to [StatsD][urls.statsd] metrics service.",
       "event_types": [
         "metric"
       ],
@@ -488,6 +573,7 @@ module.exports = {
     "tcp": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Streams log events to a TCP connection.",
       "event_types": [
         "log"
       ],
@@ -509,6 +595,7 @@ module.exports = {
     "vector": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Streams log events to another downstream [`vector` source][docs.sources.vector].",
       "event_types": [
         "log"
       ],
@@ -532,6 +619,7 @@ module.exports = {
     "docker": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the docker engine daemon and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -553,6 +641,7 @@ module.exports = {
     "file": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through one or more local files and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -574,6 +663,7 @@ module.exports = {
     "journald": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through log records from journald and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -594,6 +684,7 @@ module.exports = {
     "kafka": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
+      "description": "Ingests data through Kafka 0.9 or later and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -615,6 +706,7 @@ module.exports = {
     "statsd": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the StatsD UDP protocol and outputs metric events.",
       "event_types": [
         "metric"
       ],
@@ -636,6 +728,7 @@ module.exports = {
     "stdin": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
+      "description": "Ingests data through standard input (STDIN) and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -657,6 +750,7 @@ module.exports = {
     "syslog": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the Syslog 5424 protocol and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -678,6 +772,7 @@ module.exports = {
     "tcp": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the TCP protocol and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -699,6 +794,7 @@ module.exports = {
     "udp": {
       "beta": false,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the UDP protocol and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -720,6 +816,7 @@ module.exports = {
     "vector": {
       "beta": true,
       "delivery_guarantee": "best_effort",
+      "description": "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events.",
       "event_types": [
         "log",
         "metric"
@@ -744,6 +841,7 @@ module.exports = {
     "add_fields": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to add one or more log fields.",
       "event_types": [
         "log"
       ],
@@ -765,6 +863,7 @@ module.exports = {
     "add_tags": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts metric events and allows you to add one or more metric tags.",
       "event_types": [
         "metric"
       ],
@@ -786,6 +885,7 @@ module.exports = {
     "coercer": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to coerce log fields into fixed types.",
       "event_types": [
         "log"
       ],
@@ -807,6 +907,7 @@ module.exports = {
     "field_filter": {
       "beta": true,
       "delivery_guarantee": null,
+      "description": "Accepts log and metric events and allows you to filter events by a log field's value.",
       "event_types": [
         "log",
         "metric"
@@ -829,6 +930,7 @@ module.exports = {
     "grok_parser": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to parse a log field value with [Grok][urls.grok].",
       "event_types": [
         "log"
       ],
@@ -850,6 +952,7 @@ module.exports = {
     "json_parser": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to parse a log field value as JSON.",
       "event_types": [
         "log"
       ],
@@ -871,6 +974,7 @@ module.exports = {
     "log_to_metric": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to convert logs into one or more metrics.",
       "event_types": [
         "log",
         "metric"
@@ -893,6 +997,7 @@ module.exports = {
     "lua": {
       "beta": true,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to transform events with a full embedded [Lua][urls.lua] engine.",
       "event_types": [
         "log"
       ],
@@ -914,6 +1019,7 @@ module.exports = {
     "regex_parser": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex].",
       "event_types": [
         "log"
       ],
@@ -935,6 +1041,7 @@ module.exports = {
     "remove_fields": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to remove one or more log fields.",
       "event_types": [
         "log"
       ],
@@ -956,6 +1063,7 @@ module.exports = {
     "remove_tags": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts metric events and allows you to remove one or more metric tags.",
       "event_types": [
         "metric"
       ],
@@ -977,6 +1085,7 @@ module.exports = {
     "sampler": {
       "beta": true,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to sample events with a configurable rate.",
       "event_types": [
         "log"
       ],
@@ -998,6 +1107,7 @@ module.exports = {
     "split": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.",
       "event_types": [
         "log"
       ],
@@ -1019,6 +1129,7 @@ module.exports = {
     "tokenizer": {
       "beta": false,
       "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.",
       "event_types": [
         "log"
       ],

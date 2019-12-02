@@ -247,14 +247,6 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip
   end
 
-  def install_from_archive_linux(archive_name)
-    render("#{partials_path}/_install_from_archive_linux.md", binding).strip
-  end
-
-  def install_from_deb_linux(deb_name)
-    render("#{partials_path}/_install_from_deb_linux.md", binding).strip
-  end
-
   def manual_installation_next_steps(type)
     if type != :source && type != :archives
       raise ArgumentError.new("type must be one of :source or :archives")
@@ -485,6 +477,12 @@ class Templates
       collect do |f|
         path = DOCS_BASE_PATH + f.gsub(DOCS_ROOT, '').split(".").first
         name = File.basename(f).split(".").first.gsub("-", " ").humanize
+
+        front_matter = FrontMatterParser::Parser.parse_file(f).front_matter
+        sidebar_label = front_matter.fetch("sidebar_label", "hidden")
+        if sidebar_label != "hidden"
+          name = sidebar_label
+        end
 
         "<Jump to=\"#{path}\">#{name}</Jump>"
       end.

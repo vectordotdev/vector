@@ -11,6 +11,7 @@
 /scripts/generate* @binarylogic
 /scripts/package-* @a-rodin
 /scripts/release-* @a-rodin
+/scripts/upgrade-* @a-rodin
 
 /src/buffers/ @a-rodin
 

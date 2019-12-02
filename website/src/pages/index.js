@@ -318,7 +318,6 @@ function Topologies() {
         <Tabs
           centered={true}
           className="rounded"
-          style={{minWidth: "500px"}}
           defaultValue="centralized"
           values={[
             { label: <><i className="feather icon-shuffle"></i> Distributed</>, value: 'distributed', },
@@ -359,20 +358,23 @@ function Installation() {
         <div className={styles.installationPlatforms}>
           <Link to="/docs/setup/installation/containers/docker"><SVG src="/img/docker.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/linux.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/raspberry-pi"><SVG src="/img/raspberry-pi.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/raspbian"><SVG src="/img/raspbian.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems/windows"><SVG src="/img/windows.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
         </div>
 
         <div className={styles.installationChecks}>
           <div>
-            <i className="feather icon-package"></i> Fully static, no dependencies
+            <i className="feather icon-package"></i> Fully static, no deps
           </div>
           <div>
-            <i className="feather icon-feather"></i> Light-weight, weighing only 7mb
+            <i className="feather icon-cpu"></i> X86_64, ARM64, & ARMv7
           </div>
           <div>
-            <i className="feather icon-zap"></i> No runtime or garbage collection
+            <i className="feather icon-feather"></i> Light-weight, only 7mb
+          </div>
+          <div>
+            <i className="feather icon-zap"></i> No runtime, mem-safe
           </div>
         </div>
 

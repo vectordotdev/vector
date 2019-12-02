@@ -25,7 +25,7 @@ function Tabs(props) {
 
   return (
     <div>
-      <div className={centered ? "tabs--centered" : ""}>
+      {values.length > 1 && <div className={centered ? "tabs--centered" : ""}>
         <ul
           className={classnames('tabs', props.className, {
             'tabs--block': block,
@@ -43,7 +43,7 @@ function Tabs(props) {
             </li>
           ))}
         </ul>
-      </div>
+      </div>}
       <div className="margin-vert--md">
         {
           Children.toArray(children).filter(

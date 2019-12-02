@@ -102,22 +102,31 @@ function DocItem(props) {
   const {url: siteUrl} = siteConfig;
   const {metadata, content: DocContent} = props;
   const {
-    delivery_guarantee: deliveryGuarantee,
     description,
     editUrl,
-    event_types: eventTypes,
     image: metaImage,
     issues_url: issuesUrl,
     keywords,
     lastUpdatedAt,
     lastUpdatedBy,
-    operating_systems: operatingSystems,
     permalink,
     source_url: sourceUrl,
-    status,
     title,
-    unsupported_operating_systems: unsupportedOperatingSystems,
+    version
   } = metadata;
+  const {
+    frontMatter: {
+      delivery_guarantee: deliveryGuarantee,
+      event_types: eventTypes,
+      hide_title: hideTitle,
+      hide_table_of_contents: hideTableOfContents,
+      operating_systems: operatingSystems,
+      status,
+      unsupported_operating_systems: unsupportedOperatingSystems,
+    },
+  } = DocContent;
+
+  console.log(metadata)
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
 
@@ -144,16 +153,25 @@ function DocItem(props) {
           <div className="row">
             <div className="col">
               <div className={styles.docItemContainer}>
-                {!metadata.hide_title && (
-                  <header>
-                    <div className="badges">
-                      {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
-                      {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
-                    </div>
-                    <h1 className={styles.docTitle}>{metadata.title}</h1>
-                  </header>
-                )}
                 <article>
+                  {version && (
+                    <span
+                      style={{verticalAlign: 'top'}}
+                      className="badge badge--info">
+                      Version: {version}
+                    </span>
+                  )}
+
+                  {!metadata.hide_title && (
+                    <header>
+                      <div className="badges">
+                        {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
+                        {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
+                      </div>
+                      <h1 className={styles.docTitle}>{metadata.title}</h1>
+                    </header>
+                  )}
+                  
                   <div className="markdown">
                     <DocContent />
                   </div>

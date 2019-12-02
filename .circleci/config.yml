@@ -2,6 +2,12 @@
 # Job Macros
 #
 
+docker-machine: &docker-machine
+  machine:
+    image: ubuntu-1604:201903-01
+    docker_layer_caching: true
+  resource_class: large
+
 install-rust: &install-rust
   run:
     name: Install Rust
@@ -37,10 +43,7 @@ jobs:
   #
 
   check-code:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -51,10 +54,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-code
 
   check-fmt:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -65,10 +65,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-fmt
 
   check-generate:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -77,10 +74,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-generate
 
   check-version:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -129,6 +123,7 @@ jobs:
       - run:
           name: Build and test
           shell: bash
+          no_output_timeout: 30m
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
@@ -188,7 +183,8 @@ jobs:
           docker_layer_caching: true
       - run:
           name: Test
-          command: cargo test --all --features docker --jobs 4 -- --test-threads 4
+          no_output_timeout: 30m
+          command: cargo test --all --features docker --jobs 4
       - store_test_results:
           path: ./test-results
 
@@ -207,6 +203,7 @@ jobs:
       - *install-rust
       - run:
           name: Build archive
+          no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             make build-archive
@@ -256,6 +253,7 @@ jobs:
       - run:
           name: Build archive
           shell: bash
+          no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             function zip() {
@@ -278,14 +276,12 @@ jobs:
             - "*-x86_64-pc-windows-msvc.zip"
 
   build-x86_64-unknown-linux-musl-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
           name: Build archive and .deb package
+          no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
@@ -298,14 +294,12 @@ jobs:
             - "*-amd64.deb"
 
   build-aarch64-unknown-linux-musl-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
           name: Build archive and .deb package
+          no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
@@ -318,14 +312,12 @@ jobs:
             - "*-arm64.deb"
 
   build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
           name: Build archive and .deb package
+          no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
@@ -363,11 +355,8 @@ jobs:
   #
   # This is how I'd like the .deb packager to work as well, and I have a
   # feeling if we ditched `cargo deb` we could achieve this.
-  package-rpm:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+  package-rpm-x86_64-unknown-linux-musl:
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -380,7 +369,40 @@ jobs:
       - persist_to_workspace:
           root: target/artifacts
           paths:
-            - "*.rpm"
+            - "*x86_64.rpm"
+
+  package-rpm-aarch64-unknown-linux-musl:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build aarch64-unknown-linux-musl .rpm package
+          command: |
+            ./scripts/docker-run.sh packager-rpm make package-rpm
+          environment:
+            PASS_TARGET: aarch64-unknown-linux-musl
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*aarch64.rpm"
+
+  package-rpm-armv7-unknown-linux-musleabihf:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build armv7-unknown-linux-musleabihf .rpm package
+          command: |
+            ./scripts/docker-run.sh packager-rpm make package-rpm
+          environment:
+            PASS_TARGET: armv7-unknown-linux-musleabihf
+            PASS_ARCH: armv7hl
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*armv7hl.rpm"
 
   #
   # Verifying
@@ -459,10 +481,7 @@ jobs:
           command: vector --version
 
   verify-zip-artifact-on-wine:
-    resource_class: large
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -475,16 +494,14 @@ jobs:
             EOF
 
   verify-docker:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Build & verify Docker
           command: |
+            ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
             make build-docker
           no_output_timeout: 30m
@@ -652,16 +669,17 @@ jobs:
   #
 
   release-docker:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    resource_class: large
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Docker
           command: |
+            ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
             make release-docker
           no_output_timeout: 30m
@@ -740,6 +758,9 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+    - package-rpm-x86_64-unknown-linux-musl
+    - package-rpm-aarch64-unknown-linux-musl
+    - package-rpm-armv7-unknown-linux-musleabihf
     - build-x86_64-apple-darwin-archive
     - build-x86_64-pc-windows-msvc-archive
     - verify-deb-artifact-on-deb-8
@@ -780,9 +801,15 @@ workflows:
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
       # Verify
 
@@ -810,15 +837,18 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
+
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -846,7 +876,11 @@ workflows:
           <<: *release-filters
       - build-x86_64-pc-windows-msvc-archive:
           <<: *release-filters
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
+          <<: *release-filters
+      - package-rpm-aarch64-unknown-linux-musl:
+          <<: *release-filters
+      - package-rpm-armv7-unknown-linux-musleabihf:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -885,19 +919,20 @@ workflows:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
-            - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-amazon-linux-2:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           <<: *release-filters
           requires:
@@ -924,7 +959,7 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          cron: "0 17 * * *"
+          cron: "0 11 * * *"
           <<: *master-filters
 
     jobs:
@@ -940,9 +975,16 @@ workflows:
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
       - build-x86_64-pc-windows-msvc-archive
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+
 
       # Verify
 
@@ -970,15 +1012,17 @@ workflows:
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -1024,7 +1068,7 @@ workflows:
   remote-checks:
     triggers:
       - schedule:
-          cron: "0 0 * * *"
+          cron: "0 11 * * *"
           <<: *master-filters
 
     jobs:

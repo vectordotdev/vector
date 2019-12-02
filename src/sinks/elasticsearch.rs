@@ -4,9 +4,8 @@ use crate::{
     region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -17,6 +16,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request,
 };
+use lazy_static::lazy_static;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -25,8 +25,6 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::time::Duration;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -44,21 +42,20 @@ pub struct ElasticSearchConfig {
     // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -208,13 +205,7 @@ fn es(
     };
 
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
     let index = if let Some(idx) = &config.index {
         Template::from(idx.as_str())
@@ -222,12 +213,6 @@ fn es(
         Template::from("vector-%Y.%m.%d")
     };
     let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
 
     let headers = config
         .headers
@@ -299,14 +284,8 @@ fn es(
             }
         });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, acker)
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 

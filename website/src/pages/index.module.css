@@ -249,6 +249,8 @@ html[data-theme="dark"] .hero {
   margin: var(--ifm-heading-margin-bottom) auto;
   max-height: 300px;
   max-width: 900px;
+  height: 100%;
+  width: 100%;
 }
 
 /*

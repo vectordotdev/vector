@@ -3,8 +3,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        retries::FixedRetryPolicy,
-        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
+        BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
@@ -13,11 +12,11 @@ use futures::{Future, Poll};
 use http::{uri::InvalidUri, Method, StatusCode, Uri};
 use hyper;
 use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::time::Duration;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -46,14 +45,15 @@ pub struct DatadogConfig {
     pub api_key: String,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_retry_attempts: Some(5),
+        ..Default::default()
+    };
 }
 
 pub fn default_host() -> String {
@@ -109,19 +109,7 @@ impl SinkConfig for DatadogConfig {
 impl DatadogSvc {
     pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
         let batch = config.batch.unwrap_or(20, 1);
-
-        let timeout = config.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(5);
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
-
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            HttpRetryLogic,
-        );
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = format!("{}/api/v1/series?api_key={}", config.host, config.api_key)
             .parse::<Uri>()
@@ -144,15 +132,9 @@ impl DatadogSvc {
             inner: http_service,
         };
 
-        let service = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(datadog_http_service);
-
-        let sink =
-            BatchServiceSink::new(service, acker).batched_with_min(MetricBuffer::new(), &batch);
+        let sink = request
+            .batch_sink(HttpRetryLogic, datadog_http_service, acker)
+            .batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }
