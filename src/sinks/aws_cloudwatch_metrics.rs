@@ -2,22 +2,20 @@ use crate::{
     buffers::Acker,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
-    sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, MetricBuffer, SinkExt,
-    },
+    sinks::util::{retries::RetryLogic, BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{Future, Poll};
+use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::{convert::TryInto, time::Duration};
-use tower::{Service, ServiceBuilder};
+use std::convert::TryInto;
+use tower::Service;
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
@@ -33,14 +31,16 @@ pub struct CloudWatchMetricsSinkConfig {
     pub region: RegionOrEndpoint,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_timeout_secs: Some(30),
+        request_rate_limit_num: Some(150),
+        ..Default::default()
+    };
 }
 
 inventory::submit! {
@@ -72,30 +72,13 @@ impl CloudWatchMetricsSvc {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
         let batch = config.batch.unwrap_or(20, 1);
-
-        let timeout = config.request_timeout_secs.unwrap_or(30);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(150);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
-
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            CloudWatchMetricsRetryLogic,
-        );
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(cloudwatch_metrics);
-
-        let sink = BatchServiceSink::new(svc, acker).batched_with_min(MetricBuffer::new(), &batch);
+        let sink = request
+            .batch_sink(CloudWatchMetricsRetryLogic, cloudwatch_metrics, acker)
+            .batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
     }

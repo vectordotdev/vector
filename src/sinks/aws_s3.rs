@@ -3,8 +3,8 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        retries::RetryLogic, BatchConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkDescription},
@@ -12,6 +12,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
@@ -19,8 +20,7 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::convert::TryInto;
-use std::time::Duration;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
@@ -49,14 +49,16 @@ pub struct S3SinkConfig {
     pub compression: Compression,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(25),
+        request_rate_limit_num: Some(25),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -111,19 +113,8 @@ enum HealthcheckError {
 
 impl S3Sink {
     pub fn new(config: &S3SinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
-        let timeout = config.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(25);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
-
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            S3RetryLogic,
-        );
 
         let compression = match config.compression {
             Compression::Gzip => true,
@@ -148,14 +139,8 @@ impl S3Sink {
             filename_extension: config.filename_extension.clone(),
         };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(s3);
-
-        let sink = BatchServiceSink::new(svc, acker)
+        let sink = request
+            .batch_sink(S3RetryLogic, s3, acker)
             .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 

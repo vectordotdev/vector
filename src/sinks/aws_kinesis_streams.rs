@@ -2,14 +2,12 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchServiceSink, SinkExt,
-    },
+    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_kinesis::{
@@ -18,9 +16,9 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
+use std::{convert::TryInto, fmt, sync::Arc};
 use string_cache::DefaultAtom as Atom;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
@@ -39,14 +37,15 @@ pub struct KinesisSinkConfig {
     pub encoding: Encoding,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_timeout_secs: Some(30),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -88,32 +87,14 @@ impl KinesisService {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
-
-        let timeout = config.request_timeout_secs.unwrap_or(30);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
 
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            KinesisRetryLogic,
-        );
-
         let kinesis = KinesisService { client, config };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(kinesis);
-
-        let sink = BatchServiceSink::new(svc, acker)
+        let sink = request
+            .batch_sink(KinesisRetryLogic, kinesis, acker)
             .batched_with_min(Vec::new(), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
