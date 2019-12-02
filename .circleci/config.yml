@@ -758,6 +758,9 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+    - package-rpm-x86_64-unknown-linux-musl
+    - package-rpm-aarch64-unknown-linux-musl
+    - package-rpm-armv7-unknown-linux-musleabihf
     - build-x86_64-apple-darwin-archive
     - build-x86_64-pc-windows-msvc-archive
     - verify-deb-artifact-on-deb-8
