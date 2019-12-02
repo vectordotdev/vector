@@ -12,7 +12,7 @@ use tower::{
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,
     timeout::Timeout,
-util::BoxService,
+    util::BoxService,
     Service, ServiceBuilder,
 };
 

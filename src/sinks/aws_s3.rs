@@ -363,25 +363,29 @@ mod tests {
         assert_eq!(map["key"], "value".to_string());
     }
 
-    // #[test]
-    // fn s3_generate_key() {
-    //     assert_eq!(
-    //         generate_key("key/".as_bytes(), &"date", Some("ext".into()), false, false),
-    //         "key/date.ext"
-    //     );
-    //     assert_eq!(
-    //         generate_key("key/".as_bytes(), &"date", None, false, false),
-    //         "key/date.log"
-    //     );
-    //     assert_eq!(
-    //         generate_key("key/".as_bytes(), &"date", None, false, true),
-    //         "key/date.log.gz"
-    //     );
-    //     assert_eq!(
-    //         generate_key("key".as_bytes(), &"date", None, false, true),
-    //         "keydate.log.gz"
-    //     );
-    // }
+    #[test]
+    fn s3_build_request() {
+        let buf = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("key/"));
+
+        let req = build_request(
+            buf.clone(),
+            "date".into(),
+            Some("ext".into()),
+            false,
+            false,
+            "bucket".into(),
+        );
+        assert_eq!(req.key, "key/date.ext".to_string());
+
+        let req = build_request(buf.clone(), "date".into(), None, false, false, "bucket".into());
+        assert_eq!(req.key, "key/date.log".to_string());
+
+        let req = build_request(buf.clone(), "date".into(), None, false, true, "bucket".into());
+        assert_eq!(req.key, "key/date.log.gz".to_string());
+
+        let req = build_request(buf.clone(), "date".into(), None, true, true, "bucket".into());
+        assert_ne!(req.key, "key/date.log.gz".to_string());
+    }
 }
 
 #[cfg(feature = "s3-integration-tests")]
