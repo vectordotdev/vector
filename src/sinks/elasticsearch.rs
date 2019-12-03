@@ -1,15 +1,14 @@
 use crate::{
     buffers::Acker,
     event::Event,
-    region::RegionOrEndpoint,
+    region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
@@ -17,6 +16,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request,
 };
+use lazy_static::lazy_static;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -25,37 +25,37 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::time::Duration;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    pub host: String,
+    pub host: Option<String>,
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
+    // TODO: This should be an Option, but when combined with flatten we never seem to get back
+    // a None. For now, we get optionality by handling the error during parsing when nothing is
+    // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
-    pub region: Option<RegionOrEndpoint>,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    pub region: RegionOrEndpoint,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -65,11 +65,15 @@ pub struct ElasticSearchBasicAuthConfig {
     pub user: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     Default,
     Aws,
+}
+
+inventory::submit! {
+    SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -92,7 +96,7 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 struct ElasticSearchCommon {
-    host: String,
+    base_url: String,
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
@@ -103,6 +107,8 @@ struct ElasticSearchCommon {
 enum ParseError {
     #[snafu(display("Invalid host {:?}: {:?}", host, source))]
     InvalidHost { host: String, source: InvalidUri },
+    #[snafu(display("Default provider requires a configured host"))]
+    DefaultRequiresHost,
     #[snafu(display("AWS provider requires a configured region"))]
     AWSRequiresRegion,
     #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
@@ -113,29 +119,46 @@ enum ParseError {
 
 impl ElasticSearchCommon {
     fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", config.host);
-        uri.parse::<Uri>().with_context(|| InvalidHost {
-            host: config.host.clone(),
-        })?;
-
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))
         });
 
-        let region: Option<Region> = match config.region {
-            Some(ref region) => Some(region.try_into()?),
-            None => None,
+        let region: Option<Region> = match (&config.region).try_into() {
+            Ok(region) => Some(region),
+            Err(region::ParseError::MissingRegionAndEndpoint) => None,
+            Err(error) => return Err(error.into()),
         };
 
-        let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
+        let provider = config.provider.unwrap_or(Provider::Default);
+
+        let base_url = match provider {
+            Provider::Default => match config.host {
+                Some(ref host) => host.clone(),
+                None => return Err(ParseError::DefaultRequiresHost.into()),
+            },
+            Provider::Aws => match region {
+                None => return Err(ParseError::AWSRequiresRegion.into()),
+                Some(ref region) => match region {
+                    // Adapted from rusoto_core::signature::build_hostname, which is unfortunately not pub
+                    Region::Custom { endpoint, .. } if endpoint.contains("://") => endpoint.clone(),
+                    Region::Custom { endpoint, .. } => format!("https://{}", endpoint),
+                    Region::CnNorth1 | Region::CnNorthwest1 => {
+                        format!("https://es.{}.amazonaws.com.cn", region.name())
+                    }
+                    _ => format!("https://es.{}.amazonaws.com", region.name()),
+                },
+            },
+        };
+
+        // Test the configured host, but ignore the result
+        let uri = format!("{}/_test", base_url);
+        uri.parse::<Uri>()
+            .with_context(|| InvalidHost { host: &base_url })?;
+
+        let credentials = match provider {
             Provider::Default => None,
             Provider::Aws => {
-                if region.is_none() {
-                    return Err(ParseError::AWSRequiresRegion.into());
-                }
-
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
@@ -152,7 +175,7 @@ impl ElasticSearchCommon {
         let tls_settings = TlsSettings::from_options(&config.tls)?;
 
         Ok(Self {
-            host: config.host.clone(),
+            base_url,
             authorization,
             region,
             credentials,
@@ -161,7 +184,7 @@ impl ElasticSearchCommon {
     }
 
     fn request_builder(&self, method: Method, path: &str) -> (Uri, http::request::Builder) {
-        let uri = format!("{}{}", self.host, path);
+        let uri = format!("{}{}", self.base_url, path);
         let uri = uri.parse::<Uri>().unwrap(); // Already tested that this parses above.
         let mut builder = Request::builder();
         builder.method(method);
@@ -181,15 +204,8 @@ fn es(
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
     let index = if let Some(idx) = &config.index {
         Template::from(idx.as_str())
@@ -197,12 +213,6 @@ fn es(
         Template::from("vector-%Y.%m.%d")
     };
     let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
 
     let headers = config
         .headers
@@ -274,19 +284,9 @@ fn es(
             }
         });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, acker)
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
     Box::new(sink)
@@ -389,7 +389,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Event;
+    use crate::{assert_downcast_matches, Event};
     use serde_json::json;
 
     #[test]
@@ -433,6 +433,56 @@ mod tests {
 
         assert_eq!(json!({}), action);
     }
+
+    fn parse_config(input: &str) -> crate::Result<ElasticSearchCommon> {
+        let config: ElasticSearchConfig = toml::from_str(input).unwrap();
+        ElasticSearchCommon::parse_config(&config)
+    }
+
+    fn parse_config_err(input: &str) -> crate::Error {
+        // ElasticSearchCommon doesn't impl Debug, so can't just unwrap_err
+        match parse_config(input) {
+            Ok(_) => panic!("Mis-parsed invalid config"),
+            Err(err) => err,
+        }
+    }
+
+    #[test]
+    fn host_is_required_for_default() {
+        let err = parse_config_err(r#"provider = "default""#);
+        assert_downcast_matches!(err, ParseError, ParseError::DefaultRequiresHost);
+    }
+
+    #[test]
+    fn host_is_not_required_for_aws() {
+        let result = parse_config(
+            r#"
+                provider = "aws"
+                region = "us-east-1"
+            "#,
+        );
+        // If not running in an AWS context, this will fail with a
+        // credentials error, but that is valid too.
+        match result {
+            Ok(_) => (),
+            Err(err) => {
+                assert_downcast_matches!(err, ParseError, ParseError::AWSCredentialsGenerateFailed { .. })
+            }
+        }
+    }
+
+    #[test]
+    fn region_is_not_required_for_default() {
+        let common = parse_config(r#"host = "https://example.com""#).unwrap();
+
+        assert_eq!(None, common.region);
+    }
+
+    #[test]
+    fn region_is_required_for_aws() {
+        let err = parse_config_err(r#"provider = "aws""#);
+        assert_downcast_matches!(err, ParseError, ParseError::AWSRequiresRegion { .. });
+    }
 }
 
 #[cfg(test)]
@@ -458,14 +508,14 @@ mod integration_tests {
     fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            host: Some("http://localhost:9200".into()),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            ..Default::default()
+            ..config()
         };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
@@ -481,10 +531,10 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(&config)).unwrap();
+        block_on(flush(&common)).unwrap();
 
         let response = reqwest::Client::new()
-            .get(&format!("{}/{}/_search", config.host, index))
+            .get(&format!("{}/{}/_search", common.base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
@@ -514,44 +564,40 @@ mod integration_tests {
     #[test]
     fn insert_events_over_http() {
         run_insert_tests(ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            host: Some("http://localhost:9200".into()),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            ..Default::default()
+            ..config()
         });
     }
 
     #[test]
     fn insert_events_over_https() {
         run_insert_tests(ElasticSearchConfig {
-            host: "https://localhost:9201".into(),
+            host: Some("https://localhost:9201".into()),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
-            batch_size: Some(1),
             tls: Some(TlsOptions {
                 ca_path: Some("tests/data/Vector_CA.crt".into()),
                 ..Default::default()
             }),
-            ..Default::default()
+            ..config()
         });
     }
 
     #[test]
     fn insert_events_on_aws() {
-        let url = "http://localhost:4571";
         run_insert_tests(ElasticSearchConfig {
-            host: url.into(),
-            batch_size: Some(1),
             provider: Some(Provider::Aws),
-            region: Some(RegionOrEndpoint::with_endpoint(url.into())),
-            ..Default::default()
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
+            ..config()
         });
     }
 
     fn run_insert_tests(mut config: ElasticSearchConfig) {
         let index = gen_index();
         config.index = Some(index.clone());
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
         let (sink, healthcheck) = config.build(Acker::Null).expect("Building config failed");
 
@@ -563,7 +609,7 @@ mod integration_tests {
         let _ = block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&config)).expect("Flushing writes failed");
+        block_on(flush(&common)).expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -578,7 +624,7 @@ mod integration_tests {
             .expect("Could not build HTTP client");
 
         let response = client
-            .get(&format!("{}/{}/_search", config.host, index))
+            .get(&format!("{}/{}/_search", common.base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
@@ -602,12 +648,11 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(config: &ElasticSearchConfig) -> impl Future<Item = (), Error = crate::Error> {
-        let uri = format!("{}/_flush", config.host);
+    fn flush(common: &ElasticSearchCommon) -> impl Future<Item = (), Error = crate::Error> {
+        let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let common = ElasticSearchCommon::parse_config(config).expect("Config error");
-        https_client(common.tls_settings)
+        https_client(common.tls_settings.clone())
             .expect("Could not build client to flush")
             .request(request)
             .map_err(|source| dbg!(source).into())
@@ -615,5 +660,15 @@ mod integration_tests {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
             })
+    }
+
+    fn config() -> ElasticSearchConfig {
+        ElasticSearchConfig {
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
+            ..Default::default()
+        }
     }
 }

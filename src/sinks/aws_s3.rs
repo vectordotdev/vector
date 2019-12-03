@@ -3,15 +3,16 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        retries::RetryLogic, BatchConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
@@ -19,8 +20,7 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::convert::TryInto;
-use std::time::Duration;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
@@ -46,17 +46,19 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    pub batch_size: Option<usize>,
     pub compression: Compression,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(25),
+        request_rate_limit_num: Some(25),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -75,6 +77,10 @@ pub enum Compression {
     #[derivative(Default)]
     Gzip,
     None,
+}
+
+inventory::submit! {
+    SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
 #[typetag::serde(name = "aws_s3")]
@@ -107,28 +113,16 @@ enum HealthcheckError {
 
 impl S3Sink {
     pub fn new(config: &S3SinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
-        let timeout = config.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(25);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            S3RetryLogic,
-        );
-
-        let batch_timeout = config.batch_timeout.unwrap_or(300);
         let compression = match config.compression {
             Compression::Gzip => true,
             Compression::None => false,
         };
-        let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
+        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
             Template::from(kp.as_str())
@@ -145,19 +139,9 @@ impl S3Sink {
             filename_extension: config.filename_extension.clone(),
         };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(s3);
-
-        let sink = BatchServiceSink::new(svc, acker)
-            .partitioned_batched_with_min(
-                PartitionBuffer::new(Buffer::new(compression)),
-                batch_size,
-                Duration::from_secs(batch_timeout),
-            )
+        let sink = request
+            .batch_sink(S3RetryLogic, s3, acker)
+            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
@@ -415,7 +399,7 @@ mod integration_tests {
 
     #[test]
     fn s3_insert_message_into() {
-        let config = config();
+        let config = config(1000000);
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
@@ -442,11 +426,10 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            batch_size: Some(1000),
             key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
             filename_time_format: Some("waitsforfullbatch".into()),
             filename_append_uuid: Some(false),
-            ..config()
+            ..config(1000)
         };
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
@@ -488,11 +471,10 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            batch_size: Some(1000),
             key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
             filename_time_format: Some("waitsforfullbatch".into()),
             filename_append_uuid: Some(false),
-            ..config()
+            ..config(1000)
         };
 
         let prefix = config.key_prefix.clone();
@@ -554,10 +536,9 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            batch_size: Some(1000),
             compression: Compression::Gzip,
             filename_time_format: Some("%S%f".into()),
-            ..config()
+            ..config(1000)
         };
 
         let prefix = config.key_prefix.clone();
@@ -591,7 +572,7 @@ mod integration_tests {
     fn s3_healthchecks() {
         let mut rt = Runtime::new().unwrap();
 
-        let healthcheck = S3Sink::healthcheck(&config()).unwrap();
+        let healthcheck = S3Sink::healthcheck(&config(1)).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -601,7 +582,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
-            ..config()
+            ..config(1)
         };
         let healthcheck = S3Sink::healthcheck(&config).unwrap();
         assert_downcast_matches!(
@@ -620,14 +601,17 @@ mod integration_tests {
         S3Sink::create_client(region)
     }
 
-    fn config() -> S3SinkConfig {
+    fn config(batch_size: usize) -> S3SinkConfig {
         ensure_bucket(&client());
 
         S3SinkConfig {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch_timeout: Some(5),
+            batch: BatchConfig {
+                batch_size: Some(batch_size),
+                batch_timeout: Some(5),
+            },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
         }

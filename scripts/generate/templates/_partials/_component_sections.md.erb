@@ -22,10 +22,10 @@ how to do this.
 
 ### Buffers & Batches
 
-<%- if component.partition_options.any? -%> 
-![][assets.sink-flow-partitioned]
+<%- if component.partition_options.any? -%>
+<SVG src="/img/buffers-and-batches-partitioned.svg" />
 <%- else -%>
-![][assets.sink-flow-serial]
+<SVG src="/img/buffers-and-batches-serial.svg" />
 <%- end -%>
 
 The `<%= component.name %>` <%= component.type %> buffers & batches data as
@@ -49,19 +49,6 @@ By default, the `<%= component.name %>` <%= component.type %> will add context
 keys to your events via the <%= option_names(component.context_options).to_sentence %>
 options.
 <%- end -%>
-<% if component.respond_to?(:delivery_guarantee) -%>
-
-### Delivery Guarantee
-
-<% case component.delivery_guarantee -%>
-<% when "at_least_once" -%>
-This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
-if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
-<% when "best_effort" -%>
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
-<% end -%>
-<% end -%>
 
 ### Environment Variables
 
@@ -90,17 +77,22 @@ accept data. This check is performed upon sink initialization.
 In order to run this check you must provide a value for the `healthcheck_uri`
 option.
 <%- end -%>
-
 If the health check fails an error will be logged and Vector will proceed to
-start. If you'd like to exit immediately upon health check failure, you can
+start.
+
+#### Require Health Checks
+
+If you'd like to exit immediately upon a health check failure, you can
 pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-And finally, if you'd like to disable health checks entirely for this sink
-you can set the `healthcheck` option to `false`.
+#### Disable Health Checks
+
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 <%- end -%>
 <%- if component.partition_options.any? -%>
 
@@ -113,28 +105,30 @@ You'll notice that Vector's [template sytax](#template-syntax) is supported
 for these options, enabling you to use field values as the partition's key.
 <%- end -%>
 <%- end -%>
-<%- if component.options.rate_limit_duration -%>
+<%- if component.options.request_rate_limit_duration_secs -%>
 
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
-options to ensure Vector does not exceed the specified number of requests in
-the specified window. You can further control the pace at which this window is
-saturated with the `request_in_flight_limit` option, which will guarantee no
-more than the specified number of requests are in-flight at any given time.
+downstream service. Start with the `request_rate_limit_duration_secs` and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the `request_in_flight_limit` option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
 with the Vector team by [opening an issie][urls.new_<%= component.id %>_issue].
 <%- end -%>
-<%- if component.options.retry_attempts -%>
+<%- if component.options.request_retry_attempts -%>
 
 ### Retry Policy
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+attempts and backoff rate with the `request_retry_attempts` and
+`request_retry_backoff_secs` options.
 <%- end -%>
 <%- if component.sink? && component.streaming? -%>
 
@@ -150,11 +144,11 @@ event-by-event basis. It does not batch data.
 The <%= option_names(component.templateable_options).to_sentence %> options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][urls.strftime_specifiers] as well as the
+[strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
+<CodeHeader fileName="vector.toml" />
+
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
@@ -164,8 +158,6 @@ enabling dynamic values derived from the event's data. This syntax accepts
   <%- end -%>
   # ...
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].

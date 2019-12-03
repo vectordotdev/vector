@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex};
@@ -33,6 +33,10 @@ impl Default for RegexParserConfig {
             types: HashMap::default(),
         }
     }
+}
+
+inventory::submit! {
+    TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
 #[typetag::serde(name = "regex_parser")]

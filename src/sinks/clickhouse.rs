@@ -3,23 +3,22 @@ use crate::{
     event::Event,
     sinks::util::{
         http::{HttpRetryLogic, HttpService, Response},
-        retries::{FixedRetryPolicy, RetryLogic},
+        retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
-use futures::{Future, Sink};
+use futures::{stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
-use std::time::Duration;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -27,20 +26,23 @@ pub struct ClickhouseConfig {
     pub host: String,
     pub table: String,
     pub database: Option<String>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub basic_auth: Option<ClickHouseBasicAuthConfig>,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
+}
+
+inventory::submit! {
+    SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
 #[typetag::serde(name = "clickhouse")]
@@ -85,25 +87,10 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
     let basic_auth = config.basic_auth.clone();
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        ClickhouseRetryLogic {
-            inner: HttpRetryLogic,
-        },
-    );
 
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
@@ -131,27 +118,25 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
                 request
             });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
+    let sink = request
+        .batch_sink(
+            ClickhouseRetryLogic {
+                inner: HttpRetryLogic,
+            },
+            http_service,
+            acker,
         )
-        .with(move |event: Event| {
-            let mut body = serde_json::to_vec(&event.as_log().all_fields())
-                .expect("Events should be valid json!");
-            body.push(b'\n');
-            Ok(body)
-        });
+        .batched_with_min(Buffer::new(gzip), &batch)
+        .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
 
     Ok(Box::new(sink))
+}
+
+fn encode_event(event: Event) -> Option<Vec<u8>> {
+    let mut body =
+        serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+    body.push(b'\n');
+    Some(body)
 }
 
 fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> super::Healthcheck {
@@ -277,8 +262,14 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch_size: Some(1),
-            request_retry_attempts: Some(1),
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
+            request: TowerRequestConfig {
+                request_retry_attempts: Some(1),
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -313,7 +304,10 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch_size: Some(1),
+            batch: BatchConfig {
+                batch_size: Some(1),
+                batch_timeout: None,
+            },
             ..Default::default()
         };
 

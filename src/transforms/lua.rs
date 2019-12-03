@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event::Event,
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -19,6 +19,10 @@ pub struct LuaConfig {
     source: String,
     #[serde(default)]
     search_dirs: Vec<String>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<LuaConfig>("lua")
 }
 
 #[typetag::serde(name = "lua")]

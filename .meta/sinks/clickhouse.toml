@@ -2,16 +2,18 @@
 batch_size = 1049000
 batch_timeout = 1
 beta = true
-buffer = false
+buffer = true
+common = true
 compressions  = ["gzip"]
 delivery_guarantee = "best_effort"
+function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
-rate_limit_duration = 1
-rate_limit_num = 5
-retry_attempts = 9223372036854775807
-retry_backoff_secs = 1
+request_rate_limit_duration_secs = 1
+request_rate_limit_num =5
+request_retry_attempts = 9223372036854775807
+request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
@@ -19,30 +21,34 @@ tls_options = []
 
 [sinks.clickhouse.options.host]
 type = "string"
+common = true
 examples = ["http://localhost:8123"]
 null = false
 description = "The host url of the [Clickhouse][urls.clickhouse] server."
 
 [sinks.clickhouse.options.table]
 type = "string"
+common = true
 examples = ["mytable"]
 null = false
 description = "The table that data will be inserted into."
 
 [sinks.clickhouse.options.database]
 type = "string"
+common = true
 examples = ["mydatabase"]
 null = true
 description = "The database that contains the stable that data will be inserted into."
 
 [sinks.clickhouse.options.basic_auth]
 type = "table"
+common = true
 null = true
 description = "Options for basic authentication."
 
 [sinks.clickhouse.options.basic_auth.options.password]
 type = "string"
-examples = ["password"]
+examples = ["password", "${PASSWORD_ENV_VAR}"]
 null = false
 description = "The basic authentication password."
 

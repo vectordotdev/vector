@@ -1,14 +1,17 @@
 [sinks.file]
 buffer = false
+common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
 encodings = ["ndjson", "text"]
+function_category = "transmit"
 healthcheck = false
 input_types = ["log"]
 write_to_description = "a file"
 
 [sinks.file.options.path]
 type = "string"
+common = true
 examples = [
   "vector-%Y-%m-%d.log",
   "application-{{ application_id }}-%Y-%m-%d.log"

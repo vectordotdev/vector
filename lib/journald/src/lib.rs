@@ -46,7 +46,7 @@ struct LibSystemd {
 }
 
 fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
-    unsafe { Container::load("libsystemd.so") }
+    unsafe { Container::load("libsystemd.so.0") }
 }
 
 /// A minimal systemd journald reader.
@@ -159,13 +159,13 @@ impl Journal {
 
         // Journald does not guarantee that the following records are
         // only from the current boot, so a filter is also needed.
+        self.lib.sd_journal_flush_matches(self.journal);
         let filter = format!("_BOOT_ID={}", boot_str);
         sd_result(self.lib.sd_journal_add_match(
             self.journal,
             filter.as_ptr() as *const c_void,
             filter.len(),
         ))?;
-        self.lib.sd_journal_flush_matches(self.journal);
 
         Ok(())
     }

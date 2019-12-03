@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    event::Event,
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
-    Event,
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -12,6 +12,10 @@ use string_cache::DefaultAtom as Atom;
 pub struct FieldFilterConfig {
     pub field: String,
     pub value: String,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<FieldFilterConfig>("field_filter")
 }
 
 #[typetag::serde(name = "field_filter")]

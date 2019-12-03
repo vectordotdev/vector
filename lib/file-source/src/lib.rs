@@ -1,3 +1,4 @@
+#![cfg_attr(windows, feature(windows_by_handle))]
 #[macro_use]
 extern crate scan_fmt;
 #[macro_use]
@@ -5,6 +6,7 @@ extern crate tracing;
 
 mod file_server;
 mod file_watcher;
+mod metadata_ext;
 
 pub use self::file_server::{FileServer, Fingerprinter};
 

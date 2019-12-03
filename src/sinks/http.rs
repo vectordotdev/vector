@@ -3,11 +3,10 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -17,10 +16,9 @@ use http::{
 };
 use hyper::{Body, Request};
 use indexmap::IndexMap;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::time::Duration;
-use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -45,20 +43,22 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(10),
+        request_timeout_secs: Some(30),
+        request_rate_limit_num: Some(10),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -77,6 +77,7 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Ndjson,
+    Json,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -84,6 +85,10 @@ pub enum Encoding {
 pub struct BasicAuth {
     user: String,
     password: String,
+}
+
+inventory::submit! {
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
 #[typetag::serde(name = "http")]
@@ -122,30 +127,18 @@ fn http(
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch_timeout.unwrap_or(1);
-    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
+    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-    let timeout = config.request_timeout_secs.unwrap_or(30);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
     let encoding = config.encoding.clone();
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
-
     let http_service =
         HttpService::builder()
             .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
+            .build(move |mut body: Vec<u8>| {
                 let mut builder = hyper::Request::builder();
 
                 let method = match method {
@@ -160,6 +153,12 @@ fn http(
                 match encoding {
                     Encoding::Text => builder.header("Content-Type", "text/plain"),
                     Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+                    Encoding::Json => {
+                        body.insert(0, b'[');
+                        body.pop(); // remove trailing comma from last record
+                        body.push(b']');
+                        builder.header("Content-Type", "application/json")
+                    }
                 };
 
                 if gzip {
@@ -181,20 +180,10 @@ fn http(
                 request
             });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
     let encoding = config.encoding.clone();
-    let sink = BatchServiceSink::new(service, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        )
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, acker)
+        .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))
@@ -264,10 +253,12 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let event = event.into_log();
 
-    let mut body = match encoding {
+    let body = match encoding {
         Encoding::Text => {
             if let Some(v) = event.get(&event::MESSAGE) {
-                v.to_string_lossy().into_bytes()
+                let mut b = v.to_string_lossy().into_bytes();
+                b.push(b'\n');
+                b
             } else {
                 warn!(
                     message = "Event missing the message key; Dropping event.",
@@ -277,12 +268,22 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
             }
         }
 
-        Encoding::Ndjson => serde_json::to_vec(&event.unflatten())
-            .map_err(|e| panic!("Unable to encode into JSON: {}", e))
-            .ok()?,
-    };
+        Encoding::Ndjson => {
+            let mut b = serde_json::to_vec(&event.unflatten())
+                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                .ok()?;
+            b.push(b'\n');
+            b
+        }
 
-    body.push(b'\n');
+        Encoding::Json => {
+            let mut b = serde_json::to_vec(&event.unflatten())
+                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                .ok()?;
+            b.push(b',');
+            b
+        }
+    };
 
     Some(body)
 }

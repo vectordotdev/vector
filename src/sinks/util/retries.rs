@@ -1,4 +1,4 @@
-use super::Error;
+use crate::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::borrow::Cow;
 use std::time::{Duration, Instant};

@@ -8,11 +8,11 @@
   <%- end -%>
   <%- options.each do |option| -%>
     <%- if option.array?("table") -%>
-<%= config_schema(option.options, path: "#{opts[:path]}.#{option.name}", array: true).indent(2) %>
+<%= config_schema(option.options_list, path: "#{opts[:path]}.#{option.name}", array: true).indent(2) %>
     <%- elsif option.table? && option.inline? -%>
-  <%= option.name %> = {<%= option.options.first.name %> = <%= schema.type_string(option.options.first.type, option.options.first.enum) %>}
+  <%= option.name %> = {<%= option.options_list.first.name %> = <%= schema.type_string(option.options_list.first.type, option.options_list.first.enum) %>}
     <%- elsif option.table? -%>
-<%= config_schema(option.options, path: "#{opts[:path]}.#{option.name}").indent(2) %>
+<%= config_schema(option.options_list, path: "#{opts[:path]}.#{option.name}").indent(2) %>
     <%- else -%>
   <%= option.name %> = <%= schema.type_string(option.type, option.enum) %>
     <%- end -%>

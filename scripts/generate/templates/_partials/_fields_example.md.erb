@@ -1,0 +1,23 @@
+<%- if breakout_top_keys -%>
+<Tabs
+  block={true}
+  defaultValue="<%= fields.first.name %>"
+  values={<%= fields.collect { |f| {label: f.name, value: f.name } }.to_json %>}>
+
+<%- fields.each do |field| -%>
+<TabItem value="<%= field.name %>">
+
+```javascript
+<%= JSON.pretty_generate(fields_hash(field.fields_list)) %>
+```
+
+</TabItem>
+<%- end -%>
+
+</Tabs>
+<%- else -%>
+
+```javascript
+<%= JSON.pretty_generate(fields_hash(fields)) %>
+```
+<%- end -%>

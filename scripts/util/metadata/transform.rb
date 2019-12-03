@@ -4,7 +4,6 @@ require_relative "component"
 
 class Transform < Component
   attr_reader :allow_you_to_description,
-    :function_categories,
     :input_types,
     :output_types
 
@@ -12,7 +11,6 @@ class Transform < Component
     super(hash)
 
     @allow_you_to_description = hash.fetch("allow_you_to_description")
-    @function_categories = hash.fetch("function_categories")
     @input_types = hash.fetch("input_types")
     @output_types = hash.fetch("output_types")
     types_coercion = hash["types_coercion"] == true
@@ -32,25 +30,25 @@ class Transform < Component
     if types_coercion
       wildcard_option =
         {
-          "name" => "*",
+          "name" => "`[field-name]`",
           "category" => "requests",
           "enum" => {
             "bool" => "Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.",
             "float" => "Coerce to a 64 bit float.",
             "int" => "Coerce to a 64 bit integer.",
             "string" => "Coerce to a string.",
-            "timestamp" => "Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string."
+            "timestamp" => "Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."
           },
           "examples" => [
-            {"name" => "status", "value" => "int"},
-            {"name" => "duration", "value" => "float"},
-            {"name" => "success", "value" => "bool"},
-            {"name" => "timestamp", "value" => "timestamp|%s", "comment" => "unix"},
-            {"name" => "timestamp", "value" => "timestamp|%+", "comment" => "iso8601 (date and time)"},
-            {"name" => "timestamp", "value" => "timestamp|%F", "comment" => "iso8601 (date)"},
-            {"name" => "timestamp", "value" => "timestamp|%a %b %e %T %Y", "comment" => "custom strftime format"},
+            {"status" => "int"},
+            {"duration" => "float"},
+            {"success" => "bool"},
+            {"timestamp" => "timestamp|%s"},
+            {"timestamp" => "timestamp|%+"},
+            {"timestamp" => "timestamp|%F"},
+            {"timestamp" => "timestamp|%a %b %e %T %Y"}
           ],
-          "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.",
+          "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.",
           "null" => false,
           "simple" => true,
           "type" => "string"
@@ -59,11 +57,16 @@ class Transform < Component
       @options.types =
         Option.new({
           "name" => "types",
+          "common" => true,
           "description" => "Key/Value pairs representing mapped log field types.",
           "null" => true,
-          "options" => {"*" => wildcard_option},
+          "options" => {"`[field-name]`" => wildcard_option},
           "type" => "table"
         })
     end
+  end
+
+  def description
+    @desription ||= "Accepts #{input_types.to_sentence} events and allows you to #{allow_you_to_description}."
   end
 end

@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event::{self, Event},
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,10 @@ use string_cache::DefaultAtom as Atom;
 pub struct SamplerConfig {
     pub rate: u64,
     pub pass_list: Vec<String>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<SamplerConfig>("sampler")
 }
 
 #[typetag::serde(name = "sampler")]

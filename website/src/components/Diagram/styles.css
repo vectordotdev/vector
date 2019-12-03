@@ -1,0 +1,178 @@
+@keyframes diagramExplodeSource1 {
+  100% {
+    opacity: 1;
+    transform: translate(82px, 56px);
+  }
+}
+
+@keyframes diagramExplodeSource2 {
+  100% {
+    opacity: 1;
+    transform: translate(0px, 122px);
+  }
+}
+
+@keyframes diagramExplodeSource3 {
+  100% {
+    opacity: 1;
+    transform: translate(82px, 182px);
+  }
+}
+
+@keyframes diagramExplodeLogo {
+  40% {
+    transform: translate(328px, 53px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(328px, 38px);
+  }
+}
+
+@keyframes diagramExplodeStructure {
+  100% {
+    opacity: 1;
+    transform: translate(29px, 74px);
+  }
+}
+
+@keyframes diagramExplodeAggregate {
+  100% {
+    opacity: 1;
+    transform: translate(29px, 194px);
+  }
+}
+
+@keyframes diagramExplodeSink1 {
+  100% {
+    opacity: 1;
+    transform: translate(1px, 58px);
+  }
+}
+
+@keyframes diagramExplodeSink2 {
+  100% {
+    opacity: 1;
+    transform: translate(81px, 124px);
+  }
+}
+
+@keyframes diagramExplodeSink3 {
+  100% {
+    opacity: 1;
+    transform: translate(0px, 184px);
+  }
+}
+
+@keyframes diagramFadeIn {
+  0% {
+    opacity: 0.01;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.diagram #Source-1 {
+  animation: diagramExplodeSource1 700ms cubic-bezier(0, 1.5, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translate(315px, 132px);
+}
+
+.diagram #Source-2 {
+  animation: diagramExplodeSource2 700ms cubic-bezier(0, 1.5, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translate(315px, 132px);
+}
+
+.diagram #Source-3 {
+  animation: diagramExplodeSource3 700ms cubic-bezier(0, 1.5, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translate(315px, 132px);
+}
+
+.diagram #Logo {
+  animation: diagramExplodeLogo 1050ms cubic-bezier(0, 5, 1, 4.1);
+  animation-delay: 250ms;
+  animation-fill-mode: forwards;
+  opacity: 1;
+  transform: translate(328px, 38px);
+}
+
+.diagram #Structure {
+  animation: diagramExplodeStructure 700ms cubic-bezier(0, 3, 1, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 1;
+  transform: translate(29px, 102px);
+}
+
+.diagram #Aggregate {
+  animation: diagramExplodeAggregate 700ms cubic-bezier(0, 3, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  transform: translate(29px, 166px);
+}
+
+.diagram a:hover path {
+  fill: var(--ifm-color-primary) !important;
+}
+
+.diagram a circle {
+  transition: all var(--ifm-transition-fast) ease;
+}
+
+.diagram a:hover circle {
+  transform: scale(1.1) translate(-0.5%, -1%);
+}
+
+.diagram a #Structure polygon,
+.diagram a #Sample polygon,
+.diagram a #Aggregate polygon {
+  transition: all var(--ifm-transition-fast) ease;
+}
+
+.diagram a:hover #Structure polygon,
+.diagram a:hover #Sample polygon,
+.diagram a:hover #Aggregate polygon {
+  transform: scale(1.05) translate(-0.5%, -1%);
+}
+
+.diagram #Sink-1 {
+  animation: diagramExplodeSink1 700ms cubic-bezier(0, 1.5, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translate(-212px, 134px);
+}
+
+.diagram #Sink-2 {
+  animation: diagramExplodeSink2 700ms cubic-bezier(0, 1.5, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translate(-212px, 134px);
+}
+
+.diagram #Sink-3 {
+  animation: diagramExplodeSink3 700ms cubic-bezier(0, 1.5, 0.32, 1.5);
+  animation-delay: 650ms;
+  animation-fill-mode: forwards;
+  opacity: 0;
+  transform: translate(-212px, 134px);
+}
+
+.diagram .fade-in {
+  animation: diagramFadeIn 1s ease-in;
+  animation-delay: 1000ms;
+  animation-fill-mode: forwards;
+  opacity: 0.01;
+}

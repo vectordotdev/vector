@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,10 @@ pub struct RemoveFieldsConfig {
 
 pub struct RemoveFields {
     fields: Vec<Atom>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<RemoveFieldsConfig>("remove_fields")
 }
 
 #[typetag::serde(name = "remove_fields")]

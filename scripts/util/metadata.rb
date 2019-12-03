@@ -3,7 +3,9 @@ require "toml-rb"
 
 require_relative "metadata/batching_sink"
 require_relative "metadata/exposing_sink"
+require_relative "metadata/field"
 require_relative "metadata/links"
+require_relative "metadata/post"
 require_relative "metadata/release"
 require_relative "metadata/source"
 require_relative "metadata/streaming_sink"
@@ -15,7 +17,7 @@ require_relative "metadata/transform"
 # each sub-component.
 class Metadata
   class << self
-    def load!(meta_dir, docs_root)
+    def load!(meta_dir, docs_root, pages_root)
       metadata = {}
 
       Dir.glob("#{meta_dir}/**/*.toml").each do |file|
@@ -23,32 +25,40 @@ class Metadata
         metadata.deep_merge!(hash)
       end
 
-      new(metadata, docs_root)
+      new(metadata, docs_root, pages_root)
     end
   end
 
-  attr_reader :companies,
+  attr_reader :blog_posts,
+  :env_vars,
     :installation,
     :links,
+    :log_fields,
+    :metric_fields,
     :options,
+    :testing,
+    :posts,
     :releases,
     :sinks,
     :sources,
     :transforms
 
-  def initialize(hash, docs_root)
-    @companies = hash.fetch("companies")
+  def initialize(hash, docs_root, pages_root)
     @installation = OpenStruct.new()
-    @options = OpenStruct.new()
+    @log_fields = Field.build_struct(hash["log_fields"] || {})
+    @metric_fields = Field.build_struct(hash["metric_fields"] || {})
+    @options = Option.build_struct(hash.fetch("options"))
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
+    @testing = Option.build_struct(hash.fetch("testing"))
 
     # installation
 
     installation_hash = hash.fetch("installation")
-    @installation.platforms = installation_hash.fetch("platforms").collect { |h| OpenStruct.new(h) }
+    @installation.containers = installation_hash.fetch("containers").collect { |h| OpenStruct.new(h) }
+    @installation.downloads = installation_hash.fetch("downloads").collect { |h| OpenStruct.new(h) }
     @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
     @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
@@ -110,37 +120,43 @@ class Metadata
       @sinks.send("#{sink_name}=", sink)
     end
 
-    transforms_list = @transforms.to_h.values
-    transforms_list.each do |transform|
-      alternatives = transforms_list.select do |alternative|
-        if transform.function_categories != ["convert_types"] && alternative.function_categories.include?("program")
-          true
-        else
-          function_diff = alternative.function_categories - transform.function_categories
-          alternative != transform && function_diff != alternative.function_categories
-        end
-      end
-
-      transform.alternatives = alternatives.sort
-    end
-
-    # options
-
-    hash.fetch("options").each do |option_name, option_hash|
-      option = Option.new(
-        option_hash.merge({"name" => option_name}
-      ))
-
-      @options.send("#{option_name}=", option)
-    end
-
     # links
 
-    @links = Links.new(hash.fetch("links"), docs_root)
+    @links = Links.new(hash.fetch("links"), docs_root, pages_root)
+
+    # posts
+
+    @posts ||=
+      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+        Post.new(path)
+      end.sort
+
+    # env vars
+
+    @env_vars = Option.build_struct(hash["env_vars"] || {})
+
+    components.each do |component|
+      component.env_vars.to_h.each do |key, val|
+        @env_vars.send("#{key}=", val)
+      end
+    end
   end
 
   def components
-    @components ||= sources.to_h.values + transforms.to_h.values + sinks.to_h.values
+    @components ||= sources_list + transforms_list + sinks_list
+  end
+
+  def downloads(arch: nil, os: nil, package_manager: nil, type: nil)
+    downloads = installation.downloads
+    downloads = downloads.select { |d| d.arch && d.arch.downcase == arch.to_s.downcase } if arch
+    downloads = downloads.select { |d| d.os && d.os.downcase == os.to_s.downcase } if os
+    downloads = downloads.select { |d| d.package_manager && d.package_manager.downcase == package_manager.to_s.downcase } if package_manager
+    downloads = downloads.select { |d| d.type && d.type.downcase == type.to_s.downcase } if type
+    downloads
+  end
+
+  def env_vars_list
+    @env_vars_list ||= env_vars.to_h.values.sort
   end
 
   def latest_patch_releases
@@ -157,6 +173,14 @@ class Metadata
 
   def latest_version
     @latest_version ||= latest_release.version
+  end
+
+  def log_fields_list
+    @log_fields_list ||= log_fields.to_h.values.sort
+  end
+
+  def metric_fields_list
+    @metric_fields_list ||= metric_fields.to_h.values.sort
   end
 
   def newer_releases(release)
@@ -179,5 +203,29 @@ class Metadata
 
   def relesed_versions
     releases
+  end
+
+  def sinks_list
+    @sinks_list ||= sinks.to_h.values.sort
+  end
+
+  def sources_list
+    @sources_list ||= sources.to_h.values.sort
+  end
+
+  def to_h
+    {
+      installation: installation.deep_to_h,
+      latest_post: posts.last.deep_to_h,
+      latest_release: latest_release.deep_to_h,
+      posts: posts.deep_to_h,
+      sources: sources.deep_to_h,
+      transforms: transforms.deep_to_h,
+      sinks: sinks.deep_to_h
+    }
+  end
+
+  def transforms_list
+    @transforms_list ||= transforms.to_h.values.sort
   end
 end

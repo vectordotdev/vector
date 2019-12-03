@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event::{Event, ValueKind},
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -18,6 +18,10 @@ pub struct AddFieldsConfig {
 
 pub struct AddFields {
     fields: IndexMap<Atom, ValueKind>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<AddFieldsConfig>("add_fields")
 }
 
 #[typetag::serde(name = "add_fields")]
