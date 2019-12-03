@@ -66,11 +66,12 @@ function navLinkAttributes(label) {
 function NavLink(props) {
   let attributes = navLinkAttributes(props.label) || {};
   const toUrl = useBaseUrl(props.to);
+  const menu = props.menu == true;
 
   return (
     <Link
       className="navbar__item navbar__link"
-      title={attributes.hideText && props.label}
+      title={!menu && attributes.hideText && props.label}
       {...props}
       {...(props.href
         ? {
@@ -82,8 +83,8 @@ function NavLink(props) {
             activeClassName: 'navbar__link--active',
             to: toUrl,
           })}>
-      {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {!attributes.hideText && props.label}
+      {!menu && attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
+      {(menu || !attributes.hideText) && props.label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
@@ -165,14 +166,14 @@ function Navbar() {
             {links
               .filter(linkItem => linkItem.position !== 'right')
               .map((linkItem, i) => (
-                <NavLink {...linkItem} key={i} />
+                <NavLink {...linkItem} menu={false} key={i} />
               ))}
           </div>
           <div className="navbar__items navbar__items--right">
             {links
               .filter(linkItem => linkItem.position === 'right')
               .map((linkItem, i) => (
-                <NavLink {...linkItem} key={i} />
+                <NavLink {...linkItem} menu={false} key={i} />
               ))}
             {!disableDarkMode && (
               <Toggle
@@ -227,6 +228,7 @@ function Navbar() {
                     <NavLink
                       className="menu__link"
                       {...linkItem}
+                      menu={true}
                       onClick={hideSidebar}
                     />
                   </li>
