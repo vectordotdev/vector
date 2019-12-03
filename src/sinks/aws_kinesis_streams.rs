@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
@@ -63,9 +63,9 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        let sink = KinesisService::new(config, acker)?;
+        let sink = KinesisService::new(config, cx.acker())?;
         let healthcheck = healthcheck(self.clone())?;
         Ok((Box::new(sink), healthcheck))
     }

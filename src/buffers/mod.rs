@@ -124,6 +124,7 @@ impl BufferConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Acker {
     Disk(Arc<AtomicUsize>, Arc<AtomicTask>),
     Null,

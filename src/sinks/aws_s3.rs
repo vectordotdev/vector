@@ -7,7 +7,7 @@ use crate::{
         TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -85,8 +85,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = S3Sink::new(self, acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = S3Sink::new(self, cx.acker())?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
         Ok((sink, healthcheck))

@@ -3,7 +3,7 @@ use crate::{
     event::metric::{MetricKind, MetricValue},
     event::Event,
     sinks::util::{BatchConfig, BatchServiceSink, Buffer, SinkExt},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
@@ -62,8 +62,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = StatsdSvc::new(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = StatsdSvc::new(self.clone(), cx.acker())?;
         let healthcheck = StatsdSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }

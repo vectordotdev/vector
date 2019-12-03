@@ -1,8 +1,7 @@
 use super::util::SinkExt;
 use crate::{
-    buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
@@ -45,7 +44,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
@@ -54,7 +53,7 @@ impl SinkConfig for ConsoleSinkConfig {
         };
 
         let sink = FramedWrite::new(output, LinesCodec::new())
-            .stream_ack(acker)
+            .stream_ack(cx.acker())
             .sink_map_err(|_| ())
             .with(move |event| encode_event(event, &encoding));
 

@@ -1,7 +1,6 @@
 mod request;
 
 use crate::{
-    buffers::Acker,
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{
@@ -10,7 +9,7 @@ use crate::{
         TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
@@ -123,7 +122,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch = self.batch.unwrap_or(1000, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -135,7 +134,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             .service(CloudwatchLogsPartitionSvc::new(self.clone())?);
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc, acker)
+            let svc_sink = BatchServiceSink::new(svc, cx.acker())
                 .partitioned_batched_with_min(PartitionBuffer::new(Vec::new()), &batch)
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)

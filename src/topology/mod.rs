@@ -5,6 +5,7 @@ mod task;
 pub mod unit_test;
 
 pub use self::config::Config;
+pub use self::config::SinkContext;
 
 use crate::topology::builder::Pieces;
 

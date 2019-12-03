@@ -7,7 +7,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -47,8 +47,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = clickhouse(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = clickhouse(self.clone(), cx.acker())?;
         let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
 
         Ok((sink, healtcheck))

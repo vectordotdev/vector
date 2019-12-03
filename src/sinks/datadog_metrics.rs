@@ -5,7 +5,7 @@ use crate::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{Future, Poll};
@@ -91,8 +91,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "datadog")]
 impl SinkConfig for DatadogConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = DatadogSvc::new(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = DatadogSvc::new(self.clone(), cx.acker())?;
         let healthcheck = DatadogSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }

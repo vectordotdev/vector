@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
@@ -24,8 +24,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = Box::new(BlackholeSink::new(self.clone(), acker));
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(healthcheck());
 
         Ok((sink, healthcheck))
@@ -95,12 +95,11 @@ mod tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::test_util::random_events_with_stream;
-    use crate::topology::config::SinkConfig;
 
     #[test]
     fn blackhole() {
         let config = BlackholeConfig { print_amount: 10 };
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let sink = BlackholeSink::new(config, Acker::Null);
 
         let (_input_lines, events) = random_events_with_stream(100, 10);
 

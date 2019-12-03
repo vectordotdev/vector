@@ -1,5 +1,9 @@
+#[cfg(test)]
+use crate::runtime::TaskExecutor;
 use crate::{
+    buffers::Acker,
     conditions,
+    dns::Resolver,
     event::{Event, Metric},
     sinks, sources, transforms,
 };
@@ -146,14 +150,35 @@ pub struct SinkOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug {
-    fn build(
-        &self,
-        acker: crate::buffers::Acker,
-    ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
+    fn build(&self, cx: SinkContext) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
 
     fn sink_type(&self) -> &'static str;
+}
+
+#[derive(Debug, Clone)]
+pub struct SinkContext {
+    pub(super) acker: Acker,
+    pub(super) resolver: Resolver,
+}
+
+impl SinkContext {
+    #[cfg(test)]
+    pub fn new_test(exec: TaskExecutor) -> Self {
+        Self {
+            acker: Acker::Null,
+            resolver: Resolver::new(Vec::new(), exec).unwrap(),
+        }
+    }
+
+    pub fn acker(&self) -> Acker {
+        self.acker.clone()
+    }
+
+    pub fn resolver(&self) -> Resolver {
+        self.resolver.clone()
+    }
 }
 
 pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
