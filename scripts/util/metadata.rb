@@ -55,16 +55,6 @@ class Metadata
     @transforms = OpenStruct.new()
     @testing = Option.build_struct(hash.fetch("testing"))
 
-    # env vars
-
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
-
-    components.each do |component|
-      component.env_vars.to_h.each do |key, val|
-        @env_vars.send("#{key}=", val)
-      end
-    end
-
     # installation
 
     installation_hash = hash.fetch("installation")
@@ -141,6 +131,16 @@ class Metadata
       Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
         Post.new(path)
       end.sort
+
+    # env vars
+
+    @env_vars = Option.build_struct(hash["env_vars"] || {})
+
+    components.each do |component|
+      component.env_vars.to_h.each do |key, val|
+        @env_vars.send("#{key}=", val)
+      end
+    end
 
     # team
 

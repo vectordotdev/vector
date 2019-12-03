@@ -50,9 +50,9 @@ simple and unified.
 
 #### Reference
 
-* [**Sources**][docs.sources] - 
-* [**Transforms**][docs.transforms] - 
-* [**Sinks**][docs.sinks] - 
+* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [syslog][docs.sources.syslog], [tcp][docs.sources.tcp], and [4 more...][docs.sources]
+* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [8 more...][docs.transforms]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [http][docs.sinks.http], [kafka][docs.sinks.kafka], [prometheus][docs.sinks.prometheus], and [10 more...][docs.sinks]
 
 #### Administration
 
@@ -150,10 +150,28 @@ Or view [platform specific installation instructions][docs.installation].
 [docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent
 [docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service
 [docs.roles]: https://vector.dev/docs/setup/deployment/roles
+[docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs
+[docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3
+[docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse
+[docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch
+[docs.sinks.http]: https://vector.dev/docs/reference/sinks/http
+[docs.sinks.kafka]: https://vector.dev/docs/reference/sinks/kafka
+[docs.sinks.prometheus]: https://vector.dev/docs/reference/sinks/prometheus
 [docs.sinks]: https://vector.dev/docs/reference/sinks
+[docs.sources.docker]: https://vector.dev/docs/reference/sources/docker
+[docs.sources.file]: https://vector.dev/docs/reference/sources/file
+[docs.sources.journald]: https://vector.dev/docs/reference/sources/journald
+[docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka
+[docs.sources.syslog]: https://vector.dev/docs/reference/sources/syslog
+[docs.sources.tcp]: https://vector.dev/docs/reference/sources/tcp
 [docs.sources]: https://vector.dev/docs/reference/sources
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies
+[docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric
+[docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua
+[docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser
+[docs.transforms.sampler]: https://vector.dev/docs/reference/transforms/sampler
+[docs.transforms.tokenizer]: https://vector.dev/docs/reference/transforms/tokenizer
 [docs.transforms]: https://vector.dev/docs/reference/transforms
 [docs.updating]: https://vector.dev/docs/administration/updating
 [docs.use_cases]: https://vector.dev/docs/use_cases

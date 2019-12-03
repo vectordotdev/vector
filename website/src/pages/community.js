@@ -17,7 +17,7 @@ function Community() {
           <h1>Vector Community</h1>
           <div className="mailing-list">
             <div className="mailing-list--description">
-              The easiest way to stay up-to-date. One email per month. No spam, ever.
+              The easiest way to stay up-to-date. One email on the 1st of every month. No spam, ever.
             </div>
             <form action="https://app.getvero.com/forms/a748ded7ce0da69e6042fa1e21042506" method="post">
               <div class="subscribe_form">

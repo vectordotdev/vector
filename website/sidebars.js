@@ -113,6 +113,26 @@ module.exports = {
           items: [
             "reference/sources",
             
+              "reference/sources/docker",
+            
+              "reference/sources/file",
+            
+              "reference/sources/journald",
+            
+              "reference/sources/kafka",
+            
+              "reference/sources/statsd",
+            
+              "reference/sources/stdin",
+            
+              "reference/sources/syslog",
+            
+              "reference/sources/tcp",
+            
+              "reference/sources/udp",
+            
+              "reference/sources/vector",
+            
           ]
         },
         {
@@ -121,6 +141,34 @@ module.exports = {
           items: [
             "reference/transforms",
             
+              "reference/transforms/add_fields",
+            
+              "reference/transforms/add_tags",
+            
+              "reference/transforms/coercer",
+            
+              "reference/transforms/field_filter",
+            
+              "reference/transforms/grok_parser",
+            
+              "reference/transforms/json_parser",
+            
+              "reference/transforms/log_to_metric",
+            
+              "reference/transforms/lua",
+            
+              "reference/transforms/regex_parser",
+            
+              "reference/transforms/remove_fields",
+            
+              "reference/transforms/remove_tags",
+            
+              "reference/transforms/sampler",
+            
+              "reference/transforms/split",
+            
+              "reference/transforms/tokenizer",
+            
           ]
         },
         {
@@ -128,6 +176,40 @@ module.exports = {
           label: 'Sinks',
           items: [
             "reference/sinks",
+            
+              "reference/sinks/aws_cloudwatch_logs",
+            
+              "reference/sinks/aws_cloudwatch_metrics",
+            
+              "reference/sinks/aws_kinesis_streams",
+            
+              "reference/sinks/aws_s3",
+            
+              "reference/sinks/blackhole",
+            
+              "reference/sinks/clickhouse",
+            
+              "reference/sinks/console",
+            
+              "reference/sinks/datadog_metrics",
+            
+              "reference/sinks/elasticsearch",
+            
+              "reference/sinks/file",
+            
+              "reference/sinks/http",
+            
+              "reference/sinks/kafka",
+            
+              "reference/sinks/prometheus",
+            
+              "reference/sinks/splunk_hec",
+            
+              "reference/sinks/statsd",
+            
+              "reference/sinks/tcp",
+            
+              "reference/sinks/vector",
             
           ],
         },
