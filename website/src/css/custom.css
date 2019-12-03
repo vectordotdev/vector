@@ -410,10 +410,22 @@ header.hero h1 {
   font-size: 1.1rem;
   margin: var(--ifm-spacing-vertical) 0;
 }
-
 .hero .mailing-list form input[type="email"] {
   margin-right: 1em;
-  width: 400px;
+  max-width: 425px;
+  width: 100%;
+}
+@media (max-width: 996px) {
+  .hero .mailing-list form input[type="email"] {
+    display: block;
+    max-width: none;
+  }
+
+  .hero .mailing-list form .button {
+    display: block;
+    margin: var(--ifm-spacing-vertical) 0 0 0;
+    width: 100%;
+  }
 }
 
 input[type="checkbox"] {
