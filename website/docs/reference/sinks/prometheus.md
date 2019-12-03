@@ -97,7 +97,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.
+The address to expose for scraping. See [Exposing & Scraping](#exposing--scraping) for more info.
 
 
 </Field>

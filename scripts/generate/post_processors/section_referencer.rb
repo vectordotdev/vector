@@ -27,7 +27,7 @@ module PostProcessors
             end.compact.uniq
 
           if titles.any?
-            links = titles.collect { |title| "[#{title}](##{title.parameterize})" }
+            links = titles.collect { |title| "[#{title}](##{section_parameterize(title)})" }
             content.sub!("[[references:#{option}]]", " See #{links.to_sentence} for more info.")
           else
             content.sub!("[[references:#{option}]]", "")
@@ -35,6 +35,14 @@ module PostProcessors
         end
 
         content
+      end
+
+      private
+      def section_parameterize(section)
+        p_section = section.downcase
+        p_section.gsub! ' & ', '--'
+        p_section.gsub! ' ', '-'
+        p_section
       end
     end
   end
