@@ -41,6 +41,7 @@ class Metadata
     :releases,
     :sinks,
     :sources,
+    :team,
     :transforms
 
   def initialize(hash, docs_root, pages_root)
@@ -53,6 +54,16 @@ class Metadata
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
     @testing = Option.build_struct(hash.fetch("testing"))
+
+    # env vars
+
+    @env_vars = Option.build_struct(hash["env_vars"] || {})
+
+    components.each do |component|
+      component.env_vars.to_h.each do |key, val|
+        @env_vars.send("#{key}=", val)
+      end
+    end
 
     # installation
 
@@ -131,15 +142,12 @@ class Metadata
         Post.new(path)
       end.sort
 
-    # env vars
+    # team
 
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
-
-    components.each do |component|
-      component.env_vars.to_h.each do |key, val|
-        @env_vars.send("#{key}=", val)
+    @team =
+      hash.fetch("team").collect do |member|
+        OpenStruct.new(member)
       end
-    end
   end
 
   def components
@@ -220,6 +228,7 @@ class Metadata
       latest_release: latest_release.deep_to_h,
       posts: posts.deep_to_h,
       sources: sources.deep_to_h,
+      team: team.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h
     }

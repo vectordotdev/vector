@@ -39,14 +39,17 @@ function navLinkAttributes(label) {
     case 'download':
       const newRelease = fetchNewRelease();
 
-      if (newRelease) {
-        return {
-          badge: 'new',
-          badgeStyle: 'primary',
-        };
-      } else {
-        return {};
+      let downloadAttrs = {
+        icon: 'download',
+        hideText: true
       }
+
+      if (newRelease) {
+        downloadAttrs.badge = 'new';
+        downloadAttrs.badgeStyle = 'primary';
+      }
+
+      return downloadAttrs;
 
     case 'github':
       return {
@@ -67,6 +70,7 @@ function NavLink(props) {
   return (
     <Link
       className="navbar__item navbar__link"
+      title={attributes.hideText && props.label}
       {...props}
       {...(props.href
         ? {

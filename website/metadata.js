@@ -837,6 +837,40 @@ module.exports = {
       ]
     }
   },
+  "team": [
+    {
+      "avatar": "https://github.com/a-rodin.png",
+      "name": "Alex"
+    },
+    {
+      "avatar": "https://github.com/loony-bean.png",
+      "name": "Alexey"
+    },
+    {
+      "avatar": "https://github.com/Jeffail.png",
+      "name": "Ash"
+    },
+    {
+      "avatar": "https://github.com/binarylogic.png",
+      "name": "Ben"
+    },
+    {
+      "avatar": "https://github.com/bruceg.png",
+      "name": "Bruce"
+    },
+    {
+      "avatar": "https://github.com/ktff.png",
+      "name": "Kruno"
+    },
+    {
+      "avatar": "https://github.com/LucioFranco.png",
+      "name": "Lucio"
+    },
+    {
+      "avatar": "https://github.com/lukesteensen.png",
+      "name": "Luke"
+    }
+  ],
   "transforms": {
     "add_fields": {
       "beta": false,

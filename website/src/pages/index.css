@@ -30,6 +30,7 @@
 
 .configuration__diagram svg {
   margin-left: -4%;
+  margin-bottom: var(--ifm-spacing-vertical);
   width: calc( 100% + 4% );
   height: 100%;
 }

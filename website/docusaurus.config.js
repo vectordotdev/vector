@@ -20,12 +20,9 @@ module.exports = {
         {to: 'components', label: 'Components', position: 'left'},
         {to: 'docs', label: 'Docs', position: 'left'},
         {to: 'blog', label: 'Blog', position: 'left'},
-        {to: 'download', label: 'Download', position: 'left'},
-        {
-          href: 'https://github.com/timberio/vector',
-          label: "GitHub",
-          position: 'right',
-        },
+        {to: 'community', label: 'Community', position: 'left'},
+        {to: 'download', label: 'Download', position: 'right'},
+        {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
     prism: {
