@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/elasticsearch.md.erb
 -->
 
-The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
+The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
 ## Configuration
 
@@ -909,7 +909,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ## Output
 
-The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
+The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

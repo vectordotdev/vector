@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/prometheus.md.erb
 -->
 
-The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
+The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
 
 ## Configuration
 
@@ -177,7 +177,7 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 
 ## Output
 
-The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
+The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
 For example:
 
 <Tabs

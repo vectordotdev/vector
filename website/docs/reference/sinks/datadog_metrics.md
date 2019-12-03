@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/datadog_metrics.md.erb
 -->
 
-The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-model#metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
+The `datadog_metrics` sink [batches](#buffers--batches) [`metric`][docs.data-model#metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 ## Configuration
 
@@ -376,7 +376,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 ## Output
 
-The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-model#metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
+The `datadog_metrics` sink [batches](#buffers--batches) [`metric`][docs.data-model#metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
