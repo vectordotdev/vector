@@ -1,6 +1,7 @@
 use crate::{
     conditions,
     event::{Event, Metric},
+    runtime::TaskExecutor,
     sinks, sources, transforms,
 };
 use component::ComponentDescription;
@@ -169,7 +170,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 

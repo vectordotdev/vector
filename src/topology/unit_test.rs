@@ -1,6 +1,7 @@
 use crate::{
     conditions::Condition,
     event::Event,
+    runtime::Runtime,
     topology::config::{TestCondition, TestDefinition, TestInputValue},
     transforms::Transform,
 };
@@ -152,6 +153,7 @@ fn build_unit_test(
     definition: &TestDefinition,
     config: &super::Config,
 ) -> Result<UnitTest, Vec<String>> {
+    let rt = Runtime::single_threaded().unwrap();
     let mut errors = vec![];
 
     // Build input event.
@@ -237,7 +239,7 @@ fn build_unit_test(
     let mut transforms: HashMap<String, UnitTestTransform> = HashMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build() {
+            match transform_config.inner.build(rt.executor()) {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

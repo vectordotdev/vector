@@ -2,6 +2,7 @@ use super::Transform;
 
 use crate::{
     event::{Event, ValueKind},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig},
 };
 use serde::{Deserialize, Serialize};
@@ -31,7 +32,7 @@ fn default_geoip_target_field() -> String {
 
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self, _exec: TaskExecutor) -> Result<Box<dyn Transform>, crate::Error> {
         let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
         Ok(Box::new(Geoip::new(
             reader,

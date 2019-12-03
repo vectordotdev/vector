@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -40,7 +41,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
@@ -196,6 +197,7 @@ mod tests {
         drop_failed: bool,
         types: &[(&str, &str)],
     ) -> Option<LogEvent> {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(event);
         let mut parser = RegexParserConfig {
             regex: regex.into(),
@@ -204,7 +206,7 @@ mod tests {
             drop_failed,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build()
+        .build(rt.executor())
         .unwrap();
 
         parser.transform(event).map(|event| event.into_log())

@@ -267,7 +267,7 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let pieces = topology::validate(&config).unwrap_or_else(|| {
+    let pieces = topology::validate(&config, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 

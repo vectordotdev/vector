@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{Event, ValueKind},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use chrono::{DateTime, Utc};
@@ -25,7 +26,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 
