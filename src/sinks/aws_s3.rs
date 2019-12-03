@@ -377,13 +377,34 @@ mod tests {
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
-        let req = build_request(buf.clone(), "date".into(), None, false, false, "bucket".into());
+        let req = build_request(
+            buf.clone(),
+            "date".into(),
+            None,
+            false,
+            false,
+            "bucket".into(),
+        );
         assert_eq!(req.key, "key/date.log".to_string());
 
-        let req = build_request(buf.clone(), "date".into(), None, false, true, "bucket".into());
+        let req = build_request(
+            buf.clone(),
+            "date".into(),
+            None,
+            false,
+            true,
+            "bucket".into(),
+        );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = build_request(buf.clone(), "date".into(), None, true, true, "bucket".into());
+        let req = build_request(
+            buf.clone(),
+            "date".into(),
+            None,
+            true,
+            true,
+            "bucket".into(),
+        );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }
