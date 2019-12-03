@@ -9,15 +9,14 @@ tags: ["type: announcement", "platform: windows"]
 ---
 
 For Windows fanatics, you'll be happy to hear that Vector now officially
-supports Windows! You can now get all of the performance and reliability
-benefits Vector offers on Windows too.
-
-[https://i.imgur.com/FHNRUC6.gif]()
+supports Windows! Bringing all of the performance and reliability benefits of
+Vector to Windows.
 
 ## Getting Started
 
 Installation is as simple as unpacking a `.zip` file. Check out the
-[Windows installation instructions][docs.operating_systems.windows] to get started.
+[Windows installation instructions][docs.operating_systems.windows] to get
+started.
 
 ## Windows Events
 

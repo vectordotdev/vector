@@ -9,37 +9,78 @@ tags: ["type: announcement", "domain: config"]
 ---
 
 Today we're excited to announce support for unit testing your configuration
-files! This feature lets you test your Vector configuration files to ensure
-they do not regress, a very welcome feature for mission-critical production
-pipelines that are managed across multiple engineers.
+files! This feature allows you to inline tests directly within your Vector
+configuration file. These tests are used to assert output from individual
+[transform][docs.transforms] components, ensuring that your configuration
+behavior does not regress; a very powerful feature for mission-critical
+production pipelines that are collaborated on.
+
+## Example
+
+Let's look at a basic example that uses the [`regex_parser` 
+transform][docs.transforms.regex_parser] to parse log lines:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[sources.my_logs]
+  type    = "file"
+  include = ["/var/log/my-app.log"]
+
+[transforms.parser]
+  inputs = ["my_logs"]
+  type   = "regex_parser"
+  regex  = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"
+
+[[tests]]
+  name = "verify_regex"
+
+  [tests.input]
+    insert_at = "my_logs"
+    type = "raw"
+    value = "2019-11-28T12:00:00+00:00 info Hello world"
+
+  [[tests.outputs.conditions]]
+      type = "check_fields"
+      "timestamp.equals" = "2019-11-28T12:00:00+00:00"
+      "level.equals" = "info"
+      "message.equals" = "Hello world"
+```
+
+And you can run the tests via the new `test` subcommand:
+
+```sh
+$ vector test ./vector.toml 
+Running ./vector.toml tests
+Test ./vector.toml: verify_regex ... passed
+```
 
 ## Why?
 
 On the surface, Vector configuration files seem like simple instructions to
-connect 2 systems. For example, [tailing a file][docs.sources.file] and sending
-that data to [AWS CloudWatch Logs][docs.sinks.aws_cloudwatch_logs]. But as you
-start to become familiar with Vector you'll start to adding
-[transforms][docs.transforms] and important logic to your configuration. After
-a while, your Vector configuration files start to look and feel like code. Unit
+connect disparate systems. For example, [tailing a file][docs.sources.file] and
+sending that data to [AWS CloudWatch Logs][docs.sinks.aws_cloudwatch_logs]. But
+as you start to become familiar with Vector, you'll start adding
+[transforms][docs.transforms] and important logic to your configuration. All of
+sudden, your Vector configuration files start to look and feel like code. Unit
 tests allow you to assert various conditions, ensuring your "code" does not
-regress. 
+regress.
 
 ## Getting Started
 
-In order to ensure the information in this post does not go stale, we've put
-together 2 documents for you:
+To help you get started we put together 2 documentation files:
 
 1. [A unit testing guide][docs.guides.unit_testing]
 2. [Unit testing reference][docs.reference.tests]
 
-These should be everything you need to get started and will be actively
-maintained as this feature matures.
+These should be everything you need and will be actively maintained as this
+feature matures.
 
 ## Feedback!
 
 We're eager to hear your feedback! Please note, this feature is in `beta` and
-represents the MVP version. As we collect more feedback we'll start to mature
-and improve it.
+represents the initial MVP version. We'd like to collect more feedback before
+we
 
 
 [docs.guides.unit_testing]: /docs/setup/guides/unit-testing
