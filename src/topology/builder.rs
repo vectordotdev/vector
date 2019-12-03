@@ -3,7 +3,7 @@ use super::{
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::{buffers, runtime};
+use crate::{buffers, dns::Resolver, runtime};
 use futures::{
     future::{lazy, Either},
     sync::mpsc,
@@ -112,8 +112,7 @@ pub fn build_pieces(
     }
 
     // TODO: remove the unimplemented
-    let resolver =
-        crate::dns::Resolver::new(config.global.dns_servers.clone(), unimplemented!()).unwrap();
+    let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
 
     // Build sources
     for (name, source) in &config.sources {
