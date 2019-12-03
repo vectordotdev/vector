@@ -42,6 +42,7 @@ type DockerEvent = shiplift::rep::Event;
 pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
+    include_images: Option<Vec<String>>,
 }
 
 impl DockerConfig {
@@ -157,6 +158,10 @@ impl DockerSourceCore {
             filters.extend(include_labels.iter().map(|l| EventFilter::Label(l.clone())));
         }
 
+        if let Some(include_images) = &self.config.include_images {
+            filters.extend(include_images.iter().map(|l| EventFilter::Image(l.clone())));
+        }
+
         options.filter(filters);
 
         self.docker.events(&options.build())
@@ -226,6 +231,7 @@ impl DockerSource {
 
         // by docker API, using both type of include results in AND between them
         // TODO: missing feature in shiplift to include ContainerFilter::Name
+
         // Include-label
         options.filter(
             self.esb
@@ -236,6 +242,19 @@ impl DockerSource {
                 .unwrap_or_default()
                 .iter()
                 .map(|s| ContainerFilter::LabelName(s.clone()))
+                .collect(),
+        );
+
+        // Include-image
+        options.filter(
+            self.esb
+                .core
+                .config
+                .include_images
+                .clone()
+                .unwrap_or_default()
+                .iter()
+                .map(|s| ContainerFilter::Label("image".to_owned(), s.clone()))
                 .collect(),
         );
 
@@ -837,16 +856,27 @@ mod tests {
         label: L,
         rt: &mut runtime::Runtime,
     ) -> mpsc::Receiver<Event> {
-        trace_init();
-        let (sender, recv) = mpsc::channel(100);
-        rt.spawn(
+        source_with_config(
             DockerConfig {
                 include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
                 include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
                 ..DockerConfig::default()
-            }
-            .build("default", &GlobalOptions::default(), sender)
-            .unwrap(),
+            },
+            rt,
+        )
+    }
+
+    /// None if docker is not present on the system
+    fn source_with_config(
+        config: DockerConfig,
+        rt: &mut runtime::Runtime,
+    ) -> mpsc::Receiver<Event> {
+        trace_init();
+        let (sender, recv) = mpsc::channel(100);
+        rt.spawn(
+            config
+                .build("default", &GlobalOptions::default(), sender)
+                .unwrap(),
         );
         recv
     }
@@ -1120,5 +1150,99 @@ mod tests {
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
+    }
+
+    #[test]
+    fn include_image() {
+        let message = "15";
+        let name = "vector_test_include_image";
+        let config = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            ..DockerConfig::default()
+        };
+
+        let mut rt = test_util::runtime();
+        let out = source_with_config(config, &mut rt);
+        let docker = docker();
+
+        let id = container_log_n(1, name, None, message, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        container_remove(&id, &docker, &mut rt);
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+    }
+
+    #[test]
+    fn not_include_image() {
+        let message = "16";
+        let name = "vector_test_not_include_image";
+        let config_ex = DockerConfig {
+            include_images: Some(vec!["some_image".to_owned()]),
+            ..DockerConfig::default()
+        };
+        let config_in = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            ..DockerConfig::default()
+        };
+
+        let mut rt = test_util::runtime();
+        let mut exclude_out = source_with_config(config_ex, &mut rt);
+        let include_out = source_with_config(config_in, &mut rt);
+        let docker = docker();
+
+        let id = container_log_n(1, name, None, message, &docker, &mut rt);
+
+        let _ = rt.block_on(collect_n(include_out, 1)).ok().unwrap();
+
+        container_remove(&id, &docker, &mut rt);
+
+        match exclude_out.poll() {
+            // Ok
+            Ok(Async::NotReady) => (),
+            msg => panic!(msg),
+        }
+    }
+
+    #[test]
+    fn not_include_image_running() {
+        let message = "17";
+        let name = "vector_test_not_include_image_running";
+        let config_ex = DockerConfig {
+            include_images: Some(vec!["some_image".to_owned()]),
+            ..DockerConfig::default()
+        };
+        let config_in = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            ..DockerConfig::default()
+        };
+        let delay = 5; // sec
+
+        let mut rt = test_util::runtime();
+        let docker = docker();
+
+        let id = delayed_container(name, None, message, delay, &docker, &mut rt);
+        if let Err(error) = container_start(&id, &docker, &mut rt) {
+            container_remove(&id, &docker, &mut rt);
+            panic!("Container start failed with error: {:?}", error);
+        }
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let mut exclude_out = source_with_config(config_ex, &mut rt);
+        let include_out = source_with_config(config_in, &mut rt);
+
+        let _ = rt.block_on(collect_n(include_out, 1)).ok().unwrap();
+        let _ = container_wait(&id, &docker, &mut rt);
+        container_remove(&id, &docker, &mut rt);
+
+        match exclude_out.poll() {
+            // Ok
+            Ok(Async::NotReady) => (),
+            msg => panic!(msg),
+        }
     }
 }
