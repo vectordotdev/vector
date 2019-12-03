@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::event::{metric::MetricValue, Event, ValueKind, MESSAGE};
+use vector::runtime::TaskExecutor;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
@@ -147,7 +148,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
+    fn build(&self, _exec: TaskExecutor) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

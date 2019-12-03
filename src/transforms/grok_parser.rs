@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
@@ -34,7 +35,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let mut grok = grok::Grok::with_patterns();
@@ -130,6 +131,7 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(event);
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
@@ -137,7 +139,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build()
+        .build(rt.executor())
         .unwrap();
         parser.transform(event).unwrap().into_log()
     }

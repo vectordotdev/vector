@@ -3,7 +3,7 @@ use super::{
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::buffers;
+use crate::{buffers, runtime};
 use futures::{
     future::{lazy, Either},
     sync::mpsc,
@@ -90,7 +90,10 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     }
 }
 
-pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec<String>> {
+pub fn build_pieces(
+    config: &super::Config,
+    exec: runtime::TaskExecutor,
+) -> Result<(Pieces, Vec<String>), Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
@@ -147,7 +150,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
         let typetag = &transform.inner.transform_type();
 
-        let mut transform = match transform.inner.build() {
+        let mut transform = match transform.inner.build(exec.clone()) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;

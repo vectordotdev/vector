@@ -978,7 +978,7 @@ end
   # 
   # * required
   # * type: string
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"
 
   # If the specified `field` should be dropped (removed) after parsing.
   # 

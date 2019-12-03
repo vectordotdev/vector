@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, ValueKind},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
@@ -19,7 +20,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         Ok(Box::new(AnsiStripper {

@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/aws_kinesis_streams.md.erb
 -->
 
-The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
+The `aws_kinesis_streams` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
 ## Configuration
 
@@ -609,7 +609,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ## Output
 
-The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
+The `aws_kinesis_streams` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.bar]
   type = "regex_parser"
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>\w*) (?P<level>\\w*) (?P<message>.*)$"
 
 [[tests]]
   # REQUIRED - General
@@ -89,7 +89,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.bar]
   type = "regex_parser"
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>\w*) (?P<level>\\w*) (?P<message>.*)$"
 
 [[tests]]
   # REQUIRED - General

@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/http.md.erb
 -->
 
-The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
+The `http` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
 
 ## Configuration
 
@@ -814,7 +814,7 @@ The full URI to make HTTP requests to. This should include the protocol and host
 
 ## Output
 
-The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
+The `http` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

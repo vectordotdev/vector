@@ -75,7 +75,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="counter"
-  values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer/Histogram","value":"timer-histogram"}]}>
+  values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer/Histogram","value":"timerhistogram"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -148,7 +148,7 @@ following structure:
 
 </TabItem>
 
-<TabItem value="timer-histogram">
+<TabItem value="timerhistogram">
 
 Given the following input:
 

@@ -501,11 +501,11 @@ class Templates
 
   def write_verb_link(sink)
     if sink.batching?
-      "[#{sink.plural_write_verb.humanize}](#buffers-and-batches)"
+      "[#{sink.plural_write_verb.humanize}](#buffers--batches)"
     elsif sink.streaming?
       "[#{sink.plural_write_verb.humanize}](#streaming)"
     elsif sink.exposing?
-      "[#{sink.plural_write_verb.humanize}](#exposing-and-scraping)"
+      "[#{sink.plural_write_verb.humanize}](#exposing--scraping)"
     else
       raise "Unhandled sink egress method: #{sink.egress_method.inspect}"
     end

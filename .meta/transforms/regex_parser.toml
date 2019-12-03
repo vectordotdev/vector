@@ -29,7 +29,7 @@ type = "string"
 common = true
 examples = [
 """\
-^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$\
+^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$\
 """
 ]
 null = false

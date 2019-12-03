@@ -36,7 +36,7 @@ function Downloads({downloads, path}) {
         </li>
       ))}
       <li>
-        <a href={`https://packages.timber.io/vector/${path}`} target="_blank">browse all files&hellip;</a>
+        <a href={`https://packages.timber.io/vector/${path}/`} target="_blank">browse all files&hellip;</a>
       </li>
     </ul>
   );

@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b

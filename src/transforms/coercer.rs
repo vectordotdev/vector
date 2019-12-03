@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::event::Event;
+use crate::runtime::TaskExecutor;
 use crate::topology::config::{DataType, TransformConfig, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer { types }))
     }
@@ -72,6 +73,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn parse_it() -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let mut event = Event::from("dummy message");
         for &(key, value) in &[
             ("number", "1234"),
@@ -91,7 +93,7 @@ mod tests {
             "#,
         )
         .unwrap()
-        .build()
+        .build(rt.executor())
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }
