@@ -28,7 +28,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "regex_parser" # example, must be: "regex_parser"
   inputs = ["my-source-id"] # example
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$" # example
+  regex = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$" # example
   
   # OPTIONAL - General
   drop_field = true # default
@@ -98,7 +98,7 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"]}
+  examples={["^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"]}
   name={"regex"}
   nullable={false}
   path={null}
@@ -246,9 +246,9 @@ Learn more in the [Performance][docs.performance] sections.
 
 ### Regex Debugger
 
-To test the validity of the[`regex`](#regex) option, we recommend the [Golang Regex
-Tester][urls.regex_tester] as it's Regex syntax closely 
-follows Rust's.
+To test the validity of the[`regex`](#regex) option, we recommend the [Rust
+Regex Tester][urls.regex_tester]. Note, you _must_ use
+[named captures](#named-captures) in your regex to map the results to fields.
 
 ### Regex Syntax
 
@@ -261,7 +261,7 @@ syntax, but lacks a few features like look around and backreferences.
 You can name Regex captures with the `<name>` syntax. For example:
 
 ```
-^(?P<timestamp>.*) (?P<level>\w*) (?P<message>.*)$
+^(?P<timestamp>\w*) (?P<level>\w*) (?P<message>.*)$
 ```
 
 Will capture `timestamp`, `level`, and `message`. All values are extracted as

@@ -33,7 +33,7 @@ vector test /etc/vector/*.toml
 ```toml
 [transforms.bar]
   type = "regex_parser"
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>\w*) (?P<level>\\w*) (?P<message>.*)$"
 
 <%= config_example(metadata.testing.tests.options_list, path: "tests", array: true, common: true) %>
 ```
@@ -46,7 +46,7 @@ vector test /etc/vector/*.toml
 ```toml
 [transforms.bar]
   type = "regex_parser"
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>\w*) (?P<level>\\w*) (?P<message>.*)$"
 
 <%= config_example(metadata.testing.tests.options_list, path: "tests", array: true, common: false) %>
 ```
