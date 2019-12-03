@@ -74,3 +74,9 @@ services:
       image: yandex/clickhouse-server:19
       ports:
         - "8123:8123"
+    ec2_metadata:
+      image: jtblin/aws-mock-metadata
+      environment: 
+        - APP_PORT="8080"
+      ports: 
+        - "8080:8080"

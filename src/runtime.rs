@@ -46,6 +46,18 @@ impl Runtime {
         self.rt.block_on(future)
     }
 
+    pub fn block_on_std<F>(&mut self, future: F) -> F::Output
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        use futures03::future::{FutureExt, TryFutureExt};
+
+        self.rt
+            .block_on(future.unit_error().boxed().compat())
+            .unwrap()
+    }
+
     pub fn shutdown_on_idle(self) -> impl Future<Item = (), Error = ()> {
         self.rt.shutdown_on_idle()
     }
