@@ -27,7 +27,7 @@ module PostProcessors
             end.compact.uniq
 
           if titles.any?
-            links = titles.collect { |title| "[#{title}](##{section_parameterize(title)})" }
+            links = titles.collect { |title| "[#{title}](##{title.slugify})" }
             content.sub!("[[references:#{option}]]", " See #{links.to_sentence} for more info.")
           else
             content.sub!("[[references:#{option}]]", "")

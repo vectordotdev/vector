@@ -12,7 +12,7 @@ module PostProcessors
           option = matches.first
 
           if content.include?("## #{option}")
-            content.gsub!(/[^\[]`#{option}`/, "[`#{option}`](##{option.parameterize})")
+            content.gsub!(/[^\[]`#{option}`/, "[`#{option}`](##{option.slugify})")
           end
         end
 
