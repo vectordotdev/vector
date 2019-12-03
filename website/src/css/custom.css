@@ -327,8 +327,7 @@ h6 > .hash-link {
 
 header {
   border-bottom: 2px solid var(--ifm-hr-border-color);
-  margin-bottom: calc( 1.5 * var(--ifm-leading) );
-  padding-bottom: calc( 0.5 * var(--ifm-leading) );
+  margin-bottom: calc( 2 * var(--ifm-leading) );
 }
 header .badges {
   float: right;
@@ -406,6 +405,17 @@ header.hero h1 {
   }
 }
 
+.hero .mailing-list .mailing-list--description {
+  color: var(--ifm-color-emphasis-600);
+  font-size: 1.1rem;
+  margin: var(--ifm-spacing-vertical) 0;
+}
+
+.hero .mailing-list form input[type="email"] {
+  margin-right: 1em;
+  width: 400px;
+}
+
 input[type="checkbox"] {
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -428,20 +438,29 @@ input[type="checkbox"]:checked {
   border: 1px solid var(--ifm-color-primary);
 }
 
+input[type="email"],
 input[type="text"] {
   background: var(--ifm-panel-background);
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
+  box-sizing: border-box;
   color: var(--ifm-font-base-color);
-  font-size: 1rem;
-  padding: calc( var(--ifm-spacing-vertical) / 2 ) var(--ifm-spacing-horizontal);
+  display: inline-block;
+  font-size: calc(0.8rem * var(--ifm-button-size-multiplier));
+  line-height: 1.5;
+  padding: calc( var(--ifm-button-padding-vertical) * var(--ifm-button-size-multiplier) ) 0.8em;
   transition: var(--ifm-transition-slow) ease;
+  vertical-align: middle;
 }
+input[type="email"]:focus,
 input[type="text"]:focus {
   background: var(--ifm-panel-background-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
+}
+.input--lg {
+  --ifm-button-size-multiplier: 1.35;
 }
 
 .label--warning {
@@ -711,7 +730,7 @@ span.link:hover {
   }
 }
 .navbar .navbar__items--right .react-toggle {
-  margin-left: calc( var(--ifm-navbar-item-padding-horizontal) * 0.5 );
+  margin-left: var(--ifm-navbar-item-padding-horizontal);
 }
 .navbar .navbar__item .badge {
   border-color: var(--ifm-background-color) !important;
@@ -761,14 +780,52 @@ span.link:hover {
   color: var(--ifm-panel-color-active);
 }
 
+.panel {
+  background: var(--ifm-panel-background);
+  border: 1px solid var(--ifm-panel-border-color);
+  border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-panel-box-shadow);
+  color: var(--ifm-font-base-color);
+  display: block;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 2 );
+}
+.panel.panel--link {
+  transition: var(--ifm-transition-fast) ease;
+}
+.panel.panel--link:hover {
+  background: var(--ifm-panel-background-active);
+  border-color: var(--ifm-color-primary);
+  box-shadow: var(--ifm-panel-box-shadow-active);
+  text-decoration: none;
+}
+.panel .panel--icon {
+  font-size: 4em;
+  line-height: 1;
+  margin: 0 0 var(--ifm-spacing-vertical) 0;
+}
+.panel .panel--title {
+  font-size: 1.2em;
+  font-weight: 600;
+}
+.panel .panel--description {
+  font-size: 0.95em;
+  opacity: 0.5;
+}
+
 section {
-  border-top: 1px solid var(--ifm-hr-border-color);
-  padding: calc( 1.5 * var(--ifm-leading) ) 0;
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  margin-bottom: calc( 2 * var(--ifm-leading) );
+  padding-bottom: calc( ( 2 * var(--ifm-leading) ) - var(--ifm-spacing-vertical) );
 }
 section .sub-title {
   color: var(--ifm-color-emphasis-600);
   margin-top: calc( var(--ifm-heading-margin-bottom) * -1 );
   margin-bottom: var(--ifm-heading-margin-bottom);
+}
+section:last-child {
+  border-bottom: 0px none;
+  margin-bottom: 0;
 }
 .alternate-bg section:nth-child(even) {
   background: var(--ifm-panel-background);
