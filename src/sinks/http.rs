@@ -6,7 +6,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -93,10 +93,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let sink = http(self.clone(), acker, tls.clone())?;
+        let sink = http(self.clone(), cx.acker(), tls.clone())?;
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
@@ -297,7 +297,6 @@ mod tests {
         runtime::Runtime,
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
-        topology::config::SinkConfig,
     };
     use bytes::Buf;
     use futures::{sync::mpsc, Future, Sink, Stream};
@@ -383,7 +382,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
+        let sink = http(config, Acker::Null, TlsSettings::default()).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -441,7 +440,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
+        let sink = http(config, Acker::Null, TlsSettings::default()).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -499,7 +498,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
+        let sink = http(config, Acker::Null, TlsSettings::default()).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

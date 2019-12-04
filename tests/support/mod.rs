@@ -7,13 +7,12 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
-use vector::buffers::Acker;
 use vector::event::{metric::MetricValue, Event, ValueKind, MESSAGE};
 use vector::runtime::TaskExecutor;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
-    DataType, GlobalOptions, SinkConfig, SourceConfig, TransformConfig,
+    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
 };
 use vector::transforms::Transform;
 
@@ -194,12 +193,12 @@ enum HealthcheckError {
 
 #[typetag::serde(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), vector::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
         let sink = self
             .sender
             .clone()
             .unwrap()
-            .stream_ack(acker)
+            .stream_ack(cx.acker())
             .sink_map_err(|e| error!("Error sending in sink {}", e));
         let healthcheck = match self.healthy {
             true => future::ok(()),

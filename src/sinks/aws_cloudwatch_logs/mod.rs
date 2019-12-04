@@ -1,7 +1,6 @@
 mod request;
 
 use crate::{
-    buffers::Acker,
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{
@@ -10,7 +9,7 @@ use crate::{
         TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
@@ -123,7 +122,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch = self.batch.unwrap_or(1000, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -135,7 +134,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             .service(CloudwatchLogsPartitionSvc::new(self.clone())?);
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc, acker)
+            let svc_sink = BatchServiceSink::new(svc, cx.acker())
                 .partitioned_batched_with_min(PartitionBuffer::new(Vec::new()), &batch)
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
@@ -714,23 +713,22 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         region::RegionOrEndpoint,
+        runtime::Runtime,
         test_util::{block_on, random_lines_with_stream, random_string},
-        topology::config::SinkConfig,
+        topology::config::{SinkConfig, SinkContext},
     };
     use futures::Sink;
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
-    use tokio::runtime::current_thread::Runtime;
 
     const GROUP_NAME: &'static str = "vector-cw";
 
     #[test]
     fn cloudwatch_insert_log_event() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let stream_name = gen_name();
 
@@ -747,7 +745,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -779,7 +777,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_dynamic_group_and_stream_creation() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -796,7 +794,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -828,7 +826,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_batched() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -850,7 +848,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -882,7 +880,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_partitioned() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let stream_name = gen_name();
 
@@ -901,7 +899,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 

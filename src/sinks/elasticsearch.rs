@@ -8,7 +8,7 @@ use crate::{
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
@@ -78,10 +78,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common)?;
-        let sink = es(self, common, acker);
+        let sink = es(self, common, cx.acker());
 
         Ok((sink, healthcheck))
     }
@@ -489,13 +489,12 @@ mod tests {
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         event,
         sinks::util::http::https_client,
         sinks::util::tls::TlsOptions,
-        test_util::{block_on, random_events_with_stream, random_string},
-        topology::config::SinkConfig,
+        test_util::{random_events_with_stream, random_string, runtime},
+        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::{Future, Sink};
@@ -506,6 +505,8 @@ mod integration_tests {
 
     #[test]
     fn structures_events_correctly() {
+        let mut rt = runtime();
+
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: Some("http://localhost:9200".into()),
@@ -517,7 +518,7 @@ mod integration_tests {
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, _hc) = config.build(Acker::Null).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event
@@ -528,10 +529,10 @@ mod integration_tests {
             .insert_explicit("foo".into(), "bar".into());
 
         let pump = sink.send(input_event.clone());
-        block_on(pump).unwrap();
+        rt.block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(&common)).unwrap();
+        rt.block_on(flush(&common)).unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", common.base_url, index))
@@ -595,21 +596,25 @@ mod integration_tests {
     }
 
     fn run_insert_tests(mut config: ElasticSearchConfig) {
+        let mut rt = runtime();
+
         let index = gen_index();
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, healthcheck) = config.build(Acker::Null).expect("Building config failed");
+        let (sink, healthcheck) = config
+            .build(SinkContext::new_test(rt.executor()))
+            .expect("Building config failed");
 
-        block_on(healthcheck).expect("Health check failed");
+        rt.block_on(healthcheck).expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        let _ = block_on(pump).expect("Sending events failed");
+        let _ = rt.block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&common)).expect("Flushing writes failed");
+        rt.block_on(flush(&common)).expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
