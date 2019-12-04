@@ -2,28 +2,22 @@ pub mod batch;
 pub mod buffer;
 pub mod http;
 pub mod retries;
+pub mod service;
 pub mod tls;
 
 use crate::buffers::Acker;
 use futures::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::time::Duration;
-use tower::{
-    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
-    retry::Retry,
-    timeout::Timeout,
-    Service, ServiceBuilder,
-};
+use tower::Service;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
 pub use buffer::metrics::MetricBuffer;
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
-use retries::{FixedRetryPolicy, RetryLogic};
+pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 
 pub trait SinkExt<T>
 where
@@ -318,95 +312,5 @@ mod test {
         drop(senders.lock().unwrap().remove(0)); // 16
         std::thread::sleep(std::time::Duration::from_millis(50));
         assert_eq!(15, ack_counter.load(Ordering::Relaxed));
-    }
-}
-
-/// Tower Request based configuration
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct TowerRequestConfig {
-    pub request_in_flight_limit: Option<usize>,        // 5
-    pub request_timeout_secs: Option<u64>,             // 60
-    pub request_rate_limit_duration_secs: Option<u64>, // 1
-    pub request_rate_limit_num: Option<u64>,           // 5
-    pub request_retry_attempts: Option<usize>,         // max_value()
-    pub request_retry_backoff_secs: Option<u64>,       // 1
-}
-
-impl TowerRequestConfig {
-    pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
-        TowerRequestSettings {
-            in_flight_limit: self
-                .request_in_flight_limit
-                .or(defaults.request_in_flight_limit)
-                .unwrap_or(5),
-            timeout: Duration::from_secs(
-                self.request_timeout_secs
-                    .or(defaults.request_timeout_secs)
-                    .unwrap_or(60),
-            ),
-            rate_limit_duration: Duration::from_secs(
-                self.request_rate_limit_duration_secs
-                    .or(defaults.request_rate_limit_duration_secs)
-                    .unwrap_or(1),
-            ),
-            rate_limit_num: self
-                .request_rate_limit_num
-                .or(defaults.request_rate_limit_num)
-                .unwrap_or(5),
-            retry_attempts: self
-                .request_retry_attempts
-                .or(defaults.request_retry_attempts)
-                .unwrap_or(usize::max_value()),
-            retry_backoff: Duration::from_secs(
-                self.request_retry_backoff_secs
-                    .or(defaults.request_retry_backoff_secs)
-                    .unwrap_or(1),
-            ),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct TowerRequestSettings {
-    pub in_flight_limit: usize,
-    pub timeout: Duration,
-    pub rate_limit_duration: Duration,
-    pub rate_limit_num: u64,
-    pub retry_attempts: usize,
-    pub retry_backoff: Duration,
-}
-
-impl TowerRequestSettings {
-    pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
-        FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
-    }
-
-    pub fn batch_sink<B, L, S, T>(
-        &self,
-        retry_logic: L,
-        service: S,
-        acker: Acker,
-    ) -> BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>
-    // Would like to return `impl Sink + SinkExt<T>` here, but that
-    // doesn't work with later calls to `batched_with_min` etc (via
-    // `trait SinkExt` above), as it is missing a bound on the
-    // associated types that cannot be expressed in stable Rust.
-    where
-        L: RetryLogic<Error = S::Error, Response = S::Response>,
-        S: Clone + Service<T>,
-        S::Error: 'static + std::error::Error + Send + Sync,
-        S::Response: std::fmt::Debug,
-        T: Clone,
-        B: Batch<Output = T>,
-    {
-        let policy = self.retry_policy(retry_logic);
-        let service = ServiceBuilder::new()
-            .concurrency_limit(self.in_flight_limit)
-            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-            .retry(policy)
-            .timeout(self.timeout)
-            .service(service);
-
-        BatchServiceSink::new(service, acker)
     }
 }
