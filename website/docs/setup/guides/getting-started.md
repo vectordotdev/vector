@@ -1,18 +1,15 @@
 ---
 title: Getting Started Guide
 sidebar_label: Getting Started
-description: Quickly and easily get started with Vector
+description: Getting started with Vector
 ---
 
-This is a "Hello World" style guide that walks through sending your first
-[event][docs.data-model#event] through Vector. It's designed to be followed locally,
-making it quick and easy. We'll start with the simplest of examples: accepting
-an event via the [`stdin` source][docs.sources.stdin], and then printing it out
-via the [`console` sink][docs.sinks.console].
+Vector is a simple beast to tame, in this guide we'll send an
+[event][docs.data-model#event] through it and touch on some basic concepts.
 
 ## 1. Install Vector
 
-If you haven't already, [install Vector][docs.installation]:
+If you haven't already, install Vector. Here's a script for the lazy:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
@@ -20,102 +17,127 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or [choose your preferred installation method][docs.installation].
 
-## 2. Send Your Event
+## 2. Configure it
 
-Start by creating a temporary [Vector configuration file][docs.configuration]
-in your home directory:
+Vector runs with a [configuration file][docs.configuration] which tells it which
+components to run and how they should interact. Let's create one that simply
+pipes a [`stdin` source][docs.sources.stdin] to a
+[`stdout` sink][docs.sinks.console]:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" />
 
-```bash
-echo '
-[sources.in]
+```toml
+[sources.foo]
     type = "stdin"
 
-[sinks.out]
-    inputs = ["in"]
+[sinks.bar]
+    inputs = ["foo"]
     type = "console"
-' > ~/vector.toml
+    encoding = "text"
 ```
 
-Now pipe an event through Vector:
+Every component within a Vector config has an identifier chosen by you. This
+allows you to specify where a sink should gather its data from (using the
+`inputs` field).
+
+That's it for our first config, now pipe an event through it:
 
 ```bash
-echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ~/vector.toml
+echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ./vector.toml
 ```
 
-Voilà! The following is printed in your terminal:
+Your input event will get echoed back (along with some service logs) unchanged:
 
 ```text
-Starting Vector ...
+... some logs ...
 172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272
 ```
 
+That's because the raw input text of our source was captured internally within
+the field `message`, and the `text` encoding option of our sink prints the raw
+contents of `message` only.
+
+If you expected something interesting to happen then that's on you. The text
+came out unchanged because we didn't ask Vector to change it, let's remedy that.
 Exit Vector by pressing `ctrl+c`.
 
-Notice that Vector prints the same raw line that you sent it. This is because
-Vector does not awkwardly enforce structuring on you until you need it, which
-brings us to parsing...
+import Alert from '@site/src/components/Alert';
 
-## 3. Parse Your Event
+<Alert type="info">
 
-In most cases you'll want to parse your event into a structured format. Vector
-makes this easy with [transforms][docs.transforms]. In this case, we'll use
-the [`regex_parser`][docs.transforms.regex_parser]. Let's update your existing
-Vector configuration file:
+Hey, kid, if you want to see something cool try setting `encoding = "json"` in
+the sink config.
 
-```bash
-echo '
-[sources.in]
+</Alert>
+
+## 3. Transform an event
+
+Nothing in this world is ever good enough for you, why should events be any
+different?
+
+Vector makes it easy to mutate events into a more (or less) structured format
+with [transforms][docs.transforms]. Let's parse our log into a structured format
+by capturing named regular expression groups with a
+[`regex_parser` transform][docs.transforms.regex_parser].
+
+A config can have any number of a transforms and it's entirely up to you how
+they are chained together. Similar to sinks, a transform requires you to specify
+where its data comes from. When a sink is configured to accept data from a
+transform the pipeline is complete.
+
+Let's place our new transform in between our existing source and sink. We are
+also going to change the [encoding][docs.sinks.console#encoding] of our sink in
+order to print the full event structure:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[sources.foo]
     type = "stdin"
 
-# Structure and parse the data
+# Structure the data
 [transforms.apache_parser]
-    inputs = ["in"]
-    type   = "regex_parser"
-  regex    = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+    inputs = ["foo"]
+    type = "regex_parser"
+    field = "message"
+    regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 
-[sinks.out]
+[sinks.bar]
     inputs = ["apache_parser"]
     type = "console"
-' > ~/vector.toml
+    encoding = "json"
 ```
 
-Let's pipe the same event again through Vector:
+And pipe the same event again through it:
 
 ```bash
-echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ~/vector.toml
+echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ./vector.toml
 ```
 
-Voilà! The following is printed in your terminal:
+Oh snap! This time we get something like:
 
 ```text
-Starting Vector ...
-{"host": "172.128.80.109", "message": 
+... some logs ...
+{"status":"406", "bytes_out":"10272", "path":"/mesh", "method":"PUT", "host":"172.128.80.109", "user":"Bins5273", "bytes_in":"656", "timestamp":"2019-05-03T13:11:48-04:00"}
 ```
 
-Exit `vector` by pressing `ctrl+c`.
+Firstly, our `message` field has been parsed out into structured fields.
+Secondly, we now see every field of the event printed to `stdout` by our sink in
+JSON format because we set `encoding = "json"`.
 
-You'll notice this time the event is structured. Vector knows when an event
-is structured or not and defaults to JSON encoding for outputs that support
-it. You can change the encoding in the
-[`console` sink options][docs.sinks.console].
+Exit `vector` again by pressing `ctrl+c`.
 
-That's it! This tutorial demonstrates the _very_ basic [concepts][docs.concepts]
-of Vector. From here, you can start to think about the various
-[sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks]
-you'll need to combine to create your pipelines.
+Next, try experimenting by adding more [transforms][docs.transforms] to your
+pipeline before moving onto the next guide.
 
 
-[docs.concepts]: /docs/about/concepts
 [docs.configuration]: /docs/setup/configuration
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.installation]: /docs/setup/installation
+[docs.sinks.console#encoding]: /docs/reference/sinks/console#encoding
 [docs.sinks.console]: /docs/reference/sinks/console
-[docs.sinks]: /docs/reference/sinks
 [docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.sources]: /docs/reference/sources
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
 [docs.transforms]: /docs/reference/transforms
