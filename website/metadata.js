@@ -504,6 +504,28 @@ module.exports = {
 
       ]
     },
+    "new_relic_logs": {
+      "beta": false,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "new_relic_logs_sink",
+      "name": "new_relic_logs",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": "New Relic",
+      "status": "prod-ready",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",

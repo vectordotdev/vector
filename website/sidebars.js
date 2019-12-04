@@ -201,6 +201,8 @@ module.exports = {
             
               "reference/sinks/kafka",
             
+              "reference/sinks/new_relic_logs",
+            
               "reference/sinks/prometheus",
             
               "reference/sinks/splunk_hec",

@@ -1,12 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
 event_types: ["log"]
-issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+new_relic_logs%22
 operating_systems: ["linux","macos","windows"]
-sidebar_label: "http|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
+sidebar_label: "new_relic_logs|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/new_relic_logs.rs
 status: "prod-ready"
-title: "http sink"
+title: "new_relic_logs sink"
 unsupported_operating_systems: []
 ---
 
@@ -15,10 +15,10 @@ unsupported_operating_systems: []
 
      To make changes please edit the template located at:
 
-     website/docs/reference/sinks/http.md.erb
+     website/docs/reference/sinks/new_relic_logs.md.erb
 -->
 
-The `http` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
+The `new_relic_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
 
 ## Configuration
 
@@ -43,18 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "http" # example, must be: "http"
+  # REQUIRED
+  type = "new_relic_logs" # example, must be: "new_relic_logs"
   inputs = ["my-source-id"] # example
-  uri = "https://10.22.212.22:9000/endpoint" # example
   
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
-  
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
+  # OPTIONAL
+  insert_key = "xxxx" # example, no default
+  license_key = "xxxx" # example, no default
+  region = "us" # default, enum
 ```
 
 </TabItem>
@@ -65,33 +61,26 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "http" # example, must be: "http"
+  type = "new_relic_logs" # example, must be: "new_relic_logs"
   inputs = ["my-source-id"] # example
-  uri = "https://10.22.212.22:9000/endpoint" # example
-  
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
   
   # OPTIONAL - General
   healthcheck = true # default
-  healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
+  insert_key = "xxxx" # example, no default
+  license_key = "xxxx" # example, no default
+  region = "us" # default, enum
   
   # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
+  batch_size = 524000 # default, bytes
   batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
-  request_in_flight_limit = 10 # default
+  request_in_flight_limit = 100 # default
   request_rate_limit_duration_secs = 1 # default, seconds
-  request_rate_limit_num = 10 # default
+  request_rate_limit_num = 100 # default
   request_retry_attempts = 10 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-  
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -99,19 +88,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
-  
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}"
-  
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "PassWord1" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
-    verify_hostname = true # default
 ```
 
 </TabItem>
@@ -128,83 +104,10 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  name={"basic_auth"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### basic_auth
-
-Options for basic authentication.
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
-  name={"password"}
-  nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### password
-
-The basic authentication password.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
-  name={"user"}
-  nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### user
-
-The basic authentication user name.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
   common={false}
-  defaultValue={1049000}
+  defaultValue={524000}
   enumValues={null}
-  examples={[1049000]}
+  examples={[524000]}
   name={"batch_size"}
   nullable={false}
   path={null}
@@ -217,7 +120,7 @@ The basic authentication user name.
 
 ### batch_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 
 </Field>
@@ -240,7 +143,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
 
 
 </Field>
@@ -366,79 +269,6 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","json","text"]}
-  name={"encoding"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  name={"headers"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### headers
-
-Options for custom headers. See [Authentication](#authentication) for more info.
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
-  name={"`[header-key]`"}
-  nullable={false}
-  path={"headers"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### `[header-key]`
-
-A custom header to be added to each outgoing HTTP request.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
   common={false}
   defaultValue={true}
   enumValues={null}
@@ -462,11 +292,11 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["https://10.22.212.22:9000/_health"]}
-  name={"healthcheck_uri"}
+  examples={["xxxx","${INSERT_KEY_ENV_VAR}"]}
+  name={"insert_key"}
   nullable={true}
   path={null}
   relevantWhen={null}
@@ -476,9 +306,55 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   unit={null}
   >
 
-### healthcheck_uri
+### insert_key
 
-A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.
+Your New Relic insert key (if applicable).
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["xxxx","${LICENSE_KEY_ENV_VAR}"]}
+  name={"license_key"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### license_key
+
+Your New Relic license key (if applicable).
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={"us"}
+  enumValues={{"us":"The US region","eu":"The EU region"}}
+  examples={["us","eu"]}
+  name={"region"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The API region to send logs to.
 
 
 </Field>
@@ -486,9 +362,9 @@ A URI that Vector can request in order to determine the service health. See [Hea
 
 <Field
   common={false}
-  defaultValue={10}
+  defaultValue={100}
   enumValues={null}
-  examples={[10]}
+  examples={[100]}
   name={"request_in_flight_limit"}
   nullable={false}
   path={null}
@@ -532,9 +408,9 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 <Field
   common={false}
-  defaultValue={10}
+  defaultValue={100}
   enumValues={null}
-  examples={[10]}
+  examples={[100]}
   name={"request_rate_limit_num"}
   nullable={false}
   path={null}
@@ -622,269 +498,16 @@ The maximum time a request can take before being aborted. It is highly recommend
 </Field>
 
 
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  name={"tls"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### tls
-
-Configures the TLS options for connections from this sink.
-
-<Fields filters={false}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/certificate_authority.crt"]}
-  name={"ca_path"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### ca_path
-
-Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/host_certificate.crt"]}
-  name={"crt_path"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### crt_path
-
-Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,[`key_path`](#key_path) must also be set.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["PassWord1"]}
-  name={"key_pass"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### key_pass
-
-Pass phrase used to unlock the encrypted key file. This has no effect unless[`key_pass`](#key_pass) above is set.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/host_certificate.key"]}
-  name={"key_path"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### key_path
-
-Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set,[`crt_path`](#crt_path) must also be set.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"verify_certificate"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### verify_certificate
-
-If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"verify_hostname"}
-  nullable={true}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### verify_hostname
-
-If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["https://10.22.212.22:9000/endpoint"]}
-  name={"uri"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### uri
-
-The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
-
-
-</Field>
-
-
 </Fields>
 
 ## Output
 
-The `http` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
+The `new_relic_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
-For example:
-
-<Tabs
-  block={true}
-  defaultValue="json"
-  values={[{"label":"JSON","value":"json"},{"label":"NDJSON","value":"ndjson"},{"label":"Text","value":"text"}]}>
-
-<TabItem value="json">
-
-```http
-POST <uri> HTTP/1.1
-Host: <uri.host>
-Content-Type: application/x-ndjson
-Content-Length: <byte_size>
-
-[
-  <json_encoded_log>,
-  <json_encoded_log>,
-  <json_encoded_log>,
-]
-```
-
-</TabItem>
-
-<TabItem value="ndjson">
-
-```http
-POST <uri> HTTP/1.1
-Host: <uri.host>
-Content-Type: application/x-ndjson
-Content-Length: <byte_size>
-
-<json_encoded_log>
-<json_encoded_log>
-<json_encoded_log>
-```
-
-</TabItem>
-
-<TabItem value="text">
-
-```http
-POST <uri> HTTP/1.1
-Host: <uri.host>
-Content-Type: text/plain
-Content-Length: <byte_size>
-
-<log.message>
-<log.message>
-<log.message>
-```
-
-</TabItem>
-</Tabs>
 
 ## How It Works
-
-### Authentication
-
-HTTP authentication is controlled via the `Authorization` header which you can
-set with the[`headers`](#headers) option. For convenience, Vector also supports the
-`basic_auth.username` and `basic_auth.password` options which handle setting the
-`Authorization` header for the [base access authentication
-scheme][urls.basic_auth].
-
-
-
 
 ### Buffers & Batches
 
@@ -892,7 +515,7 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
-The `http` sink buffers & batches data as
+The `new_relic_logs` sink buffers & batches data as
 shown in the diagram above. You'll notice that Vector treats these concepts
 differently, instead of treating them as global concepts, Vector treats them
 as sink specific concepts. This isolates sinks, ensuring services disruptions
@@ -901,7 +524,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured[`batch_timeout`](#batch_timeout) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured[`batch_size`](#batch_size) (default: `1049000 bytes`).
+2. The batch size meets or exceeds the configured[`batch_size`](#batch_size) (default: `524000 bytes`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
@@ -918,8 +541,6 @@ section.
 
 Health checks ensure that the downstream service is accessible and ready to
 accept data. This check is performed upon sink initialization.
-In order to run this check you must provide a value for the[`healthcheck_uri`](#healthcheck_uri)
-option.
 If the health check fails an error will be logged and Vector will proceed to
 start.
 
@@ -947,7 +568,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_http_sink_issue].
+with the Vector team by [opening an issie][urls.new_new_relic_logs_sink_issue].
 
 ### Retry Policy
 
@@ -960,5 +581,6 @@ attempts and backoff rate with the[`request_retry_attempts`](#request_retry_atte
 [docs.data-model#event]: /docs/about/data-model#event
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.guarantees]: /docs/about/guarantees
-[urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
-[urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http
+[urls.new_new_relic_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+new_relic_logs
+[urls.new_relic]: https://newrelic.com/
+[urls.new_relic_log_api]: https://docs.newrelic.com/docs/logs/new-relic-logs/log-api/introduction-log-api
