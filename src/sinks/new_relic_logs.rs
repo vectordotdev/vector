@@ -6,6 +6,15 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display(
+        "Missing authentication key, must provide either 'license_key' or 'insert_key'"
+    ))]
+    MissingAuthParam,
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -43,7 +52,7 @@ impl SinkConfig for NewRelicLogsConfig {
         } else if let Some(insert_key) = &self.insert_key {
             headers.insert("X-Insert-Key".to_owned(), insert_key.clone());
         } else {
-            return Err(format!("must provide either 'license_key' or 'insert_key'").into());
+            return Err(Box::new(BuildError::MissingAuthParam));
         }
 
         let uri = match self.region.as_ref().unwrap_or(&NewRelicLogsRegion::Us) {
@@ -51,7 +60,7 @@ impl SinkConfig for NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => "https://log-api.eu.newrelic.com/log/v1",
         };
 
-        let batch_conf = BatchConfig {
+        let batch = BatchConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
             batch_size: Some(
@@ -62,7 +71,7 @@ impl SinkConfig for NewRelicLogsConfig {
             ..self.batch
         };
 
-        let request_conf = TowerRequestConfig {
+        let request = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
             request_in_flight_limit: Some(self.request.request_in_flight_limit.unwrap_or(100)),
@@ -79,8 +88,8 @@ impl SinkConfig for NewRelicLogsConfig {
             compression: Some(Compression::None),
             encoding: Encoding::Json,
 
-            batch: batch_conf,
-            request: request_conf,
+            batch,
+            request,
 
             tls: None,
         };

@@ -519,7 +519,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": null,
+      "service_provider": "New Relic",
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
