@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # example, must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
-  token = "A94A8FE5CCB19BA61C4C08" # example
+  token = "${TOKEN_ENV_VAR}" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -64,7 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # example, must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
-  token = "A94A8FE5CCB19BA61C4C08" # example
+  token = "${TOKEN_ENV_VAR}" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -655,7 +655,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["A94A8FE5CCB19BA61C4C08"]}
+  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
   name={"token"}
   nullable={false}
   path={null}

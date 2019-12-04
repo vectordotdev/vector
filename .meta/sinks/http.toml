@@ -28,13 +28,13 @@ description = "Options for basic authentication."
 
 [sinks.http.options.basic_auth.options.password]
 type = "string"
-examples = ["password", "${PASSWORD_ENV_VAR}"]
+examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
 description = "The basic authentication password."
 
 [sinks.http.options.basic_auth.options.user]
 type = "string"
-examples = ["username"]
+examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
 description = "The basic authentication user name."
 

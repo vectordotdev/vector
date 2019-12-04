@@ -54,8 +54,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
+    password = "${PASSWORD_ENV_VAR}" # example
+    user = "${USERNAME_ENV_VAR}" # example
 ```
 
 </TabItem>
@@ -92,8 +92,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
+    password = "${PASSWORD_ENV_VAR}" # example
+    user = "${USERNAME_ENV_VAR}" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -151,7 +151,7 @@ Options for basic authentication.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["password","${PASSWORD_ENV_VAR}"]}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
   nullable={false}
   path={"basic_auth"}
@@ -174,7 +174,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["username"]}
+  examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
   nullable={false}
   path={"basic_auth"}

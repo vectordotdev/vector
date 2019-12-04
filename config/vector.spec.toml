@@ -2038,13 +2038,14 @@ end
     # 
     # * required
     # * type: string
-    password = "password"
     password = "${PASSWORD_ENV_VAR}"
+    password = "password"
 
     # The basic authentication user name.
     # 
     # * required
     # * type: string
+    user = "${USERNAME_ENV_VAR}"
     user = "username"
 
   #
@@ -2472,13 +2473,14 @@ end
     # 
     # * required
     # * type: string
-    password = "password"
     password = "${PASSWORD_ENV_VAR}"
+    password = "password"
 
     # The basic authentication user name.
     # 
     # * required
     # * type: string
+    user = "${USERNAME_ENV_VAR}"
     user = "username"
 
   #
@@ -2796,13 +2798,14 @@ end
     # 
     # * required
     # * type: string
-    password = "password"
     password = "${PASSWORD_ENV_VAR}"
+    password = "password"
 
     # The basic authentication user name.
     # 
     # * required
     # * type: string
+    user = "${USERNAME_ENV_VAR}"
     user = "username"
 
   #
@@ -3141,6 +3144,7 @@ end
   # 
   # * required
   # * type: string
+  token = "${TOKEN_ENV_VAR}"
   token = "A94A8FE5CCB19BA61C4C08"
 
   # Enables/disables the sink healthcheck upon start.
