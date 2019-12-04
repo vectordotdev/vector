@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/community">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.5.0<a/>
+    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/download">Download 0.5.0<a/>
   </strong>
 </p>
 
@@ -116,7 +116,7 @@ Run the following in your terminal, then follow the on-screen instructions.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 ```
 
-Or view [platform specific installation instructions][docs.installation].
+Or use your own [preferred method][docs.installation].
 
 ---
 
@@ -176,7 +176,7 @@ Or view [platform specific installation instructions][docs.installation].
 [docs.updating]: https://vector.dev/docs/administration/updating
 [docs.use_cases]: https://vector.dev/docs/use_cases
 [docs.validating]: https://vector.dev/docs/administration/validating
-[urls.mailing_list]: https://vector.dev/mailing_list/
+[urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.v0.5.0]: https://github.com/timberio/vector/releases/tag/v0.5.0
