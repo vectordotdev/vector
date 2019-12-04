@@ -39,3 +39,9 @@
 .alert.alert--warning {
   border-left: 3px solid var(--ifm-color-warning);
 }
+
+.alert.alert--fill.alert--success {
+  background: rgba( var(--ifm-color-success-rgb), 0.15 ) !important;
+  border: 0px none;
+  color: var(--ifm-color-success) !important;
+}

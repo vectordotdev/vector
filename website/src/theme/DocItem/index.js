@@ -188,7 +188,7 @@ function DocItem(props) {
             </div>
             {DocContent.rightToc && (
               <div className="col col--3">
-                <div className={styles.tableOfContents}>
+                <div className="table-of-contents">
                   <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">

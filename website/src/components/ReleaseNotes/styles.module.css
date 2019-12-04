@@ -1,0 +1,39 @@
+.containers {
+  display: flex;
+}
+
+.sidebar {
+  border-right: 1px solid var(--ifm-sidebar-border-color);
+  padding: 0 var(--ifm-spacing-horizontal) 0 0;
+  text-align: right;
+  width: 175px;
+}
+
+.content {
+  flex: 1 1 0;
+  margin: 0 calc( var(--ifm-spacing-horizontal) * 3 );
+  min-width: 0;
+}
+
+.content header {
+  padding: calc( var(--ifm-spacing-vertical) * 2 ) 0 calc( var(--ifm-spacing-vertical) * 3 ) 0;
+  text-align: center;
+}
+
+.toc {
+  width: 175px;
+}
+
+@media (max-width: 996px) {
+  .containers {
+    display: block;
+  }
+
+  .content {
+    margin: 0;
+  }
+
+  .toc {
+    display: none;
+  }
+}

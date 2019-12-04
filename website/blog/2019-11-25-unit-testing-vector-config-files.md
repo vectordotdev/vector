@@ -1,7 +1,7 @@
 ---
 id: unit-testing-vector-config-files
 title: "Unit Testing: Treating Your Vector Config Files As Code"
-author: Ashley
+author: Ash
 author_title: Vector Core Team
 author_url: https://github.com/jeffail
 author_image_url: https://github.com/jeffail.png

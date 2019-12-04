@@ -4,11 +4,13 @@ require_relative "../../util/version"
 class Release
   include Comparable
 
-  attr_reader :commits, :date, :last_version, :version
+  attr_reader :commits, :date, :last_date, :last_version, :posts, :version
 
-  def initialize(release_hash, last_version)
+  def initialize(release_hash, last_version, last_date, all_posts)
+    @last_date = last_date
     @last_version = last_version
     @date = release_hash.fetch("date").to_date
+    @posts = all_posts.select { |p| p.date > last_date && p.date <= @date }
     @version = Version.new(release_hash.fetch("version"))
 
     @commits =
@@ -39,6 +41,10 @@ class Release
 
   def compare_short_link
     @compare_short_link ||= "urls.compare_v#{last_version}...v#{version}"
+  end
+
+  def compare_url
+    @compare_url ||= "https://github.com/timberio/vector/compare/v#{last_version}...v#{version}"
   end
 
   def deletions_count
@@ -100,7 +106,10 @@ class Release
   def to_h
     {
       commits: commits.deep_to_h,
+      compare_url: compare_url,
+      deletions_count: deletions_count,
       date: date,
+      insertions_count: insertions_count,
       last_version: last_version,
       version: version,
     }

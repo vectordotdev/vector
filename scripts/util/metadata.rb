@@ -63,6 +63,13 @@ class Metadata
     @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
     @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
+    # posts
+
+    @posts ||=
+      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+        Post.new(path)
+      end.sort
+
     # releases
 
     release_versions =
@@ -82,8 +89,10 @@ class Metadata
           sort.
           last
 
+      last_date = hash.fetch("releases").fetch(version.to_s).fetch("date").to_date
+
       release_hash["version"] = version_string
-      release = Release.new(release_hash, last_version)
+      release = Release.new(release_hash, last_version, last_date, @posts)
       @releases.send("#{version_string}=", release)
     end
 
@@ -124,13 +133,6 @@ class Metadata
     # links
 
     @links = Links.new(hash.fetch("links"), docs_root, pages_root)
-
-    # posts
-
-    @posts ||=
-      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-        Post.new(path)
-      end.sort
 
     # env vars
 

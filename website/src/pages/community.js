@@ -1,9 +1,12 @@
 import React from 'react';
 
+import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
 
 import styles from './community.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+const AnchoredH2 = Heading('h2');
 
 function Community() {
   const context = useDocusaurusContext();
@@ -31,7 +34,8 @@ function Community() {
       <main>
         <section>
           <div className="container">
-            <h2>Connect</h2>
+            <AnchoredH2 id="connect">Connect</AnchoredH2>
+
             <div className="row">
               <div className="col">
                 <a href="https://chat.vector.dev" target="_blank" className="panel panel--link text--center">
@@ -66,8 +70,8 @@ function Community() {
         </section>
         <section>
           <div className="container">
-            <h2>Contribute</h2>
-            
+            <AnchoredH2 id="contribute">Contribute</AnchoredH2>
+
             <p>
               Vector is <a href="https://github.com/timberio/vector">open-source</a> and welcomes contributions. A few guidelines to help you get started:
             </p>
@@ -80,7 +84,8 @@ function Community() {
         </section>
         <section>
           <div className="container">
-            <h2>Meet The Core Team</h2>
+            <AnchoredH2 id="team">Meet The Team</AnchoredH2>
+
             <div className={styles.coreTeam}>
                {team.map((member, idx) => (
                   <div key={idx} className="avatar avatar--vertical">
