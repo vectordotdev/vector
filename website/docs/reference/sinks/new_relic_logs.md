@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/new_relic_logs.md.erb
 -->
 
-The `new_relic_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
+The `new_relic_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
 
 ## Configuration
 
@@ -120,7 +120,7 @@ import Field from '@site/src/components/Field';
 
 ### batch_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -143,7 +143,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -502,7 +502,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 ## Output
 
-The `new_relic_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
+The `new_relic_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

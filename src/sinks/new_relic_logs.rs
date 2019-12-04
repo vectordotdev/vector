@@ -1,8 +1,7 @@
 use crate::{
-    buffers::Acker,
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
     sinks::util::{BatchConfig, Compression, TowerRequestConfig},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -44,9 +43,9 @@ inventory::submit! {
 
 #[typetag::serde(name = "new_relic_logs")]
 impl SinkConfig for NewRelicLogsConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let http_conf = self.create_config()?;
-        http_conf.build(acker)
+        http_conf.build(cx)
     }
 
     fn input_type(&self) -> DataType {
@@ -115,7 +114,6 @@ impl NewRelicLogsConfig {
 mod tests {
     use super::*;
     use crate::{
-        buffers::Acker,
         event::Event,
         runtime::Runtime,
         test_util::{next_addr, shutdown_on_idle},
@@ -265,7 +263,11 @@ mod tests {
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr);
 
-        let (sink, _healthcheck) = http_config.build(Acker::Null).unwrap();
+        let mut rt = Runtime::new().unwrap();
+
+        let (sink, _healthcheck) = http_config
+            .build(SinkContext::new_test(rt.executor()))
+            .unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
@@ -273,7 +275,6 @@ mod tests {
 
         let pump = sink.send_all(events);
 
-        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         let _ = rt.block_on(pump).unwrap();
