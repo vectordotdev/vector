@@ -28,7 +28,6 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct S3Sink {
     client: S3Client,
-    // bucket: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
