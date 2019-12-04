@@ -713,23 +713,22 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         region::RegionOrEndpoint,
+        runtime::Runtime,
         test_util::{block_on, random_lines_with_stream, random_string},
-        topology::config::SinkConfig,
+        topology::config::{SinkConfig, SinkContext},
     };
     use futures::Sink;
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
-    use tokio::runtime::current_thread::Runtime;
 
     const GROUP_NAME: &'static str = "vector-cw";
 
     #[test]
     fn cloudwatch_insert_log_event() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let stream_name = gen_name();
 
@@ -746,7 +745,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -778,7 +777,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_dynamic_group_and_stream_creation() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -795,7 +794,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -827,7 +826,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_batched() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -849,7 +848,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -881,7 +880,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_partitioned() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let stream_name = gen_name();
 
@@ -900,7 +899,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
