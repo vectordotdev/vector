@@ -741,6 +741,9 @@ span.link:hover {
     width: 100% !important;
   }
 }
+.navbar .navbar__items--right {
+  flex: 0 0 40%;
+}
 .navbar .navbar__items--right .react-toggle {
   margin-left: var(--ifm-navbar-item-padding-horizontal);
 }
@@ -1042,7 +1045,7 @@ ul.tabs.rounded {
 ul.tabs.rounded li.tab-item {
   border: 0px none;
   border-radius: 2em;
-  flex: 1 1 0%;
+  flex: 1 1 0;
   padding: 0px 10px;
   white-space: nowrap;
 }
@@ -1060,7 +1063,7 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 
 @media (max-width: 996px) {
   ul.tabs.rounded {
-    display: block !important;
+    display: flex !important;
   }
 }
 

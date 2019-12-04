@@ -93,8 +93,10 @@ function Download() {
         <section>
           <div className={classnames('container', styles.downloadTableContainer)}>
             <Tabs
-              block={true}
+              centered={true}
+              className="rounded"
               defaultValue="latest"
+              style={{width: "100%"}}
               values={[
                 { label: `Latest (${latestRelease.version})`, value: 'latest', },
                 { label: 'Nightly', value: 'nightly', },
