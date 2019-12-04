@@ -2,6 +2,7 @@
 extern crate tracing;
 
 use futures::{future, Future, Stream};
+use lazy_static::lazy_static;
 use std::{
     cmp::{max, min},
     fs::File,
@@ -14,7 +15,6 @@ use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
 use vector::{generate, list, metrics, runtime, topology, trace, unit_test};
-use lazy_static::lazy_static;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]

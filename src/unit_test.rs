@@ -1,8 +1,8 @@
 use crate::topology::{config::Config, unit_test::UnitTest};
 use colored::*;
+use lazy_static::lazy_static;
 use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
-use lazy_static::lazy_static;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
