@@ -14,6 +14,7 @@ use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
 use vector::{generate, list, metrics, runtime, topology, trace, unit_test};
+use lazy_static::lazy_static;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -102,8 +103,9 @@ struct Validate {
     #[structopt(short, long)]
     deny_warnings: bool,
 
-    /// Any number of Vector config files to validate.
-    config_paths: Vec<PathBuf>,
+    /// Any number of Vector config files to validate. If none are specified the
+    /// default config path `/etc/vector/vector.toml` will be targeted.
+    paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -420,8 +422,18 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
+lazy_static! {
+    static ref DEFAULT_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
+}
+
 fn validate(opts: &Validate) -> exitcode::ExitCode {
-    for config_path in &opts.config_paths {
+    let paths = if opts.paths.len() > 0 {
+        &opts.paths
+    } else {
+        &DEFAULT_PATHS
+    };
+
+    for config_path in paths {
         let file = if let Some(file) = open_config(&config_path) {
             file
         } else {
