@@ -86,10 +86,10 @@ pub enum DatadogMetricType {
 struct DatadogPoint(i64, f64);
 
 inventory::submit! {
-    SinkDescription::new::<DatadogConfig>("datadog")
+    SinkDescription::new::<DatadogConfig>("datadog_metrics")
 }
 
-#[typetag::serde(name = "datadog")]
+#[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = DatadogSvc::new(self.clone(), cx.acker())?;
@@ -102,7 +102,7 @@ impl SinkConfig for DatadogConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "datadog"
+        "datadog_metrics"
     }
 }
 
