@@ -1,6 +1,7 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
 use crate::sinks::util::Batch;
+use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 
@@ -12,7 +13,7 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        std::mem::discriminant(metric).hash(state);
+        std::mem::discriminant(&metric.value).hash(state);
         metric.name.hash(state);
         metric.kind.hash(state);
         metric
@@ -204,12 +205,58 @@ impl Batch for MetricBuffer {
     }
 
     fn finish(self) -> Self::Output {
-        self.metrics.into_iter().map(|e| e.0).collect()
+        self.metrics
+            .into_iter()
+            .map(|e| {
+                let mut metric = e.0;
+                if let MetricValue::Distribution {
+                    values,
+                    sample_rates,
+                } = metric.value
+                {
+                    let compressed = compress_distribution(values, sample_rates);
+                    metric.value = MetricValue::Distribution {
+                        values: compressed.0,
+                        sample_rates: compressed.1,
+                    };
+                };
+                metric
+            })
+            .collect()
     }
 
     fn num_items(&self) -> usize {
         self.metrics.len()
     }
+}
+
+fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>, Vec<u32>) {
+    if values.is_empty() || sample_rates.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut pairs: Vec<_> = values.into_iter().zip(sample_rates.into_iter()).collect();
+    pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+
+    let mut prev_value = pairs[0].0;
+    let mut acc = 0;
+    let mut values = vec![];
+    let mut sample_rates = vec![];
+
+    for (v, c) in pairs {
+        if v == prev_value {
+            acc += c;
+        } else {
+            values.push(prev_value);
+            sample_rates.push(acc);
+            prev_value = v;
+            acc = c;
+        }
+    }
+    values.push(prev_value);
+    sample_rates.push(acc);
+
+    (values, sample_rates)
 }
 
 #[cfg(test)]
@@ -696,8 +743,8 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
                     value: MetricValue::Distribution {
-                        values: vec![2.0, 2.0, 2.0, 2.0, 2.0],
-                        sample_rates: vec![10, 10, 10, 10, 10],
+                        values: vec![2.0],
+                        sample_rates: vec![50],
                     },
                 },
                 Metric {
@@ -735,7 +782,18 @@ mod test {
     }
 
     #[test]
-    fn metric_buffer_aggregated_histograms() {
+    fn metric_buffer_compress_distribution() {
+        let values = vec![2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 3.0];
+        let sample_rates = vec![12, 12, 13, 11, 12, 12, 13];
+
+        assert_eq!(
+            compress_distribution(values, sample_rates),
+            (vec![1.0, 2.0, 3.0], vec![11, 48, 26])
+        );
+    }
+
+    #[test]
+    fn metric_buffer_aggregated_histograms_absolute() {
         let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
@@ -823,6 +881,82 @@ mod test {
     }
 
     #[test]
+    fn metric_buffer_aggregated_histograms_incremental() {
+        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for _ in 0..3 {
+            let event = Event::Metric(Metric {
+                name: "buckets-2".into(),
+                timestamp: None,
+                tags: Some(tag("production")),
+                kind: MetricKind::Incremental,
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![1.0, 2.0, 4.0],
+                    counts: vec![1, 2, 4],
+                    count: 6,
+                    sum: 10.0,
+                },
+            });
+            events.push(event);
+        }
+
+        for i in 1..4 {
+            let event = Event::Metric(Metric {
+                name: "buckets-2".into(),
+                timestamp: None,
+                tags: Some(tag("production")),
+                kind: MetricKind::Incremental,
+                value: MetricValue::AggregatedHistogram {
+                    buckets: vec![1.0, 4.0, 16.0],
+                    counts: vec![1 * i, 2 * i, 4 * i],
+                    count: 6 * i,
+                    sum: 10.0,
+                },
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+
+        assert_eq!(
+            sorted(&buffer[0].clone().finish()),
+            [
+                Metric {
+                    name: "buckets-2".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 2.0, 4.0],
+                        counts: vec![3, 6, 12],
+                        count: 18,
+                        sum: 30.0,
+                    },
+                },
+                Metric {
+                    name: "buckets-2".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![1.0, 4.0, 16.0],
+                        counts: vec![6, 12, 24],
+                        count: 36,
+                        sum: 30.0,
+                    },
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn metric_buffer_aggregated_summaries() {
         let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
@@ -835,7 +969,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
                         count: 6 * i,
                         sum: 10.0,
@@ -862,7 +996,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![2.0, 4.0, 8.0],
                         count: 6 * 2,
                         sum: 10.0,
@@ -874,7 +1008,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![3.0, 6.0, 12.0],
                         count: 6 * 3,
                         sum: 10.0,
@@ -886,7 +1020,7 @@ mod test {
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0, 4.0],
+                        quantiles: vec![0.0, 0.5, 1.0],
                         values: vec![4.0, 8.0, 16.0],
                         count: 6 * 4,
                         sum: 10.0,

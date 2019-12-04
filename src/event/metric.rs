@@ -103,6 +103,28 @@ impl Metric {
                 values.extend_from_slice(&values2);
                 sample_rates.extend_from_slice(&sample_rates2);
             }
+            (
+                MetricValue::AggregatedHistogram {
+                    ref buckets,
+                    ref mut counts,
+                    ref mut count,
+                    ref mut sum,
+                },
+                MetricValue::AggregatedHistogram {
+                    buckets: buckets2,
+                    counts: counts2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if buckets == buckets2 && counts.len() == counts2.len() {
+                    for (i, c) in counts2.into_iter().enumerate() {
+                        counts[i] += c;
+                    }
+                    *count += count2;
+                    *sum += sum2;
+                }
+            }
             _ => {}
         }
     }
