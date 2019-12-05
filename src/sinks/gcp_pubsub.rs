@@ -30,6 +30,7 @@ use tokio::timer::Interval;
 pub struct PubsubConfig {
     pub project: String,
     pub topic: String,
+    pub emulator_host: Option<String>,
     pub api_key: Option<String>,
     pub credentials_path: Option<String>,
 
@@ -66,13 +67,18 @@ lazy_static! {
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        if self.api_key.is_none() && self.credentials_path.is_none() {
-            return Err(BuildError::MissingAuth.into());
-        }
+        // We only need to load the credentials if we are not targetting an emulator.
+        let creds = if self.emulator_host.is_none() {
+            if self.api_key.is_none() && self.credentials_path.is_none() {
+                return Err(BuildError::MissingAuth.into());
+            }
 
-        let creds = match self.credentials_path.as_ref() {
-            Some(path) => Some(PubsubCreds::new(path)?),
-            None => None,
+            match self.credentials_path.as_ref() {
+                Some(path) => Some(PubsubCreds::new(path)?),
+                None => None,
+            }
+        } else {
+            None
         };
 
         let sink = self.service(acker, &creds)?;
@@ -110,7 +116,7 @@ impl PubsubConfig {
                     let mut builder = hyper::Request::builder();
                     builder.method(Method::POST);
                     builder.uri(uri.clone());
-                    builder.header("Content-Type", "application/x-json");
+                    builder.header("Content-Type", "application/json");
 
                     let mut request = builder.body(make_body(logs)).unwrap();
                     if let Some(creds) = creds.as_ref() {
@@ -158,9 +164,13 @@ impl PubsubConfig {
     }
 
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
+        let base = match self.emulator_host.as_ref() {
+            Some(host) => format!("http://{}", host),
+            None => "https://pubsub.googleapis.com".into(),
+        };
         let uri = format!(
-            "https://pubsub.googleapis.com/v1/projects/{}/topics/{}{}",
-            self.project, self.topic, suffix
+            "{}/v1/projects/{}/topics/{}{}",
+            base, self.project, self.topic, suffix
         );
         let uri = match &self.api_key {
             Some(key) => format!("{}?key={}", uri, key),
