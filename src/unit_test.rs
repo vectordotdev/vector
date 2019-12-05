@@ -1,6 +1,8 @@
-use crate::topology::{config::Config, unit_test::UnitTest};
+use crate::{
+    topology::{config::Config, unit_test::UnitTest},
+    types::DEFAULT_CONFIG_PATHS,
+};
 use colored::*;
-use lazy_static::lazy_static;
 use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 
@@ -41,17 +43,13 @@ fn build_tests(path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     crate::topology::unit_test::build_unit_tests(&config)
 }
 
-lazy_static! {
-    static ref DEFAULT_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
-}
-
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
     let paths = if opts.paths.len() > 0 {
         &opts.paths
     } else {
-        &DEFAULT_PATHS
+        &DEFAULT_CONFIG_PATHS
     };
 
     for (i, p) in paths.iter().enumerate() {

@@ -2,7 +2,6 @@
 extern crate tracing;
 
 use futures::{future, Future, Stream};
-use lazy_static::lazy_static;
 use std::{
     cmp::{max, min},
     fs::File,
@@ -14,7 +13,9 @@ use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{generate, list, metrics, runtime, topology, trace, unit_test};
+use vector::{
+    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -422,15 +423,11 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-lazy_static! {
-    static ref DEFAULT_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
-}
-
 fn validate(opts: &Validate) -> exitcode::ExitCode {
     let paths = if opts.paths.len() > 0 {
         &opts.paths
     } else {
-        &DEFAULT_PATHS
+        &DEFAULT_CONFIG_PATHS
     };
 
     for config_path in paths {
