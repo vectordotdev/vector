@@ -29,7 +29,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(address: SocketAddr) -> crate::Result<Self> {
-        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
         let socket = UdpSocket::bind(&from).context(SocketBindError)?;
         Ok(Client { socket, address })
     }
