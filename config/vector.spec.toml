@@ -821,6 +821,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: bool
   drop_invalid = true
 
+  # If the specified `field` should be dropped (removed) after parsing.
+  # 
+  # * optional
+  # * default: true
+  # * type: bool
+  drop_field = true
+  drop_field = false
+
   # The log field to decode as JSON. Must be a `string` value type.
   # 
   # * optional
