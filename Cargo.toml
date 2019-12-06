@@ -165,25 +165,27 @@ trust-dns-proto = "0.8.0"
 [features]
 default = ["rdkafka", "leveldb", "leveldb/leveldb-sys-2", "shiplift/unix-socket", "jemallocator", "openssl/vendored"]
 docker = [
+  "clickhouse-integration-tests",
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
-  "clickhouse-integration-tests",
+  "docker-integration-tests",
   "es-integration-tests",
+  "gcp-pubsub-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
-  "splunk-integration-tests",
-  "docker-integration-tests"
+  "splunk-integration-tests"
 ]
+clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
-clickhouse-integration-tests = []
+docker-integration-tests = []
 es-integration-tests = []
+gcp-pubsub-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
-docker-integration-tests = []
 nightly = []
 
 [[bench]]

@@ -302,3 +302,111 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[cfg(feature = "gcp-pubsub-integration-tests")]
+mod integration_tests {
+    use super::*;
+    use crate::test_util::{block_on, random_events_with_stream};
+    use serde_json::json;
+
+    const EMULATOR_HOST: &str = "localhost:8681";
+    const PROJECT: &str = "testproject";
+    // FIXME We need to create a new topic and subscription for each
+    // test to keep test runs independent.
+    const TOPIC: &str = "topic1";
+    const SUBSCRIPTION: &str = "subscription1";
+
+    #[test]
+    fn publish_events() {
+        crate::test_util::trace_init();
+
+        let config = config();
+        let (sink, healthcheck) = config.build(Acker::Null).expect("Building sink failed");
+        flush_subscription();
+
+        block_on(healthcheck).expect("Health check failed");
+
+        let (input, events) = random_events_with_stream(100, 100);
+
+        let pump = sink.send_all(events);
+        let _ = block_on(pump).expect("Sending events failed");
+
+        let response = pull_messages(1000);
+        let messages = response
+            .receivedMessages
+            .as_ref()
+            .expect("Response is missing messages");
+        assert_eq!(input.len(), messages.len());
+        for i in 0..input.len() {
+            let data = messages[i].message.decode_data();
+            let data = serde_json::to_value(data).unwrap();
+            let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
+            assert_eq!(data, expected);
+        }
+    }
+
+    fn config() -> PubsubConfig {
+        PubsubConfig {
+            emulator_host: Some(EMULATOR_HOST.into()),
+            project: PROJECT.into(),
+            topic: TOPIC.into(),
+            ..Default::default()
+        }
+    }
+
+    fn flush_subscription() {
+        while pull_messages(100).receivedMessages.is_some() {}
+    }
+
+    fn pull_messages(count: usize) -> PullResponse {
+        reqwest::Client::new()
+            .post(&format!(
+                "http://{}/v1/projects/{}/subscriptions/{}:pull",
+                EMULATOR_HOST, PROJECT, SUBSCRIPTION
+            ))
+            .json(&json!({
+                "returnImmediately": true,
+                "maxMessages": count
+            }))
+            .send()
+            .expect("Sending pull query failed")
+            .json::<PullResponse>()
+            .expect("Extracting pull data failed")
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[allow(non_snake_case)]
+    struct PullResponse {
+        receivedMessages: Option<Vec<PullMessageOuter>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[allow(non_snake_case)]
+    struct PullMessageOuter {
+        ackId: String,
+        message: PullMessage,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[allow(non_snake_case)]
+    struct PullMessage {
+        data: String,
+        messageId: String,
+        publishTime: String,
+    }
+
+    impl PullMessage {
+        fn decode_data(&self) -> TestMessage {
+            let data = base64::decode(&self.data).expect("Invalid base64 data");
+            let data = String::from_utf8_lossy(&data);
+            serde_json::from_str(&data).expect("Invalid message structure")
+        }
+    }
+
+    #[derive(Debug, Deserialize, Serialize)]
+    struct TestMessage {
+        timestamp: String,
+        message: String,
+    }
+}
