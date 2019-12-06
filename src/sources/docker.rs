@@ -196,7 +196,6 @@ impl DockerSourceCore {
         self.docker.events(&options.build())
     }
 
-    /// Accepts UNIX timestamp
     /// True if passes check.
     fn created_at_check(&self, created_at: DateTime<Utc>) -> bool {
         self.include_created_after
@@ -374,7 +373,7 @@ impl DockerSource {
                         continue;
                     }
 
-                    // Include label check
+                    // Include image check
                     if let Some(images) = self.esb.core.config.include_images.as_ref() {
                         let image_check = images
                             .iter()
