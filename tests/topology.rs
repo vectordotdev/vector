@@ -38,7 +38,7 @@ fn sleep_ms(dur: u64) {
 }
 
 // The duration at which we let the runtime spawn its extra tasks.
-const RUNTIME_SLEEP_DURATION: u64 = 50;
+const RUNTIME_SLEEP_DURATION: u64 = 100;
 
 #[test]
 fn topology_source_and_sink() {
