@@ -84,18 +84,18 @@ fn topology_multiple_sources() {
 
     in1.send(event1.clone()).wait().unwrap();
 
-    sleep_ms(RUNTIME_SLEEP_DURATION);
+    let (out_event1, out1) = out1.into_future().wait().unwrap();
 
     in2.send(event2.clone()).wait().unwrap();
 
-    sleep_ms(RUNTIME_SLEEP_DURATION);
+    let (out_event2, _out1) = out1.into_future().wait().unwrap();
 
     rt.block_on(topology.stop()).unwrap();
 
-    let res = out1.collect().wait().unwrap();
-
     shutdown_on_idle(rt);
-    assert_eq!(vec![event1, event2], res);
+
+    assert_eq!(out_event1, Some(event1));
+    assert_eq!(out_event2, Some(event2));
 }
 
 #[test]
