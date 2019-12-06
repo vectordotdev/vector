@@ -107,7 +107,7 @@ mod test {
                 address: out_addr,
                 namespace: "vector".into(),
                 buckets: vec![1.0, 2.0, 4.0],
-                flush_period: Duration::from_millis(1000),
+                flush_period_sec: 1,
             },
         );
 
