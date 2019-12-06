@@ -151,6 +151,16 @@ pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = V
     })
 }
 
+pub fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> impl Future<Item = bool, Error = ()> {
+    future::poll_fn(move || {
+        let is_empty = match rx.poll()? {
+            Async::Ready(_) => false,
+            Async::NotReady => true,
+        };
+        Ok(Async::Ready(is_empty))
+    })
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
