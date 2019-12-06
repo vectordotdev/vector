@@ -184,7 +184,7 @@ jobs:
       - run:
           name: Test
           no_output_timeout: 30m
-          command: cargo test --all --features docker --jobs 4
+          command: cargo test --all --features docker --jobs 4 -- test-threads 1
       - store_test_results:
           path: ./test-results
 
