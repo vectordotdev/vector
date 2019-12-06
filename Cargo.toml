@@ -136,6 +136,7 @@ maxminddb = "0.13.0"
 strip-ansi-escapes = "0.1.0"
 colored = "1.9"
 warp = "0.1.20"
+evmap = { version = "7", features = ["bytes"] }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
