@@ -76,6 +76,12 @@ impl TaskExecutor {
     pub fn spawn(&self, f: impl Future<Item = (), Error = ()> + Send + 'static) {
         self.execute(f).unwrap()
     }
+
+    pub fn spawn_std(&self, f: impl std::future::Future<Output = ()> + Send + 'static) {
+        use futures03::future::{FutureExt, TryFutureExt};
+
+        self.spawn(f.unit_error().boxed().compat());
+    }
 }
 
 impl<F> Executor<F> for TaskExecutor
