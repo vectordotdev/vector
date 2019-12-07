@@ -869,7 +869,8 @@ fn remove_slash(s: &str) -> &str {
 mod tests {
     use super::*;
     use crate::runtime;
-    use crate::test_util::{self, collect_n, is_empty, trace_init};
+    use crate::test_util::{self, collect_n, trace_init};
+    use futures::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
@@ -1092,6 +1093,10 @@ mod tests {
             }
         }
         id
+    }
+
+    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> impl Future<Item = bool, Error = ()> {
+        future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
     }
 
     #[test]
