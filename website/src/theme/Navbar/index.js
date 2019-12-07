@@ -40,8 +40,7 @@ function navLinkAttributes(label) {
       const newRelease = fetchNewRelease();
 
       let downloadAttrs = {
-        icon: 'download',
-        hideText: true
+        icon: 'download'
       }
 
       if (newRelease) {
@@ -54,8 +53,7 @@ function navLinkAttributes(label) {
     case 'github':
       return {
         badge: '3k',
-        icon: 'github',
-        hideText: true 
+        icon: 'github'
       };
 
     default:
@@ -63,28 +61,26 @@ function navLinkAttributes(label) {
   };
 }
 
-function NavLink(props) {
-  let attributes = navLinkAttributes(props.label) || {};
-  const toUrl = useBaseUrl(props.to);
-  const menu = props.menu == true;
+function NavLink({href, hideText, label, to}) {
+  let attributes = navLinkAttributes(label) || {};
+  const toUrl = useBaseUrl(to);
 
   return (
     <Link
       className="navbar__item navbar__link"
-      title={!menu && attributes.hideText && props.label}
-      {...props}
-      {...(props.href
+      title={hideText ? label : null}
+      {...(href
         ? {
             target: '_blank',
             rel: 'noopener noreferrer',
-            href: props.href,
+            href: href,
           }
         : {
             activeClassName: 'navbar__link--active',
             to: toUrl,
           })}>
-      {!menu && attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {(menu || !attributes.hideText) && props.label}
+      {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
+      {(!hideText) && label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
@@ -163,14 +159,14 @@ function Navbar() {
             {links
               .filter(linkItem => linkItem.position !== 'right')
               .map((linkItem, i) => (
-                <NavLink {...linkItem} menu={false} key={i} />
+                <NavLink {...linkItem} key={i} />
               ))}
           </div>
           <div className="navbar__items navbar__items--right">
             {links
               .filter(linkItem => linkItem.position === 'right')
               .map((linkItem, i) => (
-                <NavLink {...linkItem} menu={false} key={i} />
+                <NavLink {...linkItem} hideText={true} key={i} />
               ))}
             {!disableDarkMode && (
               <Toggle
@@ -217,7 +213,6 @@ function Navbar() {
                     <NavLink
                       className="menu__link"
                       {...linkItem}
-                      menu={true}
                       onClick={hideSidebar}
                     />
                   </li>
