@@ -5,7 +5,7 @@ use std::cmp::{Ordering, PartialOrd};
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MetricEntry(pub Metric);
 
 impl Eq for MetricEntry {}
@@ -16,10 +16,14 @@ impl Hash for MetricEntry {
         std::mem::discriminant(&metric.value).hash(state);
         metric.name.hash(state);
         metric.kind.hash(state);
-        metric
-            .tags
-            .as_ref()
-            .map(|ts| ts.iter().for_each(|t| t.hash(state)));
+
+        if let Some(tags) = &metric.tags {
+            let mut tags: Vec<_> = tags.iter().collect();
+            tags.sort();
+            for tag in tags {
+                tag.hash(state);
+            }
+        }
 
         match &metric.value {
             MetricValue::AggregatedHistogram { buckets, .. } => {

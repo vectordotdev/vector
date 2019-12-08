@@ -104,6 +104,27 @@ mod test {
                     # TYPE promhttp_metric_handler_requests_total counter
                     promhttp_metric_handler_requests_total{code="200"} 100
                     prometheus_remote_storage_samples_in_total 57011636
+                    # A histogram, which has a pretty complex representation in the text format:
+                    # HELP http_request_duration_seconds A histogram of the request duration.
+                    # TYPE http_request_duration_seconds histogram
+                    http_request_duration_seconds_bucket{le="0.05"} 24054
+                    http_request_duration_seconds_bucket{le="0.1"} 33444
+                    http_request_duration_seconds_bucket{le="0.2"} 100392
+                    http_request_duration_seconds_bucket{le="0.5"} 129389
+                    http_request_duration_seconds_bucket{le="1"} 133988
+                    http_request_duration_seconds_bucket{le="+Inf"} 144320
+                    http_request_duration_seconds_sum 53423
+                    http_request_duration_seconds_count 144320
+                    # Finally a summary, which has a complex representation, too:
+                    # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
+                    # TYPE rpc_duration_seconds summary
+                    rpc_duration_seconds{code="200",quantile="0.01"} 3102
+                    rpc_duration_seconds{code="200",quantile="0.05"} 3272
+                    rpc_duration_seconds{code="200",quantile="0.5"} 4773
+                    rpc_duration_seconds{code="200",quantile="0.9"} 9001
+                    rpc_duration_seconds{code="200",quantile="0.99"} 76656
+                    rpc_duration_seconds_sum{code="200"} 1.7560473e+07
+                    rpc_duration_seconds_count{code="200"} 2693
                     "##
                 ))
             })
@@ -148,12 +169,31 @@ mod test {
             .collect::<Vec<_>>();
 
         assert_eq!(lines, vec![
+            "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
+            "# TYPE vector_http_request_duration_seconds histogram",
+            "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054",
+            "vector_http_request_duration_seconds_bucket{le=\"0.1\"} 33444",
+            "vector_http_request_duration_seconds_bucket{le=\"0.2\"} 100392",
+            "vector_http_request_duration_seconds_bucket{le=\"0.5\"} 129389",
+            "vector_http_request_duration_seconds_bucket{le=\"1\"} 133988",
+            "vector_http_request_duration_seconds_bucket{le=\"+Inf\"} 144320",
+            "vector_http_request_duration_seconds_sum 53423",
+            "vector_http_request_duration_seconds_count 144320",
             "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
             "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
             "vector_prometheus_remote_storage_samples_in_total 57011636",
             "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
             "# TYPE vector_promhttp_metric_handler_requests_total counter",
             "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100",
+            "# HELP vector_rpc_duration_seconds rpc_duration_seconds",
+            "# TYPE vector_rpc_duration_seconds summary",
+            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.01\"} 3102",
+            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.05\"} 3272",
+            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.5\"} 4773",
+            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.9\"} 9001",
+            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.99\"} 76656",
+            "vector_rpc_duration_seconds_sum{code=\"200\"} 17560473",
+            "vector_rpc_duration_seconds_count{code=\"200\"} 2693",
             ],
         );
 

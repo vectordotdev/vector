@@ -90,11 +90,30 @@ fn encode_tags(tags: &Option<HashMap<String, String>>) -> String {
             .iter()
             .map(|(name, value)| format!("{}=\"{}\"", name, value))
             .collect();
+
         parts.sort();
         format!("{{{}}}", parts.join(","))
     } else {
         String::from("")
     }
+}
+
+fn encode_tags_with_extra(
+    tags: &Option<HashMap<String, String>>,
+    label: String,
+    value: String,
+) -> String {
+    let mut parts: Vec<_> = if let Some(tags) = tags {
+        tags.iter()
+            .chain(vec![(&label, &value)])
+            .map(|(name, value)| format!("{}=\"{}\"", name, value))
+            .collect()
+    } else {
+        vec![format!("{}=\"{}\"", label, value)]
+    };
+
+    parts.sort();
+    format!("{{{}}}", parts.join(","))
 }
 
 fn handle(
@@ -116,45 +135,84 @@ fn handle(
                 if metric.kind.is_absolute() {
                     let name = &metric.name;
                     let tags = &metric.tags;
-                    let fname = encode_namespace(namespace, name);
-                    let tags = encode_tags(tags);
+                    let fullname = encode_namespace(&namespace, &name);
+                    // todo: metric families
                     match &metric.value {
                         MetricValue::Counter { value } => {
-                            writeln!(&mut w, "# HELP {} {}", fname, name).unwrap();
-                            writeln!(&mut w, "# TYPE {} counter", fname).unwrap();
-                            writeln!(&mut w, "{}{} {}", fname, tags, value).unwrap();
+                            let tags = encode_tags(tags);
+                            writeln!(&mut w, "# HELP {} {}", fullname, name).unwrap();
+                            writeln!(&mut w, "# TYPE {} counter", fullname).unwrap();
+                            writeln!(&mut w, "{}{} {}", fullname, tags, value).unwrap();
                         }
                         MetricValue::Gauge { value } => {
-                            writeln!(&mut w, "# HELP {} {}", fname, name).unwrap();
-                            writeln!(&mut w, "# TYPE {} gauge", fname).unwrap();
-                            writeln!(&mut w, "{}{} {}", fname, tags, value).unwrap();
+                            let tags = encode_tags(tags);
+                            writeln!(&mut w, "# HELP {} {}", fullname, name).unwrap();
+                            writeln!(&mut w, "# TYPE {} gauge", fullname).unwrap();
+                            writeln!(&mut w, "{}{} {}", fullname, tags, value).unwrap();
                         }
                         MetricValue::Set { values } => {
-                            writeln!(&mut w, "# HELP {} {}", fname, name).unwrap();
-                            writeln!(&mut w, "# TYPE {} gauge", fname).unwrap();
-                            writeln!(&mut w, "{}{} {}", fname, tags, values.len()).unwrap();
+                            let tags = encode_tags(tags);
+                            writeln!(&mut w, "# HELP {} {}", fullname, name).unwrap();
+                            writeln!(&mut w, "# TYPE {} gauge", fullname).unwrap();
+                            writeln!(&mut w, "{}{} {}", fullname, tags, values.len()).unwrap();
                         }
                         MetricValue::AggregatedHistogram {
+                            buckets,
+                            counts,
                             count,
                             sum,
-                            ..
                         } => {
-                            writeln!(&mut w, "# HELP {} {}", fname, name).unwrap();
-                            writeln!(&mut w, "# TYPE {} histogram", fname).unwrap();
-                            // todo: buckets
-                            writeln!(&mut w, "{}_sum{} {}", fname, tags, sum).unwrap();
-                            writeln!(&mut w, "{}_count{} {}", fname, tags, count).unwrap();
+                            writeln!(&mut w, "# HELP {} {}", fullname, name).unwrap();
+                            writeln!(&mut w, "# TYPE {} histogram", fullname).unwrap();
+                            for (b, c) in buckets.iter().zip(counts.iter()) {
+                                writeln!(
+                                    &mut w,
+                                    "{}_bucket{} {}",
+                                    fullname,
+                                    encode_tags_with_extra(tags, "le".to_string(), b.to_string()),
+                                    c
+                                )
+                                .unwrap();
+                            }
+                            writeln!(
+                                &mut w,
+                                "{}_bucket{} {}",
+                                fullname,
+                                encode_tags_with_extra(tags, "le".to_string(), "+Inf".to_string()),
+                                count
+                            )
+                            .unwrap();
+                            writeln!(&mut w, "{}_sum{} {}", fullname, encode_tags(tags), sum)
+                                .unwrap();
+                            writeln!(&mut w, "{}_count{} {}", fullname, encode_tags(tags), count)
+                                .unwrap();
                         }
                         MetricValue::AggregatedSummary {
+                            quantiles,
+                            values,
                             count,
                             sum,
-                            ..
                         } => {
-                            writeln!(&mut w, "# HELP {} {}", fname, name).unwrap();
-                            writeln!(&mut w, "# TYPE {} summary", fname).unwrap();
-                            // todo: quantiles
-                            writeln!(&mut w, "{}_sum{} {}", fname, tags, sum).unwrap();
-                            writeln!(&mut w, "{}_count{} {}", fname, tags, count).unwrap();
+                            writeln!(&mut w, "# HELP {} {}", fullname, name).unwrap();
+                            writeln!(&mut w, "# TYPE {} summary", fullname).unwrap();
+                            for (q, v) in quantiles.iter().zip(values.iter()) {
+                                writeln!(
+                                    &mut w,
+                                    "{}{} {}",
+                                    fullname,
+                                    encode_tags_with_extra(
+                                        tags,
+                                        "quantile".to_string(),
+                                        q.to_string()
+                                    ),
+                                    v
+                                )
+                                .unwrap();
+                            }
+                            writeln!(&mut w, "{}_sum{} {}", fullname, encode_tags(tags), sum)
+                                .unwrap();
+                            writeln!(&mut w, "{}_count{} {}", fullname, encode_tags(tags), count)
+                                .unwrap();
                         }
                         _ => {}
                     }
@@ -238,16 +296,15 @@ impl Sink for PrometheusSink {
         let mut metrics = self.metrics.write().unwrap();
 
         match item.kind {
-            // todo: sum up deltas and aggregate ditributions
             // todo: sets flush
             MetricKind::Incremental => {
-                let new = MetricEntry(item.clone());
+                let new = MetricEntry(item.clone().into_absolute());
                 if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
                     existing.add(&item);
                     metrics.insert(MetricEntry(existing));
                 } else {
                     metrics.insert(new);
-                }
+                };
             }
             MetricKind::Absolute => {
                 let new = MetricEntry(item);
