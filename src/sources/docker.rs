@@ -973,7 +973,7 @@ mod tests {
             vec![
                 "sh".to_owned(),
                 "-c".to_owned(),
-                format!("echo before; while true; do sleep 0.1; echo {}; done", log),
+                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log),
             ],
             docker,
             rt,
@@ -1330,7 +1330,7 @@ mod tests {
         };
         let source = source_with_config(config, &mut rt);
 
-        let id1 = running_container(name_after, None, message_after, delay, &docker, &mut rt);
+        let id1 = running_container(name_after, None, message_after, &docker, &mut rt);
 
         let events = rt.block_on(collect_n(source, 2)).ok().unwrap();
 
