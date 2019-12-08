@@ -1272,6 +1272,7 @@ mod tests {
             include_images: Some(vec!["some_image".to_owned()]),
             ..DockerConfig::default()
         };
+
         let mut rt = test_util::runtime();
         let exclude_out = source_with_config(config_ex, &mut rt);
         let docker = docker();
