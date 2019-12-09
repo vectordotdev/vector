@@ -190,9 +190,9 @@ are specified, then the `default` one is used.
 
 | Feature | Description | Enabled by default |
 | :------ | :---------- | :----------------- |
-| `default` | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets. | <i className="feather icon-check"></i> |
-| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` as build dependency. | |
-| `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` as build dependency. | |
+| `default` | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets. Requires `perl` as a build dependency, which is usually pre-installed on these platforms. | <i className="feather icon-check"></i> |
+| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. | |
+| `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies. | |
 
 Alternatively, for finer control, it is possible to use specific features from the list below:
 
