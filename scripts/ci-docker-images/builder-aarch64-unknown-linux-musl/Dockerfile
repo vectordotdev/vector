@@ -1,10 +1,7 @@
 # A version like "1.38.0" or "nightly-2019-11-01".
 ARG RUST_VERSION=1.39.0
-# We use Clang and libc++ from LLVM. The commit should match the one
-# used by Rust. For each Rust version it can be found here
-# https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
-# submodule "llvm-project". Example "71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5".
-ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
+# We use compiler-rt, libunwind, and libc++ from LLVM.
+ARG LLVM_VERSION=9.0.0
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
@@ -36,22 +33,8 @@ ARG RUST_PREFIX=/opt/rust
 ARG CLANG_PREFIX=/usr
 ARG LIBS_PREFIX=/opt/libs
 
-# Independent components are built in different stages, so that
-# change of individual arguments would rebuild only affected stages.
-
-FROM ubuntu:19.10 AS llvm-source
-RUN apt-get update && apt-get install -y git
-ENV SRC_DIR=/src
-WORKDIR $SRC_DIR
-ARG LLVM_GIT_COMMIT
-RUN git clone https://github.com/rust-lang/llvm-project.git && \
-  cd llvm-project && \
-  git checkout $LLVM_GIT_COMMIT && \
-  rm -rf .git
-ENV LLVM_DIR=$SRC_DIR/llvm-project
-
 # Libs
-FROM llvm-source AS libs-builder
+FROM ubuntu:19.10 AS libs-builder
 
 ARG CLANG_PREFIX
 RUN apt-get update && apt-get install -y clang llvm lld
@@ -59,6 +42,12 @@ RUN apt-get update && apt-get install -y clang llvm lld
 # Get all sources at first, so that changes in arguments
 # flags would not redownload them.
 RUN apt-get update && apt-get -y install curl xz-utils
+
+ARG LLVM_VERSION
+RUN curl --proto '=https' --tlsv1.2 -sSfL \
+  https://github.com/llvm/llvm-project/archive/llvmorg-$LLVM_VERSION.tar.gz | \
+  tar xzf -
+ENV LLVM_DIR $SRC_DIR/llvm-project-llvmorg-$LLVM_VERSION
 
 ARG MUSL_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
@@ -73,7 +62,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
 # Install build dependencies.
-RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils 
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils clang llvm lld
 
 ARG TARGET
 ARG LIBS_PREFIX
@@ -83,6 +72,7 @@ ARG LIBS_PREFIX
 # Because Clang toolchain is not fully bootstrapped yet (no standard library),
 # it is necessary to use GCC to compile it.
 ARG GNU_TARGET
+ARG CLANG_PREFIX
 RUN apt-get install -y gcc${GNU_TARGET:+-${GNU_TARGET}} g++${GNU_TARGET:+-${GNU_TARGET}}
 WORKDIR $LLVM_DIR/compiler-rt
 ENV CC=${GNU_TARGET:+${GNU_TARGET}-}gcc
