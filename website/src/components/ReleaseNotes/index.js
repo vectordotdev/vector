@@ -93,11 +93,11 @@ function ReleaseNotes({version}) {
           <AnchoredH2 id="highlights">Highlights</AnchoredH2>
 
           <Jump to="/" className="jump-to--highlight">
-            config | Unit Testing: Treating Your Vector Config Files As Code <small> - by Ashley</small>
+            <span className="badge badge--highlight badge--category">config</span> Unit Testing: Treating Your Vector Config Files As Code <small> - by Ashley</small>
           </Jump>
 
           <Jump to="/" className="jump-to--highlight">
-            <span className="badge badge--highlight">platforms</span> Windows support is here!  <small> - by Alex</small>
+            <span className="badge badge--highlight badge--category">platforms</span> Windows support is here!  <small> - by Alex</small>
           </Jump>
 
           <Jump to="/" className="jump-to--highlight">
