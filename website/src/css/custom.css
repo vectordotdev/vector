@@ -69,7 +69,7 @@
   --ifm-heading-margin-bottom: calc( var(--ifm-spacing-vertical) * 3 );
   --ifm-hero-background-color: var(--ifm-background-color);
   --ifm-hero-text-color: var(--ifm-color-content);
-  --ifm-highlight-gradient: linear-gradient(150deg, var(--ifm-color-primary) 5%, var(--ifm-color-blue) 35%, var(--ifm-color-pink) 65%, var(--ifm-color-danger) 97%);
+  --ifm-highlight-gradient: linear-gradient(150deg, var(--ifm-color-primary) 5%, var(--ifm-color-blue) 40%, var(--ifm-color-pink) 90%);
   --ifm-highlight-gradient-20: linear-gradient(150deg, var(--ifm-color-primary) 5%, var(--ifm-color-blue) 95%);
   --ifm-hr-border-color: var(--ifm-contents-border-color);
   --ifm-leading: calc(var(--ifm-leading-desktop) * 1em);
@@ -131,6 +131,16 @@ li + li {
   margin-top: 0;
 }
 
+.link {
+  cursor: pointer;
+}
+.link:not(.badge) {
+  color: var(--ifm-color-primary);
+}
+.link:hover {
+  text-decoration: underline;
+}
+
 /**
  * a
  */
@@ -155,7 +165,7 @@ a code {
 .badge.badge--highlight {
   animation: gradientBG 5s ease-in infinite;
   background-clip: padding-box;
-  background-image: var(--ifm-highlight-gradient);
+  background-image: var(--ifm-highlight-gradient-20);
   background-size: 150% 150%;
   border-color: transparent;
   box-sizing: border-box;
@@ -163,6 +173,12 @@ a code {
 }
 .badge.badge--rounded {
   border-radius: 1em;
+}
+.badge a {
+  color: inherit;
+}
+a.badge:hover {
+  color: var(--ifm-badge-color);
 }
 
 /**
@@ -606,20 +622,6 @@ input[type="text"]:focus {
 }
 
 /**
- * link
- *
- * Turns generic text into a link to avoid the default browser event propagation.
- */
-
-.link {
-  color: var(--ifm-color-primary);
-  cursor: pointer;
-}
-.link:hover {
-  text-decoration: underline;
-}
-
-/**
  * menu
  *
  * Menu styling generally used as a navigation menu, such a the left-side
@@ -667,11 +669,20 @@ input[type="text"]:focus {
   border-left: 0px none;
   padding-left: 0;
 }
+.menu .menu__list-title {
+  color: var(--ifm-color-emphasis-300);
+  font-size: 0.9em;
+  text-transform: uppercase;
+}
 .menu .menu__link,
 .menu .menu__link:hover,
 .menu .menu__link.menu__link--active:not(.menu__link--sublist) {
   background: none;
   line-height: calc( var(--ifm-spacing-vertical) * 1.25 );
+}
+.menu .menu__link small {
+  font-weight: normal;
+  opacity: 0.75;
 }
 .menu .menu__link.menu__link--sublist::after {
   background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-6 -6 38 38"><path fill="rgba(0,0,0,0.3)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');
@@ -694,7 +705,7 @@ input[type="text"]:focus {
   vertical-align: top;
   margin-top: -1px;
 }
-.menu .menu__link .badge {
+.menu .menu__link .badges .badge {
   background-clip: padding-box;
   border: 1px solid var(--ifm-color-emphasis-50);
   border-radius: 0.25em;
@@ -887,7 +898,7 @@ section:last-child {
 .section-list > .section {
   border-radius: 5px;
   font-size: 0.95em;
-  padding-top: calc( var(--ifm-spacing-vertical) / 1.5 );
+  padding-bottom: calc( var(--ifm-spacing-vertical) / 1.5 );
   padding-left: var(--ifm-spacing-horizontal);
 }
 .section-list > .section > .badges {
@@ -956,25 +967,58 @@ section:last-child {
 .section-list.section-list--lg > .section {
   margin-top: calc( var(--ifm-spacing-vertical) * 2 );
 }
+.section-list.section-list--compact > .section {
+  padding-top: calc( var(--ifm-spacing-vertical) / 4 );
+  padding-bottom: calc( var(--ifm-spacing-vertical) / 4 );
+}
 .section-list.section-list--compact > .section > h4 {
   font-weight: normal;
-  margin: 2px 0;
+  margin: 0;
+}
+.section-list.section-list--compact > .section > h4 .badge {
+
 }
 .section-list.section-list--compact > .section:last-child > h4 {
   margin-bottom: var(--ifm-spacing-vertical);
 }
+.section-list.section-list--hover > .section:hover {
+  background: var(--ifm-panel-background);
+}
 
 /**
- * bar
+ * sidebar
  *
  * Side navigation used in sections like components, release notes, docs, etc.
  */
 
- @media (min-width: 997px) {
+.sidebar {
+  border-right: 1px solid var(--ifm-sidebar-border-color);
+}
+
+.sidebar .menu {
+  font-weight: bold;
+}
+
+.sidebar .menu .menu__link {
+  border-right: 2px solid transparent;
+}
+
+.sidebar .menu .menu__link--active {
+  border-radius: 0;
+  border-right-color: var(--ifm-color-primary);
+}
+
+.sidebar.sidebar--right .menu__list-title,
+.sidebar.sidebar--right .menu__link {
+  display: block;
+  padding-right: var(--ifm-spacing-vertical);
+  text-align: right;
+}
+
+@media (min-width: 997px) {
   .sidebar {
     height: calc(100vh - var(--ifm-navbar-height));
     overflow-y: auto;
-    padding: 0.5rem;
     position: sticky;
     top: var(--ifm-navbar-height);
   }
@@ -1184,6 +1228,14 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   ul.tabs.rounded {
     display: flex !important;
   }
+}
+
+/*
+ * text--upcase
+ */
+
+.text--upcase {
+  text-transform: uppercase;
 }
 
 /******************************************************************************

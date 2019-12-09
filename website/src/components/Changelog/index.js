@@ -16,15 +16,15 @@ function Commit({commit, setSearchTerm}) {
     <div className="section">
       <div className="badges">
         {commit.breaking_change && <span className="badge badge--danger"><i className="feather icon-alert-triangle"></i> breaking</span>}
-        {commit.pr_number && (<span className="badge badge--primary" style={{minWidth: "65px", textAlign: "center"}}>
+        {commit.pr_number && (<span className="badge badge--secondary" style={{minWidth: "65px", textAlign: "center"}}>
           <a href={`https://github.com/timberio/vector/pull/${commit.pr_number}`} target="_blank"><i className="feather icon-git-pull-request"></i> {commit.pr_number}</a>
         </span>)}
-        {!commit.pr_number && (<span className="badge badge--primary" style={{minWidth: "65px", textAlign: "center"}}>
+        {!commit.pr_number && (<span className="badge badge--secondary" style={{minWidth: "65px", textAlign: "center"}}>
           <a href={`https://github.com/timberio/vector/commit/${commit.sha}`} target="_blank"><i className="feather icon-git-commit"></i> {commit.sha.slice(0,5)}</a>
         </span>)}
       </div>
       <AnchoredH4 id={commit.sha}>
-        <code className="link" onClick={() => setSearchTerm(commit.scope.name)}>{commit.scope.name}</code>&nbsp;
+        <span className="badge badge--primary link" onClick={() => setSearchTerm(commit.scope.name)}>{commit.scope.name}</span>&nbsp;
         {commit.description}
       </AnchoredH4>
     </div>
@@ -33,7 +33,7 @@ function Commit({commit, setSearchTerm}) {
 
 function Commits({commits, groupBy, setSearchTerm}) {
   if (groupBy) {
-    const groupedCommits = _.groupBy(commits, groupBy);
+    const groupedCommits = _(commits).sortBy(commit => commit.scope.name).groupBy(groupBy).value();
     const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
 
     return(
@@ -41,7 +41,7 @@ function Commits({commits, groupBy, setSearchTerm}) {
         {groupKeys.map((groupKey, catIdx) => (
           <div className="section" key={catIdx}>
             <AnchoredH3 id={groupKey}>{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</AnchoredH3>
-            <div className="section-list section-list--compact">
+            <div className="section-list section-list--compact section-list--hover">
               {groupedCommits[groupKey].map((commit, commitIdx) => (
                 <Commit key={commitIdx} commit={commit} setSearchTerm={setSearchTerm} />
               ))}
@@ -62,7 +62,7 @@ function Commits({commits, groupBy, setSearchTerm}) {
 function Changelog(props) {
   const {commits} = props;
 
-  const [groupBy, setGroupBy] = useState('group');
+  const [groupBy, setGroupBy] = useState('type');
   const [onlyTypes, setOnlyTypes] = useState(new Set(['enhancement', 'feat', 'fix']));
   const [searchTerm, setSearchTerm] = useState(null);
 
@@ -76,6 +76,10 @@ function Changelog(props) {
 
   if (onlyTypes.size > 0) {
     filteredCommits = filteredCommits.filter(commit => onlyTypes.has(commit.type) );
+
+    if (onlyTypes.has("breaking change")) {
+      filteredCommits = filteredCommits.filter(commit => commit.breaking_change );
+    }
   }
 
   //
@@ -84,7 +88,7 @@ function Changelog(props) {
 
   const types = new Set(
     _(commits).
-      map(component => component.type).
+      map(commit => commit.group).
       uniq().
       compact().
       sort().
@@ -104,7 +108,7 @@ function Changelog(props) {
               type="text"
               onChange={(event) => setSearchTerm(event.currentTarget.value)}
               placeholder="🔍 Search..."
-              value={searchTerm} />
+              value={searchTerm || ''} />
           </div>
           <div className="filter">
             <div className="filter--choices">

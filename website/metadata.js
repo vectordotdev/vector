@@ -2125,11 +2125,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2019-11-21 15:28:49 +0000",
         "deletions_count": 11,
-        "description": "fix some URLs",
+        "description": "Fix some URLs",
         "files_count": 4,
         "group": "docs",
         "insertions_count": 7,
-        "message": "docs: fix some URLs",
+        "message": "docs: Fix some URLs",
         "pr_number": null,
         "scope": {
           "category": "core",
@@ -2485,11 +2485,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2019-11-22 16:43:22 +0000",
         "deletions_count": 4,
-        "description": "more Chrome fixes",
+        "description": "More Chrome fixes",
         "files_count": 2,
         "group": "chore",
         "insertions_count": 4,
-        "message": "chore(website): more Chrome fixes",
+        "message": "chore(website): More Chrome fixes",
         "pr_number": null,
         "scope": {
           "category": "core",
@@ -3766,6 +3766,8 @@ module.exports = {
     "deletions_count": 6960,
     "insertions_count": 15719,
     "last_version": "0.5.0",
+    "type": "initial dev",
+    "type_url": "https://semver.org/#spec-item-4",
     "version": "0.6.0"
   },
   "posts": [
@@ -9986,6 +9988,8 @@ module.exports = {
       "deletions_count": 8605,
       "insertions_count": 27640,
       "last_version": "0.3.0",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
       "version": "0.4.0"
     },
     "0.5.0": {
@@ -11256,6 +11260,8 @@ module.exports = {
       "deletions_count": 3038,
       "insertions_count": 6839,
       "last_version": "0.4.0",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
       "version": "0.5.0"
     },
     "0.6.0": {
@@ -13145,11 +13151,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2019-11-21 15:28:49 +0000",
           "deletions_count": 11,
-          "description": "fix some URLs",
+          "description": "Fix some URLs",
           "files_count": 4,
           "group": "docs",
           "insertions_count": 7,
-          "message": "docs: fix some URLs",
+          "message": "docs: Fix some URLs",
           "pr_number": null,
           "scope": {
             "category": "core",
@@ -13505,11 +13511,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2019-11-22 16:43:22 +0000",
           "deletions_count": 4,
-          "description": "more Chrome fixes",
+          "description": "More Chrome fixes",
           "files_count": 2,
           "group": "chore",
           "insertions_count": 4,
-          "message": "chore(website): more Chrome fixes",
+          "message": "chore(website): More Chrome fixes",
           "pr_number": null,
           "scope": {
             "category": "core",
@@ -14786,6 +14792,8 @@ module.exports = {
       "deletions_count": 6960,
       "insertions_count": 15719,
       "last_version": "0.5.0",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
       "version": "0.6.0"
     }
   },

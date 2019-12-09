@@ -111,12 +111,34 @@ class Release
       date: date,
       insertions_count: insertions_count,
       last_version: last_version,
+      type: type,
+      type_url: type_url,
       version: version,
     }
   end
 
   def type
-    @type ||= last_version.bump_type(version)
+    @type ||= 
+      if version.major == 0
+        "initial dev"
+      else
+        last_version.bump_type(version)
+      end
+  end
+
+  def type_url
+    case type
+    when "initial dev"
+      "https://semver.org/#spec-item-4"
+    when "patch"
+      "https://semver.org/#spec-item-6"
+    when "minor"
+      "https://semver.org/#spec-item-7"
+    when "major"
+      "https://semver.org/#spec-item-8"
+    else
+      raise "Unknown release type #{type.inspect}!"
+    end
   end
 
   private

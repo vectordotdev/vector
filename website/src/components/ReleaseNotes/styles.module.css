@@ -3,9 +3,7 @@
 }
 
 .sidebar {
-  border-right: 1px solid var(--ifm-sidebar-border-color);
-  padding: 0 var(--ifm-spacing-horizontal) 0 0;
-  text-align: right;
+  padding-top: calc( var(--ifm-spacing-vertical) * 2 );
   width: 175px;
 }
 
@@ -16,7 +14,7 @@
 }
 
 .content header {
-  padding: calc( var(--ifm-spacing-vertical) * 2 ) 0 calc( var(--ifm-spacing-vertical) * 3 ) 0;
+  padding: calc( var(--ifm-spacing-vertical) * 4 ) 0;
   text-align: center;
 }
 
