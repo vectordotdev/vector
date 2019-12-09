@@ -127,8 +127,8 @@ Alternatively, for finer control, it is possible to use specific features from t
 | Feature | Description | Included in `default` feature |
 | :------ | :---------- | :----------------- |
 | `unix` | Enables features that require `cfg(unix)` to be present on the platform, namely Unix domain sockets for [docker][docs.sources.docker] source and [jemalloc][urls.jemalloc] instead of the default memory allocator. | <i className="feather icon-check"></i> |
-| `vendored` | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. | <i className="feather icon-check"></i>|
+| `vendored` | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency. | <i className="feather icon-check"></i>|
 | `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb]. | <i className="feather icon-check"></i> |
-| `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as build dependency. Use it in case of compilation issues with `leveldb-plain`. | |
+| `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`. | |
 | `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
-| `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
+| `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
