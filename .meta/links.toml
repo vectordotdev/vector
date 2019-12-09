@@ -150,3 +150,4 @@ vector_systemd_file = "https://github.com/timberio/vector/blob/master/distributi
 vector_version_branches = "https://github.com/timberio/vector/branches/all?query=v"
 vote_feature = "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
 website = "https://vector.dev"
+zlib = "https://www.zlib.net"

@@ -185,16 +185,25 @@ executing `make build`:
 [FEATURES="<flag1>,<flag2>,..."] make build
 ```
 
+There are three meta-features which can be used when compiling for the corresponding targets. If no features
+are specified, then the `default` one is used.
+
 | Feature | Description | Enabled by default |
 | :------ | :---------- | :----------------- |
-| `jemallocator` | Enables vendored [jemalloc][urls.jemalloc] instead of default memory allocator, which improves [performance][docs.performance]. | <i className="feather icon-check"></i> |
-| `leveldb` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb]. | <i className="feather icon-check"></i> |
-| `leveldb/leveldb-sys-2` | Can be used together with `leveldb` feature to use LevelDB from [`leveldb-sys` 2.x][urls.leveldb-sys-2] crate, which doesn't require `cmake` as build dependency, but supports less platforms. | <i className="feather icon-check"></i> |
-| `leveldb/leveldb-sys-3` | Can be used together with `leveldb` feature to use LevelDB from development version of [`leveldb-sys` 3.x][urls.leveldb-sys-3] crate, which requires `cmake` as build dependency, but supports more platforms. | |
-| `openssl/vendored` | Enables vendored [OpenSSL][urls.openssl]. If disabled, system SSL library is used instead. | <i className="feather icon-check"></i> |
-| `rdkafka` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
-| `rdkafka/cmake_build` | Can be used together with `rdkafka` feature to build `librdkafka` using `cmake` instead of default build script in case of build problems on non-standard system configurations. | |
-| `shiplift/unix-socket` | Enables support for Unix domain sockets in [`docker`][docs.sources.docker] source. | <i className="feather icon-check"></i> |
+| `default` | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets. | <i className="feather icon-check"></i> |
+| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. | |
+| `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies. | |
+
+Alternatively, for finer control, it is possible to use specific features from the list below:
+
+| Feature | Description | Included in `default` feature |
+| :------ | :---------- | :----------------- |
+| `unix` | Enables features that require `cfg(unix)` to be present on the platform, namely support for Unix domain sockets in [docker][docs.sources.docker] source and [jemalloc][urls.jemalloc] instead of the default memory allocator. | <i className="feather icon-check"></i> |
+| `vendored` | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency. | <i className="feather icon-check"></i>|
+| `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb]. | <i className="feather icon-check"></i> |
+| `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`. | |
+| `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
+| `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
 
 
 [docs.configuration]: /docs/setup/configuration
@@ -204,14 +213,12 @@ executing `make build`:
 [docs.global-options#data_dir]: /docs/reference/global-options#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary#buffer
 [docs.package_managers]: /docs/setup/installation/package-managers
-[docs.performance]: /docs/about/performance
 [docs.sources.docker]: /docs/reference/sources/docker
 [docs.sources.kafka]: /docs/reference/sources/kafka
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
-[urls.leveldb-sys-2]: https://crates.io/crates/leveldb-sys
-[urls.leveldb-sys-3]: https://github.com/timberio/leveldb-sys/tree/v3.0.0
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [urls.openssl]: https://www.openssl.org/
 [urls.rust]: https://www.rust-lang.org/
+[urls.zlib]: https://www.zlib.net

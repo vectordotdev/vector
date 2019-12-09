@@ -127,9 +127,8 @@ jobs:
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
             rm rust-toolchain
-            cargo test --release --no-default-features --features "$FEATURES" -- --test-threads 1
+            cargo test --release --no-default-features --features default-msvc -- --test-threads 1
 
   test-stable:
     resource_class: xlarge
@@ -262,7 +261,7 @@ jobs:
             export -f zip
 
             export RUSTFLAGS=-Ctarget-feature=+crt-static
-            export FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
+            export FEATURES="default-msvc"
             export ARCHIVE_TYPE="zip"
             export STRIP="false"
             export RUST_LTO=""
@@ -284,7 +283,7 @@ jobs:
           no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
-            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
+            PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
@@ -302,7 +301,7 @@ jobs:
           no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
-            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
+            PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
@@ -320,7 +319,7 @@ jobs:
           no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
-            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
+            PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
       - persist_to_workspace:

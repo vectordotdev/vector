@@ -147,6 +147,7 @@ criterion = "0.2.5"
 reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
+libz-sys = "1.0"
 walkdir = "2.2.7"
 elastic_responses = "0.20"
 matches = "0.1.8"
@@ -159,7 +160,32 @@ trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
 
 [features]
-default = ["rdkafka", "leveldb", "leveldb/leveldb-sys-2", "shiplift/unix-socket", "jemallocator", "openssl/vendored"]
+# Default features for *-unknown-linux-gnu and *-apple-darwin
+default = ["vendored", "unix", "leveldb-plain", "rdkafka-plain"]
+# Default features for *-unknown-linux-musl
+default-musl = ["vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+# Default features for *-pc-windows-msvc
+default-msvc = ["vendored", "leveldb-cmake", "rdkafka-cmake"]
+
+# Enables features that work only on systems providing `cfg(unix)
+unix = ["jemallocator", "shiplift/unix-socket"]
+# Forces vendoring of OpenSSL and ZLib dependencies
+vendored = ["openssl/vendored", "libz-sys/static"]
+# This feature is less portable, but doesn't require `cmake` as build dependency
+rdkafka-plain = ["rdkafka"]
+# Enables `rdkafka` dependency.
+# This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
+# The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
+rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
+# This feature is less portable, but doesn't require `cmake` as build dependency
+leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
+# This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
+leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
+
+# Identifies that the build is a nightly build
+nightly = []
+
+# Testing-related features
 docker = [
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
@@ -180,7 +206,6 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
-nightly = []
 
 [[bench]]
 name = "bench"
