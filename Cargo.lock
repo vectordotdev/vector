@@ -1967,6 +1967,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "pin-project"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "pin-project-internal 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pin-project-internal"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "pin-utils"
 version = "0.1.0-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3668,8 +3686,8 @@ dependencies = [
 
 [[package]]
 name = "tracing-futures"
-version = "0.0.1-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.1.1"
+source = "git+https://github.com/tokio-rs/tracing#8720792dbdf3158c4dbfcaf879e28da7af67c3f7"
 dependencies = [
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3678,11 +3696,11 @@ dependencies = [
 
 [[package]]
 name = "tracing-futures"
-version = "0.1.1"
-source = "git+https://github.com/tokio-rs/tracing#8720792dbdf3158c4dbfcaf879e28da7af67c3f7"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pin-project 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -4133,7 +4151,7 @@ dependencies = [
  "tower-hyper 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-test 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tracing-futures 0.0.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracing-futures 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing-limit 0.1.0",
  "tracing-log 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing-metrics 0.1.0",
@@ -4546,6 +4564,8 @@ dependencies = [
 "checksum phf_codegen 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "b03e85129e324ad4166b06b2c7491ae27fe3ec353af72e72cd1654c7225d517e"
 "checksum phf_generator 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "09364cc93c159b8b06b1f4dd8a4398984503483891b0c26b867cf431fb132662"
 "checksum phf_shared 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)" = "234f71a15de2288bcb7e3b6515828d22af7ec8598ee6d24c3b526fa0a80b67a0"
+"checksum pin-project 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "94b90146c7216e4cb534069fb91366de4ea0ea353105ee45ed297e2d1619e469"
+"checksum pin-project-internal 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "44ca92f893f0656d3cba8158dd0f2b99b94de256a4a54e870bd6922fcc6c8355"
 "checksum pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)" = "5894c618ce612a3fa23881b152b608bafb8c56cfc22f434a3ba3120b40f7b587"
 "checksum pkg-config 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)" = "72d5370d90f49f70bd033c3d75e87fc529fbfff9d6f7cccef07d6170079d91ea"
 "checksum ppv-lite86 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "74490b50b9fbe561ac330df47c08f3f33073d2d00c150f719147d7c54522fa1b"
@@ -4715,8 +4735,8 @@ dependencies = [
 "checksum tracing 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "ff4e4f59e752cb3beb5b61c6d5e11191c7946231ba84faec2902c9efdd8691c5"
 "checksum tracing-attributes 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "a4263b12c3d3c403274493eb805966093b53214124796552d674ca1dd5d27c2b"
 "checksum tracing-core 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "bc913647c520c959b6d21e35ed8fa6984971deca9f0a2fcb8c51207e0c56af1d"
-"checksum tracing-futures 0.0.1-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)" = "08c7446f4fb35df7ba2c537b7e2f812f91b20a58aa2b846f028342c4d2429be0"
 "checksum tracing-futures 0.1.1 (git+https://github.com/tokio-rs/tracing)" = "<none>"
+"checksum tracing-futures 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "107ae59580d2a1d994b6b965b16fe94c969fe86d3f7fd2572a1ee243bcaf7f09"
 "checksum tracing-log 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5e0f8c7178e13481ff6765bd169b33e8d554c5d2bbede5e32c356194be02b9b9"
 "checksum tracing-subscriber 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "192ca16595cdd0661ce319e8eede9c975f227cdaabc4faaefdc256f43d852e45"
 "checksum tracing-tower 0.1.0 (git+https://github.com/tokio-rs/tracing)" = "<none>"

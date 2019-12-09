@@ -75,8 +75,6 @@ services:
       ports:
         - "8123:8123"
     ec2_metadata:
-      image: jtblin/aws-mock-metadata
-      environment: 
-        - APP_PORT="8080"
+      image: timberiodev/mock-ec2-metadata:latest 
       ports: 
-        - "8080:8080"
+        - "8111:8111"
