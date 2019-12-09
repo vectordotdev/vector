@@ -63,7 +63,7 @@ function Changelog(props) {
   const {commits} = props;
 
   const [groupBy, setGroupBy] = useState('type');
-  const [onlyTypes, setOnlyTypes] = useState(new Set(['enhancement', 'feat', 'fix']));
+  const [onlyTypes, setOnlyTypes] = useState(new Set(['enhancement', 'feat', 'fix', 'perf']));
   const [searchTerm, setSearchTerm] = useState(null);
 
   let filteredCommits = commits.slice(0);
@@ -120,7 +120,12 @@ function Changelog(props) {
           </div>
         </div>) :
         null}
-      <Commits commits={filteredCommits} groupBy={groupBy} setSearchTerm={setSearchTerm} types={types} />
+      {filteredCommits.length > 0 ?
+        <Commits commits={filteredCommits} groupBy={groupBy} setSearchTerm={setSearchTerm} types={types} /> :
+        <div className="empty">
+          <div className="icon">☹</div>
+          <div>No commits found</div>
+        </div>}
     </div>
   );
 }

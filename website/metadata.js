@@ -5032,11 +5032,20 @@ module.exports = {
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
       {
-        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
         "commits": [
 
         ],
+        "id": "encoding-guide",
         "title": "The `file` and `console` now require `encoding`"
+      },
+      {
+        "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_console_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+        "commits": [
+
+        ],
+        "id": "datadog-guide",
+        "title": "The `datadog` sink has been renamed to `datadog_metrics`"
       }
     ],
     "version": "0.6.0"
@@ -17344,11 +17353,20 @@ module.exports = {
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
         {
-          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
           "commits": [
 
           ],
+          "id": "encoding-guide",
           "title": "The `file` and `console` now require `encoding`"
+        },
+        {
+          "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_console_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+          "commits": [
+
+          ],
+          "id": "datadog-guide",
+          "title": "The `datadog` sink has been renamed to `datadog_metrics`"
         }
       ],
       "version": "0.6.0"
@@ -18052,9 +18070,7 @@ module.exports = {
       "id": "add_fields_transform",
       "name": "add_fields",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18074,9 +18090,7 @@ module.exports = {
       "id": "add_tags_transform",
       "name": "add_tags",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18096,9 +18110,7 @@ module.exports = {
       "id": "ansi_stripper_transform",
       "name": "ansi_stripper",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18118,9 +18130,7 @@ module.exports = {
       "id": "coercer_transform",
       "name": "coercer",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18141,9 +18151,7 @@ module.exports = {
       "id": "field_filter_transform",
       "name": "field_filter",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "beta",
@@ -18163,9 +18171,7 @@ module.exports = {
       "id": "geoip_transform",
       "name": "geoip",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18185,9 +18191,7 @@ module.exports = {
       "id": "grok_parser_transform",
       "name": "grok_parser",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18207,9 +18211,7 @@ module.exports = {
       "id": "json_parser_transform",
       "name": "json_parser",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18230,9 +18232,7 @@ module.exports = {
       "id": "log_to_metric_transform",
       "name": "log_to_metric",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18252,9 +18252,7 @@ module.exports = {
       "id": "lua_transform",
       "name": "lua",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "beta",
@@ -18274,9 +18272,7 @@ module.exports = {
       "id": "regex_parser_transform",
       "name": "regex_parser",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18296,9 +18292,7 @@ module.exports = {
       "id": "remove_fields_transform",
       "name": "remove_fields",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18318,9 +18312,7 @@ module.exports = {
       "id": "remove_tags_transform",
       "name": "remove_tags",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18340,9 +18332,7 @@ module.exports = {
       "id": "sampler_transform",
       "name": "sampler",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "beta",
@@ -18362,9 +18352,7 @@ module.exports = {
       "id": "split_transform",
       "name": "split",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",
@@ -18384,9 +18372,7 @@ module.exports = {
       "id": "tokenizer_transform",
       "name": "tokenizer",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+
       ],
       "service_provider": null,
       "status": "prod-ready",

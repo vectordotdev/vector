@@ -241,6 +241,7 @@ commits = [
 ]
 
 [[releases."0.6.0".upgrade_guides]]
+id = "encoding-guide"
 commits = []
 title = "The `file` and `console` now require `encoding`"
 body = """\
@@ -257,5 +258,20 @@ related to the output encoding format. Migration is easy:
  [sinks.my_file_sink]
    type = "file"
 +  encoding = "json" # or "text"
+```
+"""
+
+[[releases."0.6.0".upgrade_guides]]
+id = "datadog-guide"
+commits = []
+title = "The `datadog` sink has been renamed to `datadog_metrics`"
+body = """\
+The `datadog` sink was incorrectly named since we'll be adding future support \
+for DataDog logs. Migrating is as simple as renaming your sink:
+
+```diff
+ [sinks.my_console_sink]
+-  type = "datadog"
++  type = "datadog_metrics"
 ```
 """

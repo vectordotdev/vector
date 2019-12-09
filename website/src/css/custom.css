@@ -160,8 +160,24 @@ a code {
 .badge {
   background-clip: padding-box;
 }
+.badge.badge--primary {
+  --ifm-badge-background-color: rgba(var(--ifm-color-primary-rgb), 0.2);
+  --ifm-badge-color: var(--ifm-color-primary);
+}
+.badge.badge--danger {
+  --ifm-badge-background-color: rgba(var(--ifm-color-danger-rgb), 0.2);
+  --ifm-badge-color: var(--ifm-color-danger);
+}
 .badge.badge--secondary {
   color: var(--ifm-color-emphasis-800);
+}
+.badge.badge--success {
+  --ifm-badge-background-color: rgba(var(--ifm-color-success-rgb), 0.5);
+  --ifm-badge-color: var(--ifm-color-success);
+}
+.badge.badge--warning {
+  --ifm-badge-background-color: rgba(var(--ifm-color-warning-rgb), 0.2);
+  --ifm-badge-color: var(--ifm-color-warning);
 }
 .badge.badge--highlight {
   animation: gradientBG 5s ease-in infinite;
@@ -1424,9 +1440,10 @@ div[class^='docPage_'] div[class^='sidebar_'] .menu__link.menu__link--active:not
   padding-right: calc( var(--ifm-menu-link-padding-horizontal) - 2px );
 }
 div[class^='docPage_'] div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) .badge {
-  background: var(--ifm-color-primary);
-  border: 1px solid var(--ifm-color-primary);
-  color: white;
+  background: rgba(var(--ifm-color-primary-rgb), 0.2);
+  background-clip: padding-box;
+  border: 1px solid rgba(var(--ifm-color-primary-rgb), 0.2);
+  color: var(--ifm-color-primary);
 }
 @media (min-width: 997px) {
   div[class^='docPage_'] div[class^='sidebar_'] {
@@ -1494,30 +1511,6 @@ html[data-theme='dark'] .navbar__sidebar__backdrop {
 html[data-theme='dark'] .navbar .navbar__item .badge--default {
   background: var(--ifm-color-emphasis-100);
   color: var(--ifm-panel-color);
-}
-
-html[data-theme='dark']  div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) .badge {
-  background: rgba(var(--ifm-color-primary-rgb), 0.2);
-  background-clip: padding-box;
-  border: 1px solid rgba(var(--ifm-color-primary-rgb), 0.2);
-  color: var(--ifm-color-primary);
-}
-
-html[data-theme='dark'] .badge.badge--primary {
-  --ifm-badge-background-color: rgba(var(--ifm-color-primary-rgb), 0.2);
-  --ifm-badge-color: var(--ifm-color-primary);
-}
-html[data-theme='dark'] .badge.badge--danger {
-  --ifm-badge-background-color: rgba(var(--ifm-color-danger-rgb), 0.2);
-  --ifm-badge-color: var(--ifm-color-danger);
-}
-html[data-theme='dark'] .badge.badge--success {
-  --ifm-badge-background-color: rgba(var(--ifm-color-success-rgb), 0.5);
-  --ifm-badge-color: var(--ifm-color-success);
-}
-html[data-theme='dark'] .badge.badge--warning {
-  --ifm-badge-background-color: rgba(var(--ifm-color-warning-rgb), 0.2);
-  --ifm-badge-color: var(--ifm-color-warning);
 }
 
 html[data-theme='dark'] .button.button--secondary {

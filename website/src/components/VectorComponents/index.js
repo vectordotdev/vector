@@ -252,32 +252,36 @@ function VectorComponents(props) {
             </label>
           </div>
         </div>
-        <div className="filter">
-          <div className="filter--label">
-            <Link to="/docs/installation/operating-systems" title="Learn more about Vector's operating systems">
-              Operating Systems
-            </Link>
+        {operatingSystems.length > 0 && (
+          <div className="filter">
+            <div className="filter--label">
+              <Link to="/docs/installation/operating-systems" title="Learn more about Vector's operating systems">
+                Operating Systems
+              </Link>
+            </div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Operating Systems"
+                icon="cpu"
+                values={operatingSystems}
+                currentState={onlyOperatingSystems}
+                setState={setOnlyOperatingSystems} />
+            </div>
           </div>
-          <div className="filter--choices">
-            <CheckboxList
-              label="Operating Systems"
-              icon="cpu"
-              values={operatingSystems}
-              currentState={onlyOperatingSystems}
-              setState={setOnlyOperatingSystems} />
+        )}
+        {serviceProviders.length > 0 && (
+          <div className="filter">
+            <div className="filter--label">Providers</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Providers"
+                icon="cloud"
+                values={serviceProviders}
+                currentState={onlyProviders}
+                setState={setOnlyProviders} />
+            </div>
           </div>
-        </div>
-        <div className="filter">
-          <div className="filter--label">Providers</div>
-          <div className="filter--choices">
-            <CheckboxList
-              label="Providers"
-              icon="cloud"
-              values={serviceProviders}
-              currentState={onlyProviders}
-              setState={setOnlyProviders} />
-          </div>
-        </div>
+        )}
         <div className="filter">
           <div className="filter--label">Functions</div>
           <div className="filter--choices">

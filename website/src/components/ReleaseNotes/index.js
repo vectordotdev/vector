@@ -65,7 +65,7 @@ function Highlight({post}) {
 function UpgradeGuide({upgradeGuide, key}) {
   return (
     <div className="section">
-      <AnchoredH3 id={`upgrade-guide-${key}`}>{upgradeGuide.title}</AnchoredH3>
+      <AnchoredH3 id={upgradeGuide.id}>{upgradeGuide.title}</AnchoredH3>
       <MDX components={MDXComponents} scope={{}}>{upgradeGuide.body}</MDX>
     </div>
   );
@@ -187,6 +187,13 @@ function TableOfContents({release}) {
             {release.upgrade_guides.length > 0 && (
               <li>
                 <a href="#breaking-changes" className="contents__link text--danger"><i className="feather icon-alert-triangle"></i> Breaking Changes</a>
+                <ul>
+                  {release.upgrade_guides.map((upgradeGuide, idx) =>
+                    <li key={idx}>
+                      <a href={`#${upgradeGuide.id}`} className="contents__link">{upgradeGuide.title}</a>
+                    </li>
+                  )}
+                </ul>
               </li>
             )}
             <li>
