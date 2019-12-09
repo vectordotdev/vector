@@ -4,13 +4,22 @@ require_relative "../../util/version"
 class Release
   include Comparable
 
-  attr_reader :commits, :date, :last_date, :last_version, :posts, :version
+  attr_reader :commits,
+    :date,
+    :last_date,
+    :last_version,
+    :posts,
+    :upgrade_guides,
+    :version
 
   def initialize(release_hash, last_version, last_date, all_posts)
     @last_date = last_date
     @last_version = last_version
     @date = release_hash.fetch("date").to_date
     @posts = all_posts.select { |p| last_date && p.date > last_date && p.date <= @date }
+    @upgrade_guides = (release_hash["upgrade_guides"] || []).collect do |guide_hash|
+      OpenStruct.new(guide_hash)
+    end
     @version = Version.new(release_hash.fetch("version"))
 
     @commits =
@@ -114,6 +123,7 @@ class Release
       posts: posts.deep_to_h,
       type: type,
       type_url: type_url,
+      upgrade_guides: upgrade_guides.deep_to_h,
       version: version,
     }
   end

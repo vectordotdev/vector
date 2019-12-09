@@ -2,6 +2,7 @@ import React from 'react';
 
 import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
+import MailingListForm from '@site/src/components/MailingListForm';
 
 import styles from './community.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
@@ -18,17 +19,7 @@ function Community() {
       <header className="hero">
         <div className="container container--fluid">
           <h1>Vector Community</h1>
-          <div className="mailing-list">
-            <div className="mailing-list--description">
-              The easiest way to stay up-to-date. One email on the 1st of every month. No spam, ever.
-            </div>
-            <form action="https://app.getvero.com/forms/a748ded7ce0da69e6042fa1e21042506" method="post">
-              <div class="subscribe_form">
-                <input className="input input--lg" name="email" placeholder="you@email.com" type="email" />
-                <button className="button button--primary button--lg" type="submit">Subscribe</button>
-              </div>
-            </form>
-          </div>
+          <MailingListForm />
         </div>
       </header>
       <main>

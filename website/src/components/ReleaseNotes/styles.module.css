@@ -29,6 +29,10 @@
     display: block;
   }
 
+  .sidebar {
+    display: none;
+  }
+
   .content {
     margin: 0;
   }

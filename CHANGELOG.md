@@ -17,7 +17,7 @@
 -->
 
 * [**Unreleased**](#unreleased) - [download][urls.vector_nightly_builds], [install][docs.installation.manual], [compare][urls.compare_v0.6.0...master]
-* [**0.6.0**](#060---dec-8-2019) - [download][urls.v0.6.0], [install][docs.installation], [compare][urls.compare_v0.5.0...v0.6.0]
+* [**0.6.0**](#060---dec-9-2019) - [download][urls.v0.6.0], [install][docs.installation], [compare][urls.compare_v0.5.0...v0.6.0]
 
 ---
 
@@ -28,11 +28,12 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * [Compare `v0.6.0` to `master`][urls.compare_v0.6.0...master]
 * [Download nightly builds][urls.vector_nightly_builds]
 
-## [0.6.0][urls.v0.6.0] - Dec 8, 2019
+## [0.6.0][urls.v0.6.0] - Dec 9, 2019
 
 ### Breaking changes
 
 * *[config][docs.configuration]*: Require `encoding` option for console and file sinks ([#1033][urls.pr_1033])
+* *[`datadog_metrics` sink][docs.sinks.datadog_metrics]*: Rename `datadog` sink to `datadog_metrics` ([#1314][urls.pr_1314])
 * *[metric data model][docs.data-model.metric]*: Reorganise metric model ([#1217][urls.pr_1217])
 
 ### New features
@@ -46,6 +47,8 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * *new platform*: Support `aarch64-unknown-linux` (arm64, raspberry pi, etc) platforms ([#1193][urls.pr_1193])
 * *new platform*: Support `x86_64-pc-windows-msvc` (windows 7+) platform ([#1205][urls.pr_1205])
 * *new sink*: Initial `datadog_metrics` implementation ([#967][urls.pr_967])
+* *new sink*: Initial [`new_relic_logs` sink][docs.sinks.new_relic_logs] implementation ([#1303][urls.pr_1303])
+* *new source*: Initial [`splunk_hec` source][docs.sources.splunk_hec] implementation ([a68c978][urls.commit_a68c9781a12cd35f2ee1cd7686320d1bd6e52c05])
 * *new transform*: Initial [`ansi_stripper` transform][docs.transforms.ansi_stripper] implementation ([#1188][urls.pr_1188])
 * *new transform*: Initial [`geoip` transform][docs.transforms.geoip] implementation ([#1015][urls.pr_1015])
 
@@ -54,9 +57,12 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * *[`blackhole` sink][docs.sinks.blackhole]*: Accept metric events, too ([#1237][urls.pr_1237])
 * *[cli][docs.administration]*: Show git version and target triple in `vector --version` output ([#1044][urls.pr_1044])
 * *[cli][docs.administration]*: Allow >1 config targets for validate command ([#1218][urls.pr_1218])
+* *[cli][docs.administration]*: Test & validate subcommands without args target default path ([#1313][urls.pr_1313])
 * *[config][docs.configuration]*: Refactor the batching configuration ([#1154][urls.pr_1154])
 * *[config][docs.configuration]*: Support default environment variable values ([#1185][urls.pr_1185])
+* *[config][docs.configuration]*: Refactor the sinks' request_* configuration ([#1187][urls.pr_1187])
 * *[`datadog_metrics` sink][docs.sinks.datadog_metrics]*: Use metric buffer in datadog sink ([#1080][urls.pr_1080])
+* *[`datadog_metrics` sink][docs.sinks.datadog_metrics]*: Send aggregated distributions to datadog ([#1263][urls.pr_1263])
 * *[`docker` source][docs.sources.docker]*: Enrich events with metadata ([#1149][urls.pr_1149])
 * *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Wrap provider call with a tokio runtime ([#1104][urls.pr_1104])
 * *[`file` sink][docs.sinks.file]*: Automatically create missing directories ([#1094][urls.pr_1094])
@@ -76,17 +82,23 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * *platforms*: Update `openssl` dependency ([#1240][urls.pr_1240])
 * *[`regex_parser` transform][docs.transforms.regex_parser]*: Set default `drop_field` to true ([e56f950][urls.commit_e56f9503f09a7f97d96093775856a019d738d402])
 
+### Performance improvements
+
+* *[metric data model][docs.data-model.metric]*: Performance optimisations in metric buffer ([#1290][urls.pr_1290])
+
 ### Bug fixes
 
 * *[`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics]*: Fix metrics batch strategy in sinks ([#1141][urls.pr_1141])
 * *[cli][docs.administration]*: Make global options actually use default ([#1013][urls.pr_1013])
 * *[config][docs.configuration]*: Require `encoding` option for console and file sinks ([#1033][urls.pr_1033])
+* *[`datadog_metrics` sink][docs.sinks.datadog_metrics]*: Rename `datadog` sink to `datadog_metrics` ([#1314][urls.pr_1314])
 * *docker platform*: Add ca certificates for docker image ([#1014][urls.pr_1014])
 * *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Flatten out region configuration in elasticsearch sink ([#1116][urls.pr_1116])
 * *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Stop accidentally requiring region for es ([#1161][urls.pr_1161])
 * *[`elasticsearch` sink][docs.sinks.elasticsearch]*: `host` is not required when provider is aws ([#1164][urls.pr_1164])
 * *[`file` source][docs.sources.file]*: Sleep to avoid split reads ([#1236][urls.pr_1236])
 * *[`grok_parser` transform][docs.transforms.grok_parser]*: Don't drop parsed field ([#1172][urls.pr_1172])
+* *[`grok_parser` transform][docs.transforms.grok_parser]*: Add missing rate limited log ([#1336][urls.pr_1336])
 * *[`journald` source][docs.sources.journald]*: Fix a couple minor issues with checkpointing ([#1086][urls.pr_1086])
 * *[`journald` source][docs.sources.journald]*: Rework option to limit records to current boot in journald source ([#1105][urls.pr_1105])
 * *[`journald` source][docs.sources.journald]*: Cursor/checkpoint fixes ([#1106][urls.pr_1106])
@@ -95,7 +107,12 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * *[`journald` source][docs.sources.journald]*: Re-fix journald cursor handling and libsystemd name ([#1202][urls.pr_1202])
 * *[`json_parser` transform][docs.transforms.json_parser]*: Fixes a bug droping parsed field ([#1167][urls.pr_1167])
 * *[observability][docs.monitoring]*: Improve topology tracing spans ([#1123][urls.pr_1123])
+* *operations*: Remove extra `setup_remote_docker` step from `relase-docker` ([#1287][urls.pr_1287])
+* *operations*: Fix s3 release verification ([#1286][urls.pr_1286])
+* *operations*: Upgrade docker on the step in which it is used ([#1288][urls.pr_1288])
+* *operations*: Run `package-rpm*` jobs explicitly ([#1298][urls.pr_1298])
 * *platforms*: Don't put *.erb files to configs directory ([#1241][urls.pr_1241])
+* *[`statsd` sink][docs.sinks.statsd]*: Fix statsd binding to loopback only ([#1316][urls.pr_1316])
 * *[`stdin` source][docs.sources.stdin]*: Resolve inability to shutdown vector when std… ([#960][urls.pr_960])
 * *testing*: Increase wait timeouts in tests which otherwise fail on slow cpus ([#1181][urls.pr_1181])
 
@@ -112,10 +129,13 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch
 [docs.sinks.file]: https://vector.dev/docs/reference/sinks/file
 [docs.sinks.http]: https://vector.dev/docs/reference/sinks/http
+[docs.sinks.new_relic_logs]: https://vector.dev/docs/reference/sinks/new_relic_logs
+[docs.sinks.statsd]: https://vector.dev/docs/reference/sinks/statsd
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file
 [docs.sources.journald]: https://vector.dev/docs/reference/sources/journald
 [docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka
+[docs.sources.splunk_hec]: https://vector.dev/docs/reference/sources/splunk_hec
 [docs.sources.stdin]: https://vector.dev/docs/reference/sources/stdin
 [docs.transforms.ansi_stripper]: https://vector.dev/docs/reference/transforms/ansi_stripper
 [docs.transforms.geoip]: https://vector.dev/docs/reference/transforms/geoip
@@ -123,6 +143,7 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua
 [docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser
+[urls.commit_a68c9781a12cd35f2ee1cd7686320d1bd6e52c05]: https://github.com/timberio/vector/commit/a68c9781a12cd35f2ee1cd7686320d1bd6e52c05
 [urls.commit_e56f9503f09a7f97d96093775856a019d738d402]: https://github.com/timberio/vector/commit/e56f9503f09a7f97d96093775856a019d738d402
 [urls.compare_v0.5.0...v0.6.0]: https://github.com/timberio/vector/compare/v0.5.0...v0.6.0
 [urls.compare_v0.6.0...master]: https://github.com/timberio/vector/compare/v0.6.0...master
@@ -165,6 +186,7 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [urls.pr_1174]: https://github.com/timberio/vector/pull/1174
 [urls.pr_1181]: https://github.com/timberio/vector/pull/1181
 [urls.pr_1185]: https://github.com/timberio/vector/pull/1185
+[urls.pr_1187]: https://github.com/timberio/vector/pull/1187
 [urls.pr_1188]: https://github.com/timberio/vector/pull/1188
 [urls.pr_1193]: https://github.com/timberio/vector/pull/1193
 [urls.pr_1202]: https://github.com/timberio/vector/pull/1202
@@ -177,6 +199,17 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [urls.pr_1239]: https://github.com/timberio/vector/pull/1239
 [urls.pr_1240]: https://github.com/timberio/vector/pull/1240
 [urls.pr_1241]: https://github.com/timberio/vector/pull/1241
+[urls.pr_1263]: https://github.com/timberio/vector/pull/1263
+[urls.pr_1286]: https://github.com/timberio/vector/pull/1286
+[urls.pr_1287]: https://github.com/timberio/vector/pull/1287
+[urls.pr_1288]: https://github.com/timberio/vector/pull/1288
+[urls.pr_1290]: https://github.com/timberio/vector/pull/1290
+[urls.pr_1298]: https://github.com/timberio/vector/pull/1298
+[urls.pr_1303]: https://github.com/timberio/vector/pull/1303
+[urls.pr_1313]: https://github.com/timberio/vector/pull/1313
+[urls.pr_1314]: https://github.com/timberio/vector/pull/1314
+[urls.pr_1316]: https://github.com/timberio/vector/pull/1316
+[urls.pr_1336]: https://github.com/timberio/vector/pull/1336
 [urls.pr_930]: https://github.com/timberio/vector/pull/930
 [urls.pr_944]: https://github.com/timberio/vector/pull/944
 [urls.pr_960]: https://github.com/timberio/vector/pull/960

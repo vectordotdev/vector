@@ -3760,12 +3760,1232 @@ module.exports = {
         },
         "sha": "9c531ca1e734234e187d82b76912bf5dfa188742",
         "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-11-29 15:29:25 +0000",
+        "deletions_count": 0,
+        "description": "Add a unit test guide",
+        "files_count": 6,
+        "group": "docs",
+        "insertions_count": 253,
+        "message": "docs: Add a unit test guide (#1278)",
+        "pr_number": 1278,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "c815d27773da3acd0272ef009270f772a3103791",
+        "type": "docs"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-11-29 12:01:14 +0000",
+        "deletions_count": 23,
+        "description": "Add topology section",
+        "files_count": 6,
+        "group": "chore",
+        "insertions_count": 90,
+        "message": "chore(website): Add topology section",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "7b5a7f322bffdbd7638791e32effa848deb1fdea",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-11-29 13:59:31 +0000",
+        "deletions_count": 3,
+        "description": "Default to centralized topology",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 3,
+        "message": "chore(website): Default to centralized topology",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "ecdb56f5f49920353e5696e936f2d711d6881bbd",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-11-29 14:21:42 +0000",
+        "deletions_count": 13,
+        "description": "Fix rounded tabs",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 33,
+        "message": "chore(website): Fix rounded tabs",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "1dc6e303079bf6a9bb9802fe108e77edf0b0fd83",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 00:15:17 +0000",
+        "deletions_count": 1,
+        "description": "Increase CI output timeout",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 8,
+        "message": "chore(operations): Increase CI output timeout (#1272)",
+        "pr_number": 1272,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "4e98b8321cd334d780a5388bd848d83cb677003c",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 00:37:24 +0000",
+        "deletions_count": 24,
+        "description": "Delete unused OpenSSL patch",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 0,
+        "message": "chore(operations): Delete unused OpenSSL patch (#1282)",
+        "pr_number": 1282,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "7dd271e9102d2a2eb2016f8d735c8d9710966210",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-29 22:11:41 +0000",
+        "deletions_count": 1,
+        "description": "Run nightly builds at 12am UTC",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Run nightly builds at 12am UTC",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "32e5bfc2ff07ce0dddf817d5b64a2b04cc40f9ab",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 01:14:25 +0000",
+        "deletions_count": 5,
+        "description": "Set up redirects for x86_64-unknown-linux-gnu archives",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 23,
+        "message": "chore(operations): Set up redirects for x86_64-unknown-linux-gnu archives (#1284)",
+        "pr_number": 1284,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "62992492de9c21e8a59464696b2ba226c50b82f0",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 01:42:23 +0000",
+        "deletions_count": 122,
+        "description": "Build multi-arch Docker images",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 151,
+        "message": "chore(operations): Build multi-arch Docker images (#1279)",
+        "pr_number": 1279,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "5fa10916882cd07ee6c6726be10227b321f5880c",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 02:06:35 +0000",
+        "deletions_count": 11,
+        "description": "Use `sidebar_label` as subpage title if possible",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 17,
+        "message": "chore(website): Use `sidebar_label` as subpage title if possible (#1283)",
+        "pr_number": 1283,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "5c6942f8e52971ec3eb95750d2a79574cb0c12bd",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 02:06:47 +0000",
+        "deletions_count": 8,
+        "description": "Simplify platform names in \"downloads\" section",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 8,
+        "message": "chore(website): Simplify platform names in \"downloads\" section (#1285)",
+        "pr_number": 1285,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "4058ef356271a8276ddd6b1f41933d25ddd585a6",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 10:13:42 +0000",
+        "deletions_count": 2,
+        "description": "Run nightly builds at 11am UTC",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 2,
+        "message": "chore(operations): Run nightly builds at 11am UTC",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "42c2a1f75e639ff29da5419cff29848fa3163d01",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 13:15:43 +0000",
+        "deletions_count": 2,
+        "description": "Remove extra `setup_remote_docker` step from `relase-docker`",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 0,
+        "message": "fix(operations): Remove extra `setup_remote_docker` step from `relase-docker` (#1287)",
+        "pr_number": 1287,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "8f271aee3b9873b10a68ab5c747c4e895347acca",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 13:15:56 +0000",
+        "deletions_count": 1,
+        "description": "Fix S3 release verification",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(operations): Fix S3 release verification (#1286)",
+        "pr_number": 1286,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "643716654c9049e18c057d9e88de4e78f566d983",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-11-30 18:26:36 +0000",
+        "deletions_count": 22,
+        "description": "Upgrade Docker on the step in which it is used",
+        "files_count": 3,
+        "group": "fix",
+        "insertions_count": 22,
+        "message": "fix(operations): Upgrade Docker on the step in which it is used (#1288)",
+        "pr_number": 1288,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "08a297961a767d798ebb244a10baf05b318272e7",
+        "type": "fix"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2019-11-30 16:14:02 +0000",
+        "deletions_count": 618,
+        "description": "Cleanup installation docs",
+        "files_count": 32,
+        "group": "docs",
+        "insertions_count": 783,
+        "message": "docs: Cleanup installation docs (#1289)",
+        "pr_number": 1289,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "70965d8e6d0c0d850faa86fb674987a107df9b93",
+        "type": "docs"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-01 11:21:05 +0000",
+        "deletions_count": 229,
+        "description": "Update to docaurus 2.0.0-alpha.37",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 242,
+        "message": "chore(website): Update to docaurus 2.0.0-alpha.37",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "469671dc457f867cee8bab247b6529026e7ae4ca",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-01 11:39:36 +0000",
+        "deletions_count": 10,
+        "description": "Group downloads by os",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 62,
+        "message": "chore(website): Group downloads by os",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "06a864b106bc2233c5d5a8ba78f045def8a937f6",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-01 13:15:28 +0000",
+        "deletions_count": 25,
+        "description": "Rename raspberry-pi to raspbian",
+        "files_count": 10,
+        "group": "docs",
+        "insertions_count": 44,
+        "message": "docs: Rename raspberry-pi to raspbian",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "8ee38009da9bcd41444e9cf2ed48683aa1870a1a",
+        "type": "docs"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-01 13:29:57 +0000",
+        "deletions_count": 1,
+        "description": "Fix responsive styling on homepage",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 9,
+        "message": "chore(website): Fix responsive styling on homepage",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "73dc9d55803733c460f42ce38e09b8c7c8344680",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-01 23:44:37 +0000",
+        "deletions_count": 5,
+        "description": "Fix accessing custom front-matter in docs",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 13,
+        "message": "chore(website): Fix accessing custom front-matter in docs",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "3fc6196a6b6e2df7c76e9d5924377a2054dcb5e2",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-02 09:58:25 +0000",
+        "deletions_count": 62,
+        "description": "Build RPM packages for ARM",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 220,
+        "message": "chore(operations): Build RPM packages for ARM (#1292)",
+        "pr_number": 1292,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "a6668b0c1db009b537c989ef95d8c4e616440cb9",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2019-12-02 08:27:53 +0000",
+        "deletions_count": 338,
+        "description": "Refactor the sinks' request_* configuration",
+        "files_count": 12,
+        "group": "enhancement",
+        "insertions_count": 321,
+        "message": "enhancement(config): Refactor the sinks' request_* configuration (#1187)",
+        "pr_number": 1187,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "config"
+        },
+        "sha": "62f9db5ba46a0824ed0e979743bc8aaec8e05010",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-02 19:23:02 +0000",
+        "deletions_count": 2,
+        "description": "Fix Raspbian id capitalization",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Fix Raspbian id capitalization (#1295)",
+        "pr_number": 1295,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "cbac5010444357dae078b299991304ca8055889c",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-02 22:44:56 +0000",
+        "deletions_count": 0,
+        "description": "Run `package-rpm*` jobs explicitly",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 3,
+        "message": "fix(operations): Run `package-rpm*` jobs explicitly (#1298)",
+        "pr_number": 1298,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "a0eec9935a8a2d0409e23c6cb23cba807b16a7df",
+        "type": "fix"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-03 11:28:27 +0000",
+        "deletions_count": 16,
+        "description": "Fix section links",
+        "files_count": 9,
+        "group": "docs",
+        "insertions_count": 24,
+        "message": "docs: Fix section links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5ae3036f0a0de24aeeb92135621c877428bcfa02",
+        "type": "docs"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-02 11:36:52 +0000",
+        "deletions_count": 1,
+        "description": "Fix browse downloads link",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(website): Fix browse downloads link",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "1f52116c3c40dcc439bd8f32c9cdf2a0a3b197d7",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 12:29:30 +0000",
+        "deletions_count": 11,
+        "description": "Add slugify method to mimic Docusaurus hashing logic for links",
+        "files_count": 7,
+        "group": "chore",
+        "insertions_count": 23,
+        "message": "chore(website): Add slugify method to mimic Docusaurus hashing logic for links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "bd865b06bc2ff68edb3a131a574572b88fcc8b87",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 12:33:09 +0000",
+        "deletions_count": 20,
+        "description": "Fix buffers and batches hash link",
+        "files_count": 10,
+        "group": "chore",
+        "insertions_count": 20,
+        "message": "chore(website): Fix buffers and batches hash link",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "9d38c48a10b9d3deb8d35b6e97002cab4a03b885",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 13:30:43 +0000",
+        "deletions_count": 2,
+        "description": "Use the Rust regex tester, closes #634",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Use the Rust regex tester, closes #634",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "0c0f07265ad4020d68116c14113d917499ca862f",
+        "type": "docs"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 13:35:39 +0000",
+        "deletions_count": 16,
+        "description": "Fix example regex",
+        "files_count": 6,
+        "group": "chore",
+        "insertions_count": 16,
+        "message": "chore(website): Fix example regex",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "d962fa60fd1e71cd2c9c02fc4e1ead2fd0a5086c",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-03 15:55:03 +0000",
+        "deletions_count": 35,
+        "description": "Pass `TaskExecutor` to transform",
+        "files_count": 25,
+        "group": "chore",
+        "insertions_count": 67,
+        "message": "chore(topology): Pass `TaskExecutor` to transform (#1144)",
+        "pr_number": 1144,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "topology"
+        },
+        "sha": "17a27b315b4e65f687adb0d64d2b6c5cf8890a95",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2019-12-03 17:28:50 +0000",
+        "deletions_count": 223,
+        "description": "Add community page with mailing list",
+        "files_count": 13,
+        "group": "chore",
+        "insertions_count": 271,
+        "message": "chore(website): Add community page with mailing list (#1309)",
+        "pr_number": 1309,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "cf95723d77ba4bd3fa819dd45fa7676bd1a7d19d",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 17:45:00 +0000",
+        "deletions_count": 2,
+        "description": "Responsive styling for community page",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 14,
+        "message": "chore(wensite): Responsive styling for community page",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "wensite"
+        },
+        "sha": "c912f16f1cbd924db1e800498dbfb240e9211212",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 18:04:41 +0000",
+        "deletions_count": 5,
+        "description": "Fix slide out main nav menu link labels",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 7,
+        "message": "chore(website): Fix slide out main nav menu link labels",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "4c1718431e887c9a9f58392428cde6c2a33e5070",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 18:53:47 +0000",
+        "deletions_count": 14,
+        "description": "Re-add components list",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 207,
+        "message": "chore(website): Re-add components list",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "14ebf42842d90f937df7efa88f7acea1bb1859e8",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 21:44:27 +0000",
+        "deletions_count": 29,
+        "description": "Use ${ENV_VAR} syntax in relavant examples",
+        "files_count": 9,
+        "group": "docs",
+        "insertions_count": 33,
+        "message": "docs: Use ${ENV_VAR} syntax in relavant examples",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "6e60b2fab0de568ef47c5afdd606a60c3069531d",
+        "type": "docs"
+      },
+      {
+        "author": "Alexey Suslov",
+        "breaking_change": false,
+        "date": "2019-12-04 12:21:43 +0000",
+        "deletions_count": 9,
+        "description": "Performance optimisations in metric buffer",
+        "files_count": 2,
+        "group": "perf",
+        "insertions_count": 165,
+        "message": "perf(metric data model): Performance optimisations in metric buffer (#1290)",
+        "pr_number": 1290,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "metric data model"
+        },
+        "sha": "fcf6356f11ac7d80a5c378aeceabd6cf72168ef1",
+        "type": "perf"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-03 23:24:55 +0000",
+        "deletions_count": 5,
+        "description": "Fix nav width",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 10,
+        "message": "chore(website): Fix nav width",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "690d798e8cc4d08457b5ad3dd3fcee4da7fea4b3",
+        "type": "chore"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-04 10:56:01 +0000",
+        "deletions_count": 6,
+        "description": "Update README with new links",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 8,
+        "message": "docs: Update README with new links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "53d2a9ca0ff85c8d39cf9b312265c859f079c170",
+        "type": "docs"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-04 13:23:44 +0000",
+        "deletions_count": 113,
+        "description": "Add `SinkContext` to `SinkConfig`",
+        "files_count": 23,
+        "group": "chore",
+        "insertions_count": 146,
+        "message": "chore(topology): Add `SinkContext` to `SinkConfig` (#1306)",
+        "pr_number": 1306,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "topology"
+        },
+        "sha": "00e21e83c54d2ca5e0b50b3b96a3390e761bf2dd",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-04 19:18:34 +0000",
+        "deletions_count": 9,
+        "description": "Initial `new_relic_logs` sink implementation",
+        "files_count": 13,
+        "group": "feat",
+        "insertions_count": 1166,
+        "message": "feat(new sink): Initial `new_relic_logs` sink implementation (#1303)",
+        "pr_number": 1303,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "52e4f176f62c305a6d0adcf6fa1f5b08bd2466dc",
+        "type": "feat"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-04 19:48:24 +0000",
+        "deletions_count": 11,
+        "description": "Fix NR build signature",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 12,
+        "message": "chore: Fix NR build signature",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "4c1d8ceaef63fc9f73e5e568773bf569f6c2f460",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-04 15:29:04 +0000",
+        "deletions_count": 182,
+        "description": "Add map to ServiceBuilder and s3",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 346,
+        "message": "chore: Add map to ServiceBuilder and s3 (#1189)",
+        "pr_number": 1189,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "772672e65920de3c0f13fa5b86c9c428b2d3fbfb",
+        "type": "chore"
+      },
+      {
+        "author": "Alexey Suslov",
+        "breaking_change": true,
+        "date": "2019-12-04 22:34:43 +0000",
+        "deletions_count": 3,
+        "description": "Rename `datadog` sink to `datadog_metrics`",
+        "files_count": 1,
+        "group": "breaking change",
+        "insertions_count": 3,
+        "message": "fix(datadog_metrics sink)!: Rename `datadog` sink to `datadog_metrics` (#1314)",
+        "pr_number": 1314,
+        "scope": {
+          "category": "sink",
+          "component_name": "datadog_metrics",
+          "component_type": "sink",
+          "name": "datadog_metrics sink"
+        },
+        "sha": "59fd318f227524a84a7520bbae004d2c75156365",
+        "type": "fix"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-04 15:39:15 +0000",
+        "deletions_count": 166,
+        "description": "Sync with new toggle changes",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 2,
+        "message": "chore(website): Sync with new toggle changes",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "e76083548a2d46664acd67a8e40f1835614d94c5",
+        "type": "chore"
+      },
+      {
+        "author": "Alexey Suslov",
+        "breaking_change": false,
+        "date": "2019-12-05 09:31:01 +0000",
+        "deletions_count": 0,
+        "description": "Send aggregated distributions to Datadog",
+        "files_count": 1,
+        "group": "enhancement",
+        "insertions_count": 231,
+        "message": "enhancement(datadog_metrics sink): Send aggregated distributions to Datadog (#1263)",
+        "pr_number": 1263,
+        "scope": {
+          "category": "sink",
+          "component_name": "datadog_metrics",
+          "component_type": "sink",
+          "name": "datadog_metrics sink"
+        },
+        "sha": "5822ee199bafbc2558491d5ba9682b8f10ed95d0",
+        "type": "enhancement"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-05 13:28:26 +0000",
+        "deletions_count": 7,
+        "description": "Test & validate subcommands without args target default path",
+        "files_count": 3,
+        "group": "enhancement",
+        "insertions_count": 32,
+        "message": "enhancement(cli): Test & validate subcommands without args target default path (#1313)",
+        "pr_number": 1313,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "e776d3a404810935810983caf888aa86138b448b",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexey Suslov",
+        "breaking_change": false,
+        "date": "2019-12-05 17:51:10 +0000",
+        "deletions_count": 1,
+        "description": "Fix statsd binding to loopback only",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(statsd sink): Fix statsd binding to loopback only (#1316)",
+        "pr_number": 1316,
+        "scope": {
+          "category": "sink",
+          "component_name": "statsd",
+          "component_type": "sink",
+          "name": "statsd sink"
+        },
+        "sha": "58d6e976cf81f2175e7fd6cc6d4c85c9e2bc88eb",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-06 14:38:03 +0000",
+        "deletions_count": 5,
+        "description": "Fix multiple sources test",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 5,
+        "message": "chore(testing): Fix multiple sources test (#1322)",
+        "pr_number": 1322,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "324012b74c8879b1185ace3c5c36d9170222597e",
+        "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2019-12-06 15:54:01 +0000",
+        "deletions_count": 2,
+        "description": "Document `drop_field`",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 42,
+        "message": "docs(json_parser transform): Document `drop_field` (#1323)",
+        "pr_number": 1323,
+        "scope": {
+          "category": "transform",
+          "component_name": "json_parser",
+          "component_type": "transform",
+          "name": "json_parser transform"
+        },
+        "sha": "dc21766356a422e694287bff1b70fde8a49e74af",
+        "type": "docs"
+      },
+      {
+        "author": "Ben Johnson",
+        "breaking_change": false,
+        "date": "2019-12-07 10:53:05 +0000",
+        "deletions_count": 207,
+        "description": "Update to docusaurus 2.0.0-alpha.39",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 198,
+        "message": "chore(website): Update to docusaurus 2.0.0-alpha.39",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "8d15fdd267df44ac9f5079e7b6a5a2bc122b9e1f",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-09 13:11:56 +0000",
+        "deletions_count": 29,
+        "description": "Add \"default-{musl,msvc}\" features",
+        "files_count": 7,
+        "group": "chore",
+        "insertions_count": 93,
+        "message": "chore(operations): Add \"default-{musl,msvc}\" features (#1331)",
+        "pr_number": 1331,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "2c6982502c75409806da7d74a4cc019f2c60ed08",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-09 11:06:57 +0000",
+        "deletions_count": 1,
+        "description": "Fix validating environment title",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 1,
+        "message": "docs: Fix validating environment title",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "fb7f1f5743e464294c62d11e1be0d26e309f2061",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-09 15:35:33 +0000",
+        "deletions_count": 87,
+        "description": "Use LLVM-9 from the distribution repository",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 31,
+        "message": "chore(operations): Use LLVM-9 from the distribution repository (#1333)",
+        "pr_number": 1333,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "8cb9ec9406315d87c10f297da115ced93c2418f1",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2019-12-09 13:26:38 +0000",
+        "deletions_count": 44,
+        "description": "Initial `splunk_hec` source implementation",
+        "files_count": 7,
+        "group": "feat",
+        "insertions_count": 1142,
+        "message": "feat(new source): Initial `splunk_hec` source implementation",
+        "pr_number": null,
+        "scope": {
+          "category": "source",
+          "component_name": null,
+          "component_type": "source",
+          "name": "new source"
+        },
+        "sha": "a68c9781a12cd35f2ee1cd7686320d1bd6e52c05",
+        "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-09 17:00:16 +0000",
+        "deletions_count": 63,
+        "description": "Use LLVM from an archive instead of Git",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 33,
+        "message": "chore(operations): Use LLVM from an archive instead of Git (#1334)",
+        "pr_number": 1334,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "9c53a5dd65c4711c58a5afede4a23c048c4bed4d",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-09 10:57:26 +0000",
+        "deletions_count": 7,
+        "description": "Update `shiplift 0.6`",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 7,
+        "message": "chore(docker source): Update `shiplift 0.6` (#1335)",
+        "pr_number": 1335,
+        "scope": {
+          "category": "source",
+          "component_name": "docker",
+          "component_type": "source",
+          "name": "docker source"
+        },
+        "sha": "86abe53556fd7647717ddfecc21834f87adaa62b",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-09 16:04:27 +0000",
+        "deletions_count": 54,
+        "description": "Rewrite getting started guide.",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 76,
+        "message": "docs: Rewrite getting started guide. (#1332)",
+        "pr_number": 1332,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "4b93936dc588438a3023a6d86075ca75a33921f3",
+        "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-09 16:05:58 +0000",
+        "deletions_count": 18,
+        "description": "Update contribution guide for docs",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 53,
+        "message": "docs: Update contribution guide for docs",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5461ff419b9587264bbce823af227e1a3007a578",
+        "type": "docs"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-09 11:06:50 +0000",
+        "deletions_count": 0,
+        "description": "Add missing rate limited log",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(grok_parser transform): Add missing rate limited log (#1336)",
+        "pr_number": 1336,
+        "scope": {
+          "category": "transform",
+          "component_name": "grok_parser",
+          "component_type": "transform",
+          "name": "grok_parser transform"
+        },
+        "sha": "285b967ab228a94b4a140803cec38b71bb59ad14",
+        "type": "fix"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
-    "date": "2019-12-08",
-    "deletions_count": 6960,
-    "insertions_count": 15719,
+    "date": "2019-12-09",
+    "deletions_count": 9118,
+    "insertions_count": 21198,
     "last_version": "0.5.0",
     "posts": [
       {
@@ -3810,6 +5030,15 @@ module.exports = {
     ],
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
+    "upgrade_guides": [
+      {
+        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+        "commits": [
+
+        ],
+        "title": "The `file` and `console` now require `encoding`"
+      }
+    ],
     "version": "0.6.0"
   },
   "posts": [
@@ -10039,6 +11268,9 @@ module.exports = {
       ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
+      "upgrade_guides": [
+
+      ],
       "version": "0.4.0"
     },
     "0.5.0": {
@@ -11314,6 +12546,9 @@ module.exports = {
       ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
+      "upgrade_guides": [
+
+      ],
       "version": "0.5.0"
     },
     "0.6.0": {
@@ -14837,12 +16072,1232 @@ module.exports = {
           },
           "sha": "9c531ca1e734234e187d82b76912bf5dfa188742",
           "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-11-29 15:29:25 +0000",
+          "deletions_count": 0,
+          "description": "Add a unit test guide",
+          "files_count": 6,
+          "group": "docs",
+          "insertions_count": 253,
+          "message": "docs: Add a unit test guide (#1278)",
+          "pr_number": 1278,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "c815d27773da3acd0272ef009270f772a3103791",
+          "type": "docs"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-11-29 12:01:14 +0000",
+          "deletions_count": 23,
+          "description": "Add topology section",
+          "files_count": 6,
+          "group": "chore",
+          "insertions_count": 90,
+          "message": "chore(website): Add topology section",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "7b5a7f322bffdbd7638791e32effa848deb1fdea",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-11-29 13:59:31 +0000",
+          "deletions_count": 3,
+          "description": "Default to centralized topology",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 3,
+          "message": "chore(website): Default to centralized topology",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "ecdb56f5f49920353e5696e936f2d711d6881bbd",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-11-29 14:21:42 +0000",
+          "deletions_count": 13,
+          "description": "Fix rounded tabs",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 33,
+          "message": "chore(website): Fix rounded tabs",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "1dc6e303079bf6a9bb9802fe108e77edf0b0fd83",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 00:15:17 +0000",
+          "deletions_count": 1,
+          "description": "Increase CI output timeout",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 8,
+          "message": "chore(operations): Increase CI output timeout (#1272)",
+          "pr_number": 1272,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "4e98b8321cd334d780a5388bd848d83cb677003c",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 00:37:24 +0000",
+          "deletions_count": 24,
+          "description": "Delete unused OpenSSL patch",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 0,
+          "message": "chore(operations): Delete unused OpenSSL patch (#1282)",
+          "pr_number": 1282,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "7dd271e9102d2a2eb2016f8d735c8d9710966210",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-29 22:11:41 +0000",
+          "deletions_count": 1,
+          "description": "Run nightly builds at 12am UTC",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Run nightly builds at 12am UTC",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "32e5bfc2ff07ce0dddf817d5b64a2b04cc40f9ab",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 01:14:25 +0000",
+          "deletions_count": 5,
+          "description": "Set up redirects for x86_64-unknown-linux-gnu archives",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 23,
+          "message": "chore(operations): Set up redirects for x86_64-unknown-linux-gnu archives (#1284)",
+          "pr_number": 1284,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "62992492de9c21e8a59464696b2ba226c50b82f0",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 01:42:23 +0000",
+          "deletions_count": 122,
+          "description": "Build multi-arch Docker images",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 151,
+          "message": "chore(operations): Build multi-arch Docker images (#1279)",
+          "pr_number": 1279,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "5fa10916882cd07ee6c6726be10227b321f5880c",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 02:06:35 +0000",
+          "deletions_count": 11,
+          "description": "Use `sidebar_label` as subpage title if possible",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 17,
+          "message": "chore(website): Use `sidebar_label` as subpage title if possible (#1283)",
+          "pr_number": 1283,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "5c6942f8e52971ec3eb95750d2a79574cb0c12bd",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 02:06:47 +0000",
+          "deletions_count": 8,
+          "description": "Simplify platform names in \"downloads\" section",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 8,
+          "message": "chore(website): Simplify platform names in \"downloads\" section (#1285)",
+          "pr_number": 1285,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "4058ef356271a8276ddd6b1f41933d25ddd585a6",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 10:13:42 +0000",
+          "deletions_count": 2,
+          "description": "Run nightly builds at 11am UTC",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 2,
+          "message": "chore(operations): Run nightly builds at 11am UTC",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "42c2a1f75e639ff29da5419cff29848fa3163d01",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 13:15:43 +0000",
+          "deletions_count": 2,
+          "description": "Remove extra `setup_remote_docker` step from `relase-docker`",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 0,
+          "message": "fix(operations): Remove extra `setup_remote_docker` step from `relase-docker` (#1287)",
+          "pr_number": 1287,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "8f271aee3b9873b10a68ab5c747c4e895347acca",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 13:15:56 +0000",
+          "deletions_count": 1,
+          "description": "Fix S3 release verification",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(operations): Fix S3 release verification (#1286)",
+          "pr_number": 1286,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "643716654c9049e18c057d9e88de4e78f566d983",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-11-30 18:26:36 +0000",
+          "deletions_count": 22,
+          "description": "Upgrade Docker on the step in which it is used",
+          "files_count": 3,
+          "group": "fix",
+          "insertions_count": 22,
+          "message": "fix(operations): Upgrade Docker on the step in which it is used (#1288)",
+          "pr_number": 1288,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "08a297961a767d798ebb244a10baf05b318272e7",
+          "type": "fix"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2019-11-30 16:14:02 +0000",
+          "deletions_count": 618,
+          "description": "Cleanup installation docs",
+          "files_count": 32,
+          "group": "docs",
+          "insertions_count": 783,
+          "message": "docs: Cleanup installation docs (#1289)",
+          "pr_number": 1289,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "70965d8e6d0c0d850faa86fb674987a107df9b93",
+          "type": "docs"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-01 11:21:05 +0000",
+          "deletions_count": 229,
+          "description": "Update to docaurus 2.0.0-alpha.37",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 242,
+          "message": "chore(website): Update to docaurus 2.0.0-alpha.37",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "469671dc457f867cee8bab247b6529026e7ae4ca",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-01 11:39:36 +0000",
+          "deletions_count": 10,
+          "description": "Group downloads by os",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 62,
+          "message": "chore(website): Group downloads by os",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "06a864b106bc2233c5d5a8ba78f045def8a937f6",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-01 13:15:28 +0000",
+          "deletions_count": 25,
+          "description": "Rename raspberry-pi to raspbian",
+          "files_count": 10,
+          "group": "docs",
+          "insertions_count": 44,
+          "message": "docs: Rename raspberry-pi to raspbian",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "8ee38009da9bcd41444e9cf2ed48683aa1870a1a",
+          "type": "docs"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-01 13:29:57 +0000",
+          "deletions_count": 1,
+          "description": "Fix responsive styling on homepage",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 9,
+          "message": "chore(website): Fix responsive styling on homepage",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "73dc9d55803733c460f42ce38e09b8c7c8344680",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-01 23:44:37 +0000",
+          "deletions_count": 5,
+          "description": "Fix accessing custom front-matter in docs",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 13,
+          "message": "chore(website): Fix accessing custom front-matter in docs",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "3fc6196a6b6e2df7c76e9d5924377a2054dcb5e2",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-02 09:58:25 +0000",
+          "deletions_count": 62,
+          "description": "Build RPM packages for ARM",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 220,
+          "message": "chore(operations): Build RPM packages for ARM (#1292)",
+          "pr_number": 1292,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "a6668b0c1db009b537c989ef95d8c4e616440cb9",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2019-12-02 08:27:53 +0000",
+          "deletions_count": 338,
+          "description": "Refactor the sinks' request_* configuration",
+          "files_count": 12,
+          "group": "enhancement",
+          "insertions_count": 321,
+          "message": "enhancement(config): Refactor the sinks' request_* configuration (#1187)",
+          "pr_number": 1187,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "config"
+          },
+          "sha": "62f9db5ba46a0824ed0e979743bc8aaec8e05010",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-02 19:23:02 +0000",
+          "deletions_count": 2,
+          "description": "Fix Raspbian id capitalization",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Fix Raspbian id capitalization (#1295)",
+          "pr_number": 1295,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "cbac5010444357dae078b299991304ca8055889c",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-02 22:44:56 +0000",
+          "deletions_count": 0,
+          "description": "Run `package-rpm*` jobs explicitly",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 3,
+          "message": "fix(operations): Run `package-rpm*` jobs explicitly (#1298)",
+          "pr_number": 1298,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "a0eec9935a8a2d0409e23c6cb23cba807b16a7df",
+          "type": "fix"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-03 11:28:27 +0000",
+          "deletions_count": 16,
+          "description": "Fix section links",
+          "files_count": 9,
+          "group": "docs",
+          "insertions_count": 24,
+          "message": "docs: Fix section links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5ae3036f0a0de24aeeb92135621c877428bcfa02",
+          "type": "docs"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-02 11:36:52 +0000",
+          "deletions_count": 1,
+          "description": "Fix browse downloads link",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(website): Fix browse downloads link",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "1f52116c3c40dcc439bd8f32c9cdf2a0a3b197d7",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 12:29:30 +0000",
+          "deletions_count": 11,
+          "description": "Add slugify method to mimic Docusaurus hashing logic for links",
+          "files_count": 7,
+          "group": "chore",
+          "insertions_count": 23,
+          "message": "chore(website): Add slugify method to mimic Docusaurus hashing logic for links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "bd865b06bc2ff68edb3a131a574572b88fcc8b87",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 12:33:09 +0000",
+          "deletions_count": 20,
+          "description": "Fix buffers and batches hash link",
+          "files_count": 10,
+          "group": "chore",
+          "insertions_count": 20,
+          "message": "chore(website): Fix buffers and batches hash link",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "9d38c48a10b9d3deb8d35b6e97002cab4a03b885",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 13:30:43 +0000",
+          "deletions_count": 2,
+          "description": "Use the Rust regex tester, closes #634",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Use the Rust regex tester, closes #634",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "0c0f07265ad4020d68116c14113d917499ca862f",
+          "type": "docs"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 13:35:39 +0000",
+          "deletions_count": 16,
+          "description": "Fix example regex",
+          "files_count": 6,
+          "group": "chore",
+          "insertions_count": 16,
+          "message": "chore(website): Fix example regex",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "d962fa60fd1e71cd2c9c02fc4e1ead2fd0a5086c",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-03 15:55:03 +0000",
+          "deletions_count": 35,
+          "description": "Pass `TaskExecutor` to transform",
+          "files_count": 25,
+          "group": "chore",
+          "insertions_count": 67,
+          "message": "chore(topology): Pass `TaskExecutor` to transform (#1144)",
+          "pr_number": 1144,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "topology"
+          },
+          "sha": "17a27b315b4e65f687adb0d64d2b6c5cf8890a95",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2019-12-03 17:28:50 +0000",
+          "deletions_count": 223,
+          "description": "Add community page with mailing list",
+          "files_count": 13,
+          "group": "chore",
+          "insertions_count": 271,
+          "message": "chore(website): Add community page with mailing list (#1309)",
+          "pr_number": 1309,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "cf95723d77ba4bd3fa819dd45fa7676bd1a7d19d",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 17:45:00 +0000",
+          "deletions_count": 2,
+          "description": "Responsive styling for community page",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 14,
+          "message": "chore(wensite): Responsive styling for community page",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "wensite"
+          },
+          "sha": "c912f16f1cbd924db1e800498dbfb240e9211212",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 18:04:41 +0000",
+          "deletions_count": 5,
+          "description": "Fix slide out main nav menu link labels",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 7,
+          "message": "chore(website): Fix slide out main nav menu link labels",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "4c1718431e887c9a9f58392428cde6c2a33e5070",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 18:53:47 +0000",
+          "deletions_count": 14,
+          "description": "Re-add components list",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 207,
+          "message": "chore(website): Re-add components list",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "14ebf42842d90f937df7efa88f7acea1bb1859e8",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 21:44:27 +0000",
+          "deletions_count": 29,
+          "description": "Use ${ENV_VAR} syntax in relavant examples",
+          "files_count": 9,
+          "group": "docs",
+          "insertions_count": 33,
+          "message": "docs: Use ${ENV_VAR} syntax in relavant examples",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "6e60b2fab0de568ef47c5afdd606a60c3069531d",
+          "type": "docs"
+        },
+        {
+          "author": "Alexey Suslov",
+          "breaking_change": false,
+          "date": "2019-12-04 12:21:43 +0000",
+          "deletions_count": 9,
+          "description": "Performance optimisations in metric buffer",
+          "files_count": 2,
+          "group": "perf",
+          "insertions_count": 165,
+          "message": "perf(metric data model): Performance optimisations in metric buffer (#1290)",
+          "pr_number": 1290,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "metric data model"
+          },
+          "sha": "fcf6356f11ac7d80a5c378aeceabd6cf72168ef1",
+          "type": "perf"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-03 23:24:55 +0000",
+          "deletions_count": 5,
+          "description": "Fix nav width",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 10,
+          "message": "chore(website): Fix nav width",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "690d798e8cc4d08457b5ad3dd3fcee4da7fea4b3",
+          "type": "chore"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-04 10:56:01 +0000",
+          "deletions_count": 6,
+          "description": "Update README with new links",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 8,
+          "message": "docs: Update README with new links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "53d2a9ca0ff85c8d39cf9b312265c859f079c170",
+          "type": "docs"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-04 13:23:44 +0000",
+          "deletions_count": 113,
+          "description": "Add `SinkContext` to `SinkConfig`",
+          "files_count": 23,
+          "group": "chore",
+          "insertions_count": 146,
+          "message": "chore(topology): Add `SinkContext` to `SinkConfig` (#1306)",
+          "pr_number": 1306,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "topology"
+          },
+          "sha": "00e21e83c54d2ca5e0b50b3b96a3390e761bf2dd",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-04 19:18:34 +0000",
+          "deletions_count": 9,
+          "description": "Initial `new_relic_logs` sink implementation",
+          "files_count": 13,
+          "group": "feat",
+          "insertions_count": 1166,
+          "message": "feat(new sink): Initial `new_relic_logs` sink implementation (#1303)",
+          "pr_number": 1303,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "52e4f176f62c305a6d0adcf6fa1f5b08bd2466dc",
+          "type": "feat"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-04 19:48:24 +0000",
+          "deletions_count": 11,
+          "description": "Fix NR build signature",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 12,
+          "message": "chore: Fix NR build signature",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "4c1d8ceaef63fc9f73e5e568773bf569f6c2f460",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-04 15:29:04 +0000",
+          "deletions_count": 182,
+          "description": "Add map to ServiceBuilder and s3",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 346,
+          "message": "chore: Add map to ServiceBuilder and s3 (#1189)",
+          "pr_number": 1189,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "772672e65920de3c0f13fa5b86c9c428b2d3fbfb",
+          "type": "chore"
+        },
+        {
+          "author": "Alexey Suslov",
+          "breaking_change": true,
+          "date": "2019-12-04 22:34:43 +0000",
+          "deletions_count": 3,
+          "description": "Rename `datadog` sink to `datadog_metrics`",
+          "files_count": 1,
+          "group": "breaking change",
+          "insertions_count": 3,
+          "message": "fix(datadog_metrics sink)!: Rename `datadog` sink to `datadog_metrics` (#1314)",
+          "pr_number": 1314,
+          "scope": {
+            "category": "sink",
+            "component_name": "datadog_metrics",
+            "component_type": "sink",
+            "name": "datadog_metrics sink"
+          },
+          "sha": "59fd318f227524a84a7520bbae004d2c75156365",
+          "type": "fix"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-04 15:39:15 +0000",
+          "deletions_count": 166,
+          "description": "Sync with new toggle changes",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 2,
+          "message": "chore(website): Sync with new toggle changes",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "e76083548a2d46664acd67a8e40f1835614d94c5",
+          "type": "chore"
+        },
+        {
+          "author": "Alexey Suslov",
+          "breaking_change": false,
+          "date": "2019-12-05 09:31:01 +0000",
+          "deletions_count": 0,
+          "description": "Send aggregated distributions to Datadog",
+          "files_count": 1,
+          "group": "enhancement",
+          "insertions_count": 231,
+          "message": "enhancement(datadog_metrics sink): Send aggregated distributions to Datadog (#1263)",
+          "pr_number": 1263,
+          "scope": {
+            "category": "sink",
+            "component_name": "datadog_metrics",
+            "component_type": "sink",
+            "name": "datadog_metrics sink"
+          },
+          "sha": "5822ee199bafbc2558491d5ba9682b8f10ed95d0",
+          "type": "enhancement"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-05 13:28:26 +0000",
+          "deletions_count": 7,
+          "description": "Test & validate subcommands without args target default path",
+          "files_count": 3,
+          "group": "enhancement",
+          "insertions_count": 32,
+          "message": "enhancement(cli): Test & validate subcommands without args target default path (#1313)",
+          "pr_number": 1313,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "e776d3a404810935810983caf888aa86138b448b",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexey Suslov",
+          "breaking_change": false,
+          "date": "2019-12-05 17:51:10 +0000",
+          "deletions_count": 1,
+          "description": "Fix statsd binding to loopback only",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(statsd sink): Fix statsd binding to loopback only (#1316)",
+          "pr_number": 1316,
+          "scope": {
+            "category": "sink",
+            "component_name": "statsd",
+            "component_type": "sink",
+            "name": "statsd sink"
+          },
+          "sha": "58d6e976cf81f2175e7fd6cc6d4c85c9e2bc88eb",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-06 14:38:03 +0000",
+          "deletions_count": 5,
+          "description": "Fix multiple sources test",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 5,
+          "message": "chore(testing): Fix multiple sources test (#1322)",
+          "pr_number": 1322,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "324012b74c8879b1185ace3c5c36d9170222597e",
+          "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2019-12-06 15:54:01 +0000",
+          "deletions_count": 2,
+          "description": "Document `drop_field`",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 42,
+          "message": "docs(json_parser transform): Document `drop_field` (#1323)",
+          "pr_number": 1323,
+          "scope": {
+            "category": "transform",
+            "component_name": "json_parser",
+            "component_type": "transform",
+            "name": "json_parser transform"
+          },
+          "sha": "dc21766356a422e694287bff1b70fde8a49e74af",
+          "type": "docs"
+        },
+        {
+          "author": "Ben Johnson",
+          "breaking_change": false,
+          "date": "2019-12-07 10:53:05 +0000",
+          "deletions_count": 207,
+          "description": "Update to docusaurus 2.0.0-alpha.39",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 198,
+          "message": "chore(website): Update to docusaurus 2.0.0-alpha.39",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "8d15fdd267df44ac9f5079e7b6a5a2bc122b9e1f",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-09 13:11:56 +0000",
+          "deletions_count": 29,
+          "description": "Add \"default-{musl,msvc}\" features",
+          "files_count": 7,
+          "group": "chore",
+          "insertions_count": 93,
+          "message": "chore(operations): Add \"default-{musl,msvc}\" features (#1331)",
+          "pr_number": 1331,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "2c6982502c75409806da7d74a4cc019f2c60ed08",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-09 11:06:57 +0000",
+          "deletions_count": 1,
+          "description": "Fix validating environment title",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 1,
+          "message": "docs: Fix validating environment title",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "fb7f1f5743e464294c62d11e1be0d26e309f2061",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-09 15:35:33 +0000",
+          "deletions_count": 87,
+          "description": "Use LLVM-9 from the distribution repository",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 31,
+          "message": "chore(operations): Use LLVM-9 from the distribution repository (#1333)",
+          "pr_number": 1333,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "8cb9ec9406315d87c10f297da115ced93c2418f1",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2019-12-09 13:26:38 +0000",
+          "deletions_count": 44,
+          "description": "Initial `splunk_hec` source implementation",
+          "files_count": 7,
+          "group": "feat",
+          "insertions_count": 1142,
+          "message": "feat(new source): Initial `splunk_hec` source implementation",
+          "pr_number": null,
+          "scope": {
+            "category": "source",
+            "component_name": null,
+            "component_type": "source",
+            "name": "new source"
+          },
+          "sha": "a68c9781a12cd35f2ee1cd7686320d1bd6e52c05",
+          "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-09 17:00:16 +0000",
+          "deletions_count": 63,
+          "description": "Use LLVM from an archive instead of Git",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 33,
+          "message": "chore(operations): Use LLVM from an archive instead of Git (#1334)",
+          "pr_number": 1334,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "9c53a5dd65c4711c58a5afede4a23c048c4bed4d",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-09 10:57:26 +0000",
+          "deletions_count": 7,
+          "description": "Update `shiplift 0.6`",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 7,
+          "message": "chore(docker source): Update `shiplift 0.6` (#1335)",
+          "pr_number": 1335,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "86abe53556fd7647717ddfecc21834f87adaa62b",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-09 16:04:27 +0000",
+          "deletions_count": 54,
+          "description": "Rewrite getting started guide.",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 76,
+          "message": "docs: Rewrite getting started guide. (#1332)",
+          "pr_number": 1332,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "4b93936dc588438a3023a6d86075ca75a33921f3",
+          "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-09 16:05:58 +0000",
+          "deletions_count": 18,
+          "description": "Update contribution guide for docs",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 53,
+          "message": "docs: Update contribution guide for docs",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5461ff419b9587264bbce823af227e1a3007a578",
+          "type": "docs"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-09 11:06:50 +0000",
+          "deletions_count": 0,
+          "description": "Add missing rate limited log",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(grok_parser transform): Add missing rate limited log (#1336)",
+          "pr_number": 1336,
+          "scope": {
+            "category": "transform",
+            "component_name": "grok_parser",
+            "component_type": "transform",
+            "name": "grok_parser transform"
+          },
+          "sha": "285b967ab228a94b4a140803cec38b71bb59ad14",
+          "type": "fix"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
-      "date": "2019-12-08",
-      "deletions_count": 6960,
-      "insertions_count": 15719,
+      "date": "2019-12-09",
+      "deletions_count": 9118,
+      "insertions_count": 21198,
       "last_version": "0.5.0",
       "posts": [
         {
@@ -14887,6 +17342,15 @@ module.exports = {
       ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
+      "upgrade_guides": [
+        {
+          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+          "commits": [
+
+          ],
+          "title": "The `file` and `console` now require `encoding`"
+        }
+      ],
       "version": "0.6.0"
     }
   },
@@ -15378,6 +17842,28 @@ module.exports = {
 
       ]
     },
+    "splunk_hec": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "splunk_hec_source",
+      "name": "splunk_hec",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "statsd": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -15515,34 +18001,42 @@ module.exports = {
   "team": [
     {
       "avatar": "https://github.com/a-rodin.png",
+      "id": "alex",
       "name": "Alex"
     },
     {
       "avatar": "https://github.com/loony-bean.png",
+      "id": "alexey",
       "name": "Alexey"
     },
     {
       "avatar": "https://github.com/Jeffail.png",
+      "id": "ash",
       "name": "Ash"
     },
     {
       "avatar": "https://github.com/binarylogic.png",
+      "id": "ben",
       "name": "Ben"
     },
     {
       "avatar": "https://github.com/bruceg.png",
+      "id": "bruce",
       "name": "Bruce"
     },
     {
       "avatar": "https://github.com/ktff.png",
+      "id": "kruno",
       "name": "Kruno"
     },
     {
       "avatar": "https://github.com/LucioFranco.png",
+      "id": "lucio",
       "name": "Lucio"
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
+      "id": "luke",
       "name": "Luke"
     }
   ],

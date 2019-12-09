@@ -48,6 +48,7 @@ scopes:
   - file source
   - journald source
   - kafka source
+  - splunk_hec source
   - statsd source
   - stdin source
   - syslog source

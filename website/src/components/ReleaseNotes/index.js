@@ -1,10 +1,14 @@
 import React, { useEffect } from 'react';
 
 import Alert from '@site/src/components/Alert';
+import Avatar from '@site/src/components/Avatar';
 import Changelog from '@site/src/components/Changelog';
 import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
+import MailingListForm from '@site/src/components/MailingListForm';
+import MDX from '@mdx-js/runtime';
+import MDXComponents from '@theme/MDXComponents';
 
 import classnames from 'classnames';
 import {commitTypeName, sortCommitTypes} from '@site/src/exports/commits';
@@ -50,10 +54,19 @@ function Highlight({post}) {
     <div className="section">
       <span className="badge badge--secondary" style={{float: "right"}}>config</span>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
-      <div className="sub__title"><small>By <Link to="/community#team">{post.author}</Link> on {dateFormat(date, "mmmm dS, yyyy")}</small></div>
+      <Avatar id={post.author.toLowerCase()} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
       <p>
         {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full post</Link>
       </p>
+    </div>
+  );
+}
+
+function UpgradeGuide({upgradeGuide, key}) {
+  return (
+    <div className="section">
+      <AnchoredH3 id={`upgrade-guide-${key}`}>{upgradeGuide.title}</AnchoredH3>
+      <MDX components={MDXComponents} scope={{}}>{upgradeGuide.body}</MDX>
     </div>
   );
 }
@@ -63,6 +76,17 @@ function Notes({release, latest}) {
   const posts = release.posts;
   posts.reverse();
 
+  let releaseTypeClass = 'primary';
+
+  switch(release.type) {
+    case 'initial dev':
+      releaseTypeClass = 'warning';
+      break;
+    case 'major':
+      releaseTypeClass = 'warning';
+      break;
+  }
+
   return (
     <article className={styles.content}>
       <header className={styles.header}>
@@ -70,16 +94,18 @@ function Notes({release, latest}) {
           <div className={styles.componentsHeroOverlay}>
             <h1>Vector v{release.version} Release Notes</h1>
             <div className="hero__subtitle">
-              <div>Released on <time>{dateFormat(date, "mmmm dS, yyyy")}</time> by <Link to="/community#team">Ben</Link></div>
+              <div className={styles.heroSubTitle}>
+                Released by <Avatar id="ben" inline={true} size="sm" /> on <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
+              </div>
               <div>
                 <small>
                   {latest ?
-                    <span className="badge badge--primary badge--rounded" title="This is the latest stable release"><i className="feather icon-check"></i> latest</span> :
+                    <span className="badge badge--primary badge--rounded" title="This is the latest (recommended) stable release"><i className="feather icon-check"></i> latest</span> :
                     <a href="/releases/latest" className="badge badge--warning badge--rounded" title="This release is outdated, newer releases are available"><i className="feather icon-alert-triangle"></i> outdated</a>}
                   &nbsp;&nbsp;
-                  <a href={release.type_url} target="_blank" className="badge badge--primary badge--rounded" title="Semantic increment type"><i className="feather icon-chevrons-up"></i> {release.type}</a>
+                  <a href={release.type_url} target="_blank" className={classnames('badge', `badge--${releaseTypeClass}`, 'badge--rounded')} title={`This is a ${release.type} release as defined by the semantic versioning spec`}><i className="feather icon-chevrons-up"></i> {release.type}</a>
                   &nbsp;&nbsp;
-                  <a href={release.compare_url} target="_blank" className="badge badge--primary badge--rounded" title="diff/compare">+{release.insertions_count}, -{release.deletions_count}</a>
+                  <a href={release.compare_url} target="_blank" className="badge badge--primary badge--rounded" title={`View the diff since ${release.last_version}`}>+{release.insertions_count}, -{release.deletions_count}</a>
                 </small>
               </div>
             </div>
@@ -88,6 +114,9 @@ function Notes({release, latest}) {
           </div>
         </div>
       </header>
+      <section className="shade" style={{textAlign: 'center'}}>
+        <MailingListForm />
+      </section>
       <section className="markdown">
         <p>
           We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings X new features, 45 enhancements, 6 bug fixes, and 2 performance improvements. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
@@ -100,6 +129,18 @@ function Notes({release, latest}) {
             <div className="section-list">
               {posts.map((post, idx) => (
                 <Highlight post={post} key={idx} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {release.upgrade_guides.length > 0 && (
+          <>
+            <AnchoredH2 id="breaking-changes" className="text--danger"><i className="feather icon-alert-triangle"></i> Breaking Changes</AnchoredH2>
+
+            <div className="section-list">
+              {release.upgrade_guides.map((upgradeGuide, idx) => (
+                <UpgradeGuide upgradeGuide={upgradeGuide} key={idx} />
               ))}
             </div>
           </>
@@ -136,16 +177,18 @@ function TableOfContents({release}) {
                 <a href="#highlights" className="contents__link">Highlights</a>
                 <ul>
                   {posts.map((post, idx) =>
-                    <li>
+                    <li key={idx}>
                       <a href={`#${post.id}`} className="contents__link">{post.title}</a>
                     </li>
                   )}
                 </ul>
               </li>
             )}
-            <li>
-              <a href="#breaking-changes" className="contents__link">Breaking Changes</a>
-            </li>
+            {release.upgrade_guides.length > 0 && (
+              <li>
+                <a href="#breaking-changes" className="contents__link text--danger"><i className="feather icon-alert-triangle"></i> Breaking Changes</a>
+              </li>
+            )}
             <li>
               <a href="#" className="contents__link">Changelog</a>
               <ul>

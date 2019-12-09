@@ -1,5 +1,5 @@
 [releases."0.6.0"]
-date = 2019-12-08
+date = 2019-12-09
 commits = [
 {sha = "15b44d04a06c91d5e0d1017b251c32ac165f2bd6", message = "chore(operations): Push docker images so that `latest` tags are last", author = "Ben Johnson", date = 2019-10-10T15:01:52Z, files_count = 1, insertions_count = 1, deletions_count = 1},
 {sha = "4bc7696077e691f59811e8b1e078f1b029fe63a6", message = "chore(operations): Print grease command output", author = "Ben Johnson", date = 2019-10-10T15:19:21Z, files_count = 1, insertions_count = 1, deletions_count = 1},
@@ -176,10 +176,86 @@ commits = [
 {sha = "ae90038afb5d89eb080bd7c760ce3a4f1c67f219", message = "docs: Fix example categories", author = "Ben Johnson", date = 2019-11-27T19:52:42Z, files_count = 24, insertions_count = 53, deletions_count = 70},
 {sha = "b3554b16fa333727e21c8eaae87df4533e217c96", message = "chore(operations): Build .deb packages for all musl targets (#1247)", author = "Alexander Rodin", date = 2019-11-28T10:32:52Z, files_count = 17, insertions_count = 500, deletions_count = 274},
 {sha = "10de21ba24814324547d53553ed098742279f935", message = "docs: Typo (#1273)", author = "Dan Palmer", date = 2019-11-28T15:43:22Z, files_count = 1, insertions_count = 1, deletions_count = 1},
-{sha = "9c531ca1e734234e187d82b76912bf5dfa188742", message = "docs: Remove console.log", author = "Ben Johnson", date = 2019-11-28T10:51:03Z, files_count = 1, deletions_count = 1}
+{sha = "9c531ca1e734234e187d82b76912bf5dfa188742", message = "docs: Remove console.log", author = "Ben Johnson", date = 2019-11-28T10:51:03Z, files_count = 1, deletions_count = 1},
+{sha = "c815d27773da3acd0272ef009270f772a3103791", message = "docs: Add a unit test guide (#1278)", author = "Ashley Jeffs", date = 2019-11-29T15:29:25Z, files_count = 6, insertions_count = 253},
+{sha = "7b5a7f322bffdbd7638791e32effa848deb1fdea", message = "chore(website): Add topology section", author = "Ben Johnson", date = 2019-11-29T12:01:14Z, files_count = 6, insertions_count = 90, deletions_count = 23},
+{sha = "ecdb56f5f49920353e5696e936f2d711d6881bbd", message = "chore(website): Default to centralized topology", author = "Ben Johnson", date = 2019-11-29T13:59:31Z, files_count = 2, insertions_count = 3, deletions_count = 3},
+{sha = "1dc6e303079bf6a9bb9802fe108e77edf0b0fd83", message = "chore(website): Fix rounded tabs", author = "Ben Johnson", date = 2019-11-29T14:21:42Z, files_count = 4, insertions_count = 33, deletions_count = 13},
+{sha = "4e98b8321cd334d780a5388bd848d83cb677003c", message = "chore(operations): Increase CI output timeout (#1272)", author = "Alexander Rodin", date = 2019-11-30T00:15:17Z, files_count = 1, insertions_count = 8, deletions_count = 1},
+{sha = "7dd271e9102d2a2eb2016f8d735c8d9710966210", message = "chore(operations): Delete unused OpenSSL patch (#1282)", author = "Alexander Rodin", date = 2019-11-30T00:37:24Z, files_count = 1, deletions_count = 24},
+{sha = "32e5bfc2ff07ce0dddf817d5b64a2b04cc40f9ab", message = "chore(operations): Run nightly builds at 12am UTC", author = "Alexander Rodin", date = 2019-11-29T22:11:41Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "62992492de9c21e8a59464696b2ba226c50b82f0", message = "chore(operations): Set up redirects for x86_64-unknown-linux-gnu archives (#1284)", author = "Alexander Rodin", date = 2019-11-30T01:14:25Z, files_count = 1, insertions_count = 23, deletions_count = 5},
+{sha = "5fa10916882cd07ee6c6726be10227b321f5880c", message = "chore(operations): Build multi-arch Docker images (#1279)", author = "Alexander Rodin", date = 2019-11-30T01:42:23Z, files_count = 9, insertions_count = 151, deletions_count = 122},
+{sha = "5c6942f8e52971ec3eb95750d2a79574cb0c12bd", message = "chore(website): Use `sidebar_label` as subpage title if possible (#1283)", author = "Alexander Rodin", date = 2019-11-30T02:06:35Z, files_count = 5, insertions_count = 17, deletions_count = 11},
+{sha = "4058ef356271a8276ddd6b1f41933d25ddd585a6", message = "chore(website): Simplify platform names in \"downloads\" section (#1285)", author = "Alexander Rodin", date = 2019-11-30T02:06:47Z, files_count = 2, insertions_count = 8, deletions_count = 8},
+{sha = "42c2a1f75e639ff29da5419cff29848fa3163d01", message = "chore(operations): Run nightly builds at 11am UTC", author = "Alexander Rodin", date = 2019-11-30T10:13:42Z, files_count = 1, insertions_count = 2, deletions_count = 2},
+{sha = "8f271aee3b9873b10a68ab5c747c4e895347acca", message = "fix(operations): Remove extra `setup_remote_docker` step from `relase-docker` (#1287)", author = "Alexander Rodin", date = 2019-11-30T13:15:43Z, files_count = 1, deletions_count = 2},
+{sha = "643716654c9049e18c057d9e88de4e78f566d983", message = "fix(operations): Fix S3 release verification (#1286)", author = "Alexander Rodin", date = 2019-11-30T13:15:56Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "08a297961a767d798ebb244a10baf05b318272e7", message = "fix(operations): Upgrade Docker on the step in which it is used (#1288)", author = "Alexander Rodin", date = 2019-11-30T18:26:36Z, files_count = 3, insertions_count = 22, deletions_count = 22},
+{sha = "70965d8e6d0c0d850faa86fb674987a107df9b93", message = "docs: Cleanup installation docs (#1289)", author = "Binary Logic", date = 2019-11-30T16:14:02Z, files_count = 32, insertions_count = 783, deletions_count = 618},
+{sha = "469671dc457f867cee8bab247b6529026e7ae4ca", message = "chore(website): Update to docaurus 2.0.0-alpha.37", author = "Ben Johnson", date = 2019-12-01T11:21:05Z, files_count = 3, insertions_count = 242, deletions_count = 229},
+{sha = "06a864b106bc2233c5d5a8ba78f045def8a937f6", message = "chore(website): Group downloads by os", author = "Ben Johnson", date = 2019-12-01T11:39:36Z, files_count = 8, insertions_count = 62, deletions_count = 10},
+{sha = "8ee38009da9bcd41444e9cf2ed48683aa1870a1a", message = "docs: Rename raspberry-pi to raspbian", author = "Ben Johnson", date = 2019-12-01T13:15:28Z, files_count = 10, insertions_count = 44, deletions_count = 25},
+{sha = "73dc9d55803733c460f42ce38e09b8c7c8344680", message = "chore(website): Fix responsive styling on homepage", author = "Ben Johnson", date = 2019-12-01T13:29:57Z, files_count = 3, insertions_count = 9, deletions_count = 1},
+{sha = "3fc6196a6b6e2df7c76e9d5924377a2054dcb5e2", message = "chore(website): Fix accessing custom front-matter in docs", author = "Ben Johnson", date = 2019-12-01T23:44:37Z, files_count = 1, insertions_count = 13, deletions_count = 5},
+{sha = "a6668b0c1db009b537c989ef95d8c4e616440cb9", message = "chore(operations): Build RPM packages for ARM (#1292)", author = "Alexander Rodin", date = 2019-12-02T09:58:25Z, files_count = 5, insertions_count = 220, deletions_count = 62},
+{sha = "62f9db5ba46a0824ed0e979743bc8aaec8e05010", message = "enhancement(config): Refactor the sinks' request_* configuration (#1187)", author = "Bruce Guenter", date = 2019-12-02T08:27:53Z, files_count = 12, insertions_count = 321, deletions_count = 338},
+{sha = "cbac5010444357dae078b299991304ca8055889c", message = "docs: Fix Raspbian id capitalization (#1295)", author = "Alexander Rodin", date = 2019-12-02T19:23:02Z, files_count = 2, insertions_count = 2, deletions_count = 2},
+{sha = "a0eec9935a8a2d0409e23c6cb23cba807b16a7df", message = "fix(operations): Run `package-rpm*` jobs explicitly (#1298)", author = "Alexander Rodin", date = 2019-12-02T22:44:56Z, files_count = 1, insertions_count = 3},
+{sha = "5ae3036f0a0de24aeeb92135621c877428bcfa02", message = "docs: Fix section links", author = "Ashley Jeffs", date = 2019-12-03T11:28:27Z, files_count = 9, insertions_count = 24, deletions_count = 16},
+{sha = "1f52116c3c40dcc439bd8f32c9cdf2a0a3b197d7", message = "chore(website): Fix browse downloads link", author = "Ben Johnson", date = 2019-12-02T11:36:52Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "bd865b06bc2ff68edb3a131a574572b88fcc8b87", message = "chore(website): Add slugify method to mimic Docusaurus hashing logic for links", author = "Ben Johnson", date = 2019-12-03T12:29:30Z, files_count = 7, insertions_count = 23, deletions_count = 11},
+{sha = "9d38c48a10b9d3deb8d35b6e97002cab4a03b885", message = "chore(website): Fix buffers and batches hash link", author = "Ben Johnson", date = 2019-12-03T12:33:09Z, files_count = 10, insertions_count = 20, deletions_count = 20},
+{sha = "0c0f07265ad4020d68116c14113d917499ca862f", message = "docs: Use the Rust regex tester, closes #634", author = "Ben Johnson", date = 2019-12-03T13:30:43Z, files_count = 2, insertions_count = 2, deletions_count = 2},
+{sha = "d962fa60fd1e71cd2c9c02fc4e1ead2fd0a5086c", message = "chore(website): Fix example regex", author = "Ben Johnson", date = 2019-12-03T13:35:39Z, files_count = 6, insertions_count = 16, deletions_count = 16},
+{sha = "17a27b315b4e65f687adb0d64d2b6c5cf8890a95", message = "chore(topology): Pass `TaskExecutor` to transform (#1144)", author = "Lucio Franco", date = 2019-12-03T15:55:03Z, files_count = 25, insertions_count = 67, deletions_count = 35},
+{sha = "cf95723d77ba4bd3fa819dd45fa7676bd1a7d19d", message = "chore(website): Add community page with mailing list (#1309)", author = "Binary Logic", date = 2019-12-03T17:28:50Z, files_count = 13, insertions_count = 271, deletions_count = 223},
+{sha = "c912f16f1cbd924db1e800498dbfb240e9211212", message = "chore(wensite): Responsive styling for community page", author = "Ben Johnson", date = 2019-12-03T17:45:00Z, files_count = 1, insertions_count = 14, deletions_count = 2},
+{sha = "4c1718431e887c9a9f58392428cde6c2a33e5070", message = "chore(website): Fix slide out main nav menu link labels", author = "Ben Johnson", date = 2019-12-03T18:04:41Z, files_count = 1, insertions_count = 7, deletions_count = 5},
+{sha = "14ebf42842d90f937df7efa88f7acea1bb1859e8", message = "chore(website): Re-add components list", author = "Ben Johnson", date = 2019-12-03T18:53:47Z, files_count = 5, insertions_count = 207, deletions_count = 14},
+{sha = "6e60b2fab0de568ef47c5afdd606a60c3069531d", message = "docs: Use ${ENV_VAR} syntax in relavant examples", author = "Ben Johnson", date = 2019-12-03T21:44:27Z, files_count = 9, insertions_count = 33, deletions_count = 29},
+{sha = "fcf6356f11ac7d80a5c378aeceabd6cf72168ef1", message = "perf(metric data model): Performance optimisations in metric buffer (#1290)", author = "Alexey Suslov", date = 2019-12-04T12:21:43Z, files_count = 2, insertions_count = 165, deletions_count = 9},
+{sha = "690d798e8cc4d08457b5ad3dd3fcee4da7fea4b3", message = "chore(website): Fix nav width", author = "Ben Johnson", date = 2019-12-03T23:24:55Z, files_count = 3, insertions_count = 10, deletions_count = 5},
+{sha = "53d2a9ca0ff85c8d39cf9b312265c859f079c170", message = "docs: Update README with new links", author = "Ben Johnson", date = 2019-12-04T10:56:01Z, files_count = 3, insertions_count = 8, deletions_count = 6},
+{sha = "00e21e83c54d2ca5e0b50b3b96a3390e761bf2dd", message = "chore(topology): Add `SinkContext` to `SinkConfig` (#1306)", author = "Lucio Franco", date = 2019-12-04T13:23:44Z, files_count = 23, insertions_count = 146, deletions_count = 113},
+{sha = "52e4f176f62c305a6d0adcf6fa1f5b08bd2466dc", message = "feat(new sink): Initial `new_relic_logs` sink implementation (#1303)", author = "Ashley Jeffs", date = 2019-12-04T19:18:34Z, files_count = 13, insertions_count = 1166, deletions_count = 9},
+{sha = "4c1d8ceaef63fc9f73e5e568773bf569f6c2f460", message = "chore: Fix NR build signature", author = "Ashley Jeffs", date = 2019-12-04T19:48:24Z, files_count = 2, insertions_count = 12, deletions_count = 11},
+{sha = "772672e65920de3c0f13fa5b86c9c428b2d3fbfb", message = "chore: Add map to ServiceBuilder and s3 (#1189)", author = "Lucio Franco", date = 2019-12-04T15:29:04Z, files_count = 4, insertions_count = 346, deletions_count = 182},
+{sha = "59fd318f227524a84a7520bbae004d2c75156365", message = "fix(datadog_metrics sink)!: Rename `datadog` sink to `datadog_metrics` (#1314)", author = "Alexey Suslov", date = 2019-12-04T22:34:43Z, files_count = 1, insertions_count = 3, deletions_count = 3},
+{sha = "e76083548a2d46664acd67a8e40f1835614d94c5", message = "chore(website): Sync with new toggle changes", author = "Ben Johnson", date = 2019-12-04T15:39:15Z, files_count = 2, insertions_count = 2, deletions_count = 166},
+{sha = "5822ee199bafbc2558491d5ba9682b8f10ed95d0", message = "enhancement(datadog_metrics sink): Send aggregated distributions to Datadog (#1263)", author = "Alexey Suslov", date = 2019-12-05T09:31:01Z, files_count = 1, insertions_count = 231},
+{sha = "e776d3a404810935810983caf888aa86138b448b", message = "enhancement(cli): Test & validate subcommands without args target default path (#1313)", author = "Ashley Jeffs", date = 2019-12-05T13:28:26Z, files_count = 3, insertions_count = 32, deletions_count = 7},
+{sha = "58d6e976cf81f2175e7fd6cc6d4c85c9e2bc88eb", message = "fix(statsd sink): Fix statsd binding to loopback only (#1316)", author = "Alexey Suslov", date = 2019-12-05T17:51:10Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "324012b74c8879b1185ace3c5c36d9170222597e", message = "chore(testing): Fix multiple sources test (#1322)", author = "Lucio Franco", date = 2019-12-06T14:38:03Z, files_count = 1, insertions_count = 5, deletions_count = 5},
+{sha = "dc21766356a422e694287bff1b70fde8a49e74af", message = "docs(json_parser transform): Document `drop_field` (#1323)", author = "Luke Steensen", date = 2019-12-06T15:54:01Z, files_count = 3, insertions_count = 42, deletions_count = 2},
+{sha = "8d15fdd267df44ac9f5079e7b6a5a2bc122b9e1f", message = "chore(website): Update to docusaurus 2.0.0-alpha.39", author = "Ben Johnson", date = 2019-12-07T10:53:05Z, files_count = 4, insertions_count = 198, deletions_count = 207},
+{sha = "2c6982502c75409806da7d74a4cc019f2c60ed08", message = "chore(operations): Add \"default-{musl,msvc}\" features (#1331)", author = "Alexander Rodin", date = 2019-12-09T13:11:56Z, files_count = 7, insertions_count = 93, deletions_count = 29},
+{sha = "fb7f1f5743e464294c62d11e1be0d26e309f2061", message = "docs: Fix validating environment title", author = "Ashley Jeffs", date = 2019-12-09T11:06:57Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "8cb9ec9406315d87c10f297da115ced93c2418f1", message = "chore(operations): Use LLVM-9 from the distribution repository (#1333)", author = "Alexander Rodin", date = 2019-12-09T15:35:33Z, files_count = 3, insertions_count = 31, deletions_count = 87},
+{sha = "a68c9781a12cd35f2ee1cd7686320d1bd6e52c05", message = "feat(new source): Initial `splunk_hec` source implementation", author = "Kruno Tomola Fabro", date = 2019-12-09T13:26:38Z, files_count = 7, insertions_count = 1142, deletions_count = 44},
+{sha = "9c53a5dd65c4711c58a5afede4a23c048c4bed4d", message = "chore(operations): Use LLVM from an archive instead of Git (#1334)", author = "Alexander Rodin", date = 2019-12-09T17:00:16Z, files_count = 3, insertions_count = 33, deletions_count = 63},
+{sha = "86abe53556fd7647717ddfecc21834f87adaa62b", message = "chore(docker source): Update `shiplift 0.6` (#1335)", author = "Lucio Franco", date = 2019-12-09T10:57:26Z, files_count = 2, insertions_count = 7, deletions_count = 7},
+{sha = "4b93936dc588438a3023a6d86075ca75a33921f3", message = "docs: Rewrite getting started guide. (#1332)", author = "Ashley Jeffs", date = 2019-12-09T16:04:27Z, files_count = 1, insertions_count = 76, deletions_count = 54},
+{sha = "5461ff419b9587264bbce823af227e1a3007a578", message = "docs: Update contribution guide for docs", author = "Ashley Jeffs", date = 2019-12-09T16:05:58Z, files_count = 2, insertions_count = 53, deletions_count = 18},
+{sha = "285b967ab228a94b4a140803cec38b71bb59ad14", message = "fix(grok_parser transform): Add missing rate limited log (#1336)", author = "Lucio Franco", date = 2019-12-09T11:06:50Z, files_count = 1, insertions_count = 1}
 ]
-description = """\
-This release brings a lot of exciting improvement in our journey towards 1.0. \
-The main theme of this release was expanding our platform support. Vector can \
-now be installed on ARMv7 and ARM64 architectures. 
+
+[[releases."0.6.0".upgrade_guides]]
+commits = []
+title = "The `file` and `console` now require `encoding`"
+body = """\
+The `file` and `console` sinks now require an explicit `encoding` option. The \
+previous implicit nature was confusing and this should eliminate any suprises \
+related to the output encoding format. Migration is easy:
+
+```diff
+ [sinks.my_console_sink]
+   type = "console"
++  encoding = "json" # or "text"
+
+
+ [sinks.my_file_sink]
+   type = "file"
++  encoding = "json" # or "text"
+```
 """
