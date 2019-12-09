@@ -15,7 +15,7 @@ title: "geoip transform"
      website/docs/reference/transforms/geoip.md.erb
 -->
 
-The `geoip` transform accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases.
+The `geoip` transform accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 ## Configuration
 
@@ -48,7 +48,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["/path/to/GeoLite2-City.mmdb","/path/to/GeoLite2-Country.mmdb"]}
+  examples={["/path/to/GeoLite2-City.mmdb"]}
   name={"database"}
   nullable={false}
   path={null}
@@ -61,7 +61,8 @@ import Field from '@site/src/components/Field';
 
 ### database
 
-Path to the MaxMind GeoIP2 or GeoLite2 binary database file (`.mmdb).
+Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City.mmdb`). Other databases, such as the the country database are not supported.
+
 
 
 </Field>

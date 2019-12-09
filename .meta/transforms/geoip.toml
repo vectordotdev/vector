@@ -1,5 +1,5 @@
 [transforms.geoip]
-allow_you_to_description = "enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases"
+allow_you_to_description = "enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases"
 common = false
 function_category = "enrich"
 guides = []
@@ -10,10 +10,12 @@ resources = []
 [transforms.geoip.options.database]
 type = "string"
 common = true
-examples = ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-Country.mmdb"]
+examples = ["/path/to/GeoLite2-City.mmdb"]
 null = false
 description = """\
-Path to the MaxMind GeoIP2 or GeoLite2 binary database file (`.mmdb).\
+Path to the MaxMind GeoIP2 or GeoLite2 binary city database file \
+(`GeoLite2-City.mmdb`). Other databases, such as the the country database \
+are not supported.
 """
 
 [transforms.geoip.options.source]

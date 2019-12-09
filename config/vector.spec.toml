@@ -760,7 +760,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   value = "/var/log/nginx.log"
 
-# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases.
+# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `geoip`.
@@ -776,12 +776,13 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Path to the MaxMind GeoIP2 or GeoLite2 binary database file (`.mmdb).
+  # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
+  # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
+  # not supported.
   # 
   # * required
   # * type: string
   database = "/path/to/GeoLite2-City.mmdb"
-  database = "/path/to/GeoLite2-Country.mmdb"
 
   # The field name that contains the IP address. This field should contain a
   # valid IPv4 or IPv6 address.

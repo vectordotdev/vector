@@ -15568,7 +15568,7 @@ module.exports = {
     "geoip": {
       "beta": false,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 databases.",
+      "description": "Accepts log events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.",
       "event_types": [
         "log"
       ],
