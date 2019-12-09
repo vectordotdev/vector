@@ -1,6 +1,10 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{
+        self,
+        flatten::{flatten, insert},
+        Event,
+    },
     runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
@@ -110,14 +114,16 @@ impl Transform for JsonParser {
                         error!(message = "target field already exsists", %target_field);
                     } else {
                         for (name, value) in object {
-                            insert(&mut event, format!("{}.{}", target_field, name), value);
+                            insert(
+                                event.as_mut_log(),
+                                format!("{}.{}", target_field, name),
+                                value,
+                            );
                         }
                     }
                 }
                 None => {
-                    for (name, value) in object {
-                        insert(&mut event, name, value);
-                    }
+                    flatten(event.as_mut_log(), object);
                 }
             }
         } else if self.drop_invalid {
@@ -125,45 +131,6 @@ impl Transform for JsonParser {
         }
 
         Some(event)
-    }
-}
-
-fn insert(event: &mut Event, name: String, value: Value) {
-    match value {
-        Value::String(string) => {
-            event
-                .as_mut_log()
-                .insert_explicit(name.into(), string.into());
-        }
-        Value::Number(number) => {
-            let val = if let Some(val) = number.as_i64() {
-                ValueKind::from(val)
-            } else if let Some(val) = number.as_f64() {
-                ValueKind::from(val)
-            } else {
-                ValueKind::from(number.to_string())
-            };
-
-            event.as_mut_log().insert_explicit(name.into(), val);
-        }
-        Value::Bool(b) => {
-            event.as_mut_log().insert_explicit(name.into(), b.into());
-        }
-        Value::Null => {
-            event.as_mut_log().insert_explicit(name.into(), "".into());
-        }
-        Value::Array(array) => {
-            for (i, element) in array.into_iter().enumerate() {
-                let element_name = format!("{}[{}]", name, i);
-                insert(event, element_name, element);
-            }
-        }
-        Value::Object(object) => {
-            for (key, value) in object.into_iter() {
-                let item_name = format!("{}.{}", name, key);
-                insert(event, item_name, value);
-            }
-        }
     }
 }
 
