@@ -278,10 +278,23 @@ jobs:
 
             ./scripts/build-archive.sh
             ls -lha target/artifacts
+      - run:
+          name: Build MSI package
+          shell: bash
+          no_output_timeout: 30m
+          command: |
+            export PATH="/c/wix:$PATH"
+            cp -R distribution/msi target/msi-x64
+            cp target/artifacts/vector-x86_64-pc-windows-msvc.zip target/msi-x64
+            pushd target/msi-x64
+            ./build.sh
+            popd
+            cp target/msi-x64/vector.msi target/artifacts/vector-x64.msi
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-x86_64-pc-windows-msvc.zip"
+            - "vector-x64.msi"
 
   build-x86_64-unknown-linux-musl-archive-and-deb-package:
     <<: *docker-machine
