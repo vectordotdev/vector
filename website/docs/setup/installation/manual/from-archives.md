@@ -278,15 +278,15 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="latest">
 
-    ```powershell
-    Invoke-WebRequest https://packages.timber.io/vector/0.5.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```bat
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.5.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
-    ```powershell
-    Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```bat
+    powershell Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>
@@ -294,19 +294,19 @@ import TabItem from '@theme/TabItem';
 
 2.  Extract files from the archive:
 
-    ```powershell
-    Expand-Archive vector-x86_64-pc-windows-msvc.zip .
+    ```bat
+    powershell Expand-Archive vector-x86_64-pc-windows-msvc.zip .
     ```
 
-3.  Navigate to Vector directory:
+3.  Navigate to the Vector directory:
 
-    ```powershell
+    ```bat
     cd vector-x86_64-pc-windows-msvc
     ```
 4.  Start Vector:
 
-    ```powerhsell
-    bin\vector.exe --config config\vector.toml
+    ```bat
+    .\bin\vector --config config\vector.toml
     ```
 
 </TabItem>

@@ -70,6 +70,17 @@ module.exports = {
         "arch": "x86_64",
         "available_on_latest": true,
         "available_on_nightly": true,
+        "file_name": "vector-x64.msi",
+        "file_type": "msi",
+        "name": "Windows (x86_64, 7+)",
+        "os": "Windows",
+        "package_manager": "MSI",
+        "type": "package"
+      },
+      {
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-amd64.deb",
         "file_type": "deb",
         "name": "Deb (x86_64)",
@@ -205,6 +216,13 @@ module.exports = {
         ],
         "id": "rpm",
         "name": "RPM"
+      },
+      {
+        "archs": [
+          "x86_64"
+        ],
+        "id": "msi",
+        "name": "MSI"
       }
     ]
   },

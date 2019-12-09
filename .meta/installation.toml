@@ -68,6 +68,10 @@ id = "rpm"
 name = "RPM"
 archs = ["x86_64"]
 
+[[installation.package_managers]]
+id = "msi"
+name = "MSI"
+archs = ["x86_64"]
 
 [[installation.downloads]]
 available_on_latest = true
@@ -118,6 +122,17 @@ file_type = "zip"
 name = "Windows (x86_64, 7+)"
 os = "Windows"
 type = "archive"
+
+[[installation.downloads]]
+available_on_latest = true
+available_on_nightly = true
+arch = "x86_64"
+file_name = "vector-x64.msi"
+file_type = "msi"
+name = "Windows (x86_64, 7+)"
+os = "Windows"
+package_manager = "MSI"
+type = "package"
 
 [[installation.downloads]]
 available_on_latest = true
