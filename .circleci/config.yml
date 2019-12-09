@@ -264,14 +264,10 @@ jobs:
           no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            function zip() {
-              powershell Compress-Archive $3 $2
-            }
-            export -f zip
-
             export RUSTFLAGS=-Ctarget-feature=+crt-static
             export FEATURES="default-msvc"
             export ARCHIVE_TYPE="zip"
+            export OS_FAMILY="windows"
             export STRIP="false"
             export RUST_LTO=""
             export TARGET="x86_64-pc-windows-msvc"
@@ -284,12 +280,7 @@ jobs:
           no_output_timeout: 30m
           command: |
             export PATH="/c/wix:$PATH"
-            cp -R distribution/msi target/msi-x64
-            cp target/artifacts/vector-x86_64-pc-windows-msvc.zip target/msi-x64
-            pushd target/msi-x64
-            ./build.sh
-            popd
-            cp target/msi-x64/vector.msi target/artifacts/vector-x64.msi
+            ./scripts/package-msi.sh
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -511,7 +502,7 @@ jobs:
           command: |
             ./scripts/docker-run.sh verifier-wine bash -x \<<EOF
               unzip target/artifacts/*-x86_64-pc-windows-msvc.zip
-              wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+              wine ./bin/vector.exe --version
             EOF
 
   verify-docker:
