@@ -58,7 +58,7 @@ expanding the above checks with the following:
 To see other customization options for the `validate` subcommand run
 `vector validate --help`.
 
-## Validating Environment
+## Validating Environment
 
 Vector also provides a `--dry-run` option which prevents regular execution and
 instead validates a configuration file as well as the runtime environment:
