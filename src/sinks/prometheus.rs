@@ -5,6 +5,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
+use chrono::Utc;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::{
     header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
@@ -27,7 +28,7 @@ pub struct PrometheusSinkConfig {
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
     pub buckets: Vec<f64>,
-    #[serde(default = "default_flush_period")]
+    #[serde(default = "default_flush_period_sec")]
     pub flush_period_sec: u64,
 }
 
@@ -43,7 +44,7 @@ pub fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-pub fn default_flush_period() -> u64 {
+pub fn default_flush_period_sec() -> u64 {
     60
 }
 
@@ -73,6 +74,7 @@ struct PrometheusSink {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusSinkConfig,
     metrics: Arc<RwLock<HashSet<MetricEntry>>>,
+    last_flush_timestamp: Arc<RwLock<i64>>,
     acker: Acker,
 }
 
@@ -100,16 +102,16 @@ fn encode_tags(tags: &Option<HashMap<String, String>>) -> String {
 
 fn encode_tags_with_extra(
     tags: &Option<HashMap<String, String>>,
-    label: String,
+    tag: String,
     value: String,
 ) -> String {
     let mut parts: Vec<_> = if let Some(tags) = tags {
         tags.iter()
-            .chain(vec![(&label, &value)])
+            .chain(vec![(&tag, &value)])
             .map(|(name, value)| format!("{}=\"{}\"", name, value))
             .collect()
     } else {
-        vec![format!("{}=\"{}\"", label, value)]
+        vec![format!("{}=\"{}\"", tag, value)]
     };
 
     parts.sort();
@@ -120,6 +122,7 @@ fn handle(
     req: Request<Body>,
     namespace: &str,
     buckets: &[f64],
+    flushed: bool,
     metrics: &HashSet<MetricEntry>,
 ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let mut response = Response::new(Body::empty());
@@ -140,6 +143,7 @@ fn handle(
                     // todo: metric families
 
                     let ref value = match &metric.value {
+                        // convert ditributions into aggregated histograms
                         MetricValue::Distribution {
                             values,
                             sample_rates,
@@ -170,6 +174,10 @@ fn handle(
                                 sum,
                             }
                         }
+                        // sets could expire
+                        MetricValue::Set { .. } if flushed => MetricValue::Set {
+                            values: HashSet::new(),
+                        },
                         other => other.clone(),
                     };
 
@@ -280,6 +288,7 @@ impl PrometheusSink {
             server_shutdown_trigger: None,
             config,
             metrics: Arc::new(RwLock::new(HashSet::new())),
+            last_flush_timestamp: Arc::new(RwLock::new(Utc::now().timestamp())),
             acker,
         }
     }
@@ -292,19 +301,27 @@ impl PrometheusSink {
         let metrics = Arc::clone(&self.metrics);
         let namespace = self.config.namespace.clone();
         let buckets = self.config.buckets.clone();
+        let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
+        let flush_period_sec = self.config.flush_period_sec.clone();
+
         let new_service = move || {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
+            let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
+            let flush_period_sec = flush_period_sec.clone();
 
             service_fn(move |req| {
                 let metrics = metrics.read().unwrap();
+                let last_flush_timestamp = last_flush_timestamp.read().unwrap();
+                let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
+                let flushed = interval > flush_period_sec;
                 info_span!(
                     "prometheus_server",
                     method = field::debug(req.method()),
                     path = field::debug(req.uri().path()),
                 )
-                .in_scope(|| handle(req, &namespace, &buckets, &metrics))
+                .in_scope(|| handle(req, &namespace, &buckets, flushed, &metrics))
             })
         };
 
@@ -338,6 +355,16 @@ impl Sink for PrometheusSink {
             MetricKind::Incremental => {
                 let new = MetricEntry(item.clone().into_absolute());
                 if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
+                    if item.value.is_set() {
+                        // sets need to be flushed from time to time
+                        // because otherwise they could grow infinitelly
+                        let now = Utc::now().timestamp();
+                        let interval = now - *self.last_flush_timestamp.read().unwrap();
+                        if interval > self.config.flush_period_sec as i64 {
+                            *self.last_flush_timestamp.write().unwrap() = now;
+                            existing.reset();
+                        }
+                    }
                     existing.add(&item);
                     metrics.insert(MetricEntry(existing));
                 } else {
