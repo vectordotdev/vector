@@ -27,7 +27,9 @@ build: ## Build the project
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors
-	@cargo check --all --all-features --all-targets
+	@cargo check --all --all-targets
+	@cargo check --all --all-targets --no-default-features --features default-musl
+	@cargo check --all --all-targets --no-default-features --features default-msvc
 
 check-fmt: ## Checks code formatting correctness
 	@cargo fmt -- --check
