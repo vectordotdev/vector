@@ -241,6 +241,7 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
 RUN ln -s $CLANG_PREFIX/bin/ld.lld $LIBS_PREFIX/bin/ld
 RUN ln -s $CLANG_PREFIX/bin/llvm-ar $LIBS_PREFIX/bin/ar
+RUN ln -s $CLANG_PREFIX/bin/llvm-strip $LIBS_PREFIX/bin/strip
 RUN ln -s $CLANG_PREFIX/bin/llvm-ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
 
 # Use some headers provided by Clang because which are not present in musl.
