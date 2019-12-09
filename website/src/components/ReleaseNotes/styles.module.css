@@ -15,6 +15,7 @@
 }
 
 .content header {
+  margin-bottom: calc( ( var(--ifm-spacing-vertical) * 2 ) - 5px );
   padding: calc( var(--ifm-spacing-vertical) * 4 ) 0;
   text-align: center;
 }

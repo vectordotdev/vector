@@ -27,12 +27,24 @@ function groupSortToken(groupName) {
 
 export function commitTypeName(groupName) {
   switch(groupName) {
+    case 'chore':
+      return 'Chore';
+      break;
+
+    case 'docs':
+      return 'Doc Update';
+      break;
+
     case 'feat':
       return 'New Feature';
       break;
 
     case 'fix':
       return 'Bug Fix';
+      break;
+
+    case 'perf':
+      return 'Perf Improvement';
       break;
 
     default:

@@ -21,7 +21,7 @@ module.exports = {
         {to: 'docs', label: 'Docs', position: 'left'},
         {to: 'blog', label: 'Blog', position: 'left'},
         {to: 'community', label: 'Community', position: 'left'},
-        {to: '/releases/latest/download', label: 'Download', position: 'right'},
+        {to: '/releases', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },

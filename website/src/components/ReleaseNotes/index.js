@@ -44,7 +44,7 @@ function Sidebar({releases, release}) {
 
 function Highlight({post}) {
   const date = Date.parse(post.date);
-  const MAX_LENGTH = 250;
+  const MAX_LENGTH = 175;
 
   return (
     <div className="section">
@@ -52,7 +52,7 @@ function Highlight({post}) {
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
       <div className="sub__title"><small>By <Link to="/community#team">{post.author}</Link> on {dateFormat(date, "mmmm dS, yyyy")}</small></div>
       <p>
-        {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full announcement</Link>
+        {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full post</Link>
       </p>
     </div>
   );
@@ -60,6 +60,8 @@ function Highlight({post}) {
 
 function Notes({release, latest}) {
   const date = Date.parse(release.date);
+  const posts = release.posts;
+  posts.reverse();
 
   return (
     <article className={styles.content}>
@@ -88,20 +90,20 @@ function Notes({release, latest}) {
       </header>
       <section className="markdown">
         <p>
-          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release.
+          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings X new features, 45 enhancements, 6 bug fixes, and 2 performance improvements. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
         </p>
 
-        <AnchoredH2 id="highlights">Highlights</AnchoredH2>
+        {posts.length > 0 && (
+          <>
+            <AnchoredH2 id="highlights">Highlights</AnchoredH2>
 
-        <div className="section-list">
-          {release.posts.reverse().map((post, idx) => (
-            <Highlight post={post} key={idx} />
-          ))}
-        </div>
-
-        <AnchoredH2 id="highlights">Breaking Changes</AnchoredH2>
-
-        <Alert icon="thumbs-up" type="primary">This release contains no breaking changes.</Alert>
+            <div className="section-list">
+              {posts.map((post, idx) => (
+                <Highlight post={post} key={idx} />
+              ))}
+            </div>
+          </>
+        )}
 
         <AnchoredH2 id="overview">Changelog</AnchoredH2>
 
@@ -120,7 +122,7 @@ function Notes({release, latest}) {
 function TableOfContents({release}) {
   const groupedCommits = _.groupBy(release.commits, 'type');
   const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
-  const posts = release.posts.reverse();
+  const posts = release.posts;
 
   return (
     <div className={styles.toc}>
