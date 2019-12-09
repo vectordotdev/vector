@@ -46,6 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   drop_invalid = true # example
   
   # OPTIONAL
+  drop_field = true # default
   field = "message" # default
 ```
 
@@ -62,6 +63,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   drop_invalid = true # example
   
   # OPTIONAL
+  drop_field = true # default
   field = "message" # default
   overwrite_target = true # default
   target_field = "target" # example, no default
@@ -78,6 +80,29 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"drop_field"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### drop_field
+
+If the specified[`field`](#field) should be dropped (removed) after parsing.
+
+
+</Field>
 
 
 <Field
@@ -212,7 +237,7 @@ This would produce the following event as output:
 }
 ```
 
-By default, Vector drops fields after parsing them via the `drop_field`
+By default, Vector drops fields after parsing them via the[`drop_field`](#drop_field)
 option.
 
 </TabItem>
@@ -254,7 +279,7 @@ This would produce the following event as output:
 }
 ```
 
-By default, Vector drops fields after parsing them via the `drop_field`
+By default, Vector drops fields after parsing them via the[`drop_field`](#drop_field)
 option.
 
 </TabItem>
