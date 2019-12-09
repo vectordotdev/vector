@@ -10,7 +10,7 @@ class Release
     @last_date = last_date
     @last_version = last_version
     @date = release_hash.fetch("date").to_date
-    @posts = all_posts.select { |p| p.date > last_date && p.date <= @date }
+    @posts = all_posts.select { |p| last_date && p.date > last_date && p.date <= @date }
     @version = Version.new(release_hash.fetch("version"))
 
     @commits =
@@ -111,6 +111,7 @@ class Release
       date: date,
       insertions_count: insertions_count,
       last_version: last_version,
+      posts: posts.deep_to_h,
       type: type,
       type_url: type_url,
       version: version,

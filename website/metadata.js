@@ -229,6 +229,7 @@ module.exports = {
   "latest_post": {
     "author": "Ash",
     "date": "2019-11-25",
+    "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
     "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
     "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -3762,10 +3763,51 @@ module.exports = {
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
-    "date": "2019-11-28",
+    "date": "2019-12-08",
     "deletions_count": 6960,
     "insertions_count": 15719,
     "last_version": "0.5.0",
+    "posts": [
+      {
+        "author": "Alex",
+        "date": "2019-11-19",
+        "description": "Vector can now be deployed on machines using ARMv7 and ARM64 architectures!\nThese architectures are very popular within the IOT community and allows you\nto use Vector's superior performance and reliability in IOT applications.",
+        "id": "arm-raspbian-iot-support",
+        "path": "website/blog/2019-11-19-arm-support.md",
+        "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
+        "tags": [
+          "type: announcement",
+          "platform: linux"
+        ],
+        "title": "ARMv7 & Arm64 support: Raspbian & IOT"
+      },
+      {
+        "author": "Alex",
+        "date": "2019-11-21",
+        "description": "For Windows fanatics, you'll be happy to hear that Vector now officially\nsupports Windows! Bringing all of the performance and reliability benefits of\nVector to Windows.",
+        "id": "windows-support",
+        "path": "website/blog/2019-11-21-windows-support.md",
+        "permalink": "https://vector.dev/blog/windows-support",
+        "tags": [
+          "type: announcement",
+          "platform: windows"
+        ],
+        "title": "Windows Support Is Here!"
+      },
+      {
+        "author": "Ash",
+        "date": "2019-11-25",
+        "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
+        "id": "unit-testing-vector-config-files",
+        "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
+        "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+        "tags": [
+          "type: announcement",
+          "domain: config"
+        ],
+        "title": "Unit Testing: Treating Your Vector Config Files As Code"
+      }
+    ],
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
     "version": "0.6.0"
@@ -3774,6 +3816,7 @@ module.exports = {
     {
       "author": "Luke",
       "date": "2019-06-28",
+      "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
       "id": "introducing-vector",
       "path": "website/blog/2019-06-28-introducing-vector.md",
       "permalink": "https://vector.dev/blog/introducing-vector",
@@ -3785,6 +3828,7 @@ module.exports = {
     {
       "author": "Alex",
       "date": "2019-11-19",
+      "description": "Vector can now be deployed on machines using ARMv7 and ARM64 architectures!\nThese architectures are very popular within the IOT community and allows you\nto use Vector's superior performance and reliability in IOT applications.",
       "id": "arm-raspbian-iot-support",
       "path": "website/blog/2019-11-19-arm-support.md",
       "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
@@ -3797,6 +3841,7 @@ module.exports = {
     {
       "author": "Alex",
       "date": "2019-11-21",
+      "description": "For Windows fanatics, you'll be happy to hear that Vector now officially\nsupports Windows! Bringing all of the performance and reliability benefits of\nVector to Windows.",
       "id": "windows-support",
       "path": "website/blog/2019-11-21-windows-support.md",
       "permalink": "https://vector.dev/blog/windows-support",
@@ -3809,6 +3854,7 @@ module.exports = {
     {
       "author": "Ash",
       "date": "2019-11-25",
+      "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
       "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
       "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -9983,11 +10029,14 @@ module.exports = {
           "type": "chore"
         }
       ],
-      "compare_url": "https://github.com/timberio/vector/compare/v0.3.0...v0.4.0",
+      "compare_url": "https://github.com/timberio/vector/compare/v...v0.4.0",
       "date": "2019-09-24",
       "deletions_count": 8605,
       "insertions_count": 27640,
-      "last_version": "0.3.0",
+      "last_version": null,
+      "posts": [
+
+      ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "version": "0.4.0"
@@ -11260,6 +11309,9 @@ module.exports = {
       "deletions_count": 3038,
       "insertions_count": 6839,
       "last_version": "0.4.0",
+      "posts": [
+
+      ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "version": "0.5.0"
@@ -14788,10 +14840,51 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
-      "date": "2019-11-28",
+      "date": "2019-12-08",
       "deletions_count": 6960,
       "insertions_count": 15719,
       "last_version": "0.5.0",
+      "posts": [
+        {
+          "author": "Alex",
+          "date": "2019-11-19",
+          "description": "Vector can now be deployed on machines using ARMv7 and ARM64 architectures!\nThese architectures are very popular within the IOT community and allows you\nto use Vector's superior performance and reliability in IOT applications.",
+          "id": "arm-raspbian-iot-support",
+          "path": "website/blog/2019-11-19-arm-support.md",
+          "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
+          "tags": [
+            "type: announcement",
+            "platform: linux"
+          ],
+          "title": "ARMv7 & Arm64 support: Raspbian & IOT"
+        },
+        {
+          "author": "Alex",
+          "date": "2019-11-21",
+          "description": "For Windows fanatics, you'll be happy to hear that Vector now officially\nsupports Windows! Bringing all of the performance and reliability benefits of\nVector to Windows.",
+          "id": "windows-support",
+          "path": "website/blog/2019-11-21-windows-support.md",
+          "permalink": "https://vector.dev/blog/windows-support",
+          "tags": [
+            "type: announcement",
+            "platform: windows"
+          ],
+          "title": "Windows Support Is Here!"
+        },
+        {
+          "author": "Ash",
+          "date": "2019-11-25",
+          "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
+          "id": "unit-testing-vector-config-files",
+          "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
+          "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+          "tags": [
+            "type: announcement",
+            "domain: config"
+          ],
+          "title": "Unit Testing: Treating Your Vector Config Files As Code"
+        }
+      ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "version": "0.6.0"

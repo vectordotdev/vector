@@ -77,9 +77,6 @@ class Metadata
         Version.new(version_string)
       end
 
-    # Seed the list of releases with the first version
-    release_versions << Version.new("0.3.0")
-
     hash.fetch("releases").collect do |version_string, release_hash|
       version = Version.new(version_string)
 
@@ -89,7 +86,7 @@ class Metadata
           sort.
           last
 
-      last_date = hash.fetch("releases").fetch(version.to_s).fetch("date").to_date
+      last_date = last_version && hash.fetch("releases").fetch(last_version.to_s).fetch("date").to_date
 
       release_hash["version"] = version_string
       release = Release.new(release_hash, last_version, last_date, @posts)

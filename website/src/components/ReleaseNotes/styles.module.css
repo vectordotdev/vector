@@ -1,5 +1,6 @@
 .containers {
   display: flex;
+  margin: 0 var(--ifm-spacing-horizontal);
 }
 
 .sidebar {

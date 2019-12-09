@@ -165,7 +165,7 @@ a code {
 .badge.badge--highlight {
   animation: gradientBG 5s ease-in infinite;
   background-clip: padding-box;
-  background-image: var(--ifm-highlight-gradient-20);
+  background-image: var(--ifm-highlight-gradient);
   background-size: 150% 150%;
   border-color: transparent;
   box-sizing: border-box;
@@ -923,10 +923,11 @@ section:last-child {
   margin-left: calc((var(--ifm-spacing-horizontal) * -1.75) - var(--ifm-spacing-horizontal)) !important;
   padding-right: 3em;
 }
-.section-list > .section h3::before,
-.section-list > .section h4::before,
-.section-list > .section h5::before,
-.section-list > .section h6::before {
+.section-list:not(.section-list--no-bullet) > .section h3::before,
+.section-list:not(.section-list--no-bullet) > .section h4::before,
+.section-list:not(.section-list--no-bullet) > .section h5::before,
+.section-list:not(.section-list--no-bullet) > .section h6::before,
+.section-list > .section > .section--bullet {
   content: "• ";
   float: left;
   display: block;
@@ -939,6 +940,10 @@ section:last-child {
 .section-list > .section:hover > h5 > .hash-link,
 .section-list > .section:hover > h6 > .hash-link {
   opacity: 1;
+}
+.section-list > .section > .sub__title {
+  margin-top: -1em;
+  margin-bottom: 0.5em;
 }
 .section-list > .section .info {
   border-left: 1px solid var(--ifm-hr-border-color);
@@ -1140,6 +1145,9 @@ table {
 .table-of-contents ul.contents li {
   margin-right: 0;
   margin-left: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .table-of-contents ul.contents > li ul {
   border-left: 1px solid var(--ifm-hr-border-color);
@@ -1228,6 +1236,19 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   ul.tabs.rounded {
     display: flex !important;
   }
+}
+
+/*
+ * text--highlight
+ */
+
+.text--highlight {
+  animation: gradientBG 5s ease-in infinite;
+  background-clip: text;
+  background-image: var(--ifm-highlight-gradient);
+  background-size: 150% 150%;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 /*

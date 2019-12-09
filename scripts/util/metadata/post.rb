@@ -5,6 +5,7 @@ class Post
 
   attr_reader :author,
     :date,
+    :description,
     :id,
     :path,
     :permalink,
@@ -17,9 +18,11 @@ class Post
     @date = Date.parse("#{path_parts.fetch(0)}-#{path_parts.fetch(1)}-#{path_parts.fetch(2)}")
     @path = Pathname.new(path).relative_path_from(ROOT_DIR).to_s
 
-    front_matter = FrontMatterParser::Parser.parse_file(path).front_matter
+    parsed = FrontMatterParser::Parser.parse_file(path)
+    front_matter = parsed.front_matter
 
     @author = front_matter.fetch("author")
+    @description = parsed.content.split("\n\n").first.remove_markdown_links
     @id = front_matter.fetch("id")
     @permalink = "#{BLOG_HOST}/#{id}"
     @tags = front_matter.fetch("tags")
@@ -38,6 +41,7 @@ class Post
     {
       author: author,
       date: date,
+      description: description,
       id: id,
       path: path,
       permalink: permalink,
