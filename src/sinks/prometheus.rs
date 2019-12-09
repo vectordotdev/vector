@@ -119,6 +119,7 @@ fn encode_tags_with_extra(
 fn handle(
     req: Request<Body>,
     namespace: &str,
+    buckets: &[f64],
     metrics: &HashSet<MetricEntry>,
 ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let mut response = Response::new(Body::empty());
@@ -137,7 +138,42 @@ fn handle(
                     let tags = &metric.tags;
                     let fullname = encode_namespace(&namespace, &name);
                     // todo: metric families
-                    match &metric.value {
+
+                    let ref value = match &metric.value {
+                        MetricValue::Distribution {
+                            values,
+                            sample_rates,
+                        } => {
+                            let mut counts = Vec::new();
+                            for _ in buckets {
+                                counts.push(0);
+                            }
+                            let mut sum = 0.0;
+                            let mut count = 0;
+                            for (v, c) in values.into_iter().zip(sample_rates.into_iter()) {
+                                buckets
+                                    .iter()
+                                    .enumerate()
+                                    .skip_while(|&(_, b)| b < v)
+                                    .for_each(|(i, _)| {
+                                        counts[i] += c;
+                                    });
+
+                                sum += v * (*c as f64);
+                                count += c;
+                            }
+
+                            MetricValue::AggregatedHistogram {
+                                buckets: buckets.to_vec(),
+                                counts,
+                                count,
+                                sum,
+                            }
+                        }
+                        other => other.clone(),
+                    };
+
+                    match value {
                         MetricValue::Counter { value } => {
                             let tags = encode_tags(tags);
                             writeln!(&mut w, "# HELP {} {}", fullname, name).unwrap();
@@ -255,9 +291,11 @@ impl PrometheusSink {
 
         let metrics = Arc::clone(&self.metrics);
         let namespace = self.config.namespace.clone();
+        let buckets = self.config.buckets.clone();
         let new_service = move || {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
+            let buckets = buckets.clone();
 
             service_fn(move |req| {
                 let metrics = metrics.read().unwrap();
@@ -266,7 +304,7 @@ impl PrometheusSink {
                     method = field::debug(req.method()),
                     path = field::debug(req.uri().path()),
                 )
-                .in_scope(|| handle(req, &namespace, &metrics))
+                .in_scope(|| handle(req, &namespace, &buckets, &metrics))
             })
         };
 
