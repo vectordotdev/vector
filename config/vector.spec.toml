@@ -718,6 +718,22 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   field = "message"
 
+# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+[transforms.aws_ec2_metadata]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `aws_ec2_metadata`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "aws_ec2_metadata"
+  type = "aws_ec2_metadata"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
 # Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
   #
