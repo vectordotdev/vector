@@ -233,6 +233,9 @@ class Links
       when /^pr_([0-9]+)$/
         "#{VECTOR_PRS_ROOT}/#{$1}"
 
+      when /^release_notes_([a-z0-9_\.]*)$/
+        "#{HOST}/releases/#{$1}"
+
       when /^v([a-z0-9\-\.]+)$/
         "#{VECTOR_ROOT}/releases/tag/v#{$1}"
 
