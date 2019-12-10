@@ -50,6 +50,9 @@ lazy_static::lazy_static! {
     static ref VPC_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/vpc-id");
     static ref VPC_ID_KEY: Atom = Atom::from("vpc-id");
 
+    static ref ROLE_NAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/");
+    static ref ROLE_NAME_KEY: Atom = Atom::from("role-name");
+
     static ref MAC: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/mac");
 
     static ref DYNAMIC_DOCUMENT: PathAndQuery = PathAndQuery::from_static("/latest/dynamic/instance-identity/document");
@@ -65,6 +68,7 @@ lazy_static::lazy_static! {
         REGION_KEY.clone(),
         SUBNET_ID_KEY.clone(),
         VPC_ID_KEY.clone(),
+        ROLE_NAME_KEY.clone(),
     ];
 
     static ref API_TOKEN: PathAndQuery = PathAndQuery::from_static("/latest/api/token");
@@ -96,6 +100,7 @@ struct Keys {
     region_key: Atom,
     subnet_id_key: Atom,
     vpc_id_key: Atom,
+    role_name_key: Atom,
 }
 
 inventory::submit! {
@@ -340,6 +345,8 @@ impl MetadataClient {
             (None, None)
         };
 
+        let role_names = self.get_metadata(&ROLE_NAME).await?;
+
         if let Some(document) = identity_document {
             if self.fields.contains(&AMI_ID_KEY) {
                 self.state
@@ -407,6 +414,16 @@ impl MetadataClient {
             }
         }
 
+        if let Some(role_names) = role_names {
+            if self.fields.contains(&ROLE_NAME_KEY) {
+                let role_names = String::from_utf8_lossy(&role_names[..]);
+
+                for (i, role_name) in role_names.lines().enumerate() {
+                    self.state.update(format!("{}[{}]", self.keys.role_name_key, i).into(), role_name.into());
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -427,6 +444,7 @@ impl Keys {
                 region_key: format!("{}.{}", namespace, REGION_KEY.clone()).into(),
                 subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY.clone()).into(),
                 vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
+                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
             }
         } else {
             Keys {
@@ -440,6 +458,7 @@ impl Keys {
                 region_key: REGION_KEY.clone(),
                 subnet_id_key: SUBNET_ID_KEY.clone(),
                 vpc_id_key: VPC_ID_KEY.clone(),
+                role_name_key: ROLE_NAME_KEY.clone(),
             }
         }
     }
@@ -502,6 +521,7 @@ mod tests {
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
         assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
         assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
+        assert_eq!(log.get(&"role-name[0]".into()), Some(&"mock-user".into()));
     }
 
     #[test]
