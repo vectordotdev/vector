@@ -463,6 +463,7 @@ mod tests {
 
     #[test]
     fn enrich() {
+        crate::test_util::trace_init();
         let rt = runtime();
 
         let config = Ec2Metadata {
@@ -499,6 +500,8 @@ mod tests {
         );
         assert_eq!(log.get(&"ami-id".into()), Some(&"071959437513".into()));
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
+        assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
+        assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
     }
 
     #[test]
