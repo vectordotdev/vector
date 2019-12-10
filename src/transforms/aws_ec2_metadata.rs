@@ -80,7 +80,7 @@ lazy_static::lazy_static! {
 pub struct Ec2Metadata {
     host: Option<String>,
     namespace: Option<String>,
-    refresh_interval: Option<Duration>,
+    refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
 }
 
@@ -119,7 +119,7 @@ impl TransformConfig for Ec2Metadata {
             .map(|s| Uri::from_shared(s.into()).unwrap())
             .unwrap_or(HOST.clone());
 
-        let refresh_interval = self.refresh_interval.unwrap_or(Duration::from_secs(10));
+        let refresh_interval = self.refresh_interval_secs.map(Duration::from_secs).unwrap_or(Duration::from_secs(10));
         let fields = self
             .fields
             .clone()

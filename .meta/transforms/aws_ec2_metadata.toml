@@ -1,0 +1,47 @@
+[transforms.aws_ec2_metadata]
+allow_you_to_description = "enrich logs with AWS EC2 instance metadata"
+common = false
+function_category = "shape"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.aws_ec2_metadata.namespace]
+type = "string"
+common = false
+default = ""
+null = true
+description = "Prepend a namespace to each field's key."
+
+[transforms.aws_ec2_metadata.fields]
+type = "[string]"
+common = false
+default = [
+    "instance-id",
+    "local-hostname", 
+    "local-ipv4",
+    "public-hostname",
+    "public-ipv4",
+    "ami-id",
+    "availability-zone",
+    "vpc-id",
+    "subnet-id",
+    "region"
+]
+description = "A list of fields to include in each event." 
+null = true
+
+[transforms.aws_ec2_metadata.refresh_interval_secs]
+type = "int"
+common = false
+default = 10
+null = true
+description = "The interval in seconds at which the EC2 Metadata api will be called."
+
+[transforms.aws_ec2_metadata.host]
+type = "string"
+common = false
+default = "http://169.254.169.254"
+null = true
+description = "Override the default EC2 Metadata host."
