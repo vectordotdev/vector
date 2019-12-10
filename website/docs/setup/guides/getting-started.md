@@ -19,7 +19,7 @@ Or [choose your preferred installation method][docs.installation].
 
 ## 2. Configure it
 
-Vector runs with a [configuration file][docs.configuration] which tells it which
+Vector runs with a [configuration file][docs.configuration] that tells it which
 components to run and how they should interact. Let's create one that simply
 pipes a [`stdin` source][docs.sources.stdin] to a
 [`stdout` sink][docs.sinks.console]:
@@ -127,7 +127,7 @@ Firstly, our `message` field has been parsed out into structured fields.
 Secondly, we now see every field of the event printed to `stdout` by our sink in
 JSON format because we set `encoding = "json"`.
 
-Exit `vector` again by pressing `ctrl+c`.
+Exit Vector again by pressing `ctrl+c`.
 
 Next, try experimenting by adding more [transforms][docs.transforms] to your
 pipeline before moving onto the next guide.
