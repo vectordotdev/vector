@@ -745,6 +745,9 @@ input[type="text"]:focus {
   .navbar .navbar__search .navbar__search-input {
     width: 12.5rem;
   }
+  .navbar .navbar-sidebar__items .navbar__item {
+    display: inline-block;
+  }
 }
 @media (max-width: 480px) {
   .navbar .navbar__brand {
