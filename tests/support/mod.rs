@@ -29,7 +29,7 @@ pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
 }
 
 pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures::sync::mpsc::channel(0);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
