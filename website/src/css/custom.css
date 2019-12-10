@@ -859,6 +859,54 @@ input[type="text"]:focus {
 }
 
 /**
+ * react-select-container
+ */
+
+.react-select-container .react-select__control {
+  background: var(--ifm-panel-background);
+  border-color: var(--ifm-panel-border-color);
+  border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-panel-box-shadow);
+  box-sizing: border-box;
+  color: var(--ifm-font-base-color);
+}
+
+.react-select-container .react-select__indicator-separator {
+  background-color: var(--ifm-color-emphasis-200);
+}
+
+.react-select-container .react-select__single-value {
+  color: var(--ifm-font-base-color);
+
+}
+
+.react-select-container:hover .react-select__control {
+  background: var(--ifm-panel-background-active);
+  border-color: var(--ifm-color-primary);
+  box-shadow: var(--ifm-panel-box-shadow-active);
+}
+
+.react-select-container .react-select__menu {
+  background: var(--ifm-panel-background-solid);
+  border-radius: var(--ifm-global-radius);
+  color: var(--ifm-color-content);
+}
+
+.react-select-container .react-select__option:hover {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-background-color);
+}
+
+.react-select-container .react-select__option--is-selected {
+  background: var(--ifm-panel-background-active);
+}
+
+.react-select-container .react-select__option--is-focused {
+  background: var(--ifm-panel-background-active);
+  color: var(--ifm-color-content);
+}
+
+/**
  * section
  *
  * Sections are generally used on marketing pages to focus on separate topics.

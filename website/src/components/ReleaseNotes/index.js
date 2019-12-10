@@ -17,6 +17,7 @@ import pluralize from 'pluralize';
 import Signalz from '@site/src/exports/signalz';
 import styles from './styles.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import {viewedNewRelease} from '@site/src/exports/newRelease';
 
 const AnchoredH2 = Heading('h2');
 const AnchoredH3 = Heading('h3');
@@ -95,7 +96,7 @@ function Notes({release, latest}) {
             <h1>Vector v{release.version} Release Notes</h1>
             <div className="hero__subtitle">
               <div className={styles.heroSubTitle}>
-                Released by <Avatar id="ben" inline={true} size="sm" /> on <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
+                Released by <Link to="/community#team">Ben</Link> on <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
               </div>
               <div>
                 <small>
@@ -241,6 +242,10 @@ function ReleaseNotes({version}) {
   const release = releases[version];
   const releasesList = Object.values(releases).reverse();
   const latest = releasesList[0] == release;
+
+  if (latest) {
+    viewedNewRelease();
+  }
 
   return (
     <div className={styles.containers}>

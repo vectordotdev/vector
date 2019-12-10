@@ -1,9 +1,10 @@
-import React from 'react';
+import React, {useState} from 'react';
 
 import Alert from '@site/src/components/Alert';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import Select from 'react-select';
 import SVG from 'react-inlinesvg';
 import TabItem from '@theme/TabItem'
 import Tabs from '@theme/Tabs'
@@ -116,14 +117,23 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
 function ReleaseDownload() {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
-  const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
+  const {metadata: {installation: installation, latest_release: latestRelease, releases}} = siteConfig.customFields;
   const {downloads} = installation;
 
   const latestDownloads = downloads.filter(download => download.available_on_latest);
   const nightlyDownloads = downloads.filter(download => download.available_on_nightly);
   const nightlyDate = new Date().toISOString().substr(0,10);
 
+  const oldReleases = Object.values(releases).slice(0);
+  oldReleases.pop();
+  oldReleases.reverse();
+  const olderOptions = oldReleases.map(release => ({value: release.version, label: `v${release.version} - ${release.date}`}));
+
   viewedNewRelease();
+
+  const [version, setVersion] = useState(latestRelease.version);
+  const selectedTab = version == latestRelease.version ? 'latest' : 'older';
+  const oldRelease = version == latestRelease.version ? oldReleases[0] : oldReleases.find(release => release.version == version);
 
   return (
     <Layout title="Download Vector">
@@ -167,14 +177,25 @@ function ReleaseDownload() {
             <Tabs
               centered={true}
               className="rounded"
-              defaultValue="latest"
+              defaultValue={selectedTab}
               style={{width: "100%"}}
               values={[
-                { label: `Older`, value: 'older', },
+                { label: 'Older', value: 'older', },
                 { label: `Latest (${latestRelease.version})`, value: 'latest', },
                 { label: 'Nightly', value: 'nightly', },
               ]
             }>
+            <TabItem value="older">
+              <Select
+                className={classnames('react-select-container', styles.releaseSelect)}
+                classNamePrefix="react-select"
+                options={olderOptions}
+                isClearable={false}
+                placeholder="Select a version..."
+                value={olderOptions.find(option => option.value == oldRelease.version)}
+                onChange={(selectedOption) => setVersion(selectedOption ? selectedOption.value : null)} />
+              <DownloadTable version={oldRelease.version} date={oldRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${oldRelease.version}`} />
+            </TabItem>
             <TabItem value="latest">
               <DownloadTable version={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}`} />
             </TabItem>

@@ -270,7 +270,7 @@ The `datadog` sink was incorrectly named since we'll be adding future support \
 for DataDog logs. Migrating is as simple as renaming your sink:
 
 ```diff
- [sinks.my_console_sink]
+ [sinks.my_sink]
 -  type = "datadog"
 +  type = "datadog_metrics"
 ```
