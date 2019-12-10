@@ -119,7 +119,10 @@ impl TransformConfig for Ec2Metadata {
             .map(|s| Uri::from_shared(s.into()).unwrap())
             .unwrap_or(HOST.clone());
 
-        let refresh_interval = self.refresh_interval_secs.map(Duration::from_secs).unwrap_or(Duration::from_secs(10));
+        let refresh_interval = self
+            .refresh_interval_secs
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::from_secs(10));
         let fields = self
             .fields
             .clone()
@@ -419,7 +422,10 @@ impl MetadataClient {
                 let role_names = String::from_utf8_lossy(&role_names[..]);
 
                 for (i, role_name) in role_names.lines().enumerate() {
-                    self.state.update(format!("{}[{}]", self.keys.role_name_key, i).into(), role_name.into());
+                    self.state.update(
+                        format!("{}[{}]", self.keys.role_name_key, i).into(),
+                        role_name.into(),
+                    );
                 }
             }
         }
