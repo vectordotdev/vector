@@ -18507,7 +18507,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "shape",
+      "function_category": "enrich",
       "id": "aws_ec2_metadata_transform",
       "name": "aws_ec2_metadata",
       "operating_systems": [
