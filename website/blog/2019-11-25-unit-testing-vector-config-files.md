@@ -8,8 +8,8 @@ author_image_url: https://github.com/jeffail.png
 tags: ["type: announcement", "domain: config"]
 ---
 
-Today we're excited to announce support for unit testing your configuration
-files! This feature allows you to inline tests directly within your Vector
+Today we're excited to announce beta support for unit testing Vector
+configurations, allowing you to define tests directly within your Vector
 configuration file. These tests are used to assert the output from topologies of
 [transform][docs.transforms] components given certain input events, ensuring
 that your configuration behavior does not regress; a very powerful feature for
@@ -83,12 +83,12 @@ To help you get started we put together two documentation pages:
 These should be everything you need and will be actively maintained as this
 feature matures.
 
-## Feedback!
+## Feedback
 
-We're eager to hear your feedback! Please note, this feature is in `beta` and
-represents the initial MVP version. We'd like to collect more feedback before
-we expand our unit testing support so please let us know what you think either
-in our [community chat](https://chat.vector.dev/) or by
+We're eager to hear your feedback! Unit testing, as a `beta` feature, is still
+in an early phase and we need case studies and comments in order to ensure it
+works well for everyone. Please let us know what you think either in our
+[community chat](https://chat.vector.dev/) or by
 [raising an issue](https://github.com/timberio/vector/issues/new).
 
 

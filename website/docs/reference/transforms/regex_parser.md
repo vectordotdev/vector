@@ -28,7 +28,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "regex_parser" # example, must be: "regex_parser"
   inputs = ["my-source-id"] # example
-  regex = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$" # example
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
   
   # OPTIONAL - General
   drop_field = true # default
@@ -98,7 +98,7 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"]}
+  examples={["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]}
   name={"regex"}
   nullable={false}
   path={null}
@@ -111,7 +111,7 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
 
 ### regex
 
-The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
+The Regular Expression to apply. Do not include the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
 
 
 </Field>

@@ -229,7 +229,7 @@ module.exports = {
   "latest_post": {
     "author": "Ash",
     "date": "2019-11-25",
-    "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+    "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
     "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
     "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -5017,7 +5017,7 @@ module.exports = {
       {
         "author": "Ash",
         "date": "2019-11-25",
-        "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+        "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
         "id": "unit-testing-vector-config-files",
         "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
         "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -5092,7 +5092,7 @@ module.exports = {
     {
       "author": "Ash",
       "date": "2019-11-25",
-      "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
       "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
       "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -17338,7 +17338,7 @@ module.exports = {
         {
           "author": "Ash",
           "date": "2019-11-25",
-          "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
           "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
           "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",

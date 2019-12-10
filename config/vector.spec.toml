@@ -1072,11 +1072,11 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
+  # The Regular Expression to apply. Do not include the leading or trailing `/`.
   # 
   # * required
   # * type: string
-  regex = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
   # If the specified `field` should be dropped (removed) after parsing.
   # 
