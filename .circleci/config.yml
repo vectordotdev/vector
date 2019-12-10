@@ -501,7 +501,9 @@ jobs:
           name: Verify archive
           command: |
             ./scripts/docker-run.sh verifier-wine bash -x \<<EOF
-              unzip target/artifacts/*-x86_64-pc-windows-msvc.zip
+              mkdir -p dest
+              cd dest
+              unzip ../target/artifacts/*-x86_64-pc-windows-msvc.zip
               wine ./bin/vector.exe --version
             EOF
 
