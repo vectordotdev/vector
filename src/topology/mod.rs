@@ -532,6 +532,7 @@ fn handle_errors(
 #[cfg(test)]
 mod tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
+    use crate::sources::socket::{Mode, SocketConfig};
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
@@ -544,7 +545,10 @@ mod tests {
         use std::path::Path;
 
         let mut old_config = Config::empty();
-        old_config.add_source("in", TcpConfig::new(next_addr().into()));
+        old_config.add_source(
+            "in",
+            SocketConfig::new(Mode::Tcp(TcpConfig::new(next_addr().into()))),
+        );
         old_config.add_sink(
             "out",
             &[&"in"],

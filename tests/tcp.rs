@@ -9,6 +9,12 @@ use vector::test_util::{
 use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
 
+fn make_tcp_socket_source_config(
+    tcp_config: sources::tcp::TcpConfig,
+) -> sources::socket::SocketConfig {
+    sources::socket::SocketConfig::new(sources::socket::Mode::Tcp(tcp_config))
+}
+
 #[test]
 fn pipe() {
     let num_lines: usize = 10000;
@@ -17,7 +23,10 @@ fn pipe() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
+    );
     config.add_sink(
         "out",
         &["in"],
@@ -53,7 +62,10 @@ fn sample() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
+    );
     config.add_transform(
         "sampler",
         &["in"],
@@ -110,8 +122,14 @@ fn merge() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1.into()));
-    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2.into()));
+    config.add_source(
+        "in1",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr1.into())),
+    );
+    config.add_source(
+        "in2",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr2.into())),
+    );
     config.add_sink(
         "out",
         &["in1", "in2"],
@@ -168,7 +186,10 @@ fn fork() {
     let out_addr2 = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
+    );
     config.add_sink(
         "out1",
         &["in"],
@@ -217,8 +238,14 @@ fn merge_and_fork() {
     // out1 receives both in1 and in2
     // out2 receives in2 only
     let mut config = config::Config::empty();
-    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1.into()));
-    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2.into()));
+    config.add_source(
+        "in1",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr1.into())),
+    );
+    config.add_source(
+        "in2",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr2.into())),
+    );
     config.add_sink(
         "out1",
         &["in1", "in2"],
@@ -283,7 +310,10 @@ fn reconnect() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
+    );
     config.add_sink(
         "out",
         &["in"],
