@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.bar]
   type = "regex_parser"
-  regex = "^(?P<timestamp>\w*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
   # REQUIRED - General
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - Outputs
   [[tests.outputs]]
     # REQUIRED - General
-    extract_from = "bar" # example
+    extract_from = "foo" # example
     
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
@@ -64,12 +64,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
       
       # OPTIONAL
-      name = "message.eq"
-    value = "this is the content to match against" # example
-      name = "host.exists"
-    value = true # example
-      name = "method.neq"
-    value = "POST" # example
+      "message.eq" = "this is the content to match against" # example
+      "host.exists" = true # example
+      "method.neq" = "POST" # example
   
   # REQUIRED - Input
   [tests.input]
@@ -89,7 +86,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.bar]
   type = "regex_parser"
-  regex = "^(?P<timestamp>\w*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
   # REQUIRED - General
@@ -98,7 +95,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - Outputs
   [[tests.outputs]]
     # REQUIRED - General
-    extract_from = "bar" # example
+    extract_from = "foo" # example
     
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
@@ -106,12 +103,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
       
       # OPTIONAL
-      name = "message.eq"
-    value = "this is the content to match against" # example
-      name = "host.exists"
-    value = true # example
-      name = "method.neq"
-    value = "POST" # example
+      "message.eq" = "this is the content to match against" # example
+      "host.exists" = true # example
+      "method.neq" = "POST" # example
   
   # REQUIRED - Input
   [tests.input]
@@ -124,8 +118,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     
     # OPTIONAL - Log fields
     [tests.input.log_fields]
-      name = "message"
-      value = "some message contents"
+      message = "some message contents"
     
     # OPTIONAL - Metric
     [tests.input.metric]
@@ -141,8 +134,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
       
       # OPTIONAL - Tags
       [tests.input.metric.tags]
-        name = "host"
-        value = "foohost"
+        host = "foohost"
 ```
 
 </TabItem>
@@ -231,7 +223,7 @@ Specifies the log fields when the input type is 'log'.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"message","value":"some message contents"},{"name":"host","value":"myhost"}]}
+  examples={[{"message":"some message contents"},{"host":"myhost"}]}
   name={"`[field-name]`"}
   nullable={false}
   path={"input.log_fields"}
@@ -372,7 +364,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"host","value":"foohost"},{"name":"region","value":"us-east-1"}]}
+  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
   name={"`[tag-name]`"}
   nullable={false}
   path={"input.metric.tags"}
@@ -592,7 +584,7 @@ A table that defines a collection of conditions to check against the output of a
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"message.eq","value":"this is the content to match against"}]}
+  examples={[{"message.eq":"this is the content to match against"}]}
   name={"`<field_name>`.eq"}
   nullable={true}
   path={"outputs.conditions"}
@@ -615,7 +607,7 @@ Check whether a fields contents exactly matches the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"host.exists","value":true}]}
+  examples={[{"host.exists":true}]}
   name={"`<field_name>`.exists"}
   nullable={true}
   path={"outputs.conditions"}
@@ -638,7 +630,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"name":"method.neq","value":"POST"}]}
+  examples={[{"method.neq":"POST"}]}
   name={"`<field_name>`.neq"}
   nullable={true}
   path={"outputs.conditions"}
@@ -689,7 +681,7 @@ The type of the condition to execute. Currently only the `check_fields` type is 
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["bar"]}
+  examples={["foo"]}
   name={"extract_from"}
   nullable={false}
   path={"outputs"}
