@@ -616,6 +616,21 @@ the data directory which is specified via the
 [global[`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
 overridden via the[`data_dir`](#data_dir) option in the[`file`](#file) sink directly.
 
+### Compressed Files
+
+Vector will transparently detect files which have been compressed using `gzip`
+and decompress them for reading. This detection process looks for the unique
+sequence of bytes in the `gzip` header and does not rely on the compressed files
+adhering to any kind of naming convention.
+
+One caveat with reading compressed files is that Vector is not able to
+efficiently seek into them. Rather than implement a potentially-expensive full
+scan as a seek mechanism, Vector currently will not attempt to make further
+reads from a file for which it has already stored a checkpoint in a previous
+run. For this reason, users should take care to allow Vector to fully process
+any compressed files before shutting the process down or moving the files to
+another location on disk.
+
 ### Context
 
 By default, the[`file`](#file) source will add context
@@ -677,9 +692,6 @@ independent logical log streams (e.g. nginx's `access.log` and `error.log`, or
 logs from multiple services), you are likely better off with the default
 behavior. If you're dealing with a single logical log stream or if you value
 per-stream ordering over fairness across streams, consider setting[`oldest_first`](#oldest_first) to `true`.
-
-
-
 
 ### File Rotation
 
