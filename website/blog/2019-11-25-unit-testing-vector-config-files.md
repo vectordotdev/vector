@@ -3,17 +3,17 @@ id: unit-testing-vector-config-files
 title: "Unit Testing: Treating Your Vector Config Files As Code"
 author: Ash
 author_title: Vector Core Team
-author_url: https://github.com/jeffail
+author_url: https://github.com/Jeffail
 author_image_url: https://github.com/jeffail.png
 tags: ["type: announcement", "domain: config"]
 ---
 
 Today we're excited to announce support for unit testing your configuration
 files! This feature allows you to inline tests directly within your Vector
-configuration file. These tests are used to assert output from individual
-[transform][docs.transforms] components, ensuring that your configuration
-behavior does not regress; a very powerful feature for mission-critical
-production pipelines that are collaborated on.
+configuration file. These tests are used to assert the output from topologies of
+[transform][docs.transforms] components given certain input events, ensuring
+that your configuration behavior does not regress; a very powerful feature for
+mission-critical production pipelines that are collaborated on.
 
 ## Example
 
@@ -30,17 +30,20 @@ transform][docs.transforms.regex_parser] to parse log lines:
 [transforms.parser]
   inputs = ["my_logs"]
   type   = "regex_parser"
-  regex  = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"
+  regex  = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
   name = "verify_regex"
 
   [tests.input]
-    insert_at = "my_logs"
+    insert_at = "parser"
     type = "raw"
     value = "2019-11-28T12:00:00+00:00 info Hello world"
 
-  [[tests.outputs.conditions]]
+  [[tests.outputs]]
+    extract_from = "parser"
+
+    [[tests.outputs.conditions]]
       type = "check_fields"
       "timestamp.equals" = "2019-11-28T12:00:00+00:00"
       "level.equals" = "info"
@@ -57,21 +60,25 @@ Test ./vector.toml: verify_regex ... passed
 
 ## Why?
 
-On the surface, Vector configuration files seem like simple instructions to
-connect disparate systems. For example, [tailing a file][docs.sources.file] and
-sending that data to [AWS CloudWatch Logs][docs.sinks.aws_cloudwatch_logs]. But
-as you start to become familiar with Vector, you'll start adding
-[transforms][docs.transforms] and important logic to your configuration. All of
-sudden, your Vector configuration files start to look and feel like code. Unit
-tests allow you to assert various conditions, ensuring your "code" does not
-regress.
+Many Vector configurations will be simple transformations across straight
+forward pipelines (such as [tailing a file][docs.sources.file] and piping the
+data to [AWS CloudWatch Logs][docs.sinks.aws_cloudwatch_logs]) and don't really
+need protection from regressions. However, Vector configs are capable of
+expanding indefinitely with [transforms][docs.transforms] in order to solve as
+much of your processing needs as possible.
+
+As a config grows, and as the number of owners of a config grow, the potential
+for regressions also grows just like a regular codebase. The lack of testing
+capabilities of configuration driven services is therefore a common pain for
+larger organizations. We hope that natively supporting unit tests in Vector
+configs will preemptively solve this problem.
 
 ## Getting Started
 
-To help you get started we put together 2 documentation files:
+To help you get started we put together two documentation pages:
 
 1. [A unit testing guide][docs.guides.unit_testing]
-2. [Unit testing reference][docs.reference.tests]
+2. [A reference of the unit testing config spec][docs.reference.tests]
 
 These should be everything you need and will be actively maintained as this
 feature matures.
@@ -80,7 +87,9 @@ feature matures.
 
 We're eager to hear your feedback! Please note, this feature is in `beta` and
 represents the initial MVP version. We'd like to collect more feedback before
-we
+we expand our unit testing support so please let us know what you think either
+in our [community chat](https://chat.vector.dev/) or by
+[raising an issue](https://github.com/timberio/vector/issues/new).
 
 
 [docs.guides.unit_testing]: /docs/setup/guides/unit-testing
@@ -88,3 +97,4 @@ we
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs
 [docs.sources.file]: /docs/reference/sources/file
 [docs.transforms]: /docs/reference/transforms
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser

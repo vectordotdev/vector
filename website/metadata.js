@@ -229,7 +229,7 @@ module.exports = {
   "latest_post": {
     "author": "Ash",
     "date": "2019-11-25",
-    "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
+    "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
     "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
     "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -5017,7 +5017,7 @@ module.exports = {
       {
         "author": "Ash",
         "date": "2019-11-25",
-        "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
+        "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
         "id": "unit-testing-vector-config-files",
         "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
         "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -5032,12 +5032,12 @@ module.exports = {
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
       {
-        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff {3}\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
         "commits": [
 
         ],
         "id": "encoding-guide",
-        "title": "The `file` and `console` now require `encoding`"
+        "title": "The `file` and `console` sinks now require `encoding`"
       },
       {
         "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
@@ -5092,7 +5092,7 @@ module.exports = {
     {
       "author": "Ash",
       "date": "2019-11-25",
-      "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
+      "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
       "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
       "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -17338,7 +17338,7 @@ module.exports = {
         {
           "author": "Ash",
           "date": "2019-11-25",
-          "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert output from individual\ntransform components, ensuring that your configuration\nbehavior does not regress; a very powerful feature for mission-critical\nproduction pipelines that are collaborated on.",
+          "description": "Today we're excited to announce support for unit testing your configuration\nfiles! This feature allows you to inline tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
           "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
           "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -17353,12 +17353,12 @@ module.exports = {
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
         {
-          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff {3}\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
           "commits": [
 
           ],
           "id": "encoding-guide",
-          "title": "The `file` and `console` now require `encoding`"
+          "title": "The `file` and `console` sinks now require `encoding`"
         },
         {
           "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",

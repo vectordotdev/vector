@@ -243,7 +243,7 @@ commits = [
 [[releases."0.6.0".upgrade_guides]]
 id = "encoding-guide"
 commits = []
-title = "The `file` and `console` now require `encoding`"
+title = "The `file` and `console` sinks now require `encoding`"
 body = """\
 The `file` and `console` sinks now require an explicit `encoding` option. The \
 previous implicit nature was confusing and this should eliminate any suprises \
