@@ -1,11 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
-use crate::{
-    event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-};
+use crate::event::{self, Event};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
-use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
@@ -40,36 +36,9 @@ impl TcpConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new_without_default::<TcpConfig>("tcp")
-}
-
-#[typetag::serde(name = "tcp")]
-impl SourceConfig for TcpConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
-        let tcp = RawTcpSource {
-            config: self.clone(),
-        };
-        tcp.run(self.address, self.shutdown_timeout_secs, out)
-    }
-
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn source_type(&self) -> &'static str {
-        "tcp"
-    }
-}
-
 #[derive(Debug, Clone)]
-struct RawTcpSource {
-    config: TcpConfig,
+pub struct RawTcpSource {
+    pub config: TcpConfig,
 }
 
 impl TcpSource for RawTcpSource {
@@ -104,33 +73,6 @@ impl TcpSource for RawTcpSource {
 
 #[cfg(test)]
 mod test {
-    use super::TcpConfig;
-    use crate::event;
-    use crate::runtime;
-    use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
-    use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures::sync::mpsc;
-    use futures::Stream;
-
-    #[test]
-    fn tcp_it_includes_host() {
-        let (tx, rx) = mpsc::channel(1);
-
-        let addr = next_addr();
-
-        let server = TcpConfig::new(addr.into())
-            .build("default", &GlobalOptions::default(), tx)
-            .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(server);
-        wait_for_tcp(addr);
-
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
-            .unwrap();
-
-        let event = rx.wait().next().unwrap().unwrap();
-        assert_eq!(event.as_log()[&event::HOST], "127.0.0.1".into());
-    }
 
     #[test]
     fn tcp_it_defaults_max_length() {
@@ -151,39 +93,5 @@ mod test {
 
         assert_eq!(with.max_length, 19);
         assert_eq!(without.max_length, super::default_max_length());
-    }
-
-    #[test]
-    fn tcp_continue_after_long_line() {
-        let (tx, rx) = mpsc::channel(10);
-
-        let addr = next_addr();
-
-        let mut config = TcpConfig::new(addr.into());
-        config.max_length = 10;
-
-        let server = config
-            .build("default", &GlobalOptions::default(), tx)
-            .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(server);
-        wait_for_tcp(addr);
-
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
-        ];
-
-        rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
-
-        let (event, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(event.unwrap().as_log()[&event::MESSAGE], "short".into());
-
-        let (event, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(
-            event.unwrap().as_log()[&event::MESSAGE],
-            "more short".into()
-        );
     }
 }

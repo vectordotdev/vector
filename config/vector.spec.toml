@@ -473,19 +473,28 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
-# Ingests data through the TCP protocol and outputs `log` events.
-[sources.tcp]
+# Ingests data through standard socket protocols and outputs `log` events.
+# Available socket protocols are 'tcp' and 'udp'.
+[sources.socket]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `tcp`.
+  # component to use. The value _must_ be `socket`.
   # 
   # * required
   # * type: string
   # * must be: "tcp"
-  type = "tcp"
+  type = "socket"
+
+  # The input mode
+  #
+  # * required
+  # * type: string
+  # * enum: "tcp", "udp"
+  mode = "tcp"
+  mode = "udp"
 
   # The address to listen for connections on, or "systemd#N" to use the Nth
   # socket passed by systemd socket activation.
@@ -505,6 +514,7 @@ dns_servers = ["0.0.0.0:53"]
   max_length = 102400
 
   # The timeout before a connection is forcefully closed during shutdown.
+  # Only valid for "tcp" connections.
   # 
   # * optional
   # * default: 30
@@ -523,44 +533,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
-# Ingests data through the UDP protocol and outputs `log` events.
-[sources.udp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `udp`.
-  # 
-  # * required
-  # * type: string
-  # * must be: "udp"
-  type = "udp"
-
-  # The address to bind the socket to.
-  # 
-  # * required
-  # * type: string
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * type: int
-  # * unit: bytes
-  max_length = 102400
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  # * type: string
-  host_key = "host"
 
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]

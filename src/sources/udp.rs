@@ -1,7 +1,4 @@
-use crate::{
-    event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-};
+use crate::event::Event;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -24,31 +21,6 @@ impl UdpConfig {
             address,
             host_key: None,
         }
-    }
-}
-
-inventory::submit! {
-    SourceDescription::new_without_default::<UdpConfig>("udp")
-}
-
-#[typetag::serde(name = "udp")]
-impl SourceConfig for UdpConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
-        let host_key = self.host_key.clone().unwrap_or(event::HOST.clone());
-        Ok(udp(self.address, host_key, out))
-    }
-
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn source_type(&self) -> &'static str {
-        "udp"
     }
 }
 
@@ -85,112 +57,4 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
                 .map(|_| ())
         }),
     )
-}
-
-#[cfg(test)]
-mod test {
-    use super::UdpConfig;
-    use crate::event;
-    use crate::runtime;
-    use crate::test_util::{collect_n, next_addr};
-    use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures::sync::mpsc;
-    use std::{
-        net::{SocketAddr, UdpSocket},
-        thread,
-        time::Duration,
-    };
-
-    fn send_lines<'a>(addr: SocketAddr, lines: impl IntoIterator<Item = &'a str>) -> SocketAddr {
-        let bind = next_addr();
-
-        let socket = UdpSocket::bind(bind)
-            .map_err(|e| panic!("{:}", e))
-            .ok()
-            .unwrap();
-
-        for line in lines {
-            assert_eq!(
-                socket
-                    .send_to(line.as_bytes(), addr)
-                    .map_err(|e| panic!("{:}", e))
-                    .ok()
-                    .unwrap(),
-                line.as_bytes().len()
-            );
-            // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(1));
-        }
-
-        // Give packets some time to flow through
-        thread::sleep(Duration::from_millis(10));
-
-        // Done
-        bind
-    }
-
-    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, runtime::Runtime) {
-        let addr = next_addr();
-
-        let server = UdpConfig::new(addr)
-            .build("default", &GlobalOptions::default(), sender)
-            .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(server);
-
-        // Wait for udp to start listening
-        thread::sleep(Duration::from_millis(100));
-
-        (addr, rt)
-    }
-
-    #[test]
-    fn udp_message() {
-        let (tx, rx) = mpsc::channel(2);
-
-        let (address, mut rt) = init_udp(tx);
-
-        send_lines(address, vec!["test"]);
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
-
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-    }
-
-    #[test]
-    fn udp_multiple_messages() {
-        let (tx, rx) = mpsc::channel(10);
-
-        let (address, mut rt) = init_udp(tx);
-
-        send_lines(address, vec!["test\ntest2"]);
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
-
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
-    }
-
-    #[test]
-    fn udp_multiple_packets() {
-        let (tx, rx) = mpsc::channel(10);
-
-        let (address, mut rt) = init_udp(tx);
-
-        send_lines(address, vec!["test", "test2"]);
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
-
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
-    }
-
-    #[test]
-    fn udp_it_includes_host() {
-        let (tx, rx) = mpsc::channel(2);
-
-        let (address, mut rt) = init_udp(tx);
-
-        let from = send_lines(address, vec!["test"]);
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
-
-        assert_eq!(events[0].as_log()[&event::HOST], format!("{}", from).into());
-    }
 }
