@@ -186,6 +186,9 @@ function ReleaseDownload() {
               ]
             }>
             <TabItem value="older">
+              <Alert type="warning">
+                Olders versions are likely to contain bugs. It is highly recommended to use the latest version. Please proceed with caution.
+              </Alert>
               <Select
                 className={classnames('react-select-container', styles.releaseSelect)}
                 classNamePrefix="react-select"
@@ -200,11 +203,10 @@ function ReleaseDownload() {
               <DownloadTable version={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}`} />
             </TabItem>
             <TabItem value="nightly">
-              <DownloadTable version="nightly" date={nightlyDate} downloads={nightlyDownloads} releaseNotesPath="fdsf" />
-
               <Alert type="warning">
                 Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.
               </Alert>
+              <DownloadTable version="nightly" date={nightlyDate} downloads={nightlyDownloads} releaseNotesPath="fdsf" />
             </TabItem>
             </Tabs>
           </div>
