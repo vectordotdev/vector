@@ -6,8 +6,7 @@
  *
  * Note: The primary colors were generated with colorbox via:
  *
- * Light: https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
- * Dark: https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
+ * https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
  */
 :root {
   --ifm-background-color: white;
@@ -44,14 +43,14 @@
   --ifm-color-emphasis-75: var(--ifm-color-gray-75);
   --ifm-color-pink: #f44af5;
   --ifm-color-pink-rgb: 244, 74 ,245;
-  --ifm-color-primary: #25C5DC;
-  --ifm-color-primary-rgb: 37, 197, 220;
-  --ifm-color-primary-dark: #0EAED0;
-  --ifm-color-primary-darker: #038EBD;
+  --ifm-color-primary: #28D9F2;
+  --ifm-color-primary-rgb: 40, 217, 242;
+  --ifm-color-primary-dark: #0FBCE1;
+  --ifm-color-primary-darker: #0395C7;
   --ifm-color-primary-darkest: #006EA6;
-  --ifm-color-primary-light: #49D4E3;
-  --ifm-color-primary-lighter: #5FD8E4;
-  --ifm-color-primary-lightest: #76DCE6;
+  --ifm-color-primary-light: #51EBFB;
+  --ifm-color-primary-lighter: #6AF0FD;
+  --ifm-color-primary-lightest: #83F5FF;
   --ifm-color-secondary: var(--ifm-color-emphasis-100);
   --ifm-color-success: #00ff7f;
   --ifm-color-success-rgb: 0, 255, 127;
@@ -75,6 +74,7 @@
   --ifm-hr-border-color: var(--ifm-contents-border-color);
   --ifm-leading: calc(var(--ifm-leading-desktop) * 1em);
   --ifm-line-height-base: 1.7;
+  --ifm-link-color: var(--ifm-color-primary-dark);
   --ifm-menu-color: var(--ifm-color-emphasis-600);
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-navbar-link-color: var(--ifm-heading-color);
@@ -1208,6 +1208,9 @@ table {
 .table-of-contents ul.contents > li ul {
   border-left: 1px solid var(--ifm-hr-border-color);
 }
+.table-of-contents ul.contents > li > ul > li:last-child {
+  margin-bottom: 0;
+}
 @media (max-width: 996px) {
   .table-of-contents {
     display: none;
@@ -1533,17 +1536,10 @@ html[data-theme="dark"] {
   --ifm-color-gray-960: rgba(224, 235, 247, calc( 1 - 0.96 ));
   --ifm-color-gray-975: rgba(224, 235, 247, calc( 1 - 0.975 ));
   --ifm-color-gray-1000: rgb(224, 235, 247);
-  --ifm-color-primary: #28D9F2;
-  --ifm-color-primary-rgb: 40, 217, 242;
-  --ifm-color-primary-dark: #0FBCE1;
-  --ifm-color-primary-darker: #0395C7;
-  --ifm-color-primary-darkest: #006EA6;
-  --ifm-color-primary-light: #51EBFB;
-  --ifm-color-primary-lighter: #6AF0FD;
-  --ifm-color-primary-lightest: #83F5FF;
   --ifm-contents-border-color: var(--ifm-color-emphasis-75);
   --ifm-global-shadow-md: 0 3px 8px 0px rgba(0, 0, 0, 0.2);
   --ifm-heading-color: var(--ifm-color-gray-1000);
+  --ifm-link-color: var(--ifm-color-primary);
   --ifm-navbar-search-input-icon: url('data:image/svg+xml;utf8,<svg fill="rgb(224, 235, 247)" alt="Search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" height="16px" width="16px"><path d="M6.02945,10.20327a4.17382,4.17382,0,1,1,4.17382-4.17382A4.15609,4.15609,0,0,1,6.02945,10.20327Zm9.69195,4.2199L10.8989,9.59979A5.88021,5.88021,0,0,0,12.058,6.02856,6.00467,6.00467,0,1,0,9.59979,10.8989l4.82338,4.82338a.89729.89729,0,0,0,1.29912,0,.89749.89749,0,0,0-.00087-1.29909Z" /></svg>');
   --ifm-panel-background: var(--ifm-color-emphasis-50);
   --ifm-panel-background-rgb: 37, 37, 50;
