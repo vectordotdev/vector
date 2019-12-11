@@ -100,7 +100,7 @@
             <Shortcut
               Id="VectorCmdShortcut"
               Name="Vector CMD"
-              Description="Vector command prompt environment"
+              Description="Vector's command prompt environment"
               Directory="VectorStartMenuDir"
               Icon="VectorIco"
               Target="[INSTALLDIR]vector-cmd.bat"
@@ -108,10 +108,17 @@
             <Shortcut
               Id="VectorDocsShortcut"
               Name="Documentation"
-              Description="Vector documentation website"
+              Description="Vector's documentation website"
               Directory="VectorStartMenuDir"
               Icon="DocsIco"
               Target="[DocsURL]"
+              />
+            <Shortcut
+              Id="VectorConfigShortcut"
+              Name="Configuration"
+              Description="Vector's configuration folder"
+              Directory="VectorStartMenuDir"
+              Target="[INSTALLDIR]config"
               />
             <RemoveFolder
               Id="RemoveStartMenuDirVectorCmd"
@@ -127,27 +134,6 @@
               KeyPath="yes"
               />
           </Component>
-          <!--
-          <Component
-            Id="VectorDocsShortcutComponent"
-            Guid="2694AC50-93BC-4A32-836E-76B19DBB6533"
-            >
-            <RemoveFolder
-              Id="RemoveStartMenuDirVectorDocs"
-              Directory="VectorStartMenuDir"
-              On="uninstall"
-              />
-            <RegistryValue
-              Root="HKCU"
-              Key="Software\Vector"
-              Name="installed"
-              Type="integer"
-              Value="1"
-              KeyPath="yes"
-              />
-          </Component>
-          -->
-
         </Directory>
       </Directory>
     </Directory>
@@ -167,11 +153,6 @@
       <ComponentRef
         Id="VectorCmdShortcutComponent"
         />
-      <!--
-      <ComponentRef
-        Id="VectorDocsShortcutComponent"
-        />
-      -->
     </Feature>
   </Product>
 </Wix>
