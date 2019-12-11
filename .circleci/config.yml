@@ -211,7 +211,7 @@ jobs:
           paths:
             - "*-x86_64-apple-darwin.tar.gz"
 
-  build-x86_64-pc-windows-msvc-archive:
+  build-x86_64-pc-windows-msvc-archive-and-msi-package:
     executor: win/vs2019
     steps:
       - checkout
@@ -250,29 +250,42 @@ jobs:
             msiexec /quiet /i cmake-installer.msi
             del cmake-installer.msi
       - run:
+          name: Install WiX
+          shell: bash
+          command: |
+            mkdir -p /c/wix
+            cd /c/wix
+            curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+            unzip wix-binaries.zip
+            rm wix-binaries.zip
+      - run:
           name: Build archive
           shell: bash
           no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            function zip() {
-              powershell Compress-Archive $3 $2
-            }
-            export -f zip
-
             export RUSTFLAGS=-Ctarget-feature=+crt-static
             export FEATURES="default-msvc"
             export ARCHIVE_TYPE="zip"
+            export OS_FAMILY="windows"
             export STRIP="false"
             export RUST_LTO=""
             export TARGET="x86_64-pc-windows-msvc"
 
             ./scripts/build-archive.sh
             ls -lha target/artifacts
+      - run:
+          name: Build MSI package
+          shell: bash
+          no_output_timeout: 30m
+          command: |
+            export PATH="/c/wix:$PATH"
+            ./scripts/package-msi.sh
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-x86_64-pc-windows-msvc.zip"
+            - "vector-x64.msi"
 
   build-x86_64-unknown-linux-musl-archive-and-deb-package:
     <<: *docker-machine
@@ -488,8 +501,10 @@ jobs:
           name: Verify archive
           command: |
             ./scripts/docker-run.sh verifier-wine bash -x \<<EOF
-              unzip target/artifacts/*-x86_64-pc-windows-msvc.zip
-              wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+              mkdir -p dest
+              cd dest
+              unzip ../target/artifacts/*-x86_64-pc-windows-msvc.zip
+              wine ./bin/vector.exe --version
             EOF
 
   verify-docker:
@@ -761,7 +776,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - package-rpm-aarch64-unknown-linux-musl
     - package-rpm-armv7-unknown-linux-musleabihf
     - build-x86_64-apple-darwin-archive
-    - build-x86_64-pc-windows-msvc-archive
+    - build-x86_64-pc-windows-msvc-archive-and-msi-package
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
     - verify-deb-artifact-on-deb-10
@@ -799,7 +814,7 @@ workflows:
       - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -832,7 +847,7 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           requires:
-            - build-x86_64-pc-windows-msvc-archive
+            - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -873,7 +888,7 @@ workflows:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
-      - build-x86_64-pc-windows-msvc-archive:
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package:
           <<: *release-filters
       - package-rpm-x86_64-unknown-linux-musl:
           <<: *release-filters
@@ -913,7 +928,7 @@ workflows:
       - verify-zip-artifact-on-wine:
           <<: *release-filters
           requires:
-            - build-x86_64-pc-windows-msvc-archive
+            - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - verify-docker:
           <<: *release-filters
           requires:
@@ -973,7 +988,7 @@ workflows:
       - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -1007,7 +1022,7 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           requires:
-            - build-x86_64-pc-windows-msvc-archive
+            - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package

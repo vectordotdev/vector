@@ -14,12 +14,14 @@
 #   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
 #   $ARCHIVE_TYPE - archive type, either "tar.gz" or "zip"
+#   $OS_FAMILY - OS family, either "posix" or "windows"
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
 ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
+OS_FAMILY=${OS_FAMILY:-posix}
 
 if [ -z "$FEATURES" ]; then
     FEATURES="default"
@@ -97,8 +99,13 @@ rm -rf $archive_dir
 mkdir -p $archive_dir
 
 # Copy root level files
-cp -av README.md $archive_dir
-cp -av LICENSE $archive_dir
+if [ "$OS_FAMILY" == "windows" ]; then
+  suffix=".txt"
+else
+  suffix=""
+fi
+cp -av README.md $archive_dir/README.md$suffix
+cp -av LICENSE $archive_dir/LICENSE$suffix
 
 # Copy the vector binary to /bin
 mkdir -p $archive_dir/bin
@@ -115,14 +122,17 @@ cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
 mkdir -p $archive_dir/etc/init.d
 cp -av distribution/init.d/vector $archive_dir/etc/init.d
 
-# Build the release tar
+# Build the release archive
 _old_dir=$(pwd)
 cd $target_dir
-case $ARCHIVE_TYPE in
-  tar.gz) make_archive="tar -czvf" ;;
-  zip) make_archive="zip -r" ;;
-esac
-$make_archive vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
+if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
+  tar czvf vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
+elif [ "$ARCHIVE_TYPE" == "zip" ] && [ "$OS_FAMILY" == "windows" ]; then
+  powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'$TARGET'.'$ARCHIVE_TYPE' -Path "./'$archive_dir_name'/*"'
+else
+  echo "Unsupported combination of ARCHIVE_TYPE and OS_FAMILY"
+  exit 1
+fi
 cd $_old_dir
 
 # Move to the artifacts dir
