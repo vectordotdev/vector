@@ -141,7 +141,7 @@ impl PubsubConfig {
             creds.apply(&mut request);
         }
 
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        let https = HttpsConnector::new(1).expect("TLS initialization failed");
         let client = Client::builder().build(https);
         let creds = creds.clone();
         let healthcheck = client
