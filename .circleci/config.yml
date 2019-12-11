@@ -267,7 +267,6 @@ jobs:
             export RUSTFLAGS=-Ctarget-feature=+crt-static
             export FEATURES="default-msvc"
             export ARCHIVE_TYPE="zip"
-            export OS_FAMILY="windows"
             export STRIP="false"
             export RUST_LTO=""
             export TARGET="x86_64-pc-windows-msvc"
