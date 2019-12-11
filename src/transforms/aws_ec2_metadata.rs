@@ -184,7 +184,7 @@ impl Transform for Ec2MetadataTransform {
 struct MetadataClient {
     client: Client<HttpConnector, Body>,
     host: Uri,
-    token: Option<Bytes>,
+    token: Option<(Bytes, Instant)>,
     keys: Keys,
     state: WriteHandle,
     refresh_interval: Duration,
@@ -238,30 +238,36 @@ impl MetadataClient {
     }
 
     pub async fn get_token(&mut self) -> Result<Bytes, crate::Error> {
-        if let Some(token) = self.token.clone() {
-            Ok(token)
-        } else {
-            let mut parts = self.host.clone().into_parts();
-            parts.path_and_query = Some(API_TOKEN.clone());
-            let uri = Uri::from_parts(parts)?;
-
-            let req = Request::put(uri)
-                .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-                .body(Body::empty())?;
-
-            let res = self.client.request(req).compat().await?;
-
-            if res.status() != StatusCode::OK {
-                return Err(Ec2MetadataError::UnableToFetchToken.into());
+        if let Some((token, next_refresh)) = self.token.clone() {
+            // If the next refresh is greater (in the future) than
+            // the current time we can return the token since its still valid
+            // otherwise lets refresh it.
+            if next_refresh > Instant::now() {
+                return Ok(token);
             }
-
-            let body = res.into_body().concat2().compat().await?;
-            let token = body.into_bytes();
-
-            self.token = Some(token.clone());
-
-            Ok(token)
         }
+
+        let mut parts = self.host.clone().into_parts();
+        parts.path_and_query = Some(API_TOKEN.clone());
+        let uri = Uri::from_parts(parts)?;
+
+        let req = Request::put(uri)
+            .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+            .body(Body::empty())?;
+
+        let res = self.client.request(req).compat().await?;
+
+        if res.status() != StatusCode::OK {
+            return Err(Ec2MetadataError::UnableToFetchToken.into());
+        }
+
+        let body = res.into_body().concat2().compat().await?;
+        let token = body.into_bytes();
+
+        let next_refresh = Instant::now() + Duration::from_secs(21600);
+        self.token = Some((token.clone(), next_refresh));
+
+        Ok(token)
     }
 
     pub async fn get_document(&mut self) -> Result<Option<DynamicIdentityDocument>, crate::Error> {
