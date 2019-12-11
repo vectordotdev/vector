@@ -1,7 +1,7 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
 use crate::sinks::util::Batch;
-use std::cmp::{Ordering, PartialOrd};
+use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
 
@@ -52,12 +52,6 @@ impl PartialEq for MetricEntry {
         let hash2 = state.finish();
 
         hash1 == hash2
-    }
-}
-
-impl PartialOrd for MetricEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.name.partial_cmp(&other.0.name)
     }
 }
 

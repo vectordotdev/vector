@@ -170,6 +170,13 @@ mod test {
             .collect::<Vec<_>>();
 
         assert_eq!(lines, vec![
+            "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
+            "# TYPE vector_promhttp_metric_handler_requests_total counter",
+            "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100",
+            "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7",
+            "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
+            "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
+            "vector_prometheus_remote_storage_samples_in_total 57011636",
             "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
             "# TYPE vector_http_request_duration_seconds histogram",
             "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054",
@@ -180,13 +187,6 @@ mod test {
             "vector_http_request_duration_seconds_bucket{le=\"+Inf\"} 144320",
             "vector_http_request_duration_seconds_sum 53423",
             "vector_http_request_duration_seconds_count 144320",
-            "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
-            "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
-            "vector_prometheus_remote_storage_samples_in_total 57011636",
-            "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
-            "# TYPE vector_promhttp_metric_handler_requests_total counter",
-            "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100",
-            "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7",
             "# HELP vector_rpc_duration_seconds rpc_duration_seconds",
             "# TYPE vector_rpc_duration_seconds summary",
             "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.01\"} 3102",

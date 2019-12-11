@@ -10,6 +10,7 @@ use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::{
     header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
 };
+use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -72,7 +73,7 @@ impl SinkConfig for PrometheusSinkConfig {
 struct PrometheusSink {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusSinkConfig,
-    metrics: Arc<RwLock<HashSet<MetricEntry>>>,
+    metrics: Arc<RwLock<IndexSet<MetricEntry>>>,
     last_flush_timestamp: Arc<RwLock<i64>>,
     acker: Acker,
 }
@@ -250,7 +251,7 @@ fn handle(
     namespace: &str,
     buckets: &[f64],
     expired: bool,
-    metrics: &HashSet<MetricEntry>,
+    metrics: &IndexSet<MetricEntry>,
 ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let mut response = Response::new(Body::empty());
 
@@ -260,9 +261,6 @@ fn handle(
 
             // output headers only once
             let mut processed_headers = HashSet::new();
-
-            let mut metrics: Vec<_> = metrics.iter().collect();
-            metrics.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
             for metric in metrics {
                 let name = &metric.0.name;
@@ -301,7 +299,7 @@ impl PrometheusSink {
         Self {
             server_shutdown_trigger: None,
             config,
-            metrics: Arc::new(RwLock::new(HashSet::new())),
+            metrics: Arc::new(RwLock::new(IndexSet::new())),
             last_flush_timestamp: Arc::new(RwLock::new(Utc::now().timestamp())),
             acker,
         }
