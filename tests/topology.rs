@@ -33,13 +33,6 @@ fn into_message(event: Event) -> String {
     event.as_log().get(&MESSAGE).unwrap().to_string_lossy()
 }
 
-fn sleep_ms(dur: u64) {
-    std::thread::sleep(std::time::Duration::from_millis(dur));
-}
-
-// The duration at which we let the runtime spawn its extra tasks.
-const RUNTIME_SLEEP_DURATION: u64 = 50;
-
 #[test]
 fn topology_source_and_sink() {
     let mut rt = runtime();
@@ -54,8 +47,6 @@ fn topology_source_and_sink() {
 
     let event = Event::from("this");
     in1.send(event.clone()).wait().unwrap();
-
-    sleep_ms(RUNTIME_SLEEP_DURATION);
 
     rt.block_on(topology.stop()).unwrap();
 
@@ -116,8 +107,6 @@ fn topology_multiple_sinks() {
 
     in1.send(event.clone()).wait().unwrap();
 
-    sleep_ms(RUNTIME_SLEEP_DURATION);
-
     rt.block_on(topology.stop()).unwrap();
 
     let res1 = out1.collect().wait().unwrap();
@@ -147,8 +136,6 @@ fn topology_transform_chain() {
     let event = Event::from("this");
 
     in1.send(event.clone()).wait().unwrap();
-
-    sleep_ms(RUNTIME_SLEEP_DURATION);
 
     rt.block_on(topology.stop()).unwrap();
 
@@ -216,8 +203,6 @@ fn topology_remove_one_sink() {
     let event = Event::from("this");
 
     in1.send(event.clone()).wait().unwrap();
-
-    sleep_ms(RUNTIME_SLEEP_DURATION);
 
     rt.block_on(topology.stop()).unwrap();
 
