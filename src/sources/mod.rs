@@ -7,6 +7,7 @@ pub mod journald;
 pub mod kafka;
 pub mod kubernetes;
 pub mod socket;
+pub mod prometheus;
 pub mod splunk_hec;
 pub mod statsd;
 pub mod stdin;

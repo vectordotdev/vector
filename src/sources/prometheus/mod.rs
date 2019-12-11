@@ -103,6 +103,7 @@ mod test {
                     # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
                     # TYPE promhttp_metric_handler_requests_total counter
                     promhttp_metric_handler_requests_total{code="200"} 100
+                    promhttp_metric_handler_requests_total{code="404"} 7
                     prometheus_remote_storage_samples_in_total 57011636
                     # A histogram, which has a pretty complex representation in the text format:
                     # HELP http_request_duration_seconds A histogram of the request duration.
@@ -185,6 +186,7 @@ mod test {
             "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
             "# TYPE vector_promhttp_metric_handler_requests_total counter",
             "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100",
+            "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7",
             "# HELP vector_rpc_duration_seconds rpc_duration_seconds",
             "# TYPE vector_rpc_duration_seconds summary",
             "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.01\"} 3102",
