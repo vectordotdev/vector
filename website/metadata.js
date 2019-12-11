@@ -18056,6 +18056,28 @@ module.exports = {
 
       ]
     },
+    "rabbitmq": {
+      "beta": true,
+      "delivery_guarantee": "at-least-once",
+      "description": "Streams log events to [RabbitMQ][urls.rabbitmq] via the [AMQP 0.91 protocol][urls.amqp_091].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "rabbitmq_sink",
+      "name": "rabbitmq",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": "Pivotal",
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "splunk_hec": {
       "beta": false,
       "delivery_guarantee": "at_least_once",

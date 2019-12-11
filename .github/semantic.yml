@@ -90,6 +90,7 @@ scopes:
   - kafka sink
   - new_relic_logs sink
   - prometheus sink
+  - rabbitmq sink
   - splunk_hec sink
   - statsd sink
   - tcp sink

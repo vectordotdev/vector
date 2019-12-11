@@ -1,0 +1,136 @@
+[sinks.rabbitmq]
+beta = true
+buffer = true
+common = true
+delivery_guarantee = "at-least-once"
+egress_method = "streaming"
+encodings = ["json", "text"]
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+service_provider = "Pivotal"
+write_to_description = "[RabbitMQ][urls.rabbitmq] via the [AMQP 0.91 protocol][urls.amqp_091]"
+
+[sinks.rabbitmq.options.uri]
+type = "string"
+common = true
+examples = ["amqp://127.0.0.1:5672/%2f", "amqp://guest:guest@127.0.0.1:5672/%2f"]
+null = false
+description = "The URI of a target RabbitMQ broker."
+
+[sinks.rabbitmq.options.exchange]
+type = "string"
+common = true
+examples = ["foo-exchange"]
+null = true
+description = "The exchange to publish messages to, if left empty uses the default exchange."
+
+[sinks.rabbitmq.options.routing_key]
+type = "string"
+common = true
+examples = ["bar-key"]
+null = false
+description = "A routing key for messages published to the target exchange."
+
+[sinks.rabbitmq.options.mandatory]
+type = "bool"
+common = true
+null = true
+default = false
+description = "Whether to set the mandatory flag for published messages."
+
+[sinks.rabbitmq.options.immediate]
+type = "bool"
+common = true
+null = true
+default = false
+description = "Whether to set the immediate flag for published messages."
+
+[sinks.rabbitmq.options.sasl_mechanism]
+type = "string"
+common = false
+null = true
+default = "plain"
+description = "The SASL mechanism to use for authentication."
+
+[sinks.rabbitmq.options.sasl_mechanism.enum]
+plain = "Default plain login"
+external = "Delegate authentication to the transport instead of the RabbitMQ server"
+
+[sinks.rabbitmq.options.exchange_declare]
+type = "table"
+null = true
+common = false
+description = "Optionally declare an exchange once a connection is established."
+
+[sinks.rabbitmq.options.exchange_declare.options.kind]
+type = "string"
+common = false
+null = true
+default = "direct"
+description = "The kind of exchange to declare."
+
+[sinks.rabbitmq.options.exchange_declare.options.kind.enum]
+direct = "Delivers messages to queues based on the message routing key"
+fanout = "Routes messages to all of the queues that are bound to it and the routing key is ignored"
+headers = "Routes on multiple attributes that are more easily expressed as message headers than a routing key"
+topic = "Routes messages to one or many queues based on matching a message routing key and the pattern used to bind a queue"
+
+[sinks.rabbitmq.options.exchange_declare.options.passive]
+type = "bool"
+common = false
+null = true
+default = false
+description = "Whether to set the passive flag for the declared exchange."
+
+[sinks.rabbitmq.options.exchange_declare.options.durable]
+type = "bool"
+common = false
+null = true
+default = true
+description = "Whether to set the durable flag for the declared exchange."
+
+[sinks.rabbitmq.options.exchange_declare.options.auto_delete]
+type = "bool"
+common = false
+null = true
+default = false
+description = "Whether to set the auto delete flag for the declared exchange."
+
+[sinks.rabbitmq.options.exchange_declare.options.internal]
+type = "bool"
+common = false
+null = true
+default = false
+description = "Whether to set the internal flag for the declared exchange."
+
+[sinks.rabbitmq.options.exchange_declare.options.nowait]
+type = "bool"
+common = false
+null = true
+default = false
+description = "Whether to set the nowait flag for the declared exchange."
+
+[sinks.rabbitmq.options.exchange_declare.options.field_table]
+type = "table"
+common = false
+null = true
+description = "Arbitrary fields to set for the declared exchange."
+
+[sinks.rabbitmq.options.exchange_declare.options.field_table.options."`[field-name]`"]
+type = "*"
+null = false
+examples = [
+  {"my_string_field" = "string value"},
+  {"my_env_var_field" = "${ENV_VAR}"},
+  {"my_int_field" = 1},
+  {"my_float_field" = 1.2},
+  {"my_bool_field" = true},
+  {"my_timestamp_field" = 1979-05-27T00:32:00.999999-07:00},
+  {"my_nested_fields" = {key1 = "value1", key2 = "value2"}},
+  {"my_list" = ["first", "second", "third"]},
+]
+description = """\
+The name of the field to add. Accepts all \
+[supported types][docs.configuration#types].\
+"""

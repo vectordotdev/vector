@@ -212,6 +212,8 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
+              "reference/sinks/rabbitmq",
+            
               "reference/sinks/splunk_hec",
             
               "reference/sinks/statsd",
