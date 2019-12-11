@@ -520,4 +520,54 @@ mod tests {
         );
         assert_eq!(frame, "requests_bucket{le=\"0\"} 0\nrequests_bucket{le=\"2.5\"} 6\nrequests_bucket{le=\"5\"} 8\nrequests_bucket{le=\"+Inf\"} 8\nrequests_sum 15\nrequests_count 8\n".to_owned());
     }
+
+    #[test]
+    fn test_encode_histogram() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedHistogram {
+                buckets: vec![1.0, 2.1, 3.0],
+                counts: vec![1, 2, 3],
+                count: 6,
+                sum: 12.5,
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests histogram\n".to_owned()
+        );
+        assert_eq!(frame, "requests_bucket{le=\"1\"} 1\nrequests_bucket{le=\"2.1\"} 2\nrequests_bucket{le=\"3\"} 3\nrequests_bucket{le=\"+Inf\"} 6\nrequests_sum 12.5\nrequests_count 6\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_summary() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedSummary {
+                quantiles: vec![0.01, 0.5, 0.99],
+                values: vec![1.5, 2.0, 3.0],
+                count: 6,
+                sum: 12.0,
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+        );
+        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.01\"} 1.5\nrequests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 12\nrequests_count{code=\"200\"} 6\n".to_owned());
+    }
 }
