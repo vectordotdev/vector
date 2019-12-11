@@ -124,7 +124,7 @@ exitcode = "1.1.2"
 snafu = { version = "0.4.3", features = ["futures-01"] }
 url = "1.7"
 base64 = "0.10.1"
-shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber", default-features = false, features = ["tls"] }
+shiplift = { version = "0.6", default-features = false, features = ["tls"] }
 owning_ref = "0.4.0"
 trust-dns-resolver = { version = "0.12", features = ["serde-config"]}
 trust-dns-proto = { version = "0.8" }
