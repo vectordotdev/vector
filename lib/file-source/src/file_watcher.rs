@@ -58,7 +58,8 @@ impl FileWatcher {
                 // already have a stored file position from a previous run.
                 debug!(
                     message = "Not re-reading gzipped file with existing stored offset",
-                    ?path
+                    ?path,
+                    %file_position
                 );
                 (Box::new(null_reader()), file_position)
             } else {
