@@ -57,20 +57,20 @@ module.exports = {
           items: [
             {
               label: 'Sources',
-              to: 'docs/components/sources',
+              to: 'docs/reference/sources',
             },
             {
               label: 'Transforms',
-              to: 'docs/components/trasnforms',
+              to: 'docs/reference/trasnforms',
             },
             {
               label: 'Sinks',
-              to: 'docs/components/sinks',
+              to: 'docs/reference/sinks',
             },
           ],
         },
         {
-          title: 'Docs',
+          title: 'Setup',
           items: [
             {
               label: 'Install',
@@ -102,8 +102,12 @@ module.exports = {
               to: 'https://github.com/timberio/vector',
             },
             {
+              label: 'Twitter',
+              to: 'https://twitter.com/timberdotio',
+            },
+            {
               label: 'Mailing List',
-              to: 'mailing-list',
+              to: 'mailing_list',
             },
             {
               label: 'Blog',
