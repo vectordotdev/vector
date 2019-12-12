@@ -23,7 +23,7 @@ reliability and performance is brought to Windows as it is on Linux.
 
 Beyond Rust's tier 1 support for Windows, Vector does not require the
 installation of any dependencies. This makes installation as simple as copying
-the Vector binary onto your machine. There are not additional DLL files to
+the Vector binary onto your machine. There are no additional DLL files to
 install or environment changes required.
 
 ## Windows Installer Support
