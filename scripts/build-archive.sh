@@ -94,7 +94,7 @@ fi
 
 # Build the archive directory
 rm -rf $archive_dir
-mkdir -p $archive_dira
+mkdir -p $archive_dir
 
 # Copy root level files
 
