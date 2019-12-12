@@ -51,8 +51,8 @@ fn is_comment(input: &str) -> bool {
 }
 
 fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
+    // example:
     // # TYPE uptime counter
-    // 0 1    2      3
     let tokens: Vec<_> = input.split_ascii_whitespace().collect();
 
     if tokens.len() != 4 {
@@ -150,7 +150,7 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
             tags,
         })
     } else {
-        // there as no labels
+        // there are no labels
         // example: http_requests_total 1027 1395066363000
         let parts = input.split(' ').collect::<Vec<_>>();
         if parts.len() < 2 {
@@ -328,14 +328,14 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     if v.len() < 2 {
                         return Err(ParserError::Malformed("expected histogram name suffix"));
                     }
+                    let (name, suffix) = (v[1], v[0]);
 
                     let mut id: Vec<_> = tags.iter().collect();
-                    let (name, suffix) = (v[1], v[0]);
                     id.sort();
-                    let id = format!("{:?}{:?}", name, id);
+                    let group_key = format!("{:?}", id);
 
-                    let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
-                        name: v[1].to_owned(),
+                    let aggregate = aggregates.entry(group_key).or_insert(ParserAggregate {
+                        name: name.to_owned(),
                         bounds: Vec::new(),
                         values: Vec::new(),
                         count: 0,
@@ -410,9 +410,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let mut id: Vec<_> = tags.iter().collect();
                     id.sort();
-                    let id = format!("{:?}{:?}", name, id);
+                    let group_key = format!("{:?}", id);
 
-                    let aggregate = aggregates.entry(id.clone()).or_insert(ParserAggregate {
+                    let aggregate = aggregates.entry(group_key).or_insert(ParserAggregate {
                         name: name.to_owned(),
                         bounds: Vec::new(),
                         values: Vec::new(),
