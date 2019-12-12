@@ -237,7 +237,12 @@ commits = [
 {sha = "86abe53556fd7647717ddfecc21834f87adaa62b", message = "chore(docker source): Update `shiplift 0.6` (#1335)", author = "Lucio Franco", date = 2019-12-09T10:57:26Z, files_count = 2, insertions_count = 7, deletions_count = 7},
 {sha = "4b93936dc588438a3023a6d86075ca75a33921f3", message = "docs: Rewrite getting started guide. (#1332)", author = "Ashley Jeffs", date = 2019-12-09T16:04:27Z, files_count = 1, insertions_count = 76, deletions_count = 54},
 {sha = "5461ff419b9587264bbce823af227e1a3007a578", message = "docs: Update contribution guide for docs", author = "Ashley Jeffs", date = 2019-12-09T16:05:58Z, files_count = 2, insertions_count = 53, deletions_count = 18},
-{sha = "285b967ab228a94b4a140803cec38b71bb59ad14", message = "fix(grok_parser transform): Add missing rate limited log (#1336)", author = "Lucio Franco", date = 2019-12-09T11:06:50Z, files_count = 1, insertions_count = 1}
+{sha = "285b967ab228a94b4a140803cec38b71bb59ad14", message = "fix(grok_parser transform): Add missing rate limited log (#1336)", author = "Lucio Franco", date = 2019-12-09T11:06:50Z, files_count = 1, insertions_count = 1},
+{sha = "137c51de9122c32cbbfba983f3068b6df1d6a68e", message = "docs: Edit getting started guide", author = "Ashley Jeffs", date = 2019-12-10T09:34:53Z, files_count = 1, insertions_count = 2, deletions_count = 2},
+{sha = "5c2c0af26554258d746051a5861ce9aaa869a8be", message = "docs: Fix unit test spec rendering", author = "Ashley Jeffs", date = 2019-12-10T16:42:08Z, files_count = 5, insertions_count = 43, deletions_count = 39},
+{sha = "da89fa9fd801ff6f87412fb78d686936115b241c", message = "chore(operations): Build `msi` package for Vector (#1345)", author = "Alexander Rodin", date = 2019-12-11T17:09:12Z, files_count = 23, insertions_count = 780, deletions_count = 44},
+{sha = "8561d42eba3c5d30d57ab47c6454f19978c5ea4b", message = "fix(testing): Remove sleeps from topology tests (#1346)", author = "Luke Steensen", date = 2019-12-11T15:56:33Z, files_count = 2, insertions_count = 1, deletions_count = 16},
+{sha = "8c991293ee2cd478fc639e96e6c27df794a0c5ec", message = "feat(file source): Detect and read gzipped files (#1344)", author = "Luke Steensen", date = 2019-12-11T16:30:27Z, files_count = 7, insertions_count = 127, deletions_count = 21}
 ]
 
 [[releases."0.6.0".upgrade_guides]]
