@@ -45,7 +45,6 @@ commands =
   git tag -d v#{version}
   git push --delete origin v#{version}
   #{branch_commands}
-  git reset HEAD~
   EOF
 
 commands.chomp!
