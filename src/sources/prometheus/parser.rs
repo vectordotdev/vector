@@ -3,7 +3,7 @@ use chrono::{offset::TimeZone, DateTime, Utc};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::{
     error, fmt,
     num::{ParseFloatError, ParseIntError},
@@ -29,7 +29,6 @@ struct ParserHeader {
 }
 
 struct ParserMetric {
-    id: String,
     name: String,
     value: f64,
     tags: HashMap<String, String>,
@@ -37,14 +36,13 @@ struct ParserMetric {
 }
 
 struct ParserAggregate {
-    // id: String,
     name: String,
     bounds: Vec<f64>,
     values: Vec<f64>,
     count: u32,
     sum: f64,
     tags: HashMap<String, String>,
-    // timestamp: Option<DateTime<Utc>>,
+    timestamp: Option<DateTime<Utc>>,
 }
 
 fn is_header(input: &str) -> bool {
@@ -161,13 +159,13 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         };
 
         Ok(ParserMetric {
-            id: first.to_string(),
             name: name.to_string(),
             value,
             tags,
             timestamp,
         })
     } else {
+        // there as no labels
         // example: http_requests_total 1027 1395066363000
         let parts = input.split(' ').collect::<Vec<_>>();
         if parts.len() < 2 {
@@ -184,7 +182,6 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         };
 
         Ok(ParserMetric {
-            id: name.to_string(),
             name: name.to_string(),
             value,
             tags: HashMap::new(),
@@ -194,6 +191,16 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
 }
 
 fn group_metrics(packet: &str) -> Result<IndexMap<ParserHeader, Vec<String>>, ParserError> {
+    // This will organise text into groups of lines, wrt to the format spec:
+    // https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
+    //
+    // All lines for a given metric must be provided as one single group,
+    // with the optional HELP and TYPE lines first (in no particular order).
+    // Beyond that, reproducible sorting in repeated expositions is preferred
+    // but not required, i.e. do not sort if the computational cost is prohibitive.
+    //
+    // Each line must have a unique combination of a metric name and labels.
+    // Otherwise, the ingestion behavior is undefined.
     let mut result = IndexMap::new();
 
     let mut current_header = ParserHeader {
@@ -277,10 +284,7 @@ fn group_metrics(packet: &str) -> Result<IndexMap<ParserHeader, Vec<String>>, Pa
 }
 
 pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
-    // https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
     let mut result = Vec::new();
-    // this will be used for deduplication
-    let mut processed_metrics = HashSet::new();
 
     for (header, group) in group_metrics(packet)? {
         // just a header without measurements
@@ -292,47 +296,45 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
             ParserType::Counter => {
                 for line in group {
                     let metric = parse_metric(&line)?;
-                    if !processed_metrics.contains(&metric.id) {
-                        let tags = if !metric.tags.is_empty() {
-                            Some(metric.tags)
-                        } else {
-                            None
-                        };
-                        let counter = Metric {
-                            name: metric.name,
-                            timestamp: metric.timestamp,
-                            tags,
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::Counter {
-                                value: metric.value,
-                            },
-                        };
-                        result.push(counter);
-                        processed_metrics.insert(metric.id);
-                    }
+                    let tags = if !metric.tags.is_empty() {
+                        Some(metric.tags)
+                    } else {
+                        None
+                    };
+
+                    let counter = Metric {
+                        name: metric.name,
+                        timestamp: metric.timestamp,
+                        tags,
+                        kind: MetricKind::Absolute,
+                        value: MetricValue::Counter {
+                            value: metric.value,
+                        },
+                    };
+
+                    result.push(counter);
                 }
             }
             ParserType::Gauge | ParserType::Untyped => {
                 for line in group {
                     let metric = parse_metric(&line)?;
-                    if !processed_metrics.contains(&metric.id) {
-                        let tags = if !metric.tags.is_empty() {
-                            Some(metric.tags)
-                        } else {
-                            None
-                        };
-                        let gauge = Metric {
-                            name: metric.name,
-                            timestamp: metric.timestamp,
-                            tags,
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::Gauge {
-                                value: metric.value,
-                            },
-                        };
-                        result.push(gauge);
-                        processed_metrics.insert(metric.id);
-                    }
+                    let tags = if !metric.tags.is_empty() {
+                        Some(metric.tags)
+                    } else {
+                        None
+                    };
+
+                    let gauge = Metric {
+                        name: metric.name,
+                        timestamp: metric.timestamp,
+                        tags,
+                        kind: MetricKind::Absolute,
+                        value: MetricValue::Gauge {
+                            value: metric.value,
+                        },
+                    };
+
+                    result.push(gauge);
                 }
             }
             ParserType::Histogram => {
@@ -360,6 +362,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         count: 0,
                         sum: 0.0,
                         tags,
+                        timestamp: None,
                     });
 
                     match suffix {
@@ -388,28 +391,27 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     }
                 }
 
-                for (id, aggregate) in aggregates {
-                    if !processed_metrics.contains(&id) {
-                        let tags = if !aggregate.tags.is_empty() {
-                            Some(aggregate.tags)
-                        } else {
-                            None
-                        };
-                        let hist = Metric {
-                            name: aggregate.name,
-                            timestamp: None,
-                            tags,
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::AggregatedHistogram {
-                                buckets: aggregate.bounds,
-                                counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
-                                count: aggregate.count,
-                                sum: aggregate.sum,
-                            },
-                        };
-                        result.push(hist);
-                        processed_metrics.insert(id);
-                    }
+                for (_, aggregate) in aggregates {
+                    let tags = if !aggregate.tags.is_empty() {
+                        Some(aggregate.tags)
+                    } else {
+                        None
+                    };
+
+                    let hist = Metric {
+                        name: aggregate.name,
+                        timestamp: aggregate.timestamp,
+                        tags,
+                        kind: MetricKind::Absolute,
+                        value: MetricValue::AggregatedHistogram {
+                            buckets: aggregate.bounds,
+                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
+                            count: aggregate.count,
+                            sum: aggregate.sum,
+                        },
+                    };
+
+                    result.push(hist);
                 }
             }
             ParserType::Summary => {
@@ -439,6 +441,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         count: 0,
                         sum: 0.0,
                         tags,
+                        timestamp: None,
                     });
 
                     match suffix {
@@ -464,28 +467,27 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     }
                 }
 
-                for (id, aggregate) in aggregates {
-                    if !processed_metrics.contains(&id) {
-                        let tags = if !aggregate.tags.is_empty() {
-                            Some(aggregate.tags)
-                        } else {
-                            None
-                        };
-                        let summary = Metric {
-                            name: aggregate.name,
-                            timestamp: None,
-                            tags,
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::AggregatedSummary {
-                                quantiles: aggregate.bounds,
-                                values: aggregate.values,
-                                count: aggregate.count,
-                                sum: aggregate.sum,
-                            },
-                        };
-                        result.push(summary);
-                        processed_metrics.insert(id);
-                    }
+                for (_id, aggregate) in aggregates {
+                    let tags = if !aggregate.tags.is_empty() {
+                        Some(aggregate.tags)
+                    } else {
+                        None
+                    };
+
+                    let summary = Metric {
+                        name: aggregate.name,
+                        timestamp: aggregate.timestamp,
+                        tags,
+                        kind: MetricKind::Absolute,
+                        value: MetricValue::AggregatedSummary {
+                            quantiles: aggregate.bounds,
+                            values: aggregate.values,
+                            count: aggregate.count,
+                            sum: aggregate.sum,
+                        },
+                    };
+
+                    result.push(summary);
                 }
             }
         }
@@ -881,39 +883,6 @@ mod test {
             "##;
 
         assert!(parse(exp).is_err());
-    }
-
-    #[test]
-    fn test_mixed_and_duplicated() {
-        let exp = r##"
-            # TYPE uptime counter
-            uptime 123.0
-            uptime 234.0
-            # TYPE temperature gauge
-            temperature -1.5
-            # TYPE uptime counter
-            uptime 345.0
-            "##;
-
-        assert_eq!(
-            parse(exp),
-            Ok(vec![
-                Metric {
-                    name: "uptime".into(),
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 123.0 },
-                },
-                Metric {
-                    name: "temperature".into(),
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: -1.5 },
-                }
-            ]),
-        );
     }
 
     #[test]
