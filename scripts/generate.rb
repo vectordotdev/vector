@@ -135,7 +135,7 @@ end
 erb_paths =
   Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
-  filter { |path| !File.basename(path).start_with?("_") }
+  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }
 
 #
 # Create missing .md files
