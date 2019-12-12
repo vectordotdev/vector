@@ -6,6 +6,11 @@
 #
 #   Uploads target/artifacts to Github releases
 
+require_relative "setup"
+
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+release = metadata.releases.to_h.fetch(:"#{VERSION}")
+
 #
 # Constants
 #
