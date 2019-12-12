@@ -15,6 +15,7 @@ import MailingListForm from '@site/src/components/MailingListForm';
 
 import {enrichTags} from '@site/src/exports/tags';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import {viewedNewPost} from '@site/src/exports/newPost';
 
 import './styles.css';
 
@@ -26,6 +27,8 @@ function BlogListPage(props) {
   const enrichedTags = enrichTags(postTags);
   const typeTags = enrichedTags.filter(tag => tag.category == 'type');
   const domainTags = enrichedTags.filter(tag => tag.category == 'domain');
+
+  viewedNewPost();
 
   return (
     <Layout title="Blog" description="Blog">

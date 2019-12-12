@@ -21,8 +21,8 @@ function BlogPostItem(props) {
     truncated,
     isBlogPostPage = false,
   } = props;
-  const {author_id, date: dateString, description, permalink, tags} = metadata;
-  const {author, title} = frontMatter;
+  const {date: dateString, description, permalink, tags} = metadata;
+  const {author_id, title} = frontMatter;
   const readingStats = readingTime(children.toString());
   const date = Date.parse(dateString);
   const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');

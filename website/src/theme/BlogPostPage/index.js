@@ -12,18 +12,24 @@ import {MDXProvider} from '@mdx-js/react';
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
 import {enrichTags} from '@site/src/exports/tags';
+import {fetchNewPost, viewedNewPost} from '@site/src/exports/newPost';
 import readingTime from 'reading-time';
 import styles from './styles.module.css';
 
 function BlogPostPage(props) {
   const {content: BlogPostContents} = props;
   const {frontMatter, metadata} = BlogPostContents;
-  const {author_id, title} = frontMatter;
+  const {author_id, id, title} = frontMatter;
   const {dateString, tags} = metadata;
   const readingStats = readingTime(BlogPostContents.toString());
   const date = Date.parse(dateString);
   const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
+  const newPost = fetchNewPost();
+
+  if (newPost && newPost.id == id) {
+    viewedNewPost();
+  }
 
   return (
     <Layout title={metadata.title} description={metadata.description}>
