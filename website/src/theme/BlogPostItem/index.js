@@ -21,7 +21,7 @@ function BlogPostItem(props) {
     truncated,
     isBlogPostPage = false,
   } = props;
-  const {author_id, dateString, description, permalink, tags} = metadata;
+  const {author_id, date: dateString, description, permalink, tags} = metadata;
   const {author, title} = frontMatter;
   const readingStats = readingTime(children.toString());
   const date = Date.parse(dateString);

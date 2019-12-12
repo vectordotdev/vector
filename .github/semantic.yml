@@ -42,6 +42,7 @@ scopes:
   - DPKG platform
   - Homebrew platform
   - RPM platform
+  - MSI platform
 
   # sources
   - docker source

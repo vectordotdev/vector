@@ -4980,12 +4980,112 @@ module.exports = {
         },
         "sha": "285b967ab228a94b4a140803cec38b71bb59ad14",
         "type": "fix"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-10 09:34:53 +0000",
+        "deletions_count": 2,
+        "description": "Edit getting started guide",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Edit getting started guide",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "137c51de9122c32cbbfba983f3068b6df1d6a68e",
+        "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2019-12-10 16:42:08 +0000",
+        "deletions_count": 39,
+        "description": "Fix unit test spec rendering",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 43,
+        "message": "docs: Fix unit test spec rendering",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5c2c0af26554258d746051a5861ce9aaa869a8be",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-11 17:09:12 +0000",
+        "deletions_count": 44,
+        "description": "Build `msi` package for Vector",
+        "files_count": 23,
+        "group": "chore",
+        "insertions_count": 780,
+        "message": "chore(operations): Build `msi` package for Vector (#1345)",
+        "pr_number": 1345,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "da89fa9fd801ff6f87412fb78d686936115b241c",
+        "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2019-12-11 15:56:33 +0000",
+        "deletions_count": 16,
+        "description": "Remove sleeps from topology tests",
+        "files_count": 2,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(testing): Remove sleeps from topology tests (#1346)",
+        "pr_number": 1346,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "8561d42eba3c5d30d57ab47c6454f19978c5ea4b",
+        "type": "fix"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2019-12-11 16:30:27 +0000",
+        "deletions_count": 21,
+        "description": "Detect and read gzipped files",
+        "files_count": 7,
+        "group": "feat",
+        "insertions_count": 127,
+        "message": "feat(file source): Detect and read gzipped files (#1344)",
+        "pr_number": 1344,
+        "scope": {
+          "category": "source",
+          "component_name": "file",
+          "component_type": "source",
+          "name": "file source"
+        },
+        "sha": "8c991293ee2cd478fc639e96e6c27df794a0c5ec",
+        "type": "feat"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
     "date": "2019-12-09",
-    "deletions_count": 9118,
-    "insertions_count": 21198,
+    "deletions_count": 9199,
+    "insertions_count": 22106,
     "last_version": "0.5.0",
     "posts": [
       {
@@ -17312,12 +17412,112 @@ module.exports = {
           },
           "sha": "285b967ab228a94b4a140803cec38b71bb59ad14",
           "type": "fix"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-10 09:34:53 +0000",
+          "deletions_count": 2,
+          "description": "Edit getting started guide",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Edit getting started guide",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "137c51de9122c32cbbfba983f3068b6df1d6a68e",
+          "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2019-12-10 16:42:08 +0000",
+          "deletions_count": 39,
+          "description": "Fix unit test spec rendering",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 43,
+          "message": "docs: Fix unit test spec rendering",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5c2c0af26554258d746051a5861ce9aaa869a8be",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-11 17:09:12 +0000",
+          "deletions_count": 44,
+          "description": "Build `msi` package for Vector",
+          "files_count": 23,
+          "group": "chore",
+          "insertions_count": 780,
+          "message": "chore(operations): Build `msi` package for Vector (#1345)",
+          "pr_number": 1345,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "da89fa9fd801ff6f87412fb78d686936115b241c",
+          "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2019-12-11 15:56:33 +0000",
+          "deletions_count": 16,
+          "description": "Remove sleeps from topology tests",
+          "files_count": 2,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(testing): Remove sleeps from topology tests (#1346)",
+          "pr_number": 1346,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "8561d42eba3c5d30d57ab47c6454f19978c5ea4b",
+          "type": "fix"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2019-12-11 16:30:27 +0000",
+          "deletions_count": 21,
+          "description": "Detect and read gzipped files",
+          "files_count": 7,
+          "group": "feat",
+          "insertions_count": 127,
+          "message": "feat(file source): Detect and read gzipped files (#1344)",
+          "pr_number": 1344,
+          "scope": {
+            "category": "source",
+            "component_name": "file",
+            "component_type": "source",
+            "name": "file source"
+          },
+          "sha": "8c991293ee2cd478fc639e96e6c27df794a0c5ec",
+          "type": "feat"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
       "date": "2019-12-09",
-      "deletions_count": 9118,
-      "insertions_count": 21198,
+      "deletions_count": 9199,
+      "insertions_count": 22106,
       "last_version": "0.5.0",
       "posts": [
         {

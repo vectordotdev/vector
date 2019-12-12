@@ -279,7 +279,7 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.5.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.6.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>
