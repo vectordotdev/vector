@@ -222,7 +222,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -230,7 +230,7 @@ Building steps:
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.5.0 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.0 | \
       tar xzf - -C vector --strip-components=1
     ```
 
