@@ -230,6 +230,12 @@ blockquote {
 .button.button--primary {
   --ifm-button-color: var(--ifm-background-color);
 }
+.button.button--highlight {
+  animation: gradientBG 5s ease-in infinite;
+  background-image: var(--ifm-highlight-gradient);
+  background-size: 150% 150%;
+  color: var(--ifm-background-color);
+}
 
 /**
  * checks
@@ -369,13 +375,16 @@ table.comparison tr td.bar.vector .bar {
 
 .container--narrow {
   max-width: 760px;
+  padding: 0;
 }
 
 .container--bleed > .bleed,
+.container--bleed > section > p > img,
 .container--bleed > section > .code-header,
 .container--bleed > section > pre {
   margin-left: calc( -1 * ( var(--ifm-container-width) - 760px ) / 2 );
   margin-right: calc( -1 * ( var(--ifm-container-width) - 760px ) / 2 );
+  max-width: var(--ifm-container-width);
 }
 
 @media (max-width: 996px) {
@@ -659,6 +668,14 @@ input[type="text"]:focus {
 }
 .input--lg {
   --ifm-button-size-multiplier: 1.35;
+}
+.input--highlight-wrapper {
+  animation: gradientBG 5s ease-in infinite;
+  background-image: var(--ifm-highlight-gradient);
+  background-size: 150% 150%;
+  border: 0px none;
+  font-weight: 600;
+  padding: 1px;
 }
 
 /**

@@ -47,8 +47,14 @@ function BlogPostPage(props) {
           <section className="markdown">
             <MDXProvider components={MDXComponents}><BlogPostContents /></MDXProvider>
           </section>
-          <section className="panel bleed" style={{textAlign: 'center'}}>
-            <MailingListForm size="lg" />
+          <section className={classnames('panel', 'bleed', styles.mailingList)} style={{textAlign: 'center'}}>
+            <div className={styles.mailingListTitle}>
+              Vector In Your Inbox
+            </div>
+            <p>
+              One email on the 1st of the month. No spam, ever.
+            </p>
+            <MailingListForm description={false} size="lg" />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
             <div className="bleed margin-vert--xl">

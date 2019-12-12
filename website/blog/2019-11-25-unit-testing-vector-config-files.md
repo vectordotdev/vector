@@ -1,7 +1,7 @@
 ---
 id: unit-testing-vector-config-files
-title: "Unit Testing: Treating Your Config Files As Code"
-description: "A better way to develop, test, and verify your Vector configuration"
+title: "Unit Testing Your Vector Config Files"
+description: "Treating your Vector configuration files as code"
 author_id: "ash"
 tags: ["type: announcement", "domain: config"]
 ---

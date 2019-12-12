@@ -28,17 +28,17 @@ required.
 
 ## Windows Installer Support
 
-In addition to installing Vector through a `.zip` archive, we've included an
-`.msi` installer that makes installing Vector even simpler. This can be
-done through the command line:
+In addition to installing Vector through a [`.zip` archive][pages.downloads],
+we've included an [`.msi` installer][pages.downloads] that makes installing
+Vector even simpler. This can be done [through the command line][docs.package-managers.msi]:
 
 ```bat
-
+msiexec /i vector-x64.msi /quiet
 ```
 
 Or manually through the GUI installer:
 
-
+![Vector Windows Installation](https://res.cloudinary.com/timber/image/upload/v1576161621/Vector%20Website/vector-windows-install.gif)
 
 ## An important step for Vector
 
