@@ -12,9 +12,11 @@ description: Install Vector from the Vector source code
      website/docs/setup/installation/manual/from-source.md.erb
 -->
 
-This page covers installing Vector from source. Because Vector is written in
-[Rust][urls.rust] it can compile to a single static binary. You can view an
-example of this in the [musl builder Docker image][urls.musl_builder_docker_image].
+This page covers installing Vector from source using the native toolchain for the host.
+
+Vector can also be compiled to a static binary for Linux for `x86_64`, `ARM64`,
+and `ARMv7` architectures. See [compiling using Docker](#compiling-using-docker)
+for details.
 
 import Alert from '@site/src/components/Alert';
 
@@ -205,6 +207,92 @@ Alternatively, for finer control, it is possible to use specific features from t
 | `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
 
+## Compiling using Docker
+
+It is possible to build statically linked binaries of Vector for Linux using Docker.
+
+In this case the dependencies listed in the previous section are not
+needed, as all of them would be automatically pulled by Docker.
+
+Building steps:
+
+1.  Download Vector's Source
+  
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Master', value: 'master'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.0 | \
+      tar xzf - -C vector --strip-components=1
+    ```
+
+    </TabItem>
+    <TabItem value="master">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/master.tar.gz | \
+      tar xzf - -C vector --strip-components=1
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2. Build Vector using Docker
+  <Tabs
+    defaultValue="x86_64-unknown-linux-musl"
+    urlKey="file_name"
+    values={
+    [{
+      "label":"Linux (x86_64)",
+      "value":"x86_64-unknown-linux-musl"
+    }, {
+      "label":"Linux (ARM64)",
+      "value":"aarch64-unknown-linux-musl"
+    },{
+      "label":"Linux (ARMv7)",
+      "value":"armv7-unknown-linux-musleabihf"
+    }]
+    }>
+
+    <TabItem value="x86_64-unknown-linux-musl">
+
+    ```bash
+    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
+    ```
+
+    </TabItem>
+
+    <TabItem value="aarch64-unknown-linux-musl">
+
+    ```bash
+    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
+    ```
+
+    </TabItem>
+
+    <TabItem value="armv7-unknown-linux-musleabihf">
+
+    ```bash
+    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
+    ```
+
+    </TabItem>
+  </Tabs>
+
+  The command above builds a Docker image with Rust toolchain for a Linux target for the
+  corresponding architecture using `musl` as the C library, then starts a container from
+  this image, and then builds inside the Container. The target binary is located in
+  `target/<target triple>/release/vector` like in the previous case.
+
 
 [docs.configuration]: /docs/setup/configuration
 [docs.containers]: /docs/setup/installation/containers
@@ -218,7 +306,5 @@ Alternatively, for finer control, it is possible to use specific features from t
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
-[urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [urls.openssl]: https://www.openssl.org/
-[urls.rust]: https://www.rust-lang.org/
 [urls.zlib]: https://www.zlib.net
