@@ -242,7 +242,11 @@ commits = [
 {sha = "5c2c0af26554258d746051a5861ce9aaa869a8be", message = "docs: Fix unit test spec rendering", author = "Ashley Jeffs", date = 2019-12-10T16:42:08Z, files_count = 5, insertions_count = 43, deletions_count = 39},
 {sha = "da89fa9fd801ff6f87412fb78d686936115b241c", message = "chore(operations): Build `msi` package for Vector (#1345)", author = "Alexander Rodin", date = 2019-12-11T17:09:12Z, files_count = 23, insertions_count = 780, deletions_count = 44},
 {sha = "8561d42eba3c5d30d57ab47c6454f19978c5ea4b", message = "fix(testing): Remove sleeps from topology tests (#1346)", author = "Luke Steensen", date = 2019-12-11T15:56:33Z, files_count = 2, insertions_count = 1, deletions_count = 16},
-{sha = "8c991293ee2cd478fc639e96e6c27df794a0c5ec", message = "feat(file source): Detect and read gzipped files (#1344)", author = "Luke Steensen", date = 2019-12-11T16:30:27Z, files_count = 7, insertions_count = 127, deletions_count = 21}
+{sha = "8c991293ee2cd478fc639e96e6c27df794a0c5ec", message = "feat(file source): Detect and read gzipped files (#1344)", author = "Luke Steensen", date = 2019-12-11T16:30:27Z, files_count = 7, insertions_count = 127, deletions_count = 21},
+{sha = "cbba6f180a583d4d7f236b64b77fdd6406bc6c63", message = "fix(operations): Put `etc` directory only to Linux archives (#1352)", author = "Alexander Rodin", date = 2019-12-12T15:49:31Z, files_count = 2, insertions_count = 11, deletions_count = 11},
+{sha = "1f9b9cf6eddf27557bcaa6a1e1139da0137dcb4c", message = "chore(operations): Allow passing features to `make build` (#1356)", author = "Alexander Rodin", date = 2019-12-12T16:22:49Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "779d727fb49c907d6babbd8ed48e0db2cec14604", message = "chore(operations): Compress release archives with `gzip -9` (#1294)", author = "Alexander Rodin", date = 2019-12-12T16:53:31Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "f8ad1b5a0edcf214865e4ba1133b3a0df1465905", message = "chore(operations): Add notices for OpenSSL to the license for binary distributions (#1351)", author = "Alexander Rodin", date = 2019-12-12T19:11:22Z, files_count = 4, insertions_count = 22, deletions_count = 1}
 ]
 
 [[releases."0.6.0".upgrade_guides]]

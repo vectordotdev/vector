@@ -5080,12 +5080,92 @@ module.exports = {
         },
         "sha": "8c991293ee2cd478fc639e96e6c27df794a0c5ec",
         "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-12 15:49:31 +0000",
+        "deletions_count": 11,
+        "description": "Put `etc` directory only to Linux archives",
+        "files_count": 2,
+        "group": "fix",
+        "insertions_count": 11,
+        "message": "fix(operations): Put `etc` directory only to Linux archives (#1352)",
+        "pr_number": 1352,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "cbba6f180a583d4d7f236b64b77fdd6406bc6c63",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-12 16:22:49 +0000",
+        "deletions_count": 1,
+        "description": "Allow passing features to `make build`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Allow passing features to `make build` (#1356)",
+        "pr_number": 1356,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "1f9b9cf6eddf27557bcaa6a1e1139da0137dcb4c",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-12 16:53:31 +0000",
+        "deletions_count": 1,
+        "description": "Compress release archives with `gzip -9`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Compress release archives with `gzip -9` (#1294)",
+        "pr_number": 1294,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "779d727fb49c907d6babbd8ed48e0db2cec14604",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2019-12-12 19:11:22 +0000",
+        "deletions_count": 1,
+        "description": "Add notices for OpenSSL to the license for binary distributions",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 22,
+        "message": "chore(operations): Add notices for OpenSSL to the license for binary distributions (#1351)",
+        "pr_number": 1351,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "f8ad1b5a0edcf214865e4ba1133b3a0df1465905",
+        "type": "chore"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
     "date": "2019-12-09",
-    "deletions_count": 9199,
-    "insertions_count": 22106,
+    "deletions_count": 9213,
+    "insertions_count": 22141,
     "last_version": "0.5.0",
     "posts": [
       {
@@ -17512,12 +17592,92 @@ module.exports = {
           },
           "sha": "8c991293ee2cd478fc639e96e6c27df794a0c5ec",
           "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-12 15:49:31 +0000",
+          "deletions_count": 11,
+          "description": "Put `etc` directory only to Linux archives",
+          "files_count": 2,
+          "group": "fix",
+          "insertions_count": 11,
+          "message": "fix(operations): Put `etc` directory only to Linux archives (#1352)",
+          "pr_number": 1352,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "cbba6f180a583d4d7f236b64b77fdd6406bc6c63",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-12 16:22:49 +0000",
+          "deletions_count": 1,
+          "description": "Allow passing features to `make build`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Allow passing features to `make build` (#1356)",
+          "pr_number": 1356,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "1f9b9cf6eddf27557bcaa6a1e1139da0137dcb4c",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-12 16:53:31 +0000",
+          "deletions_count": 1,
+          "description": "Compress release archives with `gzip -9`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Compress release archives with `gzip -9` (#1294)",
+          "pr_number": 1294,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "779d727fb49c907d6babbd8ed48e0db2cec14604",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2019-12-12 19:11:22 +0000",
+          "deletions_count": 1,
+          "description": "Add notices for OpenSSL to the license for binary distributions",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 22,
+          "message": "chore(operations): Add notices for OpenSSL to the license for binary distributions (#1351)",
+          "pr_number": 1351,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "f8ad1b5a0edcf214865e4ba1133b3a0df1465905",
+          "type": "chore"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
       "date": "2019-12-09",
-      "deletions_count": 9199,
-      "insertions_count": 22106,
+      "deletions_count": 9213,
+      "insertions_count": 22141,
       "last_version": "0.5.0",
       "posts": [
         {

@@ -28,9 +28,6 @@ require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/templates"
 
-require_relative "generate/core_ext/hash"
-require_relative "generate/core_ext/string"
-
 #
 # Flags
 #
