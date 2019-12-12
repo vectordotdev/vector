@@ -19,17 +19,17 @@ This is not a makeshift integration. Vector is written in [Rust][urls.rust],
 and Windows is a [tier 1 platform][urls.rust_tier_1_platform], meaning the same
 reliability and performance is brought to Windows as it is on Linux.
 
-## Fully-static without dependencies
+## No dependencies required
 
-Beyond Rust's tier 1 support for Windows, Vector compiles to a single static
-binary. This makes installation as simple as copying the Vector binary onto
-your machine. There are no dependencies to install or environment changes
-required.
+Beyond Rust's tier 1 support for Windows, Vector does not require the
+installation of any dependencies. This makes installation as simple as copying
+the Vector binary onto your machine. There are not additional DLL files to
+install or environment changes required.
 
 ## Windows Installer Support
 
-In addition to installing Vector through a [`.zip` archive][pages.downloads],
-we've included an [`.msi` installer][pages.downloads] that makes installing
+In addition to installing Vector through a [`.zip` archive][pages.releases],
+we've included an [`.msi` installer][pages.releases] that makes installing
 Vector even simpler. This can be done [through the command line][docs.package-managers.msi]:
 
 ```bat
@@ -52,6 +52,7 @@ towards accomplishing that vision.
 
 
 [docs.operating-systems.windows]: /docs/setup/installation/operating-systems/windows
+[docs.package-managers.msi]: /docs/setup/installation/package-managers/msi
 [pages.community]: /community
 [pages.releases]: /releases
 [urls.rust]: https://www.rust-lang.org/
