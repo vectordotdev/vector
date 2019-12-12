@@ -307,23 +307,29 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{block_on, random_events_with_stream};
-    use serde_json::json;
+    use crate::test_util::{block_on, random_events_with_stream, random_string};
+    use reqwest::{Client, Method, Response};
+    use serde_json::{json, Value};
 
     const EMULATOR_HOST: &str = "localhost:8681";
     const PROJECT: &str = "testproject";
-    // FIXME We need to create a new topic and subscription for each
-    // test to keep test runs independent.
-    const TOPIC: &str = "topic1";
-    const SUBSCRIPTION: &str = "subscription1";
+
+    fn config(topic: &str) -> PubsubConfig {
+        PubsubConfig {
+            emulator_host: Some(EMULATOR_HOST.into()),
+            project: PROJECT.into(),
+            topic: topic.into(),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn publish_events() {
         crate::test_util::trace_init();
 
-        let config = config();
+        let (topic, subscription) = create_topic_subscription();
+        let config = config(&topic);
         let (sink, healthcheck) = config.build(Acker::Null).expect("Building sink failed");
-        flush_subscription();
 
         block_on(healthcheck).expect("Health check failed");
 
@@ -332,7 +338,7 @@ mod integration_tests {
         let pump = sink.send_all(events);
         let _ = block_on(pump).expect("Sending events failed");
 
-        let response = pull_messages(1000);
+        let response = pull_messages(&subscription, 1000);
         let messages = response
             .receivedMessages
             .as_ref()
@@ -346,33 +352,42 @@ mod integration_tests {
         }
     }
 
-    fn config() -> PubsubConfig {
-        PubsubConfig {
-            emulator_host: Some(EMULATOR_HOST.into()),
-            project: PROJECT.into(),
-            topic: TOPIC.into(),
-            ..Default::default()
-        }
+    fn create_topic_subscription() -> (String, String) {
+        let topic = format!("topic-{}", random_string(10));
+        let subscription = format!("subscription-{}", random_string(10));
+        request(Method::PUT, &format!("topics/{}", topic), json!({}))
+            .json::<Value>()
+            .expect("Creating new topic failed");
+        request(
+            Method::PUT,
+            &format!("subscriptions/{}", subscription),
+            json!({ "topic": format!("projects/{}/topics/{}", PROJECT, topic) }),
+        )
+        .json::<Value>()
+        .expect("Creating new subscription failed");
+        (topic, subscription)
     }
 
-    fn flush_subscription() {
-        while pull_messages(100).receivedMessages.is_some() {}
+    fn request(method: Method, path: &str, json: Value) -> Response {
+        let url = format!("http://{}/v1/projects/{}/{}", EMULATOR_HOST, PROJECT, path);
+        Client::new()
+            .request(method.clone(), &url)
+            .json(&json)
+            .send()
+            .expect(&format!("Sending {} request to {} failed", method, url))
     }
 
-    fn pull_messages(count: usize) -> PullResponse {
-        reqwest::Client::new()
-            .post(&format!(
-                "http://{}/v1/projects/{}/subscriptions/{}:pull",
-                EMULATOR_HOST, PROJECT, SUBSCRIPTION
-            ))
-            .json(&json!({
+    fn pull_messages(subscription: &str, count: usize) -> PullResponse {
+        request(
+            Method::POST,
+            &format!("subscriptions/{}:pull", subscription),
+            json!({
                 "returnImmediately": true,
                 "maxMessages": count
-            }))
-            .send()
-            .expect("Sending pull query failed")
-            .json::<PullResponse>()
-            .expect("Extracting pull data failed")
+            }),
+        )
+        .json::<PullResponse>()
+        .expect("Extracting pull data failed")
     }
 
     #[derive(Debug, Deserialize)]
