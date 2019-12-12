@@ -17,10 +17,10 @@ docker build \
   -f scripts/ci-docker-images/$tag/Dockerfile \
   scripts/ci-docker-images
 
-# set flags for "docker run"
-# note that the `--privileged` flags is set by default because it is
-# required to register `binfmt` handlers, which allow to run builders
-# for ARM achitectures which use `qemu`
+# Set flags for "docker run".
+# Note that the `--privileged` flags is set by default because it is
+# required to register `binfmt` handlers, whaich allow to run builders
+# for ARM achitectures which need to use `qemu-user`.
 docker_flags=("--privileged" "--interactive")
 if [ -t 0 ]; then # the script's input is connected to a terminal
   docker_flags+=("--tty")
