@@ -237,7 +237,7 @@ module.exports = {
       "type: announcement",
       "domain: config"
     ],
-    "title": "Unit Testing: Treating Your Vector Config Files As Code"
+    "title": "Unit Testing: Treating Your Config Files As Code"
   },
   "latest_release": {
     "commits": [
@@ -5127,7 +5127,7 @@ module.exports = {
           "type: announcement",
           "domain: config"
         ],
-        "title": "Unit Testing: Treating Your Vector Config Files As Code"
+        "title": "Unit Testing: Treating Your Config Files As Code"
       }
     ],
     "type": "initial dev",
@@ -5211,7 +5211,7 @@ module.exports = {
         "type: announcement",
         "domain: config"
       ],
-      "title": "Unit Testing: Treating Your Vector Config Files As Code"
+      "title": "Unit Testing: Treating Your Config Files As Code"
     }
   ],
   "releases": {
@@ -17559,7 +17559,7 @@ module.exports = {
             "type: announcement",
             "domain: config"
           ],
-          "title": "Unit Testing: Treating Your Vector Config Files As Code"
+          "title": "Unit Testing: Treating Your Config Files As Code"
         }
       ],
       "type": "initial dev",

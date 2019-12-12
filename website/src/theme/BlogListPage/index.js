@@ -35,7 +35,7 @@ function BlogListPage(props) {
       <div className="blog-list container">
         <div className="blog-list--filters">
           <h1>The Vector Blog</h1>
-          <p>Thoughts on logs, metrics, and all things observability from the <a href="/">Vector & Timber.io team</a>.</p>
+          <p>Thoughts on logs, metrics, and all things observability from the <Link to="/community#team">Vector & Timber.io team</Link>.</p>
 
           <h3>Types</h3>
 
