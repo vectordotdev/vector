@@ -1,0 +1,112 @@
+[transforms.geoip]
+allow_you_to_description = "enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases"
+common = false
+function_category = "enrich"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.geoip.options.database]
+type = "string"
+common = true
+examples = ["/path/to/GeoLite2-City.mmdb"]
+null = false
+description = """\
+Path to the MaxMind GeoIP2 or GeoLite2 binary city database file \
+(`GeoLite2-City.mmdb`). Other databases, such as the the country database \
+are not supported.
+"""
+
+[transforms.geoip.options.source]
+type = "string"
+common = true
+examples =  ["ip_address", "x-forwarded-for"]
+null = false
+description = """\
+The field name that contains the IP address. This field should contain a valid \
+IPv4 or IPv6 address.\
+"""
+
+[transforms.geoip.options.target]
+type = "string"
+common = true
+default = "geoip"
+null = false
+description = """\
+The default field to insert the resulting GeoIP data into. See \
+[output](#output) for more info.\
+"""
+
+[transforms.geoip.output.log.fields.geoip]
+type = "table"
+optional = true
+description = """\
+The root field containing all geolocation data as sub-fields.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.city_name]
+type = "string"
+examples = ["New York", "Brooklyn", "Chicago"]
+optional = false
+description = """\
+The city name associated with the IP address.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.continent_code]
+type = "string"
+optional = false
+description = """\
+The continent code associated with the IP address.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.continent_code.enum]
+AF = "Africa"
+AN = "Antarctica"
+AS = "Asia"
+EU = "Europe"
+NA = "North America"
+OC = "Oceania"
+SA = "South America"
+
+[transforms.geoip.output.log.fields.geoip.fields.country_code]
+type = "string"
+examples = ["US", "US-PR", "FR", "FR-BL", "GB", "A1", "A2"]
+optional = false
+description = """\
+The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.latitude]
+type = "string"
+examples = ["51.75"]
+optional = false
+description = """\
+The latitude associated with the IP address.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.longitude]
+type = "string"
+examples = ["-1.25"]
+optional = false
+description = """\
+The longitude associated with the IP address.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.postal_code]
+type = "string"
+examples = ["07094", "10010", "OX1"]
+optional = false
+description = """\
+The postal code associated with the IP address.\
+"""
+
+[transforms.geoip.output.log.fields.geoip.fields.timezone]
+type = "string"
+examples = ["America/New_York", "Asia/Atyrau", "Europe/London"]
+optional = false
+description = """\
+The timezone associated with the IP address in [IANA time zone \
+format][urls.iana_time_zone_format]. A full list of time zones can be found \
+[here][urls.iana_time_zones].
+"""

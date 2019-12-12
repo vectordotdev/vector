@@ -41,54 +41,6 @@ class Templates
     @metadata = metadata
   end
 
-  def commit(commit)
-    render("#{partials_path}/_commit.md", binding).gsub("\n", "")
-  end
-
-  def commit_scope(commit)
-    scope = commit.scope
-
-    info =
-      if scope.existing_component?
-        {
-          text: "`#{scope.component_name}` #{scope.component_type}",
-          link: scope.short_link
-        }
-      else
-        {
-          text: scope.name,
-          link: scope.short_link
-        }
-      end
-
-    if info[:link] && metadata.links.exists?(info[:link])
-      "[#{info[:text]}][#{info[:link]}]"
-    else
-      info[:text]
-    end
-  end
-
-  def commit_type_category(type_name, category)
-    if type_name == "new feature"
-      "new #{category}"
-    else
-      "#{category} #{type_name}"
-    end
-  end
-
-  def commit_type_commits(type_name, commits, grouped: false)
-    commits =
-      commits.sort_by do |commit|
-        [commit.scope.name, commit.date]
-      end
-
-    render("#{partials_path}/_commit_type_commits.md", binding)
-  end
-
-  def commit_type_toc_item(type_name, commits)
-    render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
-  end
-
   def common_component_links(type, limit = 6)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
@@ -372,14 +324,6 @@ class Templates
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
   end
 
-  def release_changes(release, grouped: false)
-    render("#{partials_path}/_release_changes.md", binding)
-  end
-
-  def release_notes(release)
-    render("#{partials_path}/_release_notes.md", binding)
-  end
-
   def release_summary(release)
     parts = []
 
@@ -438,7 +382,7 @@ class Templates
         -->
         EOF
     
-      notice + content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
+      content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
     end
 
     content

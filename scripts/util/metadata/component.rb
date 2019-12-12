@@ -151,7 +151,7 @@ class Component
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
       name: name,
-      operating_systems: operating_systems,
+      operating_systems: (transform? ? [] : operating_systems),
       service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
       status: status,
       type: type,

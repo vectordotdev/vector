@@ -1,6 +1,7 @@
 ---
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
+posts_path: /blog/tags/transform-regex_parser
 sidebar_label: "regex_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
 status: "prod-ready"
@@ -28,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "regex_parser" # example, must be: "regex_parser"
   inputs = ["my-source-id"] # example
-  regex = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$" # example
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
   
   # OPTIONAL - General
   drop_field = true # default
@@ -98,7 +99,7 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"]}
+  examples={["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]}
   name={"regex"}
   nullable={false}
   path={null}
@@ -111,7 +112,7 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
 
 ### regex
 
-The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
+The Regular Expression to apply. Do not include the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
 
 
 </Field>

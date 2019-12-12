@@ -36,14 +36,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.5.0/vector-amd64.deb 
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.6.0/vector-amd64.deb 
     ```
 
     </TabItem>
@@ -79,14 +79,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.5.0/vector-arm64.deb 
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.6.0/vector-arm64.deb 
     ```
 
     </TabItem>
@@ -122,14 +122,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.5.0/vector-armhf.deb 
+    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.6.0/vector-armhf.deb 
     ```
 
     </TabItem>

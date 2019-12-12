@@ -21,7 +21,7 @@ module.exports = {
         {to: 'docs', label: 'Docs', position: 'left'},
         {to: 'blog', label: 'Blog', position: 'left'},
         {to: 'community', label: 'Community', position: 'left'},
-        {to: 'download', label: 'Download', position: 'right'},
+        {to: '/releases', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
@@ -132,6 +132,12 @@ module.exports = {
     [
       '@docusaurus/preset-classic',
       {
+        blog: {
+          feedOptions: {
+            type: 'all',
+            copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
+          },
+        },
         docs: {
           editUrl: 'https://github.com/timberio/vector/edit/master/website/',
           sidebarPath: require.resolve('./sidebars.js'),
@@ -146,5 +152,6 @@ module.exports = {
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
     'https://at-ui.github.io/feather-font/css/iconfont.css',
+    ''
   ],
 };
