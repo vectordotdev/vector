@@ -39,7 +39,7 @@ The default field to insert the resulting GeoIP data into. See \
 """
 
 [transforms.geoip.output.log.fields.geoip]
-type = "table"
+type = "struct"
 optional = true
 description = """\
 The root field containing all geolocation data as sub-fields.\

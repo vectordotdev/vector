@@ -16,6 +16,10 @@
 <%= fields(component.env_vars_list) %>
 
 <%- end -%>
+## Output
+
+<%= component_output(:log, component.output.log, heading_depth: 3) %>
+
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

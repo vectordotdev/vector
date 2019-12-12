@@ -16,13 +16,13 @@
 <%%= fields(component.env_vars_list) %>
 
 <%%- end -%>
-<%- if component.source? -%>
+<%- if component.source? || component.transform? -%>
 ## Output
 
 <%- if component.output.log -%>
-<%%= source_output(:log, component.output.log, heading_depth: 3) %>
+<%%= component_output(:log, component.output.log, heading_depth: 3) %>
 <%- else -%>
-<%%= source_output(:metric, component.output.metric, heading_depth: 3) %>
+<%%= component_output(:metric, component.output.metric, heading_depth: 3) %>
 <%- end -%>
 
 <%- elsif component.sink? && component.output -%>

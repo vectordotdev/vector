@@ -16,7 +16,7 @@ title: "geoip transform"
      website/docs/reference/transforms/geoip.md.erb
 -->
 
-The `geoip` transform accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+The[`geoip`](#geoip) transform accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 ## Configuration
 
@@ -117,6 +117,183 @@ The default field to insert the resulting GeoIP data into. See [output](#output)
 
 </Fields>
 
+## Output
+
+This component outputs [`log` events][docs.data-model.log].
+For example:
+
+```javascript
+{
+  "geoip": {
+    "city_name": "New York",
+    "continent_code": [
+      "AF",
+      "Africa"
+    ],
+    "country_code": "US",
+    "latitude": "51.75",
+    "longitude": "-1.25",
+    "postal_code": "07094",
+    "timezone": "America/New_York"
+  }
+}
+```
+More detail on the output schema is below.
+
+<Fields filters={true}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"geoip"}
+  path={null}
+  required={false}
+  type={"struct"}
+  >
+
+### geoip
+
+The root field containing all geolocation data as sub-fields.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["New York","Brooklyn","Chicago"]}
+  name={"city_name"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### city_name
+
+The city name associated with the IP address.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={{"AF":"Africa","AN":"Antarctica","AS":"Asia","EU":"Europe","NA":"North America","OC":"Oceania","SA":"South America"}}
+  examples={{"AF":"Africa","AN":"Antarctica","AS":"Asia","EU":"Europe","NA":"North America","OC":"Oceania","SA":"South America"}}
+  name={"continent_code"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### continent_code
+
+The continent code associated with the IP address.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["US","US-PR","FR","FR-BL","GB","A1","A2"]}
+  name={"country_code"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### country_code
+
+The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["51.75"]}
+  name={"latitude"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### latitude
+
+The latitude associated with the IP address.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["-1.25"]}
+  name={"longitude"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### longitude
+
+The longitude associated with the IP address.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["07094","10010","OX1"]}
+  name={"postal_code"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### postal_code
+
+The postal code associated with the IP address.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["America/New_York","Asia/Atyrau","Europe/London"]}
+  name={"timezone"}
+  path={"geoip"}
+  required={true}
+  type={"string"}
+  >
+
+#### timezone
+
+The timezone associated with the IP address in [IANA time zone format][urls.iana_time_zone_format]. A full list of time zones can be found [here][urls.iana_time_zones].
+
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+</Fields>
+
 ## How It Works
 
 ### Environment Variables
@@ -131,3 +308,7 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
+[urls.iana_time_zone_format]: https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones
+[urls.iana_time_zones]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+[urls.iso3166-2]: https://en.wikipedia.org/wiki/ISO_3166-2
