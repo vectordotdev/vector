@@ -37,6 +37,10 @@ class Post
     self.<=>(other) == 0
   end
 
+  def type?(name)
+    tags.any? { |tag| tag == "type: announcement" }
+  end
+
   def to_h
     {
       author_id: author_id,

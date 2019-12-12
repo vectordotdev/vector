@@ -3,25 +3,15 @@
 }
 
 .header {
-  padding: 0;
+  margin: 0;
+  padding: calc( var(--ifm-spacing-vertical) * 3 ) 0;
   text-align: center;
 }
-
-.headerBackground {
-  height: 350px;
-}
-
-.headerContainer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  height: 350px;
-  margin-bottom: -350px;
-  top: -350px;
-}
 @media (max-width: 480px) {
-  .headerContainer h1 {
+  .header {
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  }
+  .header h1 {
     font-size: 2em !important;
   }
 }

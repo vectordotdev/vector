@@ -392,18 +392,16 @@ table.comparison tr td.bar.vector .bar {
  */
 
 .domain-bg {
-  background-image: url(/img/vector-bg.svg);
+  background-image: url(/img/vector-bg-light.svg);
 }
 .domain-bg.domain-bg--config {
-  background-image: url(/img/cogs.svg);
+  background-image: url(/img/cogs-bg-light.svg);
 }
 .domain-bg.domain-bg--platforms {
-  background-image: url(/img/circuit.svg);
-}
-.domain-bg--hover {
+  background-image: url(/img/circuit-bg-light.svg);
 }
 .domain-bg--hover:not(:hover) {
-  background-image: none;
+  background-image: none !important;
 }
 
 /**
@@ -1601,6 +1599,24 @@ html[data-theme="dark"] {
   --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.5 );
 }
 
+/**
+ * domain-bg
+ */
+
+html[data-theme='dark'] .domain-bg {
+  background-image: url(/img/vector-bg-dark.svg);
+}
+html[data-theme='dark'] .domain-bg.domain-bg--config {
+  background-image: url(/img/cogs-bg-dark.svg);
+}
+html[data-theme='dark'] .domain-bg.domain-bg--platforms {
+  background-image: url(/img/circuit-bg-dark.svg);
+}
+
+/*
+ * navbar
+ */
+
 html[data-theme='dark'] .navbar {
   border-bottom: 1px solid var(--ifm-sidebar-border-color);
   box-shadow: none;
@@ -1612,6 +1628,10 @@ html[data-theme='dark'] .navbar .navbar__item .badge--default {
   background: var(--ifm-color-emphasis-100);
   color: var(--ifm-panel-color);
 }
+
+/*
+ * button
+ */
 
 html[data-theme='dark'] .button.button--secondary {
   --ifm-button-background-color: var(--ifm-panel-background);
@@ -1625,6 +1645,10 @@ html[data-theme='dark'] .button.button--secondary:hover {
   --ifm-button-color: var(--ifm-panel-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
 }
+
+/*
+ * svg
+ */
 
 html[data-theme='dark'] .container svg [fill="#000000"],
 html[data-theme='dark'] .footer svg [fill="#000000"],
@@ -1656,6 +1680,10 @@ html[data-theme='dark'] .markdown svg [stroke="#FFFFFF"],
 html[data-theme='dark'] .navbar__brand svg [stroke="#FFFFFF"] {
   stroke: var(--ifm-background-color);
 }
+
+/*
+ * menu
+ */
 
 html[data-theme='dark']  .menu .menu__link.menu__link--sublist::after {
   background-image: url('data:image/svg+xml;utf8,<svg alt="Arrow" xmlns="http://www.w3.org/2000/svg" width="14px" height="14px" viewBox="-6 -6 38 38"><path fill="rgba(255,255,255,0.3)" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>');

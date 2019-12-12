@@ -34,15 +34,12 @@ function BlogPostPage(props) {
   return (
     <Layout title={metadata.title} description={metadata.description}>
       <article className={styles.blogPost}>
-        <header className={classnames('hero', styles.header)}>
-          <div className={classnames('domain-bg', `domain-bg--${domain}`, styles.headerBackground)}></div>
+        <header className={classnames('hero', 'domain-bg', `domain-bg--${domain}`, styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
-            <div>
-              <Avatar id={author_id} size="lg" nameSuffix={` / ${dateFormat(date, "mmm dS, yyyy")} / ${readingStats.text}`} subTitle={false} vertical={true} />
-              <h1>{title}</h1>
-              <div className={styles.headerTags}>
-                <BlogPostTags tags={tags} />
-              </div>
+            <Avatar id={author_id} size="lg" nameSuffix={` / ${dateFormat(date, "mmm dS, yyyy")} / ${readingStats.text}`} subTitle={false} vertical={true} />
+            <h1>{title}</h1>
+            <div className={styles.headerTags}>
+              <BlogPostTags tags={tags} />
             </div>
           </div>
         </header>

@@ -16,10 +16,17 @@ class Release
     @last_date = last_date
     @last_version = last_version
     @date = release_hash.fetch("date").to_date
-    @posts = all_posts.select { |p| last_date && p.date > last_date && p.date <= @date }
-    @upgrade_guides = (release_hash["upgrade_guides"] || []).collect do |guide_hash|
-      OpenStruct.new(guide_hash)
-    end
+
+    @posts =
+      all_posts.select do |p|
+        last_date && p.date > last_date && p.date <= @date && p.type?("announcement")
+      end
+
+    @upgrade_guides =
+      (release_hash["upgrade_guides"] || []).collect do |guide_hash|
+        OpenStruct.new(guide_hash)
+      end
+
     @version = Version.new(release_hash.fetch("version"))
 
     @commits =

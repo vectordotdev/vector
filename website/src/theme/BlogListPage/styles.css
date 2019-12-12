@@ -4,8 +4,8 @@
 }
 
 .blog-list--filters {
-  flex: 0 0 350px;
-  margin-right: var(--ifm-spacing-horizontal);
+  flex: 0 0 400px;
+  margin-right: calc( var(--ifm-spacing-horizontal) * 3 );
   padding-top: calc( var(--ifm-spacing-vertical) + 2px );
 }
 
