@@ -1,5 +1,4 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
-use chrono::{offset::TimeZone, DateTime, Utc};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -32,7 +31,6 @@ struct ParserMetric {
     name: String,
     value: f64,
     tags: HashMap<String, String>,
-    timestamp: Option<DateTime<Utc>>,
 }
 
 struct ParserAggregate {
@@ -42,7 +40,6 @@ struct ParserAggregate {
     count: u32,
     sum: f64,
     tags: HashMap<String, String>,
-    timestamp: Option<DateTime<Utc>>,
 }
 
 fn is_header(input: &str) -> bool {
@@ -90,12 +87,6 @@ fn parse_value(input: &str) -> Result<f64, ParserError> {
     };
 
     Ok(value)
-}
-
-fn parse_timestamp(input: &str) -> Result<DateTime<Utc>, ParserError> {
-    let input = input.trim();
-    let millis: i64 = input.parse()?;
-    Ok(Utc.timestamp(millis / 1000, 0))
 }
 
 fn parse_tags(input: &str) -> Result<HashMap<String, String>, ParserError> {
@@ -149,20 +140,14 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
 
         let name = parts[0].trim();
         let tags = parse_tags(parts[1])?;
-        // second is value and optional timestamp
+        // second is value and optional timestamp, which is not meant to be used at client side
         let parts = &second[1..].trim().split(' ').collect::<Vec<_>>();
         let value = parse_value(parts[0])?;
-        let timestamp = if let Some(ts) = parts.get(1) {
-            Some(parse_timestamp(ts)?)
-        } else {
-            None
-        };
 
         Ok(ParserMetric {
             name: name.to_string(),
             value,
             tags,
-            timestamp,
         })
     } else {
         // there as no labels
@@ -175,17 +160,11 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         };
         let name = parts[0];
         let value = parse_value(parts[1])?;
-        let timestamp = if let Some(ts) = parts.get(2) {
-            Some(parse_timestamp(ts)?)
-        } else {
-            None
-        };
 
         Ok(ParserMetric {
             name: name.to_string(),
             value,
             tags: HashMap::new(),
-            timestamp,
         })
     }
 }
@@ -304,7 +283,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let counter = Metric {
                         name: metric.name,
-                        timestamp: metric.timestamp,
+                        timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
                         value: MetricValue::Counter {
@@ -326,7 +305,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let gauge = Metric {
                         name: metric.name,
-                        timestamp: metric.timestamp,
+                        timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
                         value: MetricValue::Gauge {
@@ -362,7 +341,6 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         count: 0,
                         sum: 0.0,
                         tags,
-                        timestamp: None,
                     });
 
                     match suffix {
@@ -400,7 +378,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let hist = Metric {
                         name: aggregate.name,
-                        timestamp: aggregate.timestamp,
+                        timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
@@ -441,7 +419,6 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         count: 0,
                         sum: 0.0,
                         tags,
-                        timestamp: None,
                     });
 
                     match suffix {
@@ -476,7 +453,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let summary = Metric {
                         name: aggregate.name,
-                        timestamp: aggregate.timestamp,
+                        timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedSummary {
@@ -530,7 +507,6 @@ impl From<ParseFloatError> for ParserError {
 mod test {
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -656,7 +632,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "http_requests_total".into(),
-                    timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
+                    timestamp: None,
                     tags: Some(
                         vec![
                             ("method".into(), "post".into()),
@@ -670,7 +646,7 @@ mod test {
                 },
                 Metric {
                     name: "http_requests_total".into(),
-                    timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
+                    timestamp: None,
                     tags: Some(
                         vec![
                             ("method".into(), "post".into()),
@@ -779,7 +755,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "something_weird".into(),
-                timestamp: Some(Utc.ymd(1969, 11, 15).and_hms_nano(21, 52, 35, 0)),
+                timestamp: None,
                 tags: Some(
                     vec![("problem".into(), "division by zero".into())]
                         .into_iter()
@@ -806,7 +782,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "latency".into(),
-                    timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
+                    timestamp: None,
                     tags: Some(
                         vec![("env".into(), "production".into())]
                             .into_iter()
@@ -817,7 +793,7 @@ mod test {
                 },
                 Metric {
                     name: "latency".into(),
-                    timestamp: Some(Utc.ymd(2014, 3, 17).and_hms_nano(14, 26, 3, 0)),
+                    timestamp: None,
                     tags: Some(vec![("env".into(), "testing".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
                     value: MetricValue::Gauge { value: 2.0 },
