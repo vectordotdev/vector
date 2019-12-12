@@ -698,17 +698,15 @@ jobs:
           no_output_timeout: 30m
 
   release-github:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Github
           command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-github
+            export PASS_VERSION=$(make version)
+            ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
     docker:
