@@ -127,7 +127,7 @@ fi
 _old_dir=$(pwd)
 cd $target_dir
 if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
-  tar czvf vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
+  tar cvf - ./$archive_dir_name | gzip -9 > vector-$TARGET.$ARCHIVE_TYPE
 elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
   powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'$TARGET'.'$ARCHIVE_TYPE' -Path "./'$archive_dir_name'/*"'
 else
