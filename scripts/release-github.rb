@@ -8,15 +8,19 @@
 
 require_relative "setup"
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
-release = metadata.releases.to_h.fetch(:"#{VERSION}")
-
 #
 # Constants
 #
 
 VERSION = ENV.fetch("VERSION")
 SHA1 = ENV.fetch("CIRCLE_SHA1")
+
+#
+# Setup
+#
+
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+release = metadata.releases.to_h.fetch(:"#{VERSION}")
 
 #
 # Release
