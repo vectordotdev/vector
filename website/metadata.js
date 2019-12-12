@@ -18233,17 +18233,6 @@ module.exports = {
 
       ]
     },
-<<<<<<< HEAD
-    "kubernetes": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "collect",
-      "id": "kubernetes_source",
-      "name": "kubernetes",
-=======
     "splunk_hec": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
@@ -18254,7 +18243,6 @@ module.exports = {
       "function_category": "receive",
       "id": "splunk_hec_source",
       "name": "splunk_hec",
->>>>>>> origin/master
       "operating_systems": [
         "linux",
         "macos",

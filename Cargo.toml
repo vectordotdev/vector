@@ -210,8 +210,11 @@ kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
-kubernetes-integration-tests = []
 docker-integration-tests = []
+
+
+kubernetes = ["kubernetes-integration-tests"]
+kubernetes-integration-tests = []
 
 [[bench]]
 name = "bench"

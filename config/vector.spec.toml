@@ -363,16 +363,6 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
-# Ingests data through kubernetes node's and outputs `log` events.
-[sources.kubernetes]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `kubernetes`.
-  # 
-  # * required
-  # * type: string
-  # * must be: "kubernetes"
-  type = "kubernetes"
-
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
   # The component type. This is a required field that tells Vector which

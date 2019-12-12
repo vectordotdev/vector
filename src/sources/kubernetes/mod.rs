@@ -7,10 +7,10 @@ use crate::{
         file::{FileConfig, FingerprintingConfig},
         Source,
     },
-    topology::config::{DataType, GlobalOptions, SourceConfig, TransformConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
-        regex_parser::RegexParserConfig,
+        regex_parser::{RegexParser, RegexParserConfig},
         Transform,
     },
 };
@@ -71,6 +71,10 @@ impl SourceConfig for KubernetesConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "kubernetes"
     }
 }
 
@@ -264,7 +268,7 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
         .insert(event::TIMESTAMP.clone(), "timestamp|%+".to_owned());
     // stream is a string
     // message is a string
-    rp_config.build().map_err(|e| {
+    RegexParser::build(&rp_config).map_err(|e| {
         format!(
             "Failed in creating message regex transform with error: {:?}",
             e
@@ -287,7 +291,7 @@ fn transform_file() -> crate::Result<Box<dyn Transform>> {
 
     // pod_uid is a string
     // container_name is a string
-    config.build().map_err(|e| {
+    RegexParser::build(&config).map_err(|e| {
         format!(
             "Failed in creating file regex transform with error: {:?}",
             e
