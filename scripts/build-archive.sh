@@ -104,7 +104,8 @@ else
   suffix=""
 fi
 cp -av README.md $archive_dir/README.md$suffix
-cp -av LICENSE $archive_dir/LICENSE$suffix
+# Create the license file for binary distributions (LICENSE + NOTICE)
+cat LICENSE NOTICE > $archive_dir/LICENSE$suffix
 
 # Copy the vector binary to /bin
 mkdir -p $archive_dir/bin

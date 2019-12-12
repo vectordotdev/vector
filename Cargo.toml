@@ -23,6 +23,7 @@ assets = [
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
+license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
 
 [workspace]
