@@ -196,6 +196,10 @@ class Metadata
     end
   end
 
+  def post_tags
+    @post_tags ||= posts.collect(&:tags).flatten.uniq
+  end
+
   def platforms
     @platforms ||= installation.containers +
       installation.operating_systems +
@@ -232,6 +236,7 @@ class Metadata
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
       posts: posts.deep_to_h,
+      post_tags: post_tags,
       releases: releases.deep_to_h,
       sources: sources.deep_to_h,
       team: team.deep_to_h,

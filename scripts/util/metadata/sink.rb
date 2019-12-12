@@ -117,8 +117,7 @@ class Sink < Component
           "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
           "examples" => ["AKIAIOSFODNN7EXAMPLE"],
           "name" => "AWS_ACCESS_KEY_ID",
-          "null" => false,
-          "optional" => true,
+          "null" => true,
           "type" => "string"
         })
 
@@ -127,8 +126,7 @@ class Sink < Component
           "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
           "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
           "name" => "AWS_SECRET_ACCESS_KEY",
-          "null" => false,
-          "optional" => true,
+          "null" => true,
           "type" => "string"
         })
 

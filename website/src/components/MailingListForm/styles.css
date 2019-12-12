@@ -1,9 +1,20 @@
 .mailing-list .mailing-list--description {
-  margin: var(--ifm-spacing-vertical) 0;
+  margin-bottom: var(--ifm-spacing-vertical);
 }
 .mailing-list form input[type="email"] {
   margin-right: 1em;
   max-width: 250px;
+  width: 100%;
+}
+.mailing-list.mailing-list--block input[type="email"] {
+  display: block;
+  max-width: none;
+  width: 100%;
+}
+.mailing-list.mailing-list--block .button {
+  display: block;
+  margin-top: var(--ifm-spacing-vertical);
+  max-width: none;
   width: 100%;
 }
 

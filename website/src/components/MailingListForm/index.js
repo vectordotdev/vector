@@ -4,9 +4,9 @@ import classnames from 'classnames';
 
 import './styles.css';
 
-function MailingListForm({size}) {
+function MailingListForm({block, size}) {
   return (
-    <div className="mailing-list">
+    <div className={classnames('mailing-list', {'mailing-list--block': block})}>
       <div className="mailing-list--description">
         The easiest way to stay up-to-date. One email on the 1st of every month. No spam, ever.
       </div>

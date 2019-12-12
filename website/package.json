@@ -27,6 +27,7 @@
     "react-dom": "^16.8.4",
     "react-inlinesvg": "^1.1.7",
     "react-select": "^3.0.8",
+    "reading-time": "^1.2.0",
     "strftime": "^0.10.0",
     "svg.js": "^2.6.2"
   },

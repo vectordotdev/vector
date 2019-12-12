@@ -175,10 +175,9 @@ function ReleaseDownload() {
         <section>
           <div className={classnames('container', styles.downloadTableContainer)}>
             <Tabs
-              centered={true}
+              block={true}
               className="rounded"
               defaultValue={selectedTab}
-              style={{width: "100%"}}
               values={[
                 { label: 'Older', value: 'older', },
                 { label: `Latest (${latestRelease.version})`, value: 'latest', },
@@ -187,7 +186,7 @@ function ReleaseDownload() {
             }>
             <TabItem value="older">
               <Alert type="warning">
-                Olders versions are likely to contain bugs. It is highly recommended to use the latest version. Please proceed with caution.
+                Olders versions are outdated and it is highly recommended to use the latest version. Please proceed with caution.
               </Alert>
               <Select
                 className={classnames('react-select-container', styles.releaseSelect)}

@@ -10,6 +10,11 @@
   margin-left: 10px;
 }
 
+.avatar.avatar--sm .avatar__subtitle {
+  font-size: 1em;
+  margin-top: 1px;
+}
+
 .avatar.avatar--inline {
   display: inline;
 }

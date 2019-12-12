@@ -1,0 +1,18 @@
+.blog-list-filters {
+  padding-top: calc( var(--ifm-spacing-vertical) + 2px );
+}
+
+.blog-list-filters h1 {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.blog-list-filters h3 {
+  color: var(--ifm-color-emphasis-300);
+  font-size: 1em;
+  margin-bottom: var(--ifm-spacing-vertical);
+  text-transform: uppercase;
+}
+
+.blog-list-filters ul {
+  font-size: 0.9em;
+}

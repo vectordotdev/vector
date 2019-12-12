@@ -181,15 +181,15 @@ The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream re
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
   name={"AWS_ACCESS_KEY_ID"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -204,15 +204,15 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
   name={"AWS_SECRET_ACCESS_KEY"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

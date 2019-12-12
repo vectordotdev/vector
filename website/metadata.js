@@ -227,7 +227,7 @@ module.exports = {
     ]
   },
   "latest_post": {
-    "author": "Ash",
+    "author_id": "ash",
     "date": "2019-11-25",
     "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
@@ -4989,33 +4989,35 @@ module.exports = {
     "last_version": "0.5.0",
     "posts": [
       {
-        "author": "Alex",
+        "author_id": "ben",
         "date": "2019-11-19",
-        "description": "Vector can now be deployed on machines using ARMv7 and ARM64 architectures!\nThese architectures are very popular within the IOT community and allows you\nto use Vector's superior performance and reliability in IOT applications.",
-        "id": "arm-raspbian-iot-support",
-        "path": "website/blog/2019-11-19-arm-support.md",
-        "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
+        "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+        "id": "arm-support-on-linux",
+        "path": "website/blog/2019-11-19-arm-support-on-linux.md",
+        "permalink": "https://vector.dev/blog/arm-support-on-linux",
         "tags": [
           "type: announcement",
-          "platform: linux"
+          "domain: platforms",
+          "platform: arm"
         ],
-        "title": "ARMv7 & Arm64 support: Raspbian & IOT"
+        "title": "ARMv7 & ARM64 Support on Linux"
       },
       {
-        "author": "Alex",
+        "author_id": "ben",
         "date": "2019-11-21",
-        "description": "For Windows fanatics, you'll be happy to hear that Vector now officially\nsupports Windows! Bringing all of the performance and reliability benefits of\nVector to Windows.",
+        "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
         "id": "windows-support",
         "path": "website/blog/2019-11-21-windows-support.md",
         "permalink": "https://vector.dev/blog/windows-support",
         "tags": [
           "type: announcement",
+          "domain: platforms",
           "platform: windows"
         ],
         "title": "Windows Support Is Here!"
       },
       {
-        "author": "Ash",
+        "author_id": "ash",
         "date": "2019-11-25",
         "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
         "id": "unit-testing-vector-config-files",
@@ -5050,9 +5052,16 @@ module.exports = {
     ],
     "version": "0.6.0"
   },
+  "post_tags": [
+    "type: announcement",
+    "domain: platforms",
+    "platform: arm",
+    "platform: windows",
+    "domain: config"
+  ],
   "posts": [
     {
-      "author": "Luke",
+      "author_id": "luke",
       "date": "2019-06-28",
       "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
       "id": "introducing-vector",
@@ -5064,33 +5073,35 @@ module.exports = {
       "title": "Introducing Vector"
     },
     {
-      "author": "Alex",
+      "author_id": "ben",
       "date": "2019-11-19",
-      "description": "Vector can now be deployed on machines using ARMv7 and ARM64 architectures!\nThese architectures are very popular within the IOT community and allows you\nto use Vector's superior performance and reliability in IOT applications.",
-      "id": "arm-raspbian-iot-support",
-      "path": "website/blog/2019-11-19-arm-support.md",
-      "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
+      "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+      "id": "arm-support-on-linux",
+      "path": "website/blog/2019-11-19-arm-support-on-linux.md",
+      "permalink": "https://vector.dev/blog/arm-support-on-linux",
       "tags": [
         "type: announcement",
-        "platform: linux"
+        "domain: platforms",
+        "platform: arm"
       ],
-      "title": "ARMv7 & Arm64 support: Raspbian & IOT"
+      "title": "ARMv7 & ARM64 Support on Linux"
     },
     {
-      "author": "Alex",
+      "author_id": "ben",
       "date": "2019-11-21",
-      "description": "For Windows fanatics, you'll be happy to hear that Vector now officially\nsupports Windows! Bringing all of the performance and reliability benefits of\nVector to Windows.",
+      "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
       "id": "windows-support",
       "path": "website/blog/2019-11-21-windows-support.md",
       "permalink": "https://vector.dev/blog/windows-support",
       "tags": [
         "type: announcement",
+        "domain: platforms",
         "platform: windows"
       ],
       "title": "Windows Support Is Here!"
     },
     {
-      "author": "Ash",
+      "author_id": "ash",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -17310,33 +17321,35 @@ module.exports = {
       "last_version": "0.5.0",
       "posts": [
         {
-          "author": "Alex",
+          "author_id": "ben",
           "date": "2019-11-19",
-          "description": "Vector can now be deployed on machines using ARMv7 and ARM64 architectures!\nThese architectures are very popular within the IOT community and allows you\nto use Vector's superior performance and reliability in IOT applications.",
-          "id": "arm-raspbian-iot-support",
-          "path": "website/blog/2019-11-19-arm-support.md",
-          "permalink": "https://vector.dev/blog/arm-raspbian-iot-support",
+          "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+          "id": "arm-support-on-linux",
+          "path": "website/blog/2019-11-19-arm-support-on-linux.md",
+          "permalink": "https://vector.dev/blog/arm-support-on-linux",
           "tags": [
             "type: announcement",
-            "platform: linux"
+            "domain: platforms",
+            "platform: arm"
           ],
-          "title": "ARMv7 & Arm64 support: Raspbian & IOT"
+          "title": "ARMv7 & ARM64 Support on Linux"
         },
         {
-          "author": "Alex",
+          "author_id": "ben",
           "date": "2019-11-21",
-          "description": "For Windows fanatics, you'll be happy to hear that Vector now officially\nsupports Windows! Bringing all of the performance and reliability benefits of\nVector to Windows.",
+          "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
           "id": "windows-support",
           "path": "website/blog/2019-11-21-windows-support.md",
           "permalink": "https://vector.dev/blog/windows-support",
           "tags": [
             "type: announcement",
+            "domain: platforms",
             "platform: windows"
           ],
           "title": "Windows Support Is Here!"
         },
         {
-          "author": "Ash",
+          "author_id": "ash",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",

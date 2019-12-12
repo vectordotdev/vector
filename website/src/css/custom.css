@@ -17,8 +17,8 @@
   --ifm-code-background: var(--ifm-color-emphasis-50);
   --ifm-code-font-size: 85%;
   --ifm-color-black: rgb(0, 27, 61);
-  --ifm-color-blue: #3084ff;
-  --ifm-color-blue-rgb: 48, 132 ,255;
+  --ifm-color-blue: #438FFF;
+  --ifm-color-blue-rgb: 67, 143 ,255;
   --ifm-color-content: var(--ifm-color-emphasis-800);
   --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
   --ifm-color-danger: #ff1178;
@@ -78,13 +78,13 @@
   --ifm-menu-color: var(--ifm-color-emphasis-600);
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-navbar-link-color: var(--ifm-heading-color);
-  --ifm-panel-background: var(--ifm-color-emphasis-50);
+  --ifm-panel-background: var(--ifm-background-color);
   --ifm-panel-background-rgb: 249, 249, 250;
   --ifm-panel-background-solid: #f9f9fa;
   --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
   --ifm-panel-border-color: var(--ifm-hr-border-color);
   --ifm-panel-border-color-active: var(--ifm-color-primary);
-  --ifm-panel-box-shadow: none;
+  --ifm-panel-box-shadow: 0 0px 10px 0px var(--ifm-color-emphasis-50);
   --ifm-panel-box-shadow-active: var(--ifm-panel-box-shadow);
   --ifm-panel-color: var(--ifm-color-emphasis-800);
   --ifm-panel-color-active: var(--ifm-color-primary);
@@ -154,19 +154,46 @@ a code {
 }
 
 /**
+ * article
+ */
+
+article header h1 {
+  font-size: 2em;
+}
+
+/**
  * badge
  */
 
 .badge {
   background-clip: padding-box;
+  border-color: transparent;
+  box-sizing: border-box;
+}
+.badge.badge--blue {
+  --ifm-badge-background-color: rgba(var(--ifm-color-blue-rgb), 0.25);
+  --ifm-badge-color: var(--ifm-color-blue);
+}
+.badge.badge--danger {
+  --ifm-badge-background-color: rgba(var(--ifm-color-danger-rgb), 0.2);
+  --ifm-badge-color: var(--ifm-color-danger);
+}
+.badge.badge--highlight {
+  animation: gradientBG 5s ease-in infinite;
+  background-image: var(--ifm-highlight-gradient);
+  background-size: 150% 150%;
+  color: var(--ifm-background-color);
+}
+.badge.badge--pink {
+  --ifm-badge-background-color: rgba(var(--ifm-color-pink-rgb), 0.2);
+  --ifm-badge-color: var(--ifm-color-pink);
 }
 .badge.badge--primary {
   --ifm-badge-background-color: rgba(var(--ifm-color-primary-rgb), 0.2);
   --ifm-badge-color: var(--ifm-color-primary);
 }
-.badge.badge--danger {
-  --ifm-badge-background-color: rgba(var(--ifm-color-danger-rgb), 0.2);
-  --ifm-badge-color: var(--ifm-color-danger);
+.badge.badge--rounded {
+  border-radius: 1em;
 }
 .badge.badge--secondary {
   color: var(--ifm-color-emphasis-800);
@@ -178,18 +205,6 @@ a code {
 .badge.badge--warning {
   --ifm-badge-background-color: rgba(var(--ifm-color-warning-rgb), 0.2);
   --ifm-badge-color: var(--ifm-color-warning);
-}
-.badge.badge--highlight {
-  animation: gradientBG 5s ease-in infinite;
-  background-clip: padding-box;
-  background-image: var(--ifm-highlight-gradient);
-  background-size: 150% 150%;
-  border-color: transparent;
-  box-sizing: border-box;
-  color: var(--ifm-background-color);
-}
-.badge.badge--rounded {
-  border-radius: 1em;
 }
 .badge a {
   color: inherit;
@@ -349,6 +364,49 @@ table.comparison tr td.bar.vector .bar {
 }
 
 /**
+ * container
+ */
+
+.container--narrow {
+  max-width: 760px;
+}
+
+.container--bleed > .bleed,
+.container--bleed > section > .code-header,
+.container--bleed > section > pre {
+  margin-left: calc( -1 * ( var(--ifm-container-width) - 760px ) / 2 );
+  margin-right: calc( -1 * ( var(--ifm-container-width) - 760px ) / 2 );
+}
+
+@media (max-width: 996px) {
+  .container--bleed > .bleed,
+  .container--bleed > section > .code-header,
+  .container--bleed > section > pre {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/**
+ * domain-bg
+ */
+
+.domain-bg {
+  background-image: url(/img/vector-bg.svg);
+}
+.domain-bg.domain-bg--config {
+  background-image: url(/img/cogs.svg);
+}
+.domain-bg.domain-bg--platforms {
+  background-image: url(/img/circuit.svg);
+}
+.domain-bg--hover {
+}
+.domain-bg--hover:not(:hover) {
+  background-image: none;
+}
+
+/**
  * empty
  *
  * Generic empty state. Used for showing no results, etc.
@@ -479,8 +537,8 @@ header .badges .badge {
 }
 header h1 {
   font-family: Ubuntu, var(--ifm-font-family-base);
-  font-size: 2rem !important;
-  margin-bottom: 0.5rem !important;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 /**
@@ -498,11 +556,10 @@ header h1 {
   }
 }
 header.hero h1 {
-  font-size: 2.5rem !important;
-  margin-bottom: 0.3rem !important;
+  font-size: 2.5rem;
 }
 .hero {
-  display: flex;
+  display: block;
   align-items: center;
   min-height: 200px;
   padding: 3em 0;
@@ -511,6 +568,7 @@ header.hero h1 {
 .hero .hero__subtitle {
   color: var(--ifm-color-emphasis-600);
   font-size: 1.1rem;
+  margin-top: 0.3rem;
 }
 .hero .hero__subtitle a {
   color: var(--ifm-color-content);
@@ -1267,7 +1325,6 @@ ul.tabs.mini li.tab-item.tab-item--active {
 ul.tabs.rounded {
   border: 0px none;
   border-radius: 2em;
-  display: inline-flex !important;
   font-size: 1em;
   font-weight: normal;
   margin: 0 auto;
@@ -1291,11 +1348,6 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 .tabs--centered ul.tabs {
   display: inline-block;
 }
-@media (max-width: 996px) {
-  ul.tabs.rounded {
-    display: flex !important;
-  }
-}
 
 /*
  * text--highlight
@@ -1316,6 +1368,15 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 
 .text--upcase {
   text-transform: uppercase;
+}
+
+/*
+ * unstyled
+ */
+
+.unstyled {
+  list-style: none;
+  padding-left: 0;
 }
 
 /******************************************************************************
@@ -1433,19 +1494,6 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   background: var(--ifm-color-emphasis-25);
 }
 
-.markdown ol {
-  border-left: 1px solid var(--ifm-hr-border-color);
-  margin-left: 0.25em;
-  padding-left: calc( var(--ifm-spacing-horizontal) - 3px );
-}
-.markdown ol li {
-  padding-left: calc( var(--ifm-spacing-horizontal) / 2 );
-  margin: 0;
-}
-.markdown ol li::marker {
-  font-weight: bold;
-}
-
 /******************************************************************************
  * Docs
  *
@@ -1460,6 +1508,11 @@ div[class^='docPage_'] div[class^='docItemContainer_'] {
     max-width: none;
     padding: 0 calc( var(--ifm-spacing-horizontal) * 2);
   }
+}
+
+div[class^='docPage_'] h1[class^='docTitle_'] {
+  font-size: 2em;
+  margin-bottom: 0.5rem;
 }
 
 div[class^='docPage_'] main[class^='docMainContainer_'] div.container div.row div.col.col--3 {

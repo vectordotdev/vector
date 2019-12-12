@@ -185,8 +185,11 @@ end
 
 title("Post processing generated files...")
 
-docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
-docs = docs + ["#{ROOT_DIR}/README.md"]
+docs =
+  Dir.glob("#{DOCS_ROOT}/**/*.md").to_a +
+    Dir.glob("#{POSTS_ROOT}/**/*.md").to_a +
+    ["#{ROOT_DIR}/README.md"]
+
 docs.each do |doc|
   path = doc.gsub(/^#{ROOT_DIR}\//, "")
   original_content = File.read(doc)

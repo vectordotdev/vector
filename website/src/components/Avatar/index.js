@@ -5,11 +5,11 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Avatar({className, id, inline, size, subTitle}) {
+function Avatar({className, id, inline, nameSuffix, size, subTitle, vertical}) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {team}} = siteConfig.customFields;
-  const member = team.find(member => member.id == id) || team[0];
+  const member = team.find(member => member.id == id) || team.find(member => member.id == 'ben');
 
   if (inline) {
     return (
@@ -22,15 +22,16 @@ function Avatar({className, id, inline, size, subTitle}) {
       </span>
     );
   } else {
+
     return (
-      <div className={classnames('avatar', `avatar--${size}`, className, {'avatar--inline': inline})}>
+      <div className={classnames('avatar', className, {[`avatar--${size}`]: size, 'avatar--inline': inline, 'avatar--vertical': vertical})}>
         <img
           className={classnames('avatar__photo', `avatar__photo--${size}`)}
           src={member.avatar}
         />
         <div className="avatar__intro">
-          <div className="avatar__name">{member.name}</div>
-          <small className="avatar__subtitle">{subTitle || 'Vector core team'}</small>
+          <div className="avatar__name">{member.name}{nameSuffix}</div>
+          {subTitle !== false && <small className="avatar__subtitle">{subTitle || 'Vector core team'}</small>}
         </div>
       </div>
     );
