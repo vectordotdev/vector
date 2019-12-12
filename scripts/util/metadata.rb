@@ -30,28 +30,30 @@ class Metadata
   end
 
   attr_reader :blog_posts,
-    :companies,
+  :env_vars,
     :installation,
     :links,
     :log_fields,
     :metric_fields,
     :options,
+    :testing,
     :posts,
     :releases,
     :sinks,
     :sources,
+    :team,
     :transforms
 
   def initialize(hash, docs_root, pages_root)
-    @companies = hash.fetch("companies")
     @installation = OpenStruct.new()
     @log_fields = Field.build_struct(hash["log_fields"] || {})
     @metric_fields = Field.build_struct(hash["metric_fields"] || {})
-    @options = OpenStruct.new()
+    @options = Option.build_struct(hash.fetch("options"))
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
+    @testing = Option.build_struct(hash.fetch("testing"))
 
     # installation
 
@@ -61,15 +63,19 @@ class Metadata
     @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
     @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
+    # posts
+
+    @posts ||=
+      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+        Post.new(path)
+      end.sort
+
     # releases
 
     release_versions =
       hash.fetch("releases").collect do |version_string, _release_hash|
         Version.new(version_string)
       end
-
-    # Seed the list of releases with the first version
-    release_versions << Version.new("0.3.0")
 
     hash.fetch("releases").collect do |version_string, release_hash|
       version = Version.new(version_string)
@@ -80,8 +86,10 @@ class Metadata
           sort.
           last
 
+      last_date = last_version && hash.fetch("releases").fetch(last_version.to_s).fetch("date").to_date
+
       release_hash["version"] = version_string
-      release = Release.new(release_hash, last_version)
+      release = Release.new(release_hash, last_version, last_date, @posts)
       @releases.send("#{version_string}=", release)
     end
 
@@ -119,30 +127,43 @@ class Metadata
       @sinks.send("#{sink_name}=", sink)
     end
 
-    # options
-
-    hash.fetch("options").each do |option_name, option_hash|
-      option = Option.new(
-        option_hash.merge({"name" => option_name}
-      ))
-
-      @options.send("#{option_name}=", option)
-    end
-
     # links
 
     @links = Links.new(hash.fetch("links"), docs_root, pages_root)
 
-    # posts
+    # env vars
 
-    @posts ||=
-      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-        Post.new(path)
-      end.sort
+    @env_vars = Option.build_struct(hash["env_vars"] || {})
+
+    components.each do |component|
+      component.env_vars.to_h.each do |key, val|
+        @env_vars.send("#{key}=", val)
+      end
+    end
+
+    # team
+
+    @team =
+      hash.fetch("team").collect do |member|
+        OpenStruct.new(member)
+      end
   end
 
   def components
     @components ||= sources_list + transforms_list + sinks_list
+  end
+
+  def downloads(arch: nil, os: nil, package_manager: nil, type: nil)
+    downloads = installation.downloads
+    downloads = downloads.select { |d| d.arch && d.arch.downcase == arch.to_s.downcase } if arch
+    downloads = downloads.select { |d| d.os && d.os.downcase == os.to_s.downcase } if os
+    downloads = downloads.select { |d| d.package_manager && d.package_manager.downcase == package_manager.to_s.downcase } if package_manager
+    downloads = downloads.select { |d| d.type && d.type.downcase == type.to_s.downcase } if type
+    downloads
+  end
+
+  def env_vars_list
+    @env_vars_list ||= env_vars.to_h.values.sort
   end
 
   def latest_patch_releases
@@ -175,6 +196,16 @@ class Metadata
     end
   end
 
+  def post_tags
+    @post_tags ||= posts.collect(&:tags).flatten.uniq
+  end
+
+  def platforms
+    @platforms ||= installation.containers +
+      installation.operating_systems +
+      installation.package_managers
+  end
+
   def previous_minor_releases(release)
     releases_list.select do |other_release|
       other_release.version < release.version &&
@@ -205,7 +236,10 @@ class Metadata
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
       posts: posts.deep_to_h,
+      post_tags: post_tags,
+      releases: releases.deep_to_h,
       sources: sources.deep_to_h,
+      team: team.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h
     }

@@ -9,10 +9,10 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-rate_limit_duration = 1
-rate_limit_num = 5
-retry_attempts = 5
-retry_backoff_secs = 1
+request_rate_limit_duration_secs = 1
+request_rate_limit_num =5
+request_retry_attempts = 5
+request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 60
 service_provider = "Elastic"
@@ -51,13 +51,13 @@ description = "Options for basic authentication."
 
 [sinks.elasticsearch.options.basic_auth.options.password]
 type = "string"
-examples = ["password", "${PASSWORD_ENV_VAR}"]
+examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
 description = "The basic authentication password."
 
 [sinks.elasticsearch.options.basic_auth.options.user]
 type = "string"
-examples = ["username"]
+examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
 description = "The basic authentication user name."
 
@@ -66,11 +66,11 @@ type = "table"
 null = true
 description = "Options for custom headers."
 
-[sinks.elasticsearch.options.headers.options."*"]
+[sinks.elasticsearch.options.headers.options."`[header-name]`"]
 type = "string"
 examples = [
-  {name = "Authorization", value = "${TOKEN_ENV_VAR}"},
-  { name = "X-Powered-By", value = "Vector"}
+  {Authorization = "${TOKEN_ENV_VAR}"},
+  {"X-Powered-By" = "Vector"}
 ]
 null = false
 description = "A custom header to be added to each outgoing Elasticsearch request."
@@ -95,9 +95,9 @@ type = "table"
 null = true
 description = "Custom parameters to Elasticsearch query string."
 
-[sinks.elasticsearch.options.query.options."*"]
+[sinks.elasticsearch.options.query.options."`[parameter-name]`"]
 type = "string"
-examples = [{ name = "X-Powered-By", value = "Vector"}]
+examples = [{"X-Powered-By" = "Vector"}]
 null = false
 description = "A custom parameter to be added to each Elasticsearch request."
 
@@ -110,7 +110,8 @@ description = "When using the AWS provider, the [AWS region][urls.aws_elasticsea
 [[sinks.elasticsearch.output.examples]]
 label = "Generic"
 type = "http"
-body = """\
+output.type = "http"
+output.body = """\
 POST <host>/_bulk HTTP/1.1
 Host: <host>
 Content-Type: application/x-ndjson

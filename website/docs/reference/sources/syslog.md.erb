@@ -1,4 +1,4 @@
-<% component = metadata.sources.syslog %>
+<%- component = metadata.sources.syslog -%>
 
 <%= component_header(component) %>
 
@@ -10,9 +10,15 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
 ## Output
 
-<%= source_output(:log, component.output.log, heading_depth: 3) %>
+<%= component_output(:log, component.output.log, heading_depth: 3) %>
 
 ## How It Works [[sort]]
 

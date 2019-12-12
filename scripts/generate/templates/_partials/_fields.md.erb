@@ -4,6 +4,7 @@
 <%- full_path = [path, field.name].compact.join(".") -%>
 
 <Field
+  defaultValue={<%= field.default.to_json %>}
   enumValues={<%= field.enum.to_json %>}
   examples={<%= field.examples.to_json %>}
   name={<%= field.name.to_json %>}

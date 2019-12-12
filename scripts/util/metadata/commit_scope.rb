@@ -94,4 +94,13 @@ class CommitScope
         end
       end
   end
+
+  def to_h
+    {
+      category: category,
+      component_name: component_name,
+      component_type: component_type,
+      name: name
+    }
+  end
 end

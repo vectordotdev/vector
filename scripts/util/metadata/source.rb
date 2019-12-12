@@ -60,6 +60,10 @@ class Source < Component
     end
   end
 
+  def description
+    @description ||= "Ingests data through #{through_description} and outputs #{output_types.to_sentence} events."
+  end
+
   def log_fields_list
     @log_fields_list ||= log_fields.to_h.values.sort
   end

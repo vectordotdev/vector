@@ -1,4 +1,4 @@
-<% component = metadata.sinks.aws_s3 %>
+<%- component = metadata.sinks.aws_s3 -%>
 
 <%= component_header(component) %>
 
@@ -10,6 +10,12 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
 ## Output
 
 <%= sink_output(component) %>
@@ -29,7 +35,7 @@ By default, Vector will name your S3 objects in the following format:
 
 <Tabs
   block={true}
-  defaultValue="manual"
+  defaultValue="without_compression"
   values={[
     { label: 'Without Compression', value: 'without_compression', },
     { label: 'With Compression', value: 'with_compression', },

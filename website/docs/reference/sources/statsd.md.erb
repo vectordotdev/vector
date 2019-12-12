@@ -1,4 +1,4 @@
-<% component = metadata.sources.statsd %>
+<%- component = metadata.sources.statsd -%>
 
 <%= component_header(component) %>
 
@@ -10,9 +10,15 @@
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
 
-## Output (metric)
+<%- if component.env_vars_list.any? -%>
+## Env Vars
 
-<%= source_output(:metric, component.output.metric, heading_depth: 3) %>
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+## Output
+
+<%= component_output(:metric, component.output.metric, heading_depth: 3) %>
 
 ## How It Works [[sort]]
 

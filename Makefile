@@ -22,12 +22,12 @@ bench: ## Run internal benchmarks
 	@cargo bench --all
 
 build: ## Build the project
-	@cargo build
+	@cargo build --no-default-features --features="$${FEATURES:-default}"
 
 check: check-code check-fmt check-generate check-examples
 
-check-code: ## Checks code for compilation errors
-	@cargo check --all --all-features --all-targets
+check-code: ## Checks code for compilation errors (only default features)
+	@cargo check --all --all-targets
 
 check-fmt: ## Checks code formatting correctness
 	@cargo fmt -- --check

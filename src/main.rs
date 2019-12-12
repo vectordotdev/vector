@@ -13,7 +13,9 @@ use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{generate, list, metrics, runtime, topology, trace};
+use vector::{
+    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -81,6 +83,9 @@ enum SubCommand {
     /// Validate the target config, then exit.
     Validate(Validate),
 
+    /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
+    Test(unit_test::Opts),
+
     /// List available components, then exit.
     List(list::Opts),
 
@@ -99,8 +104,9 @@ struct Validate {
     #[structopt(short, long)]
     deny_warnings: bool,
 
-    /// Any number of Vector config files to validate.
-    config_paths: Vec<PathBuf>,
+    /// Any number of Vector config files to validate. If none are specified the
+    /// default config path `/etc/vector/vector.toml` will be targeted.
+    paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -196,6 +202,7 @@ fn main() {
         std::process::exit(match s {
             SubCommand::Validate(v) => validate(&v),
             SubCommand::List(l) => list::cmd(&l),
+            SubCommand::Test(t) => unit_test::cmd(&t),
             SubCommand::Generate(g) => generate::cmd(&g),
         })
     });
@@ -263,7 +270,7 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let pieces = topology::validate(&config).unwrap_or_else(|| {
+    let pieces = topology::validate(&config, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -417,7 +424,13 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate) -> exitcode::ExitCode {
-    for config_path in &opts.config_paths {
+    let paths = if opts.paths.len() > 0 {
+        &opts.paths
+    } else {
+        &DEFAULT_CONFIG_PATHS
+    };
+
+    for config_path in paths {
         let file = if let Some(file) = open_config(&config_path) {
             file
         } else {

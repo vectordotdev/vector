@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -55,7 +56,7 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
-                  "setup/installation/operating-systems/raspberry-pi",
+                  "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
                   "setup/installation/operating-systems/windows",
@@ -97,6 +98,7 @@ module.exports = {
             "setup/guides",
             "setup/guides/getting-started",
             "setup/guides/troubleshooting",
+            "setup/guides/unit-testing",
           ]
         },
       ],
@@ -106,7 +108,6 @@ module.exports = {
       label: 'Reference',
       items: [
         "reference",
-        "reference/global-options",
         {
           type: 'category',
           label: 'Sources',
@@ -122,6 +123,8 @@ module.exports = {
               "reference/sources/kafka",
             
               "reference/sources/kubernetes",
+            
+              "reference/sources/splunk_hec",
             
               "reference/sources/statsd",
             
@@ -147,9 +150,13 @@ module.exports = {
             
               "reference/transforms/add_tags",
             
+              "reference/transforms/ansi_stripper",
+            
               "reference/transforms/coercer",
             
               "reference/transforms/field_filter",
+            
+              "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",
             
@@ -203,6 +210,8 @@ module.exports = {
             
               "reference/sinks/kafka",
             
+              "reference/sinks/new_relic_logs",
+            
               "reference/sinks/prometheus",
             
               "reference/sinks/splunk_hec",
@@ -214,6 +223,15 @@ module.exports = {
               "reference/sinks/vector",
             
           ],
+        },
+        {
+          type: 'category',
+          label: 'Advanced',
+          items: [
+            "reference/env-vars",
+            "reference/global-options",
+            "reference/tests",
+          ]
         },
       ],
     },
@@ -227,7 +245,6 @@ module.exports = {
         "administration/tuning",
         "administration/updating",
         "administration/validating",
-        "administration/env-vars",
       ],
     },
     {

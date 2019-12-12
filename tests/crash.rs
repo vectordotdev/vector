@@ -1,14 +1,13 @@
 use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
-    buffers::Acker,
     test_util::{
         block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
     },
     topology::{
         self,
-        config::{self, GlobalOptions},
+        config::{self, GlobalOptions, SinkContext},
     },
     Event, {sinks, sources},
 };
@@ -20,7 +19,7 @@ struct PanicSink;
 impl config::SinkConfig for PanicSink {
     fn build(
         &self,
-        _acker: Acker,
+        _cx: SinkContext,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
@@ -73,15 +72,18 @@ fn test_sink_panic() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     let _ = std::panic::take_hook();
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -96,7 +98,7 @@ struct ErrorSink;
 impl config::SinkConfig for ErrorSink {
     fn build(
         &self,
-        _acker: Acker,
+        _cx: SinkContext,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
@@ -149,14 +151,17 @@ fn test_sink_error() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -210,14 +215,17 @@ fn test_source_error() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -274,15 +282,18 @@ fn test_source_panic() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
     let _ = std::panic::take_hook();
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
