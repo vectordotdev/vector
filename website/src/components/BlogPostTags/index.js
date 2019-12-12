@@ -6,13 +6,13 @@ import classnames from 'classnames';
 import {enrichTags} from '@site/src/exports/tags';
 import styles from './styles.module.css';
 
-function BlogPostTags({tags}) {
+function BlogPostTags({tags, valuesOnly}) {
   const enrichedTags = enrichTags(tags);
 
   return (
     <div className={styles.tags}>
       {enrichedTags.map((tag, idx) => (
-        <Link to={tag.permalink} className={classnames('badge', 'badge--rounded', `badge--${tag.style}`)}>{tag.label}</Link>
+        <Link to={tag.permalink} className={classnames('badge', 'badge--rounded', `badge--${tag.style}`)}>{valuesOnly ? tag.value : tag.label}</Link>
       ))}
     </div>
   );

@@ -1,3 +1,5 @@
+import GithubSlugger from 'github-slugger';
+
 function enrichTag(tag) {
   const labelParts = tag.label.split(': ', 2);
   const category = labelParts[0];
@@ -25,7 +27,17 @@ function enrichTag(tag) {
 }
 
 export function enrichTags(tags) {
-  return tags.map(tag => enrichTag(tag));
+  const slugger = new GithubSlugger();
+
+  return tags.map(tag => {
+    let normalizedTag = tag;
+
+    if (typeof(tag) == 'string') {
+      normalizedTag = {label: tag, permalink: `/blog/tags/${slugger.slug(tag)}`};
+    }
+
+    return enrichTag(normalizedTag)
+  });
 }
 
 export default {enrichTags};

@@ -14,7 +14,6 @@ import Link from '@docusaurus/Link';
 import MailingListForm from '@site/src/components/MailingListForm';
 
 import {enrichTags} from '@site/src/exports/tags';
-import GithubSlugger from 'github-slugger';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
@@ -24,11 +23,7 @@ function BlogListPage(props) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {post_tags: postTags}} = siteConfig.customFields;
-
-  const slugger = new GithubSlugger();
-  const tags = postTags.sort().map(postTag => ({label: postTag, permalink: `/blog/tags/${slugger.slug(postTag)}`}));
-  const enrichedTags = enrichTags(tags);
-
+  const enrichedTags = enrichTags(postTags);
   const typeTags = enrichedTags.filter(tag => tag.category == 'type');
   const domainTags = enrichedTags.filter(tag => tag.category == 'domain');
 

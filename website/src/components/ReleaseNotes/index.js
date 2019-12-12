@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 
 import Alert from '@site/src/components/Alert';
 import Avatar from '@site/src/components/Avatar';
+import BlogPostTags from '@site/src/components/BlogPostTags';
 import Changelog from '@site/src/components/Changelog';
 import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
@@ -53,7 +54,9 @@ function Highlight({post}) {
 
   return (
     <div className="section">
-      <span className="badge badge--secondary" style={{float: "right"}}>config</span>
+      <div style={{float: 'right'}}>
+        <BlogPostTags tags={post.tags} valuesOnly={true} />
+      </div>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
       <Avatar id={post.author_id} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
       <p>
