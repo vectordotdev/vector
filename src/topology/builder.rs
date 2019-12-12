@@ -1,8 +1,9 @@
 use super::{
+    config::SinkContext,
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::{buffers, runtime};
+use crate::{buffers, dns::Resolver, runtime};
 use futures::{
     future::{lazy, Either},
     sync::mpsc,
@@ -110,6 +111,9 @@ pub fn build_pieces(
         return Err(vec!["No sinks defined in the config.".to_owned()]);
     }
 
+    // TODO: remove the unimplemented
+    let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
+
     // Build sources
     for (name, source) in &config.sources {
         let (tx, rx) = mpsc::channel(1000);
@@ -190,7 +194,12 @@ pub fn build_pieces(
             Ok(buffer) => buffer,
         };
 
-        let (sink, healthcheck) = match sink.inner.build(acker) {
+        let cx = SinkContext {
+            resolver: resolver.clone(),
+            acker,
+        };
+
+        let (sink, healthcheck) = match sink.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;

@@ -48,7 +48,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -56,7 +56,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-x86_64-unknown-linux-musl.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.6.0/vector-x86_64-unknown-linux-musl.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -104,7 +104,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -112,7 +112,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-aarch64-unknown-linux-musl.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.6.0/vector-aarch64-unknown-linux-musl.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -160,7 +160,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -168,7 +168,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-armv7-unknown-linux-musleabihf.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.6.0/vector-armv7-unknown-linux-musleabihf.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -216,7 +216,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -224,7 +224,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.5.0/vector-x86_64-apple-darwin.tar.gz | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.6.0/vector-x86_64-apple-darwin.tar.gz | \
       tar xzf - -C vector --strip-components=2
     ```
 
@@ -272,21 +272,21 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
-    ```powershell
-    Invoke-WebRequest https://packages.timber.io/vector/0.5.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```bat
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.6.0/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
-    ```powershell
-    Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
+    ```bat
+    powershell Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x86_64-pc-windows-msvc.zip -OutFile vector-x86_64-pc-windows-msvc.zip
     ```
 
     </TabItem>
@@ -294,19 +294,19 @@ import TabItem from '@theme/TabItem';
 
 2.  Extract files from the archive:
 
-    ```powershell
-    Expand-Archive vector-x86_64-pc-windows-msvc.zip .
+    ```bat
+    powershell Expand-Archive vector-x86_64-pc-windows-msvc.zip .
     ```
 
-3.  Navigate to Vector directory:
+3.  Navigate to the Vector directory:
 
-    ```powershell
+    ```bat
     cd vector-x86_64-pc-windows-msvc
     ```
 4.  Start Vector:
 
-    ```powerhsell
-    bin\vector.exe --config config\vector.toml
+    ```bat
+    .\bin\vector --config config\vector.toml
     ```
 
 </TabItem>

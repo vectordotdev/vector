@@ -7,7 +7,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
@@ -47,8 +47,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = clickhouse(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = clickhouse(self.clone(), cx.acker())?;
         let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
 
         Ok((sink, healtcheck))
@@ -241,10 +241,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        buffers::Acker,
-        test_util::{block_on, random_string},
-        topology::config::SinkConfig,
-        Event,
+        event::Event,
+        test_util::{random_string, runtime},
+        topology::config::{SinkConfig, SinkContext},
     };
     use futures::Sink;
     use serde_json::Value;
@@ -254,6 +253,7 @@ mod integration_tests {
     #[test]
     fn insert_events() {
         crate::test_util::trace_init();
+        let mut rt = runtime();
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
@@ -276,7 +276,7 @@ mod integration_tests {
         let client = ClickhouseClient::new(host);
         client.create_table(&table, "host String, timestamp String, message String");
 
-        let (sink, _hc) = config.build(Acker::Null).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event
@@ -284,7 +284,7 @@ mod integration_tests {
             .insert_explicit("host".into(), "example.com".into());
 
         let pump = sink.send(input_event.clone());
-        block_on(pump).unwrap();
+        rt.block_on(pump).unwrap();
 
         let output = client.select_all(&table);
         assert_eq!(1, output.rows);
@@ -296,6 +296,7 @@ mod integration_tests {
     #[test]
     fn no_retry_on_incorrect_data() {
         crate::test_util::trace_init();
+        let mut rt = runtime();
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
@@ -316,7 +317,7 @@ mod integration_tests {
         // fail the request.
         client.create_table(&table, "host String, timestamp String");
 
-        let (sink, _hc) = config.build(Acker::Null).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event
@@ -327,7 +328,7 @@ mod integration_tests {
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        block_on(pump.timeout(Duration::from_secs(5))).unwrap();
+        rt.block_on(pump.timeout(Duration::from_secs(5))).unwrap();
     }
 
     struct ClickhouseClient {

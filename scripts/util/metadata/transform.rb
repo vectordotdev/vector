@@ -5,15 +5,21 @@ require_relative "component"
 class Transform < Component
   attr_reader :allow_you_to_description,
     :input_types,
+    :output,
     :output_types
 
   def initialize(hash)
     super(hash)
 
+    # init
+
     @allow_you_to_description = hash.fetch("allow_you_to_description")
     @input_types = hash.fetch("input_types")
+    @output = OpenStruct.new
     @output_types = hash.fetch("output_types")
     types_coercion = hash["types_coercion"] == true
+
+    # checks
 
     if @allow_you_to_description.strip[-1] == "."
       raise("#{self.class.name}#allow_you_to_description cannot not end with a period")
@@ -25,6 +31,28 @@ class Transform < Component
 
     if (invalid_types = @output_types - EVENT_TYPES) != []
       raise("#{self.class.name}#output_types contains invalid values: #{invalid_types.inspect}")
+    end
+
+    # output
+
+    output = hash["output"] || {}
+
+    # output.log
+
+    if output["log"]
+      log = output["log"]
+      @output.log = OpenStruct.new
+      @output.log.fields = Field.build_struct(log["fields"] || {})
+      @output.log.examples = (log["examples"] || []).collect { |e| OpenStruct.new(e) }
+    end
+
+    # output.metric
+
+    if output["metric"]
+      metric = output["metric"]
+      @output.metric = OpenStruct.new
+      @output.metric.fields = Field.build_struct(metric["fields"] || {})
+      @output.metric.examples = (metric["examples"] || []).collect { |e| OpenStruct.new(e) }
     end
 
     if types_coercion

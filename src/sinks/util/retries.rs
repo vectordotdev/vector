@@ -17,7 +17,7 @@ pub trait RetryLogic: Clone {
 }
 
 #[derive(Debug, Clone)]
-pub struct FixedRetryPolicy<L: RetryLogic> {
+pub struct FixedRetryPolicy<L> {
     remaining_attempts: usize,
     backoff: Duration,
     logic: L,

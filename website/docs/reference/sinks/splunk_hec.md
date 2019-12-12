@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
 operating_systems: ["linux","macos","windows"]
+posts_path: /blog/tags/sink-splunk_hec
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
@@ -47,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # example, must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
-  token = "A94A8FE5CCB19BA61C4C08" # example
+  token = "${TOKEN_ENV_VAR}" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -64,7 +65,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # example, must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
-  token = "A94A8FE5CCB19BA61C4C08" # example
+  token = "${TOKEN_ENV_VAR}" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -655,7 +656,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["A94A8FE5CCB19BA61C4C08"]}
+  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
   name={"token"}
   nullable={false}
   path={null}

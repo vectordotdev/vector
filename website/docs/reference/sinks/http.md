@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
 operating_systems: ["linux","macos","windows"]
+posts_path: /blog/tags/sink-http
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"
@@ -53,8 +54,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
+    password = "${PASSWORD_ENV_VAR}" # example
+    user = "${USERNAME_ENV_VAR}" # example
 ```
 
 </TabItem>
@@ -78,7 +79,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
-  batch_timeout = 5 # default, seconds
+  batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
   request_in_flight_limit = 10 # default
@@ -90,8 +91,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
+    password = "${PASSWORD_ENV_VAR}" # example
+    user = "${USERNAME_ENV_VAR}" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -153,7 +154,7 @@ Options for basic authentication.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["password","${PASSWORD_ENV_VAR}"]}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
   nullable={false}
   path={"basic_auth"}
@@ -176,7 +177,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["username"]}
+  examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
   nullable={false}
   path={"basic_auth"}
@@ -225,9 +226,9 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={1}
   enumValues={null}
-  examples={[5]}
+  examples={[1]}
   name={"batch_timeout"}
   nullable={false}
   path={null}
@@ -900,7 +901,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured[`batch_timeout`](#batch_timeout) (default: `5 seconds`).
+1. The batch age meets or exceeds the configured[`batch_timeout`](#batch_timeout) (default: `1 seconds`).
 2. The batch size meets or exceeds the configured[`batch_size`](#batch_size) (default: `1049000 bytes`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.

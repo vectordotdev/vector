@@ -79,8 +79,14 @@
   margin: 0 auto;
 }
 
+.releaseSelect {
+  font-size: 0.8em;
+  margin: calc(var(--ifm-spacing-vertical) * 2) auto var(--ifm-spacing-vertical) auto;
+  width: 500px;
+}
+
 .downloadTableContainer {
-  max-width: 700px;
+  max-width: 650px;
 }
 
 .downloadTable {
@@ -99,7 +105,7 @@
 
 .downloadTable > div > div:first-child {
   text-align: right;
-  width: 33%;
+  width: 30%;
 }
 
 @media (max-width: 996px) {

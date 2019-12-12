@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -121,6 +122,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/splunk_hec",
+            
               "reference/sources/statsd",
             
               "reference/sources/stdin",
@@ -145,9 +148,13 @@ module.exports = {
             
               "reference/transforms/add_tags",
             
+              "reference/transforms/ansi_stripper",
+            
               "reference/transforms/coercer",
             
               "reference/transforms/field_filter",
+            
+              "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",
             
@@ -202,6 +209,8 @@ module.exports = {
               "reference/sinks/http",
             
               "reference/sinks/kafka",
+            
+              "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
             

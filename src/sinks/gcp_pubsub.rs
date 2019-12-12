@@ -6,7 +6,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::{BufMut, BytesMut};
 use futures::{stream::iter_ok, Future, Sink, Stream};
@@ -66,7 +66,7 @@ lazy_static! {
 
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         // We only need to load the credentials if we are not targetting an emulator.
         let creds = if self.emulator_host.is_none() {
             if self.api_key.is_none() && self.credentials_path.is_none() {
@@ -81,7 +81,7 @@ impl SinkConfig for PubsubConfig {
             None
         };
 
-        let sink = self.service(acker, &creds)?;
+        let sink = self.service(cx.acker(), &creds)?;
         let healthcheck = self.healthcheck(&creds)?;
 
         Ok((sink, healthcheck))
@@ -259,7 +259,7 @@ fn encode_event(event: Event) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_downcast_matches, event::LogEvent};
+    use crate::{assert_downcast_matches, event::LogEvent, test_util::runtime};
     use std::iter::FromIterator;
 
     #[test]
@@ -296,7 +296,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        match config.build(Acker::Null) {
+        match config.build(SinkContext::new_test(runtime().executor())) {
             Ok(_) => panic!("config.build failed to error"),
             Err(err) => assert_downcast_matches!(err, BuildError, BuildError::MissingAuth),
         }
@@ -307,7 +307,7 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{block_on, random_events_with_stream, random_string};
+    use crate::test_util::{block_on, random_events_with_stream, random_string, runtime};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
@@ -329,7 +329,9 @@ mod integration_tests {
 
         let (topic, subscription) = create_topic_subscription();
         let config = config(&topic);
-        let (sink, healthcheck) = config.build(Acker::Null).expect("Building sink failed");
+        let (sink, healthcheck) = config
+            .build(SinkContext::new_test(runtime().executor()))
+            .expect("Building sink failed");
 
         block_on(healthcheck).expect("Health check failed");
 

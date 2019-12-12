@@ -47,15 +47,15 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="latest">
 
-    ```powershell
-    Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version}/#{download.file_name}") %> -OutFile <%= download.file_name %>
+    ```bat
+    powershell Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version}/#{download.file_name}") %> -OutFile <%= download.file_name %>
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
-    ```powershell
-    Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.nightly/latest/#{download.file_name}") %> -OutFile <%= download.file_name %>
+    ```bat
+    powershell Invoke-WebRequest <%= metadata.links.fetch("urls.vector_downloads.nightly/latest/#{download.file_name}") %> -OutFile <%= download.file_name %>
     ```
 
     </TabItem>
@@ -63,19 +63,19 @@ import TabItem from '@theme/TabItem';
 
 2.  Extract files from the archive:
 
-    ```powershell
-    Expand-Archive <%= download.file_name %> .
+    ```bat
+    powershell Expand-Archive <%= download.file_name %> .
     ```
 
-3.  Navigate to Vector directory:
+3.  Navigate to the Vector directory:
 
-    ```powershell
+    ```bat
     cd <%= download.file_name.split(".").first %>
     ```
 4.  Start Vector:
 
-    ```powerhsell
-    bin\vector.exe --config config\vector.toml
+    ```bat
+    .\bin\vector --config config\vector.toml
     ```
 
 <%- else -%>

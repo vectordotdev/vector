@@ -109,6 +109,7 @@ impl Transform for GrokParser {
             debug!(
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
+                rate_limit_secs = 30,
             );
         }
 

@@ -6,7 +6,7 @@ use crate::{
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Sink};
@@ -68,9 +68,9 @@ inventory::submit! {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        let sink = hec(self.clone(), acker)?;
+        let sink = hec(self.clone(), cx.acker())?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
 
         Ok((sink, healthcheck))

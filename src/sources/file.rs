@@ -349,15 +349,19 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event;
-    use crate::runtime;
-    use crate::sources::file;
-    use crate::test_util::{block_on, shutdown_on_idle};
-    use crate::topology::Config;
+    use crate::{
+        event, runtime,
+        sources::file,
+        test_util::{block_on, shutdown_on_idle},
+        topology::Config,
+    };
     use futures::{Future, Stream};
-    use std::collections::HashSet;
-    use std::fs::{self, File};
-    use std::io::{Seek, Write};
+    use pretty_assertions::assert_eq;
+    use std::{
+        collections::HashSet,
+        fs::{self, File},
+        io::{Seek, Write},
+    };
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
     use tokio::util::FutureExt;
@@ -1311,6 +1315,43 @@ mod tests {
                 "i'm new".into(),
                 "hopefully you read all the old stuff first".into(),
                 "because otherwise i'm not going to make sense".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_gzipped_file() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![PathBuf::from("test-data/gzipped.log")],
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "this is a simple file".into(),
+                "i have been compressed".into(),
+                "in order to make me smaller".into(),
+                "but you can still read me".into(),
+                "hooray".into(),
             ]
         );
     }

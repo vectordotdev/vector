@@ -3,7 +3,7 @@ use crate::{
     event::proto,
     sinks::tcp::TcpSink,
     sinks::util::SinkExt,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
@@ -32,7 +32,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let addr = self
             .address
             .to_socket_addrs()
@@ -42,7 +42,7 @@ impl SinkConfig for VectorSinkConfig {
                 address: self.address.clone(),
             }))?;
 
-        let sink = vector(self.address.clone(), addr, acker);
+        let sink = vector(self.address.clone(), addr, cx.acker());
         let healthcheck = super::tcp::tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
