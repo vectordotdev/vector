@@ -18393,7 +18393,7 @@ module.exports = {
     {
       "avatar": "https://github.com/a-rodin.png",
       "id": "alex",
-      "name": "Alex"
+      "name": "Alexander"
     },
     {
       "avatar": "https://github.com/loony-bean.png",
