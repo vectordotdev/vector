@@ -133,19 +133,7 @@ impl TransformConfig for Ec2Metadata {
             async move {
                 let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
 
-                // Keep retrying the client if there are errors.
-                loop {
-                    if let Err(error) = client.fetch_metadata().await {
-                        error!(message = "Unable to refresh metadata.", %error);
-
-                        Delay::new(Instant::now() + Duration::from_secs(5))
-                            .compat()
-                            .await
-                            .unwrap();
-                    } else {
-                        break;
-                    }
-                }
+                client.run().await;
             }
                 // TODO: Once #1338 is done we can fetch the current span
                 .instrument(info_span!("aws_ec2_metadata: worker")),
@@ -193,7 +181,7 @@ struct MetadataClient {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DynamicIdentityDocument {
+struct IdentityDocument {
     account_id: String,
     architecture: String,
     image_id: String,
@@ -223,17 +211,22 @@ impl MetadataClient {
         }
     }
 
-    async fn fetch_metadata(&mut self) -> Result<(), crate::Error> {
+    async fn run(&mut self) {
         loop {
-            self.fetch_all().await?;
+            if let Err(error) = self.refresh_metadata().await {
+                error!(message="Unable to fetch EC2 metadata; Retrying.", %error);
 
-            // Make changes viewable to the transform. This may block if
-            // readers are still reading.
-            self.state.refresh();
+                Delay::new(Instant::now() + Duration::from_secs(1))
+                    .compat()
+                    .await
+                    .expect("Timer not set.");
+
+                continue;
+            }
 
             let deadline = Instant::now() + self.refresh_interval;
 
-            Delay::new(deadline).compat().await?;
+            Delay::new(deadline).compat().await.expect("Timer not set.");
         }
     }
 
@@ -270,7 +263,7 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<DynamicIdentityDocument>, crate::Error> {
+    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
         let token = self.get_token().await?;
 
         let mut parts = self.host.clone().into_parts();
@@ -284,7 +277,7 @@ impl MetadataClient {
         let res = self.client.request(req).compat().await?;
 
         if res.status() != StatusCode::OK {
-            warn!(message="Dynamic request failed.", status = %res.status());
+            warn!(message="Identity document request failed.", status = %res.status());
             return Ok(None);
         }
 
@@ -325,7 +318,7 @@ impl MetadataClient {
         Ok(Some(body.into_bytes()))
     }
 
-    pub async fn fetch_all(&mut self) -> Result<(), crate::Error> {
+    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         // Fetch all resources, _then_ add them to the state map.
         let identity_document = self.get_document().await?;
         let availability_zone = self.get_metadata(&AVAILABILITY_ZONE).await?;
@@ -359,7 +352,7 @@ impl MetadataClient {
         if let Some(document) = identity_document {
             if self.fields.contains(&AMI_ID_KEY) {
                 self.state
-                    .update(self.keys.ami_id_key.clone(), document.account_id.into());
+                    .update(self.keys.ami_id_key.clone(), document.image_id.into());
             }
 
             if self.fields.contains(&INSTANCE_ID_KEY) {
@@ -435,6 +428,10 @@ impl MetadataClient {
                 }
             }
         }
+
+        // Make changes viewable to the transform. This may block if
+        // readers are still reading.
+        self.state.refresh();
 
         Ok(())
     }
@@ -529,7 +526,10 @@ mod tests {
             log.get(&"instance-id".into()),
             Some(&"i-096fba6d03d36d262".into())
         );
-        assert_eq!(log.get(&"ami-id".into()), Some(&"071959437513".into()));
+        assert_eq!(
+            log.get(&"ami-id".into()),
+            Some(&"ami-05f27d4d6770a43d2".into())
+        );
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
         assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
         assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
