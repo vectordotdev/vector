@@ -185,7 +185,7 @@ function ReleaseDownload() {
               ]
             }>
             <TabItem value="older">
-              <Alert type="warning">
+              <Alert fill={true} type="warning">
                 Olders versions are outdated and it is highly recommended to use the latest version. Please proceed with caution.
               </Alert>
               <Select
@@ -202,7 +202,7 @@ function ReleaseDownload() {
               <DownloadTable version={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}`} />
             </TabItem>
             <TabItem value="nightly">
-              <Alert type="warning">
+              <Alert fill={true} type="warning">
                 Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.
               </Alert>
               <DownloadTable version="nightly" date={nightlyDate} downloads={nightlyDownloads} releaseNotesPath="fdsf" />

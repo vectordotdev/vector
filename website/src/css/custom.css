@@ -1280,7 +1280,7 @@ table {
  */
 
 ul.tabs {
-  background-color: var(--ifm-panel-background);
+  background-color: var(--ifm-color-emphasis-50);
   border-bottom: 1px solid var(--ifm-hr-border-color);
   font-size: 0.9em;
   font-weight: bold;

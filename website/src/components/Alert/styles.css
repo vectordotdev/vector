@@ -50,4 +50,10 @@
 .alert.alert--fill.alert--primary {
   background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
   border: 1px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary) !important;
+}
+.alert.alert--fill.alert--warning {
+  background: rgba( var(--ifm-color-warning-rgb), 0.15 ) !important;
+  border: 1px solid var(--ifm-color-warning);
+  color: var(--ifm-color-warning) !important;
 }
