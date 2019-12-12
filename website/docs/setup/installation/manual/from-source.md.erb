@@ -216,6 +216,7 @@ Building steps:
     </TabItem>
   </Tabs>
 
-  The command above builds a Docker image and then starts a container
-  with it. Note that the container ought to be privileged because it registers
-  `binfmt` handlers which allow to run tests for non-native architectures inside them.
+  The command above builds a Docker image with Rust toolchain for a Linux target for the
+  corresponding architecture using `musl` as the C library, then starts a container from
+  this image, and then builds inside the Container. The target binary is located in
+  `target/<target triple>/release/vector` like in the previous case.
