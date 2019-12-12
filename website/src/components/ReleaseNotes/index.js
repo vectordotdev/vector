@@ -55,7 +55,7 @@ function Highlight({post}) {
     <div className="section">
       <span className="badge badge--secondary" style={{float: "right"}}>config</span>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
-      <Avatar id={post.author.toLowerCase()} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
+      <Avatar id={post.author_id} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
       <p>
         {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full post</Link>
       </p>
