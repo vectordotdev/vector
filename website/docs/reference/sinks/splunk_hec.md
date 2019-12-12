@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/splunk_hec.md.erb
 -->
 
-The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
+The `splunk_hec` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
 
 ## Configuration
 
@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # example, must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
-  token = "A94A8FE5CCB19BA61C4C08" # example
+  token = "${TOKEN_ENV_VAR}" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -64,7 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # example, must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
-  token = "A94A8FE5CCB19BA61C4C08" # example
+  token = "${TOKEN_ENV_VAR}" # example
   
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
@@ -131,7 +131,7 @@ import Field from '@site/src/components/Field';
 
 ### batch_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -154,7 +154,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -655,7 +655,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["A94A8FE5CCB19BA61C4C08"]}
+  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
   name={"token"}
   nullable={false}
   path={null}
@@ -678,7 +678,7 @@ Your Splunk HEC token. See [Setup](#setup) for more info.
 
 ## Output
 
-The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
+The `splunk_hec` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

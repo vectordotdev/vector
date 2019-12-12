@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/clickhouse.md.erb
 -->
 
-The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
+The `clickhouse` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
 
 ## Configuration
 
@@ -54,8 +54,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
+    password = "${PASSWORD_ENV_VAR}" # example
+    user = "${USERNAME_ENV_VAR}" # example
 ```
 
 </TabItem>
@@ -92,8 +92,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # example
-    user = "username" # example
+    password = "${PASSWORD_ENV_VAR}" # example
+    user = "${USERNAME_ENV_VAR}" # example
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -151,7 +151,7 @@ Options for basic authentication.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["password","${PASSWORD_ENV_VAR}"]}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
   nullable={false}
   path={"basic_auth"}
@@ -174,7 +174,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["username"]}
+  examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
   nullable={false}
   path={"basic_auth"}
@@ -215,7 +215,7 @@ The basic authentication user name.
 
 ### batch_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -238,7 +238,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -785,7 +785,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ## Output
 
-The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
+The `clickhouse` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

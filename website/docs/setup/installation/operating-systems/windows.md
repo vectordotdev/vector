@@ -8,7 +8,7 @@ Vector can be installed on Windows through the following methods:
 
 import InstallChoices from '@site/src/components/InstallChoices';
 
-<InstallChoices os="Windows" />
+<InstallChoices os="Windows" packageManager="MSI" />
 
 
 

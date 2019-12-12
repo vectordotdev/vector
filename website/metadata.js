@@ -70,6 +70,17 @@ module.exports = {
         "arch": "x86_64",
         "available_on_latest": true,
         "available_on_nightly": true,
+        "file_name": "vector-x64.msi",
+        "file_type": "msi",
+        "name": "Windows (x86_64, 7+)",
+        "os": "Windows",
+        "package_manager": "MSI",
+        "type": "package"
+      },
+      {
+        "arch": "x86_64",
+        "available_on_latest": true,
+        "available_on_nightly": true,
         "file_name": "vector-amd64.deb",
         "file_type": "deb",
         "name": "Deb (x86_64)",
@@ -159,7 +170,7 @@ module.exports = {
         "package_manager": "Homebrew"
       },
       {
-        "id": "Raspbian",
+        "id": "raspbian",
         "name": "Raspbian",
         "os": "Linux",
         "package_manager": "DPKG"
@@ -205,6 +216,13 @@ module.exports = {
         ],
         "id": "rpm",
         "name": "RPM"
+      },
+      {
+        "archs": [
+          "x86_64"
+        ],
+        "id": "msi",
+        "name": "MSI"
       }
     ]
   },
@@ -498,6 +516,28 @@ module.exports = {
         "windows"
       ],
       "service_provider": "Confluent",
+      "status": "prod-ready",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "new_relic_logs": {
+      "beta": false,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "new_relic_logs_sink",
+      "name": "new_relic_logs",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": "New Relic",
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -837,6 +877,40 @@ module.exports = {
       ]
     }
   },
+  "team": [
+    {
+      "avatar": "https://github.com/a-rodin.png",
+      "name": "Alex"
+    },
+    {
+      "avatar": "https://github.com/loony-bean.png",
+      "name": "Alexey"
+    },
+    {
+      "avatar": "https://github.com/Jeffail.png",
+      "name": "Ash"
+    },
+    {
+      "avatar": "https://github.com/binarylogic.png",
+      "name": "Ben"
+    },
+    {
+      "avatar": "https://github.com/bruceg.png",
+      "name": "Bruce"
+    },
+    {
+      "avatar": "https://github.com/ktff.png",
+      "name": "Kruno"
+    },
+    {
+      "avatar": "https://github.com/LucioFranco.png",
+      "name": "Lucio"
+    },
+    {
+      "avatar": "https://github.com/lukesteensen.png",
+      "name": "Luke"
+    }
+  ],
   "transforms": {
     "add_fields": {
       "beta": false,

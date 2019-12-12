@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
+pub mod flatten;
 pub mod metric;
 mod unflatten;
 

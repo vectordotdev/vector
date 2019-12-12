@@ -1,4 +1,5 @@
 use crate::FilePosition;
+use flate2::bufread::MultiGzDecoder;
 use std::{
     fs,
     io::{self, BufRead, Seek},
@@ -19,7 +20,7 @@ use crate::metadata_ext::PortableMetadataExt;
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    reader: io::BufReader<fs::File>,
+    reader: Box<dyn BufRead>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -39,7 +40,7 @@ impl FileWatcher {
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let metadata = f.metadata()?;
-        let mut rdr = io::BufReader::new(f);
+        let mut reader = io::BufReader::new(f);
 
         let too_old = if let (Some(ignore_before), Ok(modified_time)) =
             (ignore_before, metadata.modified())
@@ -49,16 +50,35 @@ impl FileWatcher {
             false
         };
 
-        let file_position = if too_old {
-            rdr.seek(io::SeekFrom::End(0)).unwrap()
+        let (reader, file_position): (Box<dyn BufRead>, FilePosition) = if is_gzipped(&mut reader)?
+        {
+            if file_position != 0 || too_old {
+                // We can't accurately seek into gzipped files without manually scanning through
+                // the entire thing, so for now we simply refuse to read gzipped files for which we
+                // already have a stored file position from a previous run.
+                debug!(
+                    message = "Not re-reading gzipped file with existing stored offset",
+                    ?path,
+                    %file_position
+                );
+                (Box::new(null_reader()), file_position)
+            } else {
+                (Box::new(io::BufReader::new(MultiGzDecoder::new(reader))), 0)
+            }
         } else {
-            rdr.seek(io::SeekFrom::Start(file_position)).unwrap()
+            if too_old {
+                let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
+                (Box::new(reader), pos)
+            } else {
+                let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
+                (Box::new(reader), pos)
+            }
         };
 
         Ok(FileWatcher {
             path,
             findable: true,
-            reader: rdr,
+            reader,
             file_position,
             devno: metadata.portable_dev(),
             inode: metadata.portable_ino(),
@@ -69,8 +89,18 @@ impl FileWatcher {
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let metadata = fs::metadata(&path)?;
         if (metadata.portable_dev(), metadata.portable_ino()) != (self.devno, self.inode) {
-            let mut new_reader = io::BufReader::new(fs::File::open(&path)?);
-            new_reader.seek(io::SeekFrom::Start(self.file_position))?;
+            let mut reader = io::BufReader::new(fs::File::open(&path)?);
+            let gzipped = is_gzipped(&mut reader)?;
+            let new_reader: Box<dyn BufRead> = if gzipped {
+                if self.file_position != 0 {
+                    Box::new(null_reader())
+                } else {
+                    Box::new(io::BufReader::new(MultiGzDecoder::new(reader)))
+                }
+            } else {
+                reader.seek(io::SeekFrom::Start(self.file_position))?;
+                Box::new(reader)
+            };
             self.reader = new_reader;
             self.devno = metadata.portable_dev();
             self.inode = metadata.portable_ino();
@@ -124,6 +154,15 @@ impl FileWatcher {
             }
         }
     }
+}
+
+fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {
+    let header_bytes = r.fill_buf()?;
+    Ok(header_bytes.starts_with(&[0x1f, 0x8b]))
+}
+
+fn null_reader() -> impl BufRead {
+    io::Cursor::new(Vec::new())
 }
 
 // Tweak of https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471

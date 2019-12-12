@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/aws_cloudwatch_logs.md.erb
 -->
 
-The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
+The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 
 ## Configuration
 
@@ -132,7 +132,7 @@ import Field from '@site/src/components/Field';
 
 ### batch_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -155,7 +155,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -659,7 +659,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ## Output
 
-The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
+The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

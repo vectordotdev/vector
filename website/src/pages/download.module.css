@@ -80,7 +80,7 @@
 }
 
 .downloadTableContainer {
-  max-width: 700px;
+  max-width: 650px;
 }
 
 .downloadTable {
@@ -99,7 +99,7 @@
 
 .downloadTable > div > div:first-child {
   text-align: right;
-  width: 33%;
+  width: 30%;
 }
 
 @media (max-width: 996px) {

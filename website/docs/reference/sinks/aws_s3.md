@@ -18,7 +18,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/aws_s3.md.erb
 -->
 
-The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
+The `aws_s3` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ## Configuration
 
@@ -133,7 +133,7 @@ import Field from '@site/src/components/Field';
 
 ### batch_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -156,7 +156,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -683,7 +683,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ## Output
 
-The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model#log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
+The `aws_s3` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.

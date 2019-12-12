@@ -97,8 +97,14 @@ rm -rf $archive_dir
 mkdir -p $archive_dir
 
 # Copy root level files
-cp -av README.md $archive_dir
-cp -av LICENSE $archive_dir
+
+if [[ $TARGET == *windows* ]]; then
+  suffix=".txt"
+else
+  suffix=""
+fi
+cp -av README.md $archive_dir/README.md$suffix
+cp -av LICENSE $archive_dir/LICENSE$suffix
 
 # Copy the vector binary to /bin
 mkdir -p $archive_dir/bin
@@ -109,20 +115,25 @@ cp -rv config $archive_dir/config
 # Remove templates sources
 rm $archive_dir/config/*.erb
 
-# Copy /etc usefule files
-mkdir -p $archive_dir/etc/systemd
-cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
-mkdir -p $archive_dir/etc/init.d
-cp -av distribution/init.d/vector $archive_dir/etc/init.d
+if [[ $TARGET == *linux* ]]; then
+  # Copy /etc useful files
+  mkdir -p $archive_dir/etc/systemd
+  cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
+  mkdir -p $archive_dir/etc/init.d
+  cp -av distribution/init.d/vector $archive_dir/etc/init.d
+fi
 
-# Build the release tar
+# Build the release archive
 _old_dir=$(pwd)
 cd $target_dir
-case $ARCHIVE_TYPE in
-  tar.gz) make_archive="tar -I 'gzip -9' -cvf" ;;
-  zip) make_archive="zip -r" ;;
-esac
-$make_archive vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
+if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
+  tar czvf vector-$TARGET.$ARCHIVE_TYPE ./$archive_dir_name
+elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
+  powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'$TARGET'.'$ARCHIVE_TYPE' -Path "./'$archive_dir_name'/*"'
+else
+  echo "Unsupported combination of ARCHIVE_TYPE and TARGET"
+  exit 1
+fi
 cd $_old_dir
 
 # Move to the artifacts dir

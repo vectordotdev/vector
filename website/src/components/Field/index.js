@@ -14,12 +14,20 @@ function toTOML(value) {
   return JSON.stringify(value);
 }
 
+function keyToTOML(key) {
+  if ( key.includes(".") ) {
+    return "\"" + key + "\"";
+  } else {
+    return key;
+  }
+}
+
 function exampleToTOML(name, example) {
   if (isObject(example)) {
     if ('name' in example && 'value' in example) {
-      return `${example.name} = ${toTOML(example.value)}`;
+      return `${keyToTOML(example.name)} = ${toTOML(example.value)}`;
     } else {
-      return `${Object.keys(example)[0]} = ${toTOML(Object.values(example)[0])}`
+      return `${keyToTOML(Object.keys(example)[0])} = ${toTOML(Object.values(example)[0])}`
     }
   } else if (name) {
     return `${name} = ${toTOML(example)}`;

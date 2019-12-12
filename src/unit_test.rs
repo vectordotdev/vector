@@ -1,4 +1,7 @@
-use crate::topology::{config::Config, unit_test::UnitTest};
+use crate::{
+    topology::{config::Config, unit_test::UnitTest},
+    types::DEFAULT_CONFIG_PATHS,
+};
 use colored::*;
 use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
@@ -6,7 +9,8 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Any number of Vector config files to test.
+    /// Any number of Vector config files to test. If none are specified the
+    /// default config path `/etc/vector/vector.toml` will be targeted.
     paths: Vec<PathBuf>,
 }
 
@@ -42,7 +46,13 @@ fn build_tests(path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
-    for (i, p) in opts.paths.iter().enumerate() {
+    let paths = if opts.paths.len() > 0 {
+        &opts.paths
+    } else {
+        &DEFAULT_CONFIG_PATHS
+    };
+
+    for (i, p) in paths.iter().enumerate() {
         let path_str = p.to_str().unwrap_or("");
         if i > 0 {
             println!("");

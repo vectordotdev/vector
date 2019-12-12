@@ -36,7 +36,7 @@ function Downloads({downloads, path}) {
         </li>
       ))}
       <li>
-        <a href={`https://packages.timber.io/vector/${path}`} target="_blank">browse all files&hellip;</a>
+        <a href={`https://packages.timber.io/vector/${path}/`} target="_blank">browse all files&hellip;</a>
       </li>
     </ul>
   );
@@ -93,8 +93,10 @@ function Download() {
         <section>
           <div className={classnames('container', styles.downloadTableContainer)}>
             <Tabs
-              block={true}
+              centered={true}
+              className="rounded"
               defaultValue="latest"
+              style={{width: "100%"}}
               values={[
                 { label: `Latest (${latestRelease.version})`, value: 'latest', },
                 { label: 'Nightly', value: 'nightly', },

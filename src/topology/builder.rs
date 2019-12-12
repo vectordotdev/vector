@@ -1,8 +1,9 @@
 use super::{
+    config::SinkContext,
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::buffers;
+use crate::{buffers, dns::Resolver, runtime};
 use futures::{
     future::{lazy, Either},
     sync::mpsc,
@@ -89,7 +90,10 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     }
 }
 
-pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec<String>> {
+pub fn build_pieces(
+    config: &super::Config,
+    exec: runtime::TaskExecutor,
+) -> Result<(Pieces, Vec<String>), Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
@@ -106,6 +110,9 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     if config.sinks.is_empty() {
         return Err(vec!["No sinks defined in the config.".to_owned()]);
     }
+
+    // TODO: remove the unimplemented
+    let resolver = Resolver::new(config.global.dns_servers.clone(), exec.clone()).unwrap();
 
     // Build sources
     for (name, source) in &config.sources {
@@ -142,7 +149,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
         let typetag = &transform.inner.transform_type();
 
-        let mut transform = match transform.inner.build() {
+        let mut transform = match transform.inner.build(exec.clone()) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -187,7 +194,12 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
             Ok(buffer) => buffer,
         };
 
-        let (sink, healthcheck) = match sink.inner.build(acker) {
+        let cx = SinkContext {
+            resolver: resolver.clone(),
+            acker,
+        };
+
+        let (sink, healthcheck) = match sink.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;

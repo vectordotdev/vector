@@ -41,6 +41,7 @@ class Metadata
     :releases,
     :sinks,
     :sources,
+    :team,
     :transforms
 
   def initialize(hash, docs_root, pages_root)
@@ -140,6 +141,13 @@ class Metadata
         @env_vars.send("#{key}=", val)
       end
     end
+
+    # team
+
+    @team =
+      hash.fetch("team").collect do |member|
+        OpenStruct.new(member)
+      end
   end
 
   def components
@@ -220,6 +228,7 @@ class Metadata
       latest_release: latest_release.deep_to_h,
       posts: posts.deep_to_h,
       sources: sources.deep_to_h,
+      team: team.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h
     }

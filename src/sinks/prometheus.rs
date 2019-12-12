@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use futures::{future, try_ready, Async, AsyncSink, Future, Sink};
@@ -71,7 +71,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         // Checks
         if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
@@ -80,7 +80,7 @@ impl SinkConfig for PrometheusSinkConfig {
         }
 
         // Build
-        let sink = Box::new(PrometheusSink::new(self.clone(), acker));
+        let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))

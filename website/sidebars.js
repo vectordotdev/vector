@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -200,6 +201,8 @@ module.exports = {
               "reference/sinks/http",
             
               "reference/sinks/kafka",
+            
+              "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
             

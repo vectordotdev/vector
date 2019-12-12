@@ -6,12 +6,12 @@
  */
 
 import React, {useCallback, useState} from 'react';
-import Toggle from 'react-toggle';
 
 import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
 import SearchBar from '@theme/SearchBar';
 import SVG from 'react-inlinesvg';
+import Toggle from '@theme/Toggle';
 
 import classnames from 'classnames';
 import {fetchNewPost} from '@site/src/exports/newPost';
@@ -39,20 +39,21 @@ function navLinkAttributes(label) {
     case 'download':
       const newRelease = fetchNewRelease();
 
-      if (newRelease) {
-        return {
-          badge: 'new',
-          badgeStyle: 'primary',
-        };
-      } else {
-        return {};
+      let downloadAttrs = {
+        icon: 'download'
       }
+
+      if (newRelease) {
+        downloadAttrs.badge = 'new';
+        downloadAttrs.badgeStyle = 'primary';
+      }
+
+      return downloadAttrs;
 
     case 'github':
       return {
         badge: '3k',
-        icon: 'github',
-        hideText: true 
+        icon: 'github'
       };
 
     default:
@@ -60,33 +61,30 @@ function navLinkAttributes(label) {
   };
 }
 
-function NavLink(props) {
-  let attributes = navLinkAttributes(props.label) || {};
-  const toUrl = useBaseUrl(props.to);
+function NavLink({href, hideText, label, to}) {
+  let attributes = navLinkAttributes(label) || {};
+  const toUrl = useBaseUrl(to);
 
   return (
     <Link
       className="navbar__item navbar__link"
-      {...props}
-      {...(props.href
+      title={hideText ? label : null}
+      {...(href
         ? {
             target: '_blank',
             rel: 'noopener noreferrer',
-            href: props.href,
+            href: href,
           }
         : {
             activeClassName: 'navbar__link--active',
             to: toUrl,
           })}>
       {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {!attributes.hideText && props.label}
+      {(!hideText) && label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
 }
-
-const Moon = () => <span className={classnames(styles.toggle, styles.moon)} />;
-const Sun = () => <span className={classnames(styles.toggle, styles.sun)} />;
 
 function Navbar() {
   const context = useDocusaurusContext();
@@ -168,7 +166,7 @@ function Navbar() {
             {links
               .filter(linkItem => linkItem.position === 'right')
               .map((linkItem, i) => (
-                <NavLink {...linkItem} key={i} />
+                <NavLink {...linkItem} hideText={true} key={i} />
               ))}
             {!disableDarkMode && (
               <Toggle
@@ -176,10 +174,6 @@ function Navbar() {
                 aria-label="Dark mode toggle"
                 checked={theme === 'dark'}
                 onChange={onToggleChange}
-                icons={{
-                  checked: <Moon />,
-                  unchecked: <Sun />,
-                }}
               />
             )}
             <SearchBar
@@ -208,10 +202,6 @@ function Navbar() {
                 aria-label="Dark mode toggle in sidebar"
                 checked={theme === 'dark'}
                 onChange={onToggleChange}
-                icons={{
-                  checked: <Moon />,
-                  unchecked: <Sun />,
-                }}
               />
             )}
           </div>
