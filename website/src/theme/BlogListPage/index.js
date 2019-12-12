@@ -34,44 +34,40 @@ function BlogListPage(props) {
 
   return (
     <Layout title="Blog" description="Blog">
-      <div className="container margin-vert--xl">
-        <div className="row">
-          <div className="col col--4 blog-list-filters">
-            <h1>The Vector Blog</h1>
-            <p>Thoughts logs, metrics, and all things observability from the <a href="/">Vector team</a>.</p>
+      <div className="blog-list container">
+        <div className="blog-list--filters">
+          <h1>The Vector Blog</h1>
+          <p>Thoughts on logs, metrics, and all things observability from the <a href="/">Vector team</a>.</p>
 
-            <h3>Types</h3>
+          <h3>Types</h3>
 
-            <ul className="filters unstyled">
-              {typeTags.map((tag, idx) => (
-                <li><Link to={tag.permalink} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
-              ))}
-            </ul>
-
-            <h3>Domains</h3>
-            
-            <ul className="filters unstyled">
-              {domainTags.map((tag, idx) => (
-                <li><Link to={tag.permalink} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
-              ))}
-            </ul>
-
-            <hr />
-
-            <MailingListForm block={true} />
-          </div>
-          <div className="col col--8">
-            {items.map(({content: BlogPostContent}) => (
-              <BlogPostItem
-                key={BlogPostContent.metadata.permalink}
-                frontMatter={BlogPostContent.frontMatter}
-                metadata={BlogPostContent.metadata}
-                truncated>
-                <BlogPostContent />
-              </BlogPostItem>
+          <ul className="filters unstyled">
+            {typeTags.map((tag, idx) => (
+              <li><Link to={tag.permalink} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
             ))}
-            <BlogListPaginator metadata={metadata} />
-          </div>
+          </ul>
+
+          <h3>Domains</h3>
+          
+          <ul className="filters unstyled">
+            {domainTags.map((tag, idx) => (
+              <li><Link to={tag.permalink} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
+            ))}
+          </ul>
+
+          <MailingListForm block={true} />
+        </div>
+        <div className="blog-list--items">
+          {items.map(({content: BlogPostContent}) => (
+            <BlogPostItem
+              key={BlogPostContent.metadata.permalink}
+              frontMatter={BlogPostContent.frontMatter}
+              metadata={BlogPostContent.metadata}
+              truncated>
+              <BlogPostContent />
+            </BlogPostItem>
+          ))}
+          <BlogListPaginator metadata={metadata} />
         </div>
       </div>
     </Layout>
