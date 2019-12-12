@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     event::Event,
     region::{self, RegionOrEndpoint},
     sinks::util::{
@@ -81,7 +80,7 @@ impl SinkConfig for ElasticSearchConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common)?;
-        let sink = es(self, common, cx.acker());
+        let sink = es(self, common, cx);
 
         Ok((sink, healthcheck))
     }
@@ -196,7 +195,7 @@ impl ElasticSearchCommon {
 fn es(
     config: &ElasticSearchConfig,
     common: ElasticSearchCommon,
-    acker: Acker,
+    cx: SinkContext,
 ) -> super::RouterSink {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
@@ -232,7 +231,7 @@ fn es(
         gzip = false;
     }
 
-    let http_service = HttpService::builder()
+    let http_service = HttpService::builder(cx.resolver())
         .tls_settings(common.tls_settings.clone())
         .build(move |body: Vec<u8>| {
             let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
@@ -285,7 +284,7 @@ fn es(
         });
 
     let sink = request
-        .batch_sink(HttpRetryLogic, http_service, acker)
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
