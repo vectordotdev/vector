@@ -439,16 +439,16 @@ function Home() {
       <header className={classnames('hero', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (
-            <a href="/" className={styles.indexAnnouncement}>
+            <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
-              v{newRelease.version} has been released! Download now.
-            </a>
+              v{newRelease.version} has been released! View release notes.
+            </Link>
           )}
           {!newRelease && newPost && (
-            <a href="/" className={styles.indexAnnouncement}>
+            <Link to={`/blog/${newPost.id}`} className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
               {newPost.title}
-            </a>
+            </Link>
           )}
           <h1>Vector Makes Observability Data Simple</h1>
           <p className="hero__subtitle">

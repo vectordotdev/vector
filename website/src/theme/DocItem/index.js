@@ -106,12 +106,10 @@ function DocItem(props) {
     description,
     editUrl,
     image: metaImage,
-    issues_url: issuesUrl,
     keywords,
     lastUpdatedAt,
     lastUpdatedBy,
     permalink,
-    source_url: sourceUrl,
     title,
     version
   } = metadata;
@@ -121,13 +119,14 @@ function DocItem(props) {
       event_types: eventTypes,
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
+      issues_url: issuesUrl,
       operating_systems: operatingSystems,
+      posts_path: postsPath,
+      source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
     },
   } = DocContent;
-
-  console.log(metadata)
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
 
@@ -186,7 +185,7 @@ function DocItem(props) {
             </div>
             {DocContent.rightToc && (
               <div className="col col--3">
-                <div className={styles.tableOfContents}>
+                <div className="table-of-contents">
                   <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
@@ -198,6 +197,7 @@ function DocItem(props) {
                     <div className="title">Resources</div>
                     <ul className="contents">
                       {editUrl && (<li><a href={editUrl} className="contents__link" target="_blank"><i className="feather icon-edit-1"></i> Edit this page</a></li>)}
+                      {postsPath && (<li><Link to={postsPath} className="contents__link"><i className="feather icon-book-open"></i> View Blog Posts</Link></li>)}
                       {issuesUrl && (<li><a href={issuesUrl} className="contents__link" target="_blank"><i className="feather icon-message-circle"></i> View Issues</a></li>)}
                       {sourceUrl && (<li><a href={sourceUrl} className="contents__link" target="_blank"><i className="feather icon-github"></i> View Source</a></li>)}
                     </ul>

@@ -1,15 +1,14 @@
 ---
 id: introducing-vector
 title: Introducing Vector
-author: Luke
-author_title: Vector Core Team
-author_uRL: https://github.com/lukesteensen
-author_image_url: https://github.com/lukesteensen.png
-author_twitter: https://twitter.com/lukesteensen
-tags: [announcement]
+description: "Hello World. Bringing Vector to life."
+author_id: luke
+tags: ["type: announcement"]
 ---
 
 Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.
+
+<!--truncate-->
 
 # Why build Vector?
 
@@ -38,3 +37,6 @@ The end result is a tool that can **be** your pipeline, rather than just another
 # Try it out!
 
 We're still very early in the process of building Vector, but it's already at a stage where we believe it's competitive with existing tools and ready to be trialed for production use. Not every feature mentioned above is present yet, but we're happy with the foundation and working quickly to flesh everything out. If you're interested in giving it a try, check out the project on GitHub, our docs, and please reach out! We'd love to hear about your use cases and are excited to see where we can take this project together.
+
+
+

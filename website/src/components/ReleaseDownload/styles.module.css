@@ -79,6 +79,12 @@
   margin: 0 auto;
 }
 
+.releaseSelect {
+  font-size: 0.8em;
+  margin: calc(var(--ifm-spacing-vertical) * 2) auto var(--ifm-spacing-vertical) auto;
+  width: 500px;
+}
+
 .downloadTableContainer {
   max-width: 650px;
 }

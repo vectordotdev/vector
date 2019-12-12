@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
 operating_systems: ["linux","macos","windows"]
+posts_path: /blog/tags/sink-aws_s3
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
 status: "beta"
@@ -634,15 +635,15 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
   name={"AWS_ACCESS_KEY_ID"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -657,15 +658,15 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
   name={"AWS_SECRET_ACCESS_KEY"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -768,7 +769,7 @@ By default, Vector will name your S3 objects in the following format:
 
 <Tabs
   block={true}
-  defaultValue="manual"
+  defaultValue="without_compression"
   values={[
     { label: 'Without Compression', value: 'without_compression', },
     { label: 'With Compression', value: 'with_compression', },

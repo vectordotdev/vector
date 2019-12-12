@@ -122,6 +122,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/splunk_hec",
+            
               "reference/sources/statsd",
             
               "reference/sources/stdin",
@@ -146,9 +148,13 @@ module.exports = {
             
               "reference/transforms/add_tags",
             
+              "reference/transforms/ansi_stripper",
+            
               "reference/transforms/coercer",
             
               "reference/transforms/field_filter",
+            
+              "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",
             

@@ -1,10 +1,11 @@
 import React, {useState} from 'react';
 
+import CheckboxList from '@site/src/components/CheckboxList';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
+import _ from 'lodash';
 import classnames from 'classnames';
-import flatten from 'lodash/flatten';
 import humanizeString from 'humanize-string';
 import qs from 'qs';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
@@ -96,43 +97,6 @@ function Components({components, headingLevel, titles}) {
   }
 }
 
-function FilterList({label, icon, values, currentState, setState}) {
-  if (values.size == 0)
-    return null;
-
-  const valuesArray = Array.from(values);
-
-  return (
-    <span className="vector-components--filters--section">
-      <div className="vector-components--filters--section--title">
-        {label}
-      </div>
-      {valuesArray.map((value, idx) => {
-        let label = typeof value === 'string' ? humanizeString(value) : value;
-
-        return (
-          <label key={idx}>
-            <input
-              type="checkbox"
-              onChange={(event) => {
-                let newValues = new Set(currentState);
-
-                if (event.currentTarget.checked)
-                  newValues.add(value);
-                else
-                  newValues.delete(value);
-
-                setState(newValues);
-              }}
-              checked={currentState.has(value)} />
-            {icon ? <i className={`feather icon-${icon}`}></i> : ''} {label}
-          </label>
-        );
-      })}
-    </span>
-  );
-}
-
 function VectorComponents(props) {
   //
   // Base Variables
@@ -206,21 +170,30 @@ function VectorComponents(props) {
   // Filter options
   //
 
-  let operatingSystemsArr = components.map(component => component.operating_systems);
-  operatingSystemsArr = flatten(operatingSystemsArr).sort((a, b) => (a > b) ? 1 : -1);
-  const operatingSystems = new Set(operatingSystemsArr);
+  const operatingSystems = new Set(
+    _(components).
+      map(component => component.operating_systems).
+      flatten().
+      uniq().
+      compact().
+      sort().
+      value());
 
-  const serviceProvidersArr =
-    components.filter(component => component.service_provider).
-    map(component => component.service_provider).
-    sort((a, b) => (a > b) ? 1 : -1);
-  const serviceProviders = new Set(serviceProvidersArr);
+  const serviceProviders = new Set(
+    _(components).
+      map(component => component.service_provider).
+      uniq().
+      compact().
+      sort().
+      value());
 
-  const functionCategoriesArr =
-    components.filter(component => component.function_category).
-    map(component => component.function_category).
-    sort((a, b) => (a > b) ? 1 : -1);
-  const functionCategories = new Set(functionCategoriesArr);
+  const functionCategories = new Set(
+    _(components).
+      map(component => component.function_category).
+      uniq().
+      compact().
+      sort().
+      value());
 
   //
   // Rendering
@@ -228,20 +201,20 @@ function VectorComponents(props) {
 
   return (
     <div className={classnames('vector-components', {'vector-components--cols': filterColumn})}>
-      <div className="vector-components--filters">
-        <div className="vector-components--filters--search">
+      <div className="filters">
+        <div className="search">
           <input
             type="text"
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
             placeholder="🔍 Search..." />
         </div>
-        <div className="vector-components--filters--checkboxes">
-          <span className="vector-components--filters--section">
-            <div className="vector-components--filters--section--title">
-              <Link to="/docs/about/data-model" title="Learn more about Vector's event types">
-                Event types <i className="feather icon-info"></i>
-              </Link>
-            </div>
+        <div className="filter">
+          <div className="filter--label">
+            <Link to="/docs/about/data-model" title="Learn more about Vector's event types">
+              Event types <i className="feather icon-info"></i>
+            </Link>
+          </div>
+          <div className="filter--choices">
             <label title="Show only components that work with log event types.">
               <input
                 type="checkbox"
@@ -254,13 +227,15 @@ function VectorComponents(props) {
                 onChange={(event) => setOnlyMetric(event.currentTarget.checked)}
                 checked={onlyMetric} /> Metric
             </label>
-          </span>
-          <span className="vector-components--filters--section">
-            <div className="vector-components--filters--section--title">
-              <Link to="/docs/about/guarantees" title="Learn more about Vector's guarantees">
-                Guarantees <i className="feather icon-info"></i>
-              </Link>
-            </div>
+          </div>
+        </div>
+        <div className="filter">
+          <div className="filter--label">
+            <Link to="/docs/about/guarantees" title="Learn more about Vector's guarantees">
+              Guarantees <i className="feather icon-info"></i>
+            </Link>
+          </div>
+          <div className="filter--choices">
             <label title="Show only components that offer an at-least-once delivery guarantee.">
               <input
                 type="checkbox"
@@ -275,25 +250,48 @@ function VectorComponents(props) {
                 checked={onlyProductionReady} />
               <i className="feather icon-award"></i> Prod-ready
             </label>
-          </span>
-          <FilterList
-            label="Operating Systems"
-            icon="cpu"
-            values={operatingSystems}
-            currentState={onlyOperatingSystems}
-            setState={setOnlyOperatingSystems} />
-          <FilterList
-            label="Providers"
-            icon="cloud"
-            values={serviceProviders}
-            currentState={onlyProviders}
-            setState={setOnlyProviders} />
-          <FilterList
-            label="Functions"
-            icon="code"
-            values={functionCategories}
-            currentState={onlyFunctions}
-            setState={setOnlyFunctions} />
+          </div>
+        </div>
+        {operatingSystems.length > 0 && (
+          <div className="filter">
+            <div className="filter--label">
+              <Link to="/docs/installation/operating-systems" title="Learn more about Vector's operating systems">
+                Operating Systems
+              </Link>
+            </div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Operating Systems"
+                icon="cpu"
+                values={operatingSystems}
+                currentState={onlyOperatingSystems}
+                setState={setOnlyOperatingSystems} />
+            </div>
+          </div>
+        )}
+        {serviceProviders.length > 0 && (
+          <div className="filter">
+            <div className="filter--label">Providers</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Providers"
+                icon="cloud"
+                values={serviceProviders}
+                currentState={onlyProviders}
+                setState={setOnlyProviders} />
+            </div>
+          </div>
+        )}
+        <div className="filter">
+          <div className="filter--label">Functions</div>
+          <div className="filter--choices">
+            <CheckboxList
+              label="Functions"
+              icon="code"
+              values={functionCategories}
+              currentState={onlyFunctions}
+              setState={setOnlyFunctions} />
+          </div>
         </div>
       </div>
       <div className="vector-components--results">

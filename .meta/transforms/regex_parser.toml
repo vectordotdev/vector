@@ -29,12 +29,12 @@ type = "string"
 common = true
 examples = [
 """\
-^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$\
+^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$\
 """
 ]
 null = false
 description = """\
-The Regular Expression to apply. Do not inlcude the leading or trailing `/`.\
+The Regular Expression to apply. Do not include the leading or trailing `/`.\
 """
 
 [[transforms.regex_parser.resources]]
