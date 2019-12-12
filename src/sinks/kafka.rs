@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::tls::TlsOptions,
     sinks::util::MetadataFuture,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{
     future::{self, poll_fn, IntoFuture},
@@ -71,8 +71,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = KafkaSink::new(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
     }

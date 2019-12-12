@@ -63,6 +63,7 @@ scopes:
   - file sink
   - http sink
   - kafka sink
+  - new_relic_logs sink
   - prometheus sink
   - splunk_hec sink
   - statsd sink

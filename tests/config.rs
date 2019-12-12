@@ -1,8 +1,9 @@
 use vector::topology::{self, Config};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
+    let rt = vector::runtime::Runtime::single_threaded().unwrap();
     Config::load(config.as_bytes())
-        .and_then(|c| topology::builder::build_pieces(&c))
+        .and_then(|c| topology::builder::build_pieces(&c, rt.executor()))
         .map(|(_topology, warnings)| warnings)
 }
 
@@ -399,6 +400,64 @@ fn disabled_healthcheck() {
       encoding = "text"
       healthcheck = false
       "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_no_request() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "http"
+        inputs = ["in"]
+        uri = "https://localhost"
+        encoding = "json"
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_partial_request() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "http"
+        inputs = ["in"]
+        uri = "https://localhost"
+        encoding = "json"
+        request_in_flight_limit = 42
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_request() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "http"
+        inputs = ["in"]
+        uri = "https://localhost"
+        encoding = "json"
+        request_in_flight_limit = 42
+        request_timeout_secs = 2
+        request_rate_limit_duration_secs = 3
+        request_rate_limit_num = 4
+        request_retry_attempts = 5
+        request_retry_backoff_secs = 6
+        "#,
     )
     .unwrap();
 }

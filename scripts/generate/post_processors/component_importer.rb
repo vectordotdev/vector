@@ -26,7 +26,7 @@ module PostProcessors
       def import!(content)
         IMPORTS.each do |tag, import|
           if content.include?("<#{tag}") && !content.include?(import)
-            content.sub!("<#{tag}", "#{import}\n\n<#{tag}")
+            content.sub!(/( *)<#{tag}/, "\\1#{import}\n\n\\1<#{tag}")
           end
         end
 

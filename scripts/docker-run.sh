@@ -17,13 +17,22 @@ docker build \
   -f scripts/ci-docker-images/$tag/Dockerfile \
   scripts/ci-docker-images
 
-docker_flags="--privileged --interactive"
+# set flags for "docker run"
+docker_flags=("--privileged" "--interactive")
 if [ -t 0 ]; then # the script's input is connected to a terminal
-  docker_flags="$docker_flags --tty"
+  docker_flags+=("--tty")
 fi
+
+# pass environment variables prefixed with `PASS_` to the container
+# with removed `PASS_` prefix
+IFS=$'\n'
+for line in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
+  docker_flags+=("-e" "$line")
+done
+unset IFS
+
 docker run \
-  $docker_flags \
-  $(env | xargs -n1 printf '-e "%s"\n') \
+  "${docker_flags[@]}" \
   -w "$PWD" \
   -v "$PWD":"$PWD" \
   $image \

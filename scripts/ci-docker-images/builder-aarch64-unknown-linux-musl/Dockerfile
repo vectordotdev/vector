@@ -1,10 +1,7 @@
 # A version like "1.38.0" or "nightly-2019-11-01".
-ARG RUST_VERSION=1.38.0
-# We use Clang and libc++ from LLVM. The commit should match the one
-# used by Rust. For each Rust version it can be found here
-# https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
-# submodule "llvm-project". Example "71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5".
-ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
+ARG RUST_VERSION=1.39.0
+# We use compiler-rt, libunwind, and libc++ from LLVM.
+ARG LLVM_VERSION=9.0.0
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
@@ -18,6 +15,8 @@ ARG MUSL_VERSION=1.1.22
 ARG TARGET="aarch64-unknown-linux-musl"
 # Target architecture for LLVM
 ARG LLVM_TARGET="AArch64"
+# Target architecture for Linux kernel headres
+ARG LINUX_TARGET="arm64"
 # We also need GCC for the target architecture to compile compier-rt. Because
 # GCC target triples are different from LLVM, we need to specify it explicitly.
 # Example: "arm-linux-gnueabihf".
@@ -31,52 +30,24 @@ ARG LINUX_HEADERS_VERSION=5.3.10
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
-ARG CLANG_PREFIX=/opt/clang
+ARG CLANG_PREFIX=/usr
 ARG LIBS_PREFIX=/opt/libs
 
-# Independent components are built in different stages, so that
-# change of individual arguments would rebuild only affected stages.
-
-# LLVM source tree is shared by both clang and libs builder stages.
-FROM ubuntu:18.04 AS llvm-source
-RUN apt-get update && apt-get install -y git
-ENV SRC_DIR=/src
-WORKDIR $SRC_DIR
-ARG LLVM_GIT_COMMIT
-RUN git clone https://github.com/rust-lang/llvm-project.git && \
-  cd llvm-project && \
-  git checkout $LLVM_GIT_COMMIT && \
-  rm -rf .git
-ENV LLVM_DIR=$SRC_DIR/llvm-project
-
-# Clang
-FROM llvm-source AS clang-builder
-RUN apt-get update && apt-get -y install build-essential ninja-build cmake python3-distutils
-ARG CLANG_PREFIX
-ARG LLVM_TARGET
-WORKDIR $LLVM_DIR
-RUN mkdir build && \
-  cd build && \
-  cmake \
-  -DLLVM_ENABLE_PROJECTS="clang;lld" \
-  -DLLVM_TARGETS_TO_BUILD="$LLVM_TARGET" \
-  -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
-  -DCMAKE_BUILD_TYPE=release \
-  -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
-  -G Ninja \
-  ../llvm && \
-  cmake --build . --target install
-
 # Libs
-FROM llvm-source AS libs-builder
+FROM ubuntu:19.10 AS libs-builder
 
 ARG CLANG_PREFIX
-COPY --from=clang-builder $CLANG_PREFIX $CLANG_PREFIX
-ENV PATH="$CLANG_PREFIX/bin:$PATH"
+RUN apt-get update && apt-get install -y clang llvm lld
 
 # Get all sources at first, so that changes in arguments
 # flags would not redownload them.
 RUN apt-get update && apt-get -y install curl xz-utils
+
+ARG LLVM_VERSION
+RUN curl --proto '=https' --tlsv1.2 -sSfL \
+  https://github.com/llvm/llvm-project/archive/llvmorg-$LLVM_VERSION.tar.gz | \
+  tar xzf -
+ENV LLVM_DIR $SRC_DIR/llvm-project-llvmorg-$LLVM_VERSION
 
 ARG MUSL_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
@@ -91,7 +62,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
 # Install build dependencies.
-RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils 
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils clang llvm lld
 
 ARG TARGET
 ARG LIBS_PREFIX
@@ -101,6 +72,7 @@ ARG LIBS_PREFIX
 # Because Clang toolchain is not fully bootstrapped yet (no standard library),
 # it is necessary to use GCC to compile it.
 ARG GNU_TARGET
+ARG CLANG_PREFIX
 RUN apt-get install -y gcc${GNU_TARGET:+-${GNU_TARGET}} g++${GNU_TARGET:+-${GNU_TARGET}}
 WORKDIR $LLVM_DIR/compiler-rt
 ENV CC=${GNU_TARGET:+${GNU_TARGET}-}gcc
@@ -141,13 +113,14 @@ RUN cd $MUSL_DIR && \
 
 # Install Linux headers.
 WORKDIR $LINUX_DIR
+ARG LINUX_TARGET
 ENV CC=clang
 ENV CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
 RUN make -j$(nproc) headers_install \
   KBUILD_VERBOSE=1 \
   HOSTCC="/usr/bin/gcc" \
-  ARCH="arm64" \
+  ARCH="$LINUX_TARGET" \
   CC="$CC" \
   INSTALL_HDR_PATH=$LIBS_PREFIX
 
@@ -256,10 +229,14 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/g++
 RUN if [ -n "$GNU_TARGET" ]; then ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/$(echo $GNU_TARGET | sed 's/gnu/musl/g')-g++; fi
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
-RUN ln -s $CLANG_PREFIX/bin/ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
+RUN ln -s $CLANG_PREFIX/bin/ld.lld $LIBS_PREFIX/bin/ld
+RUN ln -s $CLANG_PREFIX/bin/llvm-ar $LIBS_PREFIX/bin/ar
+RUN ln -s $CLANG_PREFIX/bin/llvm-strip $LIBS_PREFIX/bin/strip
+RUN ln -s $CLANG_PREFIX/bin/llvm-ar $LIBS_PREFIX/bin/aarch64-linux-musl-ar
 
-# Use stdatomic.h header provided by Clang because it is not present in musl.
+# Use some headers provided by Clang because which are not present in musl.
 RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/emmintrin.h $LIBS_PREFIX/include/emmintrin.h
 
 # Some build scripts hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
@@ -268,11 +245,11 @@ RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include
 # `clang++ -o program program.cpp -lstdc++` would still link to libc++.
 RUN echo > dummy.c && \
   $LIBS_PREFIX/bin/cc -c dummy.c && \
-  $CLANG_PREFIX/bin/ar cr $LIBS_PREFIX/lib/libstdc++.a dummy.o && \
+  $CLANG_PREFIX/bin/llvm-ar cr $LIBS_PREFIX/lib/libstdc++.a dummy.o && \
   rm dummy.c dummy.o
 
 # The actual builder.
-FROM ubuntu:18.04
+FROM ubuntu:19.10
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
@@ -286,8 +263,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 ENV PATH="$RUST_PREFIX/bin:$PATH"
 
 ARG CLANG_PREFIX
-COPY --from=clang-builder $CLANG_PREFIX $CLANG_PREFIX
-ENV PATH="$CLANG_PREFIX/bin:$PATH"
+RUN apt-get update && apt-get install -y clang llvm lld
 
 ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
@@ -331,3 +307,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
 
 COPY builder-aarch64-unknown-linux-musl/start.sh /start.sh
 ENTRYPOINT ["/start.sh"]
+
+ENV TARGET="$TARGET"
+
+# Install `cargo-deb from Git until
+# https://github.com/mmstick/cargo-deb/pull/112 is published on crates.io
+RUN cargo install --git https://github.com/mmstick/cargo-deb --rev cc879930c06fa22e99f2839bad620ac0d0da879e cargo-deb
+
+RUN apt-get install -y rename cmark-gfm

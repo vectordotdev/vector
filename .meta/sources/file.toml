@@ -209,7 +209,7 @@ type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 optional = false
 description = """\
-The raw log message, unaltered.
+The raw log message, unaltered.\
 """
 
 [sources.file.output.log.fields.timestamp]
@@ -217,5 +217,5 @@ type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 optional = false
 description = """\
-The exact time the event was ingested.
+The exact time the event was ingested.\
 """

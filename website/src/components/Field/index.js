@@ -14,12 +14,20 @@ function toTOML(value) {
   return JSON.stringify(value);
 }
 
+function keyToTOML(key) {
+  if ( key.includes(".") ) {
+    return "\"" + key + "\"";
+  } else {
+    return key;
+  }
+}
+
 function exampleToTOML(name, example) {
   if (isObject(example)) {
     if ('name' in example && 'value' in example) {
-      return `${example.name} = ${toTOML(example.value)}`;
+      return `${keyToTOML(example.name)} = ${toTOML(example.value)}`;
     } else {
-      return `${Object.keys(example)[0]} = ${toTOML(Object.values(example)[0])}`
+      return `${keyToTOML(Object.keys(example)[0])} = ${toTOML(Object.values(example)[0])}`
     }
   } else if (name) {
     return `${name} = ${toTOML(example)}`;
@@ -126,9 +134,10 @@ function Field({children, common, defaultValue, enumValues, examples, name, path
   return (
     <div className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
-        {common && <span className="badge badge--primary" title="This is a popular  that we recommend for getting started">common</span>}
+        {common && <span className="badge badge--primary" title="This is a popular that we recommend for getting started">common</span>}
         {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
         <span className="badge badge--secondary">{type}</span>
+        {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary" title="This option is an enumation and only allows specific values">enum</span>}
         {unit && <span className="badge badge--secondary">{unit}</span>}
         {required ?
           <span className="badge badge--danger">required</span> :

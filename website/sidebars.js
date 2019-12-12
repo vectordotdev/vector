@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -55,9 +56,10 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
-                  "setup/installation/operating-systems/raspberry-pi",
+                  "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
+                  "setup/installation/operating-systems/windows",
               ],
             },
             {
@@ -96,6 +98,7 @@ module.exports = {
             "setup/guides",
             "setup/guides/getting-started",
             "setup/guides/troubleshooting",
+            "setup/guides/unit-testing",
           ]
         },
       ],
@@ -105,7 +108,6 @@ module.exports = {
       label: 'Reference',
       items: [
         "reference",
-        "reference/global-options",
         {
           type: 'category',
           label: 'Sources',
@@ -200,6 +202,8 @@ module.exports = {
             
               "reference/sinks/kafka",
             
+              "reference/sinks/new_relic_logs",
+            
               "reference/sinks/prometheus",
             
               "reference/sinks/splunk_hec",
@@ -212,18 +216,27 @@ module.exports = {
             
           ],
         },
+        {
+          type: 'category',
+          label: 'Advanced',
+          items: [
+            "reference/env-vars",
+            "reference/global-options",
+            "reference/tests",
+          ]
+        },
       ],
     },
     {
       type: 'category',
       label: 'Administration',
       items: [
+        "administration",
         "administration/process-management",
         "administration/monitoring",
         "administration/tuning",
         "administration/updating",
         "administration/validating",
-        "administration/env-vars",
       ],
     },
     {

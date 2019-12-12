@@ -3,7 +3,7 @@
 require_relative "component"
 
 class Sink < Component
-  EGRESS_METHODS = ["batching", "exposing", "streaming"]
+  EGRESS_METHODS = ["batching", "exposing", "streaming"].freeze
 
   attr_reader :buffer,
     :delivery_guarantee,
@@ -112,12 +112,33 @@ class Sink < Component
     # Endpoint option
 
     if service_provider == "AWS"
-      @options.hostname =
+      @env_vars.AWS_ACCESS_KEY_ID =
         Option.new({
-          "name" => "endpoint",
-          "examples" => ["127.0.0.0:5000"],
+          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
+          "examples" => ["AKIAIOSFODNN7EXAMPLE"],
+          "name" => "AWS_ACCESS_KEY_ID",
+          "null" => false,
+          "optional" => true,
+          "type" => "string"
+        })
+
+      @env_vars.AWS_SECRET_ACCESS_KEY =
+        Option.new({
+          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
+          "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
+          "name" => "AWS_SECRET_ACCESS_KEY",
+          "null" => false,
+          "optional" => true,
+          "type" => "string"
+        })
+
+      @options.endpoint =
+        Option.new({
           "description" => "Custom endpoint for use with AWS-compatible services.",
-          "null" => true,
+          "examples" => ["127.0.0.0:5000"],
+          "name" => "endpoint",
+          "null" => false,
+          "optional" => true,
           "type" => "string"
         })
     end
@@ -271,6 +292,10 @@ class Sink < Component
 
   def buffer?
     buffer == true
+  end
+
+  def description
+    @description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
   end
 
   def exposing?

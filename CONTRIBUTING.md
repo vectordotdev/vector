@@ -177,12 +177,16 @@ make fmt
 
 #### Documentation
 
-Vector places _high_ importance on documentation. As such, most of the
-Vector documentation is auto-generated via the `make generate` command. As
-a developer you do not need to understand the intricate details of the
-generation system, but you do need to understand how to use it.
+Documentation is extremely important to the Vector project. Ideally, all
+contributions that will change or add behavior to Vector should include the
+relevant updates to the documentation website.
 
-1. All source, transform, and sink 
+The project attempts to make documentation updates as easy as possible, reducing
+most of it down to a few small changes which are outlined in
+[DOCUMENTING.md](/DOCUMENTING.md).
+
+Regardless of whether your changes require documentation updates you should
+always run `make generate` before attempting to merge your commits.
 
 #### Changelog
 

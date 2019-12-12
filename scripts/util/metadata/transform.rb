@@ -30,7 +30,7 @@ class Transform < Component
     if types_coercion
       wildcard_option =
         {
-          "name" => "*",
+          "name" => "`[field-name]`",
           "category" => "requests",
           "enum" => {
             "bool" => "Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.",
@@ -40,13 +40,13 @@ class Transform < Component
             "timestamp" => "Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."
           },
           "examples" => [
-            {"name" => "status", "value" => "int"},
-            {"name" => "duration", "value" => "float"},
-            {"name" => "success", "value" => "bool"},
-            {"name" => "timestamp", "value" => "timestamp|%s", "comment" => "unix"},
-            {"name" => "timestamp", "value" => "timestamp|%+", "comment" => "iso8601 (date and time)"},
-            {"name" => "timestamp", "value" => "timestamp|%F", "comment" => "iso8601 (date)"},
-            {"name" => "timestamp", "value" => "timestamp|%a %b %e %T %Y", "comment" => "custom strptime format"},
+            {"status" => "int"},
+            {"duration" => "float"},
+            {"success" => "bool"},
+            {"timestamp" => "timestamp|%s"},
+            {"timestamp" => "timestamp|%+"},
+            {"timestamp" => "timestamp|%F"},
+            {"timestamp" => "timestamp|%a %b %e %T %Y"}
           ],
           "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.",
           "null" => false,
@@ -60,9 +60,13 @@ class Transform < Component
           "common" => true,
           "description" => "Key/Value pairs representing mapped log field types.",
           "null" => true,
-          "options" => {"*" => wildcard_option},
+          "options" => {"`[field-name]`" => wildcard_option},
           "type" => "table"
         })
     end
+  end
+
+  def description
+    @desription ||= "Accepts #{input_types.to_sentence} events and allows you to #{allow_you_to_description}."
   end
 end

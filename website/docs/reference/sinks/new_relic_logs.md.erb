@@ -1,0 +1,19 @@
+<%- component = metadata.sinks.new_relic_logs -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+## Output
+
+<%= sink_output(component) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>

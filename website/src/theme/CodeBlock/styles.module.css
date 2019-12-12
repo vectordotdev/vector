@@ -16,11 +16,11 @@
 }
 
 .copyButton {
-  background: var(--ifm-color-emphasis-100);
+  background: var(--ifm-background-color);
   background-clip: padding-box;
-  border: 1px solid var(--ifm-color-emphasis-100);
+  border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
-  color: var(--ifm-font-base-color);
+  color: var(--ifm-color-content);
   cursor: pointer;
   line-height: 12px;
   opacity: 0;
@@ -32,4 +32,11 @@
   visibility: hidden;
   transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out,
     bottom 200ms ease-in-out;
+}
+
+.copyButton:hover {
+  border-color: var(--ifm-panel-border-color-active);
+  box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-panel-color-active);
+  text-decoration: none;
 }

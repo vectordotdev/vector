@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 
 import CodeBlock from '@theme/CodeBlock';
 import Diagram from '@site/src/components/Diagram';
+import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
@@ -27,6 +28,8 @@ import cloudify from '@site/src/exports/cloudify';
 
 import styles from './index.module.css';
 import './index.css';
+
+const AnchoredH2 = Heading('h2');
 
 const features = [
   {
@@ -72,7 +75,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        An <Link to="/docs/reference/transforms/lua">embedded LUA engine</Link> makes it easy to program powerful transforms. Handle complex use cases without limitations.
+        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of a programmable runtime. Handle complex use cases with ease!
       </>
     ),
   },
@@ -106,6 +109,7 @@ function Features({features}) {
   return (
     <section className={styles.features}>
       <div className="container">
+        <AnchoredH2 id="features">Features</AnchoredH2>
         {rows}
       </div>
     </section>
@@ -128,8 +132,8 @@ function Performance() {
   return (
     <section className={styles.performance}>
       <div className="container">
-        <h2>Performance</h2>
-        <div className="sub-title">Higher throughout with the lowest memory footprint</div>
+        <AnchoredH2 id="performance">Outperforms</AnchoredH2>
+        <div className="sub-title">Higher throughout with a lower memory footprint</div>
 
         <PerformanceTests />
       </div>
@@ -141,8 +145,8 @@ function Correctness() {
   return (
     <section className={styles.correctness}>
       <div className="container">
-        <h2>Correctness</h2>
-        <div className="sub-title">Obsessed with the details</div>
+        <AnchoredH2 id="correctness">Correct</AnchoredH2>
+        <div className="sub-title">Obsessed with the details and getting it right</div>
 
         <div className="table-responsive">
           <table className="comparison">
@@ -260,7 +264,7 @@ function Integrations() {
   return (
     <section className={classnames(styles.integrations, 'integrations')}>
       <div className="container">
-        <h2>Integrates With Everything</h2>
+        <AnchoredH2 id="integrations">Integrates With Everything</AnchoredH2>
         <div className="sub-title">Sources, transforms, and sinks make it easy to compose pipelines</div>
 
         <div className={classnames(styles.components, 'components')}>
@@ -293,7 +297,7 @@ function Configuration() {
   return (
     <section className="configuration">
       <div className="container">
-        <h2>Simple To Configure</h2>
+        <AnchoredH2 id="configuration">Simple To Configure</AnchoredH2>
         <div className="sub-title">A simple composable format lets you build flexible pipelines</div>
 
         <div className="configuration__diagram">
@@ -304,36 +308,80 @@ function Configuration() {
   );
 }
 
+function Topologies() {
+  return (
+    <section className="topologies">
+      <div className="container">
+        <AnchoredH2 id="topologies">One Tool For Any Topology</AnchoredH2>
+        <div className="sub-title">One tool, one mental model, gets data from A to B</div>
+
+        <Tabs
+          centered={true}
+          className="rounded"
+          defaultValue="centralized"
+          values={[
+            { label: <><i className="feather icon-shuffle"></i> Distributed</>, value: 'distributed', },
+            { label: <><i className="feather icon-box"></i> Centralized</>, value: 'centralized', },
+            { label: <><i className="feather icon-shield"></i> Stream-based</>, value: 'stream-based', },
+          ]}>
+          <TabItem value="distributed">
+            <div className={styles.topology}>
+              <SVG src="/img/topologies-distributed.svg" className={styles.topologyDiagram} />
+              <Link to="/docs/setup/deployment/topologies#distributed">Learn more about the distributed topology</Link>
+            </div>
+          </TabItem>
+          <TabItem value="centralized">
+            <div className={styles.topology}>
+              <SVG src="/img/topologies-centralized.svg" className={styles.topologyDiagram} />
+              <Link to="/docs/setup/deployment/topologies#centralized">Learn more about the centralized topology</Link>
+            </div>
+          </TabItem>
+          <TabItem value="stream-based">
+            <div className={styles.topology}>
+              <SVG src="/img/topologies-stream-based.svg" className={styles.topologyDiagram} />
+              <Link to="/docs/setup/deployment/topologies#stream-based">Learn more about the stream-based topology</Link>
+            </div>
+          </TabItem>
+        </Tabs>
+      </div>
+    </section>
+  )
+}
+
 function Installation() {
   return (
     <section className={styles.installation}>
       <div className="container">
-        <h2>Installs Everywhere</h2>
+        <AnchoredH2 id="installation">Installs Everywhere</AnchoredH2>
         <div className="sub-title">Fully static, no dependencies, no runtime, memory safe</div>
 
         <div className={styles.installationPlatforms}>
-          <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
+          <Link to="/docs/setup/installation/containers/docker"><SVG src="/img/docker.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/linux.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/raspberry-pi.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/windows.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/raspbian"><SVG src="/img/raspbian.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/windows"><SVG src="/img/windows.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
         </div>
 
         <div className={styles.installationChecks}>
           <div>
-            <i className="feather icon-package"></i> Fully static, no dependencies
+            <i className="feather icon-package"></i> Fully static, no deps
           </div>
           <div>
-            <i className="feather icon-feather"></i> Light-weight, weighing only 7mb
+            <i className="feather icon-cpu"></i> X86_64, ARM64, & ARMv7
           </div>
           <div>
-            <i className="feather icon-zap"></i> No runtime or garbage collection
+            <i className="feather icon-feather"></i> Light-weight, only 7mb
+          </div>
+          <div>
+            <i className="feather icon-zap"></i> No runtime, mem-safe
           </div>
         </div>
 
         <h3 className={styles.installSubTitle}>Install with a one-liner:</h3>
 
         <Tabs
-          block={true}
+          className="mini"
           defaultValue="humans"
           values={[
             { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
@@ -420,6 +468,7 @@ function Home() {
         <Correctness />
         <Configuration />
         <Integrations />
+        <Topologies />
         <Installation />
       </main>
     </Layout>

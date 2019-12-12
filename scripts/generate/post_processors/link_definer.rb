@@ -14,7 +14,7 @@ module PostProcessors
       end
 
       def remove_link_footers(content)
-        parts = content.partition(/\n\n\[([a-zA-Z0-9_\-\.\/# ]*)\]:/)
+        parts = content.partition(/\n\n\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]:/)
         parts.first.strip
       end
     end
@@ -31,14 +31,14 @@ module PostProcessors
     def define!
       verify_no_direct_links!
 
-      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/# ]*)\]\]\]/).flatten.uniq
+      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]\]\]/).flatten.uniq
 
       link_ids.each do |link_id|
         definition = get_path_or_url(link_id)
         content.gsub!("[[[#{link_id}]]]", definition)
       end
 
-      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/# ]*)\]/).flatten.uniq
+      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]/).flatten.uniq
 
       footer_links = []
 
@@ -73,7 +73,7 @@ module PostProcessors
       end
 
       def verify_no_direct_links!
-        direct_links = content.scan(/\]\([^#]([a-zA-Z0-9_\-\.\/# ]*)\)/).flatten.uniq
+        direct_links = content.scan(/\]\([^#]([a-zA-Z0-9_\-\.\/?= ]*)\)/).flatten.uniq
 
         if direct_links.any?
           raise <<~EOF

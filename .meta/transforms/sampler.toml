@@ -1,7 +1,7 @@
 [transforms.sampler]
 allow_you_to_description = "sample events with a configurable rate"
 beta = true
-common = false
+common = true
 function_category = "filter"
 input_types = ["log"]
 output_types = ["log"]

@@ -33,18 +33,18 @@ include Printer
 # Constants
 #
 
-HOST = "https://vector.dev"
-DOCS_BASE_PATH = "/docs"
+HOST = "https://vector.dev".freeze
+DOCS_BASE_PATH = "/docs".freeze
 
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s
-WEBSITE_ROOT = File.join(ROOT_DIR, "website")
-ASSETS_ROOT = File.join(ROOT_DIR, "website", "static")
-BLOG_HOST = "#{HOST}/blog"
-DOCS_ROOT = File.join(ROOT_DIR, "website", "docs")
-DOCS_HOST = "#{HOST}#{DOCS_BASE_PATH}"
-META_ROOT = File.join(ROOT_DIR, ".meta")
-PAGES_ROOT = File.join(ROOT_DIR, "website", "src", "pages")
-POSTS_ROOT = File.join(ROOT_DIR, "website", "blog")
-REFERENCE_ROOT = File.join(ROOT_DIR, "website", "docs", "reference")
-RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
-PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials")
+ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s.freeze
+WEBSITE_ROOT = File.join(ROOT_DIR, "website").freeze
+ASSETS_ROOT = File.join(ROOT_DIR, "website", "static").freeze
+BLOG_HOST = "#{HOST}/blog".freeze
+DOCS_ROOT = File.join(ROOT_DIR, "website", "docs").freeze
+DOCS_HOST = "#{HOST}#{DOCS_BASE_PATH}".freeze
+META_ROOT = File.join(ROOT_DIR, ".meta").freeze
+PAGES_ROOT = File.join(ROOT_DIR, "website", "src", "pages").freeze
+POSTS_ROOT = File.join(ROOT_DIR, "website", "blog").freeze
+REFERENCE_ROOT = File.join(ROOT_DIR, "website", "docs", "reference").freeze
+RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases".freeze
+PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials").freeze

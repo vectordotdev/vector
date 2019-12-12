@@ -7,6 +7,13 @@ input_types = ["log"]
 output_types = ["log"]
 resources = []
 
+[transforms.json_parser.options.drop_field]
+type = "bool"
+common = true
+default = true
+null = false
+description = "If the specified `field` should be dropped (removed) after parsing."
+
 [transforms.json_parser.options.drop_invalid]
 type = "bool"
 common = true

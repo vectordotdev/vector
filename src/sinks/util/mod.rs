@@ -2,6 +2,7 @@ pub mod batch;
 pub mod buffer;
 pub mod http;
 pub mod retries;
+pub mod service;
 pub mod tls;
 
 use crate::buffers::Acker;
@@ -16,6 +17,7 @@ pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
 pub use buffer::metrics::MetricBuffer;
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 
 pub trait SinkExt<T>
 where
@@ -137,12 +139,10 @@ where
     }
 }
 
-type Error = Box<dyn std::error::Error + 'static + Send + Sync>;
-
 impl<T, S, B> Sink for BatchServiceSink<T, S, B>
 where
     S: Service<T>,
-    S::Error: Into<Error>,
+    S::Error: Into<crate::Error>,
     S::Response: std::fmt::Debug,
     B: Batch<Output = T>,
 {

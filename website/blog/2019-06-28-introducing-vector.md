@@ -2,10 +2,10 @@
 id: introducing-vector
 title: Introducing Vector
 author: Luke
-authorTitle: Vector Core Team
-authorURL: https://github.com/lukesteensen
-authorImageURL: https://github.com/lukesteensen.png
-authorTwitter: https://twitter.com/lukesteensen
+author_title: Vector Core Team
+author_uRL: https://github.com/lukesteensen
+author_image_url: https://github.com/lukesteensen.png
+author_twitter: https://twitter.com/lukesteensen
 tags: [announcement]
 ---
 
