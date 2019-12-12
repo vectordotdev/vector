@@ -12,6 +12,7 @@ use hyper::{
 };
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -19,6 +20,14 @@ use std::{
 };
 use stream_cancel::{Trigger, Tripwire};
 use tracing::field;
+
+const MIN_FLUSH_PERIOD_SEC: u64 = 1;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Flush period for sets must be greater or equal to {} sec", min))]
+    FlushPeriodTooShort { min: u64 },
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -55,6 +64,12 @@ inventory::submit! {
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        if self.flush_period_sec < MIN_FLUSH_PERIOD_SEC {
+            return Err(Box::new(BuildError::FlushPeriodTooShort {
+                min: MIN_FLUSH_PERIOD_SEC,
+            }));
+        }
+
         let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(future::ok(()));
 
