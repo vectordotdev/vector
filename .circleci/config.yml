@@ -891,12 +891,16 @@ workflows:
           <<: *release-filters
       - package-rpm-x86_64-unknown-linux-musl:
           <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - package-rpm-aarch64-unknown-linux-musl:
           <<: *release-filters
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - package-rpm-armv7-unknown-linux-musleabihf:
           <<: *release-filters
           requires:
-            - build-x86_64-unknown-linux-musl-archive-and-deb-package
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
       # Verify
 
