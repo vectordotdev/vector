@@ -227,7 +227,7 @@ module.exports = {
     ]
   },
   "latest_post": {
-    "author_id": "ash",
+    "author_id": "ashley",
     "date": "2019-11-25",
     "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
@@ -5197,7 +5197,7 @@ module.exports = {
         "title": "Windows Support Is Here!"
       },
       {
-        "author_id": "ash",
+        "author_id": "ashley",
         "date": "2019-11-25",
         "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
         "id": "unit-testing-vector-config-files",
@@ -5281,7 +5281,7 @@ module.exports = {
       "title": "Windows Support Is Here!"
     },
     {
-      "author_id": "ash",
+      "author_id": "ashley",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -17709,7 +17709,7 @@ module.exports = {
           "title": "Windows Support Is Here!"
         },
         {
-          "author_id": "ash",
+          "author_id": "ashley",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
@@ -18392,41 +18392,49 @@ module.exports = {
   "team": [
     {
       "avatar": "https://github.com/a-rodin.png",
+      "github": "https://github.com/a-rodin",
       "id": "alex",
       "name": "Alexander"
     },
     {
       "avatar": "https://github.com/loony-bean.png",
+      "github": "https://github.com/loony-bean",
       "id": "alexey",
       "name": "Alexey"
     },
     {
       "avatar": "https://github.com/Jeffail.png",
-      "id": "ash",
-      "name": "Ash"
+      "github": "https://github.com/Jeffail",
+      "id": "ashley",
+      "name": "Ashley"
     },
     {
       "avatar": "https://github.com/binarylogic.png",
+      "github": "https://github.com/binarylogic",
       "id": "ben",
       "name": "Ben"
     },
     {
       "avatar": "https://github.com/bruceg.png",
+      "github": "https://github.com/bruceg",
       "id": "bruce",
       "name": "Bruce"
     },
     {
       "avatar": "https://github.com/ktff.png",
+      "github": "https://github.com/ktff",
       "id": "kruno",
       "name": "Kruno"
     },
     {
       "avatar": "https://github.com/LucioFranco.png",
+      "github": "https://github.com/LucioFranco",
       "id": "lucio",
       "name": "Lucio"
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
+      "github": "https://github.com/lukesteensen",
       "id": "luke",
       "name": "Luke"
     }

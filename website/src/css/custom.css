@@ -87,7 +87,7 @@
   --ifm-panel-box-shadow: 0 0px 10px 0px var(--ifm-color-emphasis-50);
   --ifm-panel-box-shadow-active: var(--ifm-panel-box-shadow);
   --ifm-panel-color: var(--ifm-color-emphasis-800);
-  --ifm-panel-color-active: var(--ifm-color-primary);
+  --ifm-panel-color-active: var(--ifm-link-color);
   --ifm-pre-line-height: var(--ifm-line-height-base);
   --ifm-sidebar-background: var(--ifm-background-color);
   --ifm-sidebar-border-color: var(--ifm-hr-border-color);
@@ -136,7 +136,7 @@ li + li {
   cursor: pointer;
 }
 .link:not(.badge) {
-  color: var(--ifm-color-primary);
+  color: var(--ifm-link-color);
 }
 .link:hover {
   text-decoration: underline;
@@ -150,7 +150,7 @@ a.text--warning:hover {
   color: var(--ifm-color-warning);
 }
 a code {
-  color: var(--ifm-color-primary);
+  color: var(--ifm-link-color);
 }
 
 /**
@@ -585,7 +585,7 @@ header.hero h1 {
   text-decoration: underline;
 }
 .hero .hero__subtitle a:hover {
-  color: var(--ifm-color-primary);
+  color: var(--ifm-link-color);
 }
 .hero .hero__buttons {
   --ifm-button-padding-vertical: 0.5rem;
@@ -919,7 +919,7 @@ input[type="text"]:focus {
 }
 .panel.panel--link:hover {
   background: var(--ifm-panel-background-active);
-  border-color: var(--ifm-color-primary);
+  border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
   text-decoration: none;
 }
@@ -961,7 +961,7 @@ input[type="text"]:focus {
 
 .react-select-container:hover .react-select__control {
   background: var(--ifm-panel-background-active);
-  border-color: var(--ifm-color-primary);
+  border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
 }
 

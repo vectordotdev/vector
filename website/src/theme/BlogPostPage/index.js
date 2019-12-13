@@ -20,9 +20,9 @@ function BlogPostPage(props) {
   const {content: BlogPostContents} = props;
   const {frontMatter, metadata} = BlogPostContents;
   const {author_id, id, title} = frontMatter;
-  const {dateString, tags} = metadata;
+  const {date: dateString, tags} = metadata;
   const readingStats = readingTime(BlogPostContents.toString());
-  const date = Date.parse(dateString);
+  const date = new Date(Date.parse(dateString));
   const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
   const newPost = fetchNewPost();
@@ -36,7 +36,7 @@ function BlogPostPage(props) {
       <article className={styles.blogPost}>
         <header className={classnames('hero', 'domain-bg', `domain-bg--${domain}`, styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
-            <Avatar id={author_id} size="lg" nameSuffix={` / ${dateFormat(date, "mmm dS, yyyy")} / ${readingStats.text}`} subTitle={false} vertical={true} />
+            <Avatar id={author_id} size="lg" nameSuffix={<> / <time pubdate datetime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
             <h1>{title}</h1>
             <div className={styles.headerTags}>
               <BlogPostTags tags={tags} />

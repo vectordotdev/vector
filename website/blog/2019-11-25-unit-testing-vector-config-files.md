@@ -2,7 +2,7 @@
 id: unit-testing-vector-config-files
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
-author_id: "ash"
+author_id: "ashley"
 tags: ["type: announcement", "domain: config"]
 ---
 
