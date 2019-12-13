@@ -6,7 +6,7 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::fmt::Debug;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -138,6 +138,18 @@ impl TlsSettings {
             authority,
             identity,
         })
+    }
+}
+
+impl fmt::Debug for TlsSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TlsSettings")
+            .field(
+                "accept_invalid_certificates",
+                &self.accept_invalid_certificates,
+            )
+            .field("accept_invalid_hostnames", &self.accept_invalid_hostnames)
+            .finish()
     }
 }
 

@@ -2,6 +2,7 @@ use super::{
     retries::RetryLogic,
     tls::{TlsConnectorExt, TlsSettings},
 };
+use crate::dns::Resolver;
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
 use http::{Request, StatusCode};
@@ -22,35 +23,38 @@ pub type Error = hyper::Error;
 
 #[derive(Clone)]
 pub struct HttpService {
-    inner: InstrumentedService<Client<HttpsConnector<HttpConnector>, Vec<u8>>, Request<Vec<u8>>>,
+    inner: InstrumentedService<
+        Client<HttpsConnector<HttpConnector<Resolver>>, Vec<u8>>,
+        Request<Vec<u8>>,
+    >,
     request_builder: Arc<RequestBuilder>,
 }
 
 impl HttpService {
-    pub fn builder() -> HttpServiceBuilder {
-        HttpServiceBuilder::new()
+    pub fn builder(resolver: Resolver) -> HttpServiceBuilder {
+        HttpServiceBuilder::new(resolver)
     }
 
-    pub fn new<F>(request_builder: F) -> Self
+    pub fn new<F>(resolver: Resolver, request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        Self::builder().build(request_builder)
+        Self::builder(resolver).build(request_builder)
     }
 }
 
 /// A builder for `HttpService`s
-#[derive(Default)]
+#[derive(Debug)]
 pub struct HttpServiceBuilder {
-    threads: usize,
+    resolver: Resolver,
     tls_settings: Option<TlsSettings>,
 }
 
 impl HttpServiceBuilder {
-    fn new() -> Self {
+    fn new(resolver: Resolver) -> Self {
         Self {
-            threads: 4,
-            ..Default::default()
+            resolver,
+            tls_settings: None,
         }
     }
 
@@ -59,28 +63,26 @@ impl HttpServiceBuilder {
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new(self.threads);
+        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
         http.enforce_http(false);
+
         let mut tls = native_tls::TlsConnector::builder();
         if let Some(settings) = self.tls_settings {
             tls.use_tls_settings(settings);
         }
+
         let tls = tls.build().expect("TLS initialization failed");
+
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
+
         let inner = Client::with_client(client).instrument(info_span!("http"));
         HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
-    }
-
-    /// Set the number of threads used by the `HttpService`
-    pub fn threads(mut self, threads: usize) -> Self {
-        self.threads = threads;
-        self
     }
 
     /// Set the standard TLS settings
@@ -185,13 +187,16 @@ mod test {
 
     #[test]
     fn util_http_it_makes_http_requests() {
+        let rt = crate::test_util::runtime();
         let addr = crate::test_util::next_addr();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpService::new(move |body| {
+        let mut service = HttpService::new(resolver, move |body| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
