@@ -412,6 +412,9 @@ table.comparison tr td.bar.vector .bar {
 .domain-bg.domain-bg--platforms {
   background-image: url(/img/circuit-bg-light.svg);
 }
+.domain-bg.domain-bg--testing {
+  background-image: url(/img/testing-bg-light.svg);
+}
 .domain-bg--hover:not(:hover) {
   background-image: none !important;
 }

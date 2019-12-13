@@ -3,7 +3,7 @@ id: how-we-test-vector
 title: "How we test Vector"
 description: "A survey of techniques we've found useful"
 author_id: "luke"
-tags: []
+tags: ["type: post", "domain: testing"]
 ---
 
 When we set out to build Vector, we knew that reliability and performance were

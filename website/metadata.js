@@ -234,7 +234,8 @@ module.exports = {
     "path": "website/blog/2019-12-12-how-we-test-vector.md",
     "permalink": "https://vector.dev/blog/how-we-test-vector",
     "tags": [
-
+      "type: post",
+      "domain: testing"
     ],
     "title": "How we test Vector"
   },
@@ -5236,7 +5237,9 @@ module.exports = {
     "domain: platforms",
     "platform: arm",
     "platform: windows",
-    "domain: config"
+    "domain: config",
+    "type: post",
+    "domain: testing"
   ],
   "posts": [
     {
@@ -5300,7 +5303,8 @@ module.exports = {
       "path": "website/blog/2019-12-12-how-we-test-vector.md",
       "permalink": "https://vector.dev/blog/how-we-test-vector",
       "tags": [
-
+        "type: post",
+        "domain: testing"
       ],
       "title": "How we test Vector"
     }
