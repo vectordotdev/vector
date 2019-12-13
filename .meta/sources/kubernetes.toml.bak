@@ -1,0 +1,48 @@
+[sources.kubernetes]
+beta = true
+delivery_guarantee = "best_effort"
+function_category = "collect"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "kubernetes node's"
+
+[sources.kubernetes.output.log.fields.container_name]
+type = "string"
+examples = ["vector"]
+optional = false
+description = """\
+The container name that Vector is running in.\
+"""
+
+[sources.kubernetes.output.log.fields.host]
+type = "string"
+examples = ["vector-agent-rmqbn"]
+optional = false
+description = """\
+The current hostname where of the local pod Vector is running in.\
+"""
+
+[sources.kubernetes.output.log.fields.pod_uid]
+type = "string"
+examples = ["vector-f8dd5f7b-tvgfn_52cdc270-c3e6-4769-b0a9-275481502618"]
+optional = false
+description = """\
+The pod UID that Vector is running in.\
+"""
+
+[sources.kubernetes.output.log.fields.stream]
+type = "string"
+examples = ["stdout"]
+optional = false
+description = """\
+The [standard stream][urls.standard_streams] that the log was collected from.\
+"""
+
+[sources.kubernetes.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The exact time the event was ingested.\
+"""

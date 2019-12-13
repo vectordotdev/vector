@@ -130,6 +130,48 @@ jobs:
             rm rust-toolchain
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1
 
+  test-stable-kubernetes:
+    machine: true
+    resource_class: xlarge
+    environment:
+      K8S_VERSION: v1.10.0
+      KUBECONFIG: /home/circleci/.kube/config
+      MINIKUBE_VERSION: v0.30.0
+      MINIKUBE_WANTUPDATENOTIFICATION: false
+      MINIKUBE_WANTREPORTERRORPROMPT: false
+      MINIKUBE_HOME: /home/circleci
+      CHANGE_MINIKUBE_NONE_USER: true
+    steps:
+      - checkout
+      - run:
+          name: setup kubectl
+          command: |
+            curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+      - run:
+          name: Start Kubernetes
+          command: |
+            docker run -d --name kube --privileged -p 8443:8443 -p 10080:10080 bsycorp/kind:latest-1.12
+            until curl -s --fail http://127.0.0.1:10080/kubernetes-ready; do
+              sleep 1;
+            done
+            curl http://127.0.0.1:10080/config > ~/.kube/config
+            echo "Kubernetes ready - run tests!"
+      - run:
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+            source $HOME/.cargo/env
+            rustup install stable
+            rustup default stable
+
+      - run:
+          name: Run tests
+          command: |
+            export PATH=$PATH:$HOME/.cargo/bin
+            cargo test kubernetes --no-default-features --features kubernetes-integration-tests
+
+
   test-stable:
     resource_class: xlarge
     docker:
@@ -766,6 +808,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-fmt
     - check-generate
     - test-stable
+    - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
@@ -803,6 +846,7 @@ workflows:
       - check-version:
           <<: *master-filters
       - test-stable
+      - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc
 
       # Build & verify
@@ -873,6 +917,8 @@ workflows:
       - check-generate:
           <<: *release-filters
       - test-stable:
+          <<: *release-filters
+      - test-stable-kubernetes:
           <<: *release-filters
 
       # Build & verify
@@ -982,6 +1028,7 @@ workflows:
       - check-fmt
       - check-generate
       - test-stable
+      - test-stable-kubernetes
 
       # Build & verify
 

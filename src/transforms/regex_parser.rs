@@ -42,23 +42,7 @@ inventory::submit! {
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
-
-        let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
-
-        let names = &regex
-            .capture_names()
-            .filter_map(|s| s.map(|s| s.into()))
-            .collect::<Vec<_>>();
-        let types = parse_check_conversion_map(&self.types, names)?;
-
-        Ok(Box::new(RegexParser::new(
-            regex,
-            field.clone(),
-            self.drop_field,
-            self.drop_failed,
-            types,
-        )))
+        RegexParser::build(&self)
     }
 
     fn input_type(&self) -> DataType {
@@ -84,6 +68,26 @@ pub struct RegexParser {
 }
 
 impl RegexParser {
+    pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
+        let field = config.field.as_ref().unwrap_or(&event::MESSAGE);
+
+        let regex = Regex::new(&config.regex).context(super::InvalidRegex)?;
+
+        let names = &regex
+            .capture_names()
+            .filter_map(|s| s.map(|s| s.into()))
+            .collect::<Vec<_>>();
+        let types = parse_check_conversion_map(&config.types, names)?;
+
+        Ok(Box::new(RegexParser::new(
+            regex,
+            field.clone(),
+            config.drop_field,
+            config.drop_failed,
+            types,
+        )))
+    }
+
     pub fn new(
         regex: Regex,
         field: Atom,
