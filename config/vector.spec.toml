@@ -145,8 +145,8 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * default: false
   # * type: bool
-  start_at_beginning = true
   start_at_beginning = false
+  start_at_beginning = true
 
   #
   # Context
@@ -210,8 +210,8 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * default: false
   # * type: bool
-  oldest_first = true
   oldest_first = false
+  oldest_first = true
 
   #
   # Fingerprinting
@@ -930,10 +930,10 @@ dns_servers = ["0.0.0.0:53"]
   # target, it will only be overwritten if this is set to `true`.
   # 
   # * optional
-  # * default: "false"
+  # * default: false
   # * type: bool
-  overwrite_target = true
   overwrite_target = false
+  overwrite_target = true
 
   # If this setting is present, the parsed JSON will be inserted into the log as
   # a sub-object with this name. If a field with the same name already exists,
@@ -999,8 +999,8 @@ dns_servers = ["0.0.0.0:53"]
     # * default: false
     # * type: bool
     # * relevant when type = "counter"
-    increment_by_value = true
     increment_by_value = false
+    increment_by_value = true
 
     [transforms.log_to_metric.metrics.tags]
       # Key/value pairs representing metric tags. Environment variables and field
@@ -1844,9 +1844,8 @@ end
   # 
   # * optional
   # * default: "log"
-  # * type: bool
-  filename_extension = true
-  filename_extension = false
+  # * type: string
+  filename_extension = "log"
 
   # The format of the resulting object file name. `strftime` specifiers are
   # supported.
@@ -3148,8 +3147,8 @@ end
     # * optional
     # * default: false
     # * type: bool
-    enabled = true
     enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
@@ -3758,8 +3757,8 @@ end
     # * optional
     # * default: false
     # * type: bool
-    enabled = true
     enabled = false
+    enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.

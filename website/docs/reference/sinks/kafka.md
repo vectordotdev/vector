@@ -86,7 +86,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = true # default
+    enabled = false # default
     key_pass = "PassWord1" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
 ```
@@ -387,7 +387,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   common={false}
   defaultValue={false}
   enumValues={null}
-  examples={[true,false]}
+  examples={[false,true]}
   name={"enabled"}
   nullable={true}
   path={"tls"}

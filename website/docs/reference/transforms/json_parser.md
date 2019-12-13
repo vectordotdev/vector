@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL
   drop_field = true # default
   field = "message" # default
-  overwrite_target = true # default
+  overwrite_target = false # default
   target_field = "target" # example, no default
 ```
 
@@ -154,9 +154,9 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
 
 <Field
   common={false}
-  defaultValue={"false"}
+  defaultValue={false}
   enumValues={null}
-  examples={[true,false]}
+  examples={[false,true]}
   name={"overwrite_target"}
   nullable={true}
   path={null}
