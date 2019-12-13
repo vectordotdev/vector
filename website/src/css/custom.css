@@ -1636,6 +1636,9 @@ html[data-theme='dark'] .domain-bg.domain-bg--config {
 html[data-theme='dark'] .domain-bg.domain-bg--platforms {
   background-image: url(/img/circuit-bg-dark.svg);
 }
+html[data-theme='dark'] .domain-bg.domain-bg--testing {
+  background-image: url(/img/testing-bg-dark.svg);
+}
 
 /*
  * navbar
