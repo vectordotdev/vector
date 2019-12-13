@@ -28,9 +28,6 @@ require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/templates"
 
-require_relative "generate/core_ext/hash"
-require_relative "generate/core_ext/string"
-
 #
 # Flags
 #
@@ -131,13 +128,14 @@ metadata.components.each do |component|
   if !File.exists?(template_path)
     contents = templates.component_default(component)
     File.open(template_path, 'w+') { |file| file.write(contents) }
+    templates = Templates.new(ROOT_DIR, metadata)
   end
 end
 
 erb_paths =
   Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
-  filter { |path| !File.basename(path).start_with?("_") }
+  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }
 
 #
 # Create missing .md files
@@ -184,8 +182,11 @@ end
 
 title("Post processing generated files...")
 
-docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
-docs = docs + ["#{ROOT_DIR}/README.md"]
+docs =
+  Dir.glob("#{DOCS_ROOT}/**/*.md").to_a +
+    Dir.glob("#{POSTS_ROOT}/**/*.md").to_a +
+    ["#{ROOT_DIR}/README.md"]
+
 docs.each do |doc|
   path = doc.gsub(/^#{ROOT_DIR}\//, "")
   original_content = File.read(doc)

@@ -363,6 +363,33 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
+[sources.splunk_hec]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `splunk_hec`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "splunk_hec"
+  type = "splunk_hec"
+
+  # The address to accept connections on.
+  # 
+  # * optional
+  # * default: "0.0.0.0:8088"
+  # * type: string
+  address = "0.0.0.0:8088"
+
+  # If supplied, incoming requests must supply this token in the `Authorization`
+  # header, just as a client would if it was communicating with the Splunk HEC
+  # endpoint directly. If _not_ supplied, the `Authorization` header will be
+  # ignored and requests will not be authenticated.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+  token = "A94A8FE5CCB19BA61C4C08"
+
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
   # The component type. This is a required field that tells Vector which
@@ -668,6 +695,29 @@ dns_servers = ["0.0.0.0:53"]
     my_tag = "my value"
     my_env_tag = "${ENV_VAR}"
 
+# Accepts `log` events and allows you to strips ANSI characters from the specified field.
+[transforms.ansi_stripper]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `ansi_stripper`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "ansi_stripper"
+  type = "ansi_stripper"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The target field to strip ANSI characters from.
+  # 
+  # * optional
+  # * default: "message"
+  # * type: string
+  field = "message"
+
 # Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
   #
@@ -736,6 +786,46 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   value = "/var/log/nginx.log"
+
+# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+[transforms.geoip]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `geoip`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "geoip"
+  type = "geoip"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
+  # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
+  # not supported.
+  # 
+  # * required
+  # * type: string
+  database = "/path/to/GeoLite2-City.mmdb"
+
+  # The field name that contains the IP address. This field should contain a
+  # valid IPv4 or IPv6 address.
+  # 
+  # * required
+  # * type: string
+  source = "ip_address"
+  source = "x-forwarded-for"
+
+  # The default field to insert the resulting GeoIP data into. See output for
+  # more info.
+  # 
+  # * optional
+  # * default: "geoip"
+  # * type: string
+  target = "geoip"
 
 # Accepts `log` events and allows you to parse a log field value with Grok.
 [transforms.grok_parser]
@@ -982,11 +1072,11 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
+  # The Regular Expression to apply. Do not include the leading or trailing `/`.
   # 
   # * required
   # * type: string
-  regex = "^(?P<timestamp>\\w*) (?P<level>\\w*) (?P<message>.*)$"
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
   # If the specified `field` should be dropped (removed) after parsing.
   # 

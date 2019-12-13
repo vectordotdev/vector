@@ -35,14 +35,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.5.0/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.6.0/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     </TabItem>
@@ -69,7 +69,7 @@ import TabItem from '@theme/TabItem';
 4.  Start Vector:
 
     ```bat
-    .\bin\vector --config vector\vector.toml
+    .\bin\vector --config config\vector.toml
     ```
 
     That's it! Proceed to [configure](#configuring) Vector for your use case.

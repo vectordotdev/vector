@@ -43,7 +43,7 @@ class Field
     end
 
     if @type != "struct"
-      @examples = @examples || hash["examples"] || @enum || raise("#{self.class.name}#examples must be an array of examples")
+      @examples = @examples || hash["examples"] || @enum || raise("#{self.class.name}#examples must be an array of examples for #{@name}")
     end
 
     # Coercion

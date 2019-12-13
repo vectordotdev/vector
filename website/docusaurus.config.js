@@ -21,7 +21,7 @@ module.exports = {
         {to: 'docs', label: 'Docs', position: 'left'},
         {to: 'blog', label: 'Blog', position: 'left'},
         {to: 'community', label: 'Community', position: 'left'},
-        {to: 'download', label: 'Download', position: 'right'},
+        {to: '/releases', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
@@ -57,20 +57,20 @@ module.exports = {
           items: [
             {
               label: 'Sources',
-              to: 'docs/components/sources',
+              to: 'docs/reference/sources',
             },
             {
               label: 'Transforms',
-              to: 'docs/components/trasnforms',
+              to: 'docs/reference/transforms',
             },
             {
               label: 'Sinks',
-              to: 'docs/components/sinks',
+              to: 'docs/reference/sinks',
             },
           ],
         },
         {
-          title: 'Docs',
+          title: 'Setup',
           items: [
             {
               label: 'Install',
@@ -102,8 +102,12 @@ module.exports = {
               to: 'https://github.com/timberio/vector',
             },
             {
+              label: 'Twitter',
+              to: 'https://twitter.com/timberdotio',
+            },
+            {
               label: 'Mailing List',
-              to: 'mailing-list',
+              to: 'mailing_list',
             },
             {
               label: 'Blog',
@@ -132,6 +136,12 @@ module.exports = {
     [
       '@docusaurus/preset-classic',
       {
+        blog: {
+          feedOptions: {
+            type: 'all',
+            copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
+          },
+        },
         docs: {
           editUrl: 'https://github.com/timberio/vector/edit/master/website/',
           sidebarPath: require.resolve('./sidebars.js'),
@@ -146,5 +156,6 @@ module.exports = {
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
     'https://at-ui.github.io/feather-font/css/iconfont.css',
+    ''
   ],
 };

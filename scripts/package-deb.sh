@@ -36,6 +36,9 @@ cmark-gfm $project_root/README.md --to commonmark | # expand link aliases
   cmark-gfm --to plaintext | # convert to plain text
   fmt -uw 80 > $project_root/target/debian-extended-description.txt
 
+# Create the license file for binary distributions (LICENSE + NOTICE)
+cat LICENSE NOTICE > $project_root/target/debian-license.txt
+
 # Build the deb
 #
 #   --target

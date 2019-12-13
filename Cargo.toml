@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
@@ -23,6 +23,7 @@ assets = [
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
+license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
 
 [workspace]
@@ -156,6 +157,9 @@ pretty_assertions = "0.6.1"
 proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
+kube = { version = "0.16.1", features = ["openapi"] }
+k8s-openapi = { version = "0.5.1", default-features = false, features = ["v1_15"] }
+serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
@@ -207,6 +211,10 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 docker-integration-tests = []
+
+
+kubernetes = ["kubernetes-integration-tests"]
+kubernetes-integration-tests = []
 
 [[bench]]
 name = "bench"

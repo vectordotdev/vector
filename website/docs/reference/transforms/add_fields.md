@@ -1,6 +1,7 @@
 ---
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
+posts_path: /blog/tags/transform-add_fields
 sidebar_label: "add_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
 status: "prod-ready"
@@ -82,7 +83,7 @@ A table of key/value pairs representing the keys to be added to the event.
 
 #### `[field-name]`
 
-The name of the field to add. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
+The name of the field to add. Accepts all [supported types][docs.configuration#types]. Use `.` for adding nested fields.
 
 
 </Field>
@@ -228,8 +229,8 @@ special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.configuration#types]: /docs/setup/configuration#types
 [docs.configuration#value-types]: /docs/setup/configuration#value-types
-[docs.configuration#value_types]: /docs/setup/configuration#value_types
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.data-model.log#special-characters]: /docs/about/data-model/log#special-characters
 [docs.data-model.log]: /docs/about/data-model/log

@@ -4,8 +4,6 @@ import {MDXProvider} from '@mdx-js/react';
 import CodeHeader from '@site/src/components/CodeHeader';
 import CodeBlock from '@theme/CodeBlock';
 
-import './styles.css';
-
 function isObject(a) {
   return (!!a) && (a.constructor === Object);
 };

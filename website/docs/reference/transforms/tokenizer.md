@@ -1,6 +1,7 @@
 ---
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
+posts_path: /blog/tags/transform-tokenizer
 sidebar_label: "tokenizer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs
 status: "prod-ready"

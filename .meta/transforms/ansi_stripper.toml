@@ -1,0 +1,15 @@
+[transforms.ansi_stripper]
+allow_you_to_description = "strips ANSI characters from the specified field"
+common = false
+function_category = "sanitize"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.ansi_stripper.options.field]
+type = "string"
+common = true
+default = "message"
+null = false
+description = "The target field to strip ANSI characters from."

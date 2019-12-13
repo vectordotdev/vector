@@ -61,7 +61,7 @@ function navLinkAttributes(label) {
   };
 }
 
-function NavLink({href, hideText, label, to}) {
+function NavLink({href, hideIcon, hideText, label, to}) {
   let attributes = navLinkAttributes(label) || {};
   const toUrl = useBaseUrl(to);
 
@@ -79,8 +79,8 @@ function NavLink({href, hideText, label, to}) {
             activeClassName: 'navbar__link--active',
             to: toUrl,
           })}>
-      {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {(!hideText) && label}
+      {!hideIcon && attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
+      {!hideText && label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
@@ -120,7 +120,7 @@ function Navbar() {
           'navbar-sidebar--show': sidebarShown,
         })}>
         <div className="navbar__inner">
-          <div className="navbar__items">
+          <div className="navbar__items navbar__items--left">
             <div
               aria-label="Navigation bar toggle"
               className="navbar__toggle"
@@ -213,6 +213,7 @@ function Navbar() {
                     <NavLink
                       className="menu__link"
                       {...linkItem}
+                      hideIcon={true}
                       onClick={hideSidebar}
                     />
                   </li>

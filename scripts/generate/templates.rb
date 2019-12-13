@@ -41,54 +41,6 @@ class Templates
     @metadata = metadata
   end
 
-  def commit(commit)
-    render("#{partials_path}/_commit.md", binding).gsub("\n", "")
-  end
-
-  def commit_scope(commit)
-    scope = commit.scope
-
-    info =
-      if scope.existing_component?
-        {
-          text: "`#{scope.component_name}` #{scope.component_type}",
-          link: scope.short_link
-        }
-      else
-        {
-          text: scope.name,
-          link: scope.short_link
-        }
-      end
-
-    if info[:link] && metadata.links.exists?(info[:link])
-      "[#{info[:text]}][#{info[:link]}]"
-    else
-      info[:text]
-    end
-  end
-
-  def commit_type_category(type_name, category)
-    if type_name == "new feature"
-      "new #{category}"
-    else
-      "#{category} #{type_name}"
-    end
-  end
-
-  def commit_type_commits(type_name, commits, grouped: false)
-    commits =
-      commits.sort_by do |commit|
-        [commit.scope.name, commit.date]
-      end
-
-    render("#{partials_path}/_commit_type_commits.md", binding)
-  end
-
-  def commit_type_toc_item(type_name, commits)
-    render("#{partials_path}/_commit_type_toc_item.md", binding).gsub(/,$/, "")
-  end
-
   def common_component_links(type, limit = 6)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
@@ -124,6 +76,12 @@ class Templates
 
   def component_header(component)
     render("#{partials_path}/_component_header.md", binding).strip
+  end
+
+  def component_output(type, output, breakout_top_keys: false, heading_depth: 1)
+    examples = output.examples
+    fields = output.fields.to_h.values.sort
+    render("#{partials_path}/_component_output.md", binding).strip
   end
 
   def component_sections(component)
@@ -372,14 +330,6 @@ class Templates
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
   end
 
-  def release_changes(release, grouped: false)
-    render("#{partials_path}/_release_changes.md", binding)
-  end
-
-  def release_notes(release)
-    render("#{partials_path}/_release_notes.md", binding)
-  end
-
   def release_summary(release)
     parts = []
 
@@ -438,7 +388,7 @@ class Templates
         -->
         EOF
     
-      notice + content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
+      content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
     end
 
     content
@@ -459,12 +409,6 @@ class Templates
     strip <<~EOF
     Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.
     EOF
-  end
-
-  def source_output(type, output, breakout_top_keys: false, heading_depth: 1)
-    examples = output.examples
-    fields = output.fields.to_h.values.sort
-    render("#{partials_path}/_source_output.md", binding).strip
   end
 
   def subpages

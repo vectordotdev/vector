@@ -1,9 +1,13 @@
 import React from 'react';
 
+import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
+import MailingListForm from '@site/src/components/MailingListForm';
 
 import styles from './community.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
+const AnchoredH2 = Heading('h2');
 
 function Community() {
   const context = useDocusaurusContext();
@@ -15,23 +19,14 @@ function Community() {
       <header className="hero">
         <div className="container container--fluid">
           <h1>Vector Community</h1>
-          <div className="mailing-list">
-            <div className="mailing-list--description">
-              The easiest way to stay up-to-date. One email on the 1st of every month. No spam, ever.
-            </div>
-            <form action="https://app.getvero.com/forms/a748ded7ce0da69e6042fa1e21042506" method="post">
-              <div class="subscribe_form">
-                <input className="input input--lg" name="email" placeholder="you@email.com" type="email" />
-                <button className="button button--primary button--lg" type="submit">Subscribe</button>
-              </div>
-            </form>
-          </div>
+          <MailingListForm size="lg" />
         </div>
       </header>
       <main>
         <section>
           <div className="container">
-            <h2>Connect</h2>
+            <AnchoredH2 id="connect">Connect</AnchoredH2>
+
             <div className="row">
               <div className="col">
                 <a href="https://chat.vector.dev" target="_blank" className="panel panel--link text--center">
@@ -66,8 +61,8 @@ function Community() {
         </section>
         <section>
           <div className="container">
-            <h2>Contribute</h2>
-            
+            <AnchoredH2 id="contribute">Contribute</AnchoredH2>
+
             <p>
               Vector is <a href="https://github.com/timberio/vector">open-source</a> and welcomes contributions. A few guidelines to help you get started:
             </p>
@@ -80,7 +75,8 @@ function Community() {
         </section>
         <section>
           <div className="container">
-            <h2>Meet The Core Team</h2>
+            <AnchoredH2 id="team">Meet The Team</AnchoredH2>
+
             <div className={styles.coreTeam}>
                {team.map((member, idx) => (
                   <div key={idx} className="avatar avatar--vertical">

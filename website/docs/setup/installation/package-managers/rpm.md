@@ -36,14 +36,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.5.0/vector-x86_64.rpm
+    curl -O https://packages.timber.io/vector/0.6.0/vector-x86_64.rpm
     ```
 
     </TabItem>
@@ -81,14 +81,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.5.0/vector-aarch64.rpm
+    curl -O https://packages.timber.io/vector/0.6.0/vector-aarch64.rpm
     ```
 
     </TabItem>
@@ -126,14 +126,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.5.0)', value: 'latest'},
+        { label: 'Latest (0.6.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.5.0/vector-armv7hl.rpm
+    curl -O https://packages.timber.io/vector/0.6.0/vector-armv7hl.rpm
     ```
 
     </TabItem>
