@@ -175,13 +175,15 @@ impl Transform for RegexParser {
     }
 }
 
+const ELLIPSIS: &str = "[...]";
+
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
-        let mut len = maxlen - "[...]".len();
+        let mut len = maxlen - ELLIPSIS.len();
         while !s.is_char_boundary(len) {
             len -= 1;
         }
-        format!("{}[...]", &s[..len]).into()
+        format!("{}{}", &s[..len], ELLIPSIS).into()
     } else {
         s.into()
     }
