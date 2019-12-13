@@ -18325,15 +18325,16 @@ module.exports = {
       ]
     },
     "splunk_hec": {
+    "prometheus": {
       "beta": true,
-      "delivery_guarantee": "at_least_once",
-      "description": "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events.",
+      "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
       "event_types": [
-        "log"
+        "metric"
       ],
       "function_category": "receive",
-      "id": "splunk_hec_source",
-      "name": "splunk_hec",
+      "id": "prometheus_source",
+      "name": "prometheus",
       "operating_systems": [
         "linux",
         "macos",
@@ -18346,16 +18347,16 @@ module.exports = {
 
       ]
     },
-    "prometheus": {
+    "splunk_hec": {
       "beta": true,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
+      "delivery_guarantee": "at_least_once",
+      "description": "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events.",
       "event_types": [
-        "metric"
+        "log"
       ],
       "function_category": "receive",
-      "id": "prometheus_source",
-      "name": "prometheus",
+      "id": "splunk_hec_source",
+      "name": "splunk_hec",
       "operating_systems": [
         "linux",
         "macos",

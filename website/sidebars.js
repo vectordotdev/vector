@@ -128,6 +128,8 @@ module.exports = {
 
               "reference/sources/prometheus",
             
+              "reference/sources/splunk_hec",
+            
               "reference/sources/statsd",
             
               "reference/sources/stdin",

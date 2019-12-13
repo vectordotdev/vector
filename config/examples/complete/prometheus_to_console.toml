@@ -1,0 +1,14 @@
+# Parsing logs as metrics and exposing into Prometheus
+# ------------------------------------------------------------------------------
+# WIP
+
+data_dir = "/var/lib/vector"
+
+# Ingest
+[sources.prometheus]
+type = "prometheus"
+
+# Output data
+[sinks.console]
+inputs = ["prometheus"]
+type = "console"

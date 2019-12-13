@@ -1,0 +1,23 @@
+# Scraping Prometheus metrics and printing them into console
+# ------------------------------------------------------------------------------
+# WIP
+
+data_dir = "/var/lib/vector"
+
+# Ingest
+[sources.prometheus_in]
+type = "prometheus"
+hosts = ["http://127.0.0.1:9090", "http://127.0.0.1:9090"]
+scrape_interval_secs = 2
+
+# Output
+[sinks.console]
+inputs = ["prometheus_in"]
+type = "console"
+encoding = "json"
+
+[sinks.prometheus_out]
+inputs = ["prometheus_in"]
+address = "127.0.0.1:9091"
+type = "prometheus"
+namespace = "vector"

@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+prometheus%22
 operating_systems: ["linux","macos","windows"]
+posts_path: /blog/tags/source-prometheus
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/prometheus.rs
 status: "beta"

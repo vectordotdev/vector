@@ -1,0 +1,51 @@
+# Parsing logs as metrics and sending to Datadog
+# ------------------------------------------------------------------------------
+# WIP
+
+data_dir = "/tmp/vector"
+
+# Ingest
+[sources.file]
+type = "file"
+include = ["sample.log"]
+start_at_beginning = true
+
+# Structure and parse the data
+[transforms.regex_parser]
+inputs = ["file"]
+type = "regex_parser"
+regex = '^(?P<host>[\w\.]+) - (?P<user>[\w-]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+
+# Transform into metrics
+[transforms.log_to_metric]
+inputs = ["regex_parser"]
+type = "log_to_metric"
+
+[[transforms.log_to_metric.metrics]]
+type = "histogram"
+field = "bytes_out"
+name = "bytes_out_hist"
+
+# Transform into metrics
+[transforms.add_tags]
+inputs = ["log_to_metric"]
+type = "add_tags"
+tags = {env = "production"}
+
+# Output data
+[sinks.console_metrics]
+inputs = ["add_tags"]
+type = "console"
+encoding = "text"
+
+[sinks.datadog]
+inputs = ["add_tags"]
+type = "datadog_metrics"
+namespace = "vector"
+api_key = "68af4d71450acd147fd938ad69549d52"
+
+[sinks.statsd]
+inputs = ["add_tags"]
+type = "statsd"
+address = "0.0.0.0:8126"
+namespace = "vector"

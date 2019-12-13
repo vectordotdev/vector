@@ -423,6 +423,27 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "host"
   # * type: string
   host_key = "host"
+# Ingests data through the Prometheus text exposition format and outputs `metric` events.
+[sources.prometheus]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `prometheus`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "prometheus"
+  type = "prometheus"
+
+  # Host address to scrape metrics from.
+  # 
+  # * required
+  # * type: string
+  host = "http://localhost:9090"
+
+  # The interval between scrapes in seconds.
+  # 
+  # * required
+  # * type: int
+  scrape_interval_secs = 1
 
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
@@ -450,27 +471,6 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: string
   token = "A94A8FE5CCB19BA61C4C08"
-# Ingests data through the Prometheus text exposition format and outputs `metric` events.
-[sources.prometheus]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `prometheus`.
-  # 
-  # * required
-  # * type: string
-  # * must be: "prometheus"
-  type = "prometheus"
-
-  # Host address to scrape metrics from.
-  # 
-  # * required
-  # * type: string
-  host = "http://localhost:9090"
-
-  # The interval between scrapes in seconds.
-  # 
-  # * required
-  # * type: int
-  scrape_interval_secs = 1
 
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
