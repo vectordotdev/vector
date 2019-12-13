@@ -1,5 +1,5 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
@@ -81,8 +81,8 @@ inventory::submit! {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = S3Sink::new(self, cx.acker())?;
-        let healthcheck = S3Sink::healthcheck(self)?;
+        let healthcheck = S3Sink::healthcheck(self, cx.resolver())?;
+        let sink = S3Sink::new(self, cx)?;
 
         Ok((sink, healthcheck))
     }
@@ -107,7 +107,7 @@ enum HealthcheckError {
 }
 
 impl S3Sink {
-    pub fn new(config: &S3SinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+    pub fn new(config: &S3SinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -125,8 +125,10 @@ impl S3Sink {
             Template::from("date=%F/")
         };
 
+        let region = config.region.clone().try_into()?;
+
         let s3 = S3Sink {
-            client: Self::create_client(config.region.clone().try_into()?),
+            client: Self::create_client(cx.resolver(), region)?,
         };
 
         let filename_extension = config.filename_extension.clone();
@@ -146,15 +148,18 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let sink = crate::sinks::util::BatchServiceSink::new(svc, acker)
+        let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
             .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(config: &S3SinkConfig) -> crate::Result<super::Healthcheck> {
-        let client = Self::create_client(config.region.clone().try_into()?);
+    pub fn healthcheck(
+        config: &S3SinkConfig,
+        resolver: Resolver,
+    ) -> crate::Result<super::Healthcheck> {
+        let client = Self::create_client(resolver, config.region.clone().try_into()?)?;
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
@@ -177,24 +182,28 @@ impl S3Sink {
         Ok(Box::new(healthcheck))
     }
 
-    pub fn create_client(region: Region) -> S3Client {
+    pub fn create_client(resolver: Resolver, region: Region) -> crate::Result<S3Client> {
         // Hack around the fact that rusoto will not pick up runtime
         // env vars. This is designed to only for test purposes use
         // static credentials.
         #[cfg(not(test))]
         {
-            S3Client::new(region)
+            use rusoto_credential::DefaultCredentialsProvider;
+
+            let p = DefaultCredentialsProvider::new()?;
+            let d = crate::sinks::util::rusoto::client(resolver)?;
+
+            Ok(S3Client::new_with(d, p, region))
         }
 
         #[cfg(test)]
         {
-            use rusoto_core::HttpClient;
             use rusoto_credential::StaticProvider;
 
             let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-            let d = HttpClient::new().unwrap();
+            let d = crate::sinks::util::rusoto::client(resolver)?;
 
-            S3Client::new_with(d, p, region)
+            Ok(S3Client::new_with(d, p, region))
         }
     }
 }
@@ -412,14 +421,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches,
+        dns::Resolver,
         event::Event,
         region::RegionOrEndpoint,
         runtime::Runtime,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
-        test_util::{block_on, random_lines_with_stream, random_string},
+        test_util::{random_lines_with_stream, random_string, runtime},
+        topology::config::SinkContext,
     };
     use flate2::read::GzDecoder;
     use futures::{Future, Sink};
@@ -432,14 +442,17 @@ mod integration_tests {
 
     #[test]
     fn s3_insert_message_into() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
         let config = config(1000000);
         let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, Acker::Null).unwrap();
+        let sink = S3Sink::new(&config, cx).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 10);
 
         let pump = sink.send_all(events);
-        let _ = block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 1);
@@ -456,6 +469,9 @@ mod integration_tests {
 
     #[test]
     fn s3_rotate_files_after_the_buffer_size_is_reached() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
@@ -465,7 +481,7 @@ mod integration_tests {
             ..config(1000)
         };
         let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, Acker::Null).unwrap();
+        let sink = S3Sink::new(&config, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30);
 
@@ -484,7 +500,7 @@ mod integration_tests {
         });
 
         let pump = sink.send_all(futures::stream::iter_ok(events));
-        let _ = block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 3);
@@ -501,6 +517,9 @@ mod integration_tests {
 
     #[test]
     fn s3_waits_for_full_batch_or_timeout_before_sending() {
+        let rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
@@ -511,7 +530,7 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, Acker::Null).unwrap();
+        let sink = S3Sink::new(&config, cx).unwrap();
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -566,6 +585,9 @@ mod integration_tests {
 
     #[test]
     fn s3_gzip() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
@@ -575,12 +597,12 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let sink = S3Sink::new(&config, Acker::Null).unwrap();
+        let sink = S3Sink::new(&config, cx).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 500);
 
         let pump = sink.send_all(events);
-        let _ = block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 2);
@@ -604,20 +626,22 @@ mod integration_tests {
     #[test]
     fn s3_healthchecks() {
         let mut rt = Runtime::new().unwrap();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let healthcheck = S3Sink::healthcheck(&config(1)).unwrap();
+        let healthcheck = S3Sink::healthcheck(&config(1), resolver).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
     #[test]
     fn s3_healthchecks_invalid_bucket() {
         let mut rt = Runtime::new().unwrap();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         let config = S3SinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
             ..config(1)
         };
-        let healthcheck = S3Sink::healthcheck(&config).unwrap();
+        let healthcheck = S3Sink::healthcheck(&config, resolver).unwrap();
         assert_downcast_matches!(
             rt.block_on(healthcheck).unwrap_err(),
             HealthcheckError,
@@ -631,7 +655,13 @@ mod integration_tests {
             endpoint: "http://localhost:9000".to_owned(),
         };
 
-        S3Sink::create_client(region)
+        use rusoto_core::HttpClient;
+        use rusoto_credential::StaticProvider;
+
+        let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
+        let d = HttpClient::new().unwrap();
+
+        S3Client::new_with(d, p, region)
     }
 
     fn config(batch_size: usize) -> S3SinkConfig {
