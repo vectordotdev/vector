@@ -67,8 +67,8 @@
     border: 1px solid var(--ifm-panel-border-color);
     border-radius: var(--ifm-global-radius);
     box-shadow: var(--ifm-panel-box-shadow);
-    margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
-    padding-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+    margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+    padding-bottom: calc( var(--ifm-spacing-vertical) * 1 );
     padding-left: var(--ifm-spacing-horizontal);
     padding-right: var(--ifm-spacing-horizontal);
   }
