@@ -729,11 +729,6 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
-### Columnar Formats
-
-Vector has plans to support column formats, such as ORC and Parquet, in
-[`v0.6`][urls.vector_roadmap].
-
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -879,4 +874,3 @@ You can read more about the complete syntax in the
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
-[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
