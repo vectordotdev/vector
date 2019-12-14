@@ -54,7 +54,7 @@ function Highlight({post}) {
 
   return (
     <div className="section">
-      <div style={{float: 'right'}}>
+      <div className="badges">
         <BlogPostTags tags={post.tags} valuesOnly={true} />
       </div>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
@@ -73,6 +73,19 @@ function UpgradeGuide({upgradeGuide, key}) {
       <MDX components={MDXComponents} scope={{}}>{upgradeGuide.body}</MDX>
     </div>
   );
+}
+
+function ChangelogSentence({release}) {
+  const groupedCommits = _.groupBy(release.commits, 'type');
+  const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
+  const posts = release.posts;
+
+  return groupKeys.filter(key => !['docs', 'chore'].includes(key)).map((groupKey, idx) => (
+    <>
+      {idx == (groupKeys.length - 1) ? ", and " : ", "}
+      <a href={`#${groupKey}`} className="contents__link">{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</a>
+    </>
+  ));
 }
 
 function Notes({release, latest}) {
@@ -123,7 +136,7 @@ function Notes({release, latest}) {
       </section>
       <section className="markdown">
         <p>
-          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings X new features, 45 enhancements, 6 bug fixes, and 2 performance improvements. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
+          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
         </p>
 
         {posts.length > 0 && (
@@ -153,8 +166,6 @@ function Notes({release, latest}) {
         <AnchoredH2 id="overview">Changelog</AnchoredH2>
 
         <Changelog commits={release.commits} />
-
-        <AnchoredH2 id="overview">Roadmap</AnchoredH2>
 
         <hr />
 
@@ -206,13 +217,9 @@ function TableOfContents({release}) {
                 {groupKeys.map((groupKey, idx) =>
                   <li key={idx}>
                     <a href={`#${groupKey}`} className="contents__link">{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</a>
-                    
                   </li>
                 )}
               </ul>
-            </li>
-            <li>
-              <a href="#breaking-changes" className="contents__link">Roadmap</a>
             </li>
           </ul>
         </div>

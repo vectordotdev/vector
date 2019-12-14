@@ -1030,14 +1030,21 @@ header + section.shade {
   padding-bottom: calc( var(--ifm-spacing-vertical) / 1.5 );
   padding-left: var(--ifm-spacing-horizontal);
 }
+.section-list > .section:last-child {
+  padding-bottom: 0
+}
 .section-list > .section > .badges {
   float: right;
   margin-top: -0.25em;
+  margin-bottom: 0.5em;
   text-align: right;
 }
 .section-list > .section > .badges .badge {
   font-size: 0.7em;
   margin-left: 3px;
+}
+.section-list > .section > .badges .badge:first-child {
+  margin-left: 0;
 }
 .section-list > .section > h3, 
 .section-list > .section > h4,

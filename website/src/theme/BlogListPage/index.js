@@ -54,7 +54,7 @@ function BlogListPage(props) {
             ))}
           </ul>
 
-          <MailingListForm block={true} />
+          <MailingListForm block={true} buttonClass="highlight" />
         </div>
         <div className="blog-list--items">
           {items.map(({content: BlogPostContent}) => (

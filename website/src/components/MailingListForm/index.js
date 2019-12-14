@@ -4,7 +4,7 @@ import classnames from 'classnames';
 
 import './styles.css';
 
-function MailingListForm({block, description, size}) {
+function MailingListForm({block, buttonClass, description, size}) {
   return (
     <div className={classnames('mailing-list', `mailing-list--${size}`, {'mailing-list--block': block})}>
       {description !== false && (
@@ -14,8 +14,8 @@ function MailingListForm({block, description, size}) {
       )}
       <form action="https://app.getvero.com/forms/a748ded7ce0da69e6042fa1e21042506" method="post">
         <div className="subscribe_form">
-          <input className={classnames('input', 'input--highlight', `input--${size}`)} name="email" placeholder="you@email.com" type="email" />
-          <button className={classnames('button', 'button--highlight', `button--${size}`)} type="submit">Subscribe</button>
+          <input className={classnames('input', `input--${size}`)} name="email" placeholder="you@email.com" type="email" />
+          <button className={classnames('button', `button--${buttonClass || 'primary'}`, `button--${size}`)} type="submit">Subscribe</button>
         </div>
       </form>
     </div>
