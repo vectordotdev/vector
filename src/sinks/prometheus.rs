@@ -163,7 +163,7 @@ impl PrometheusSink {
             f(counter);
         } else {
             let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+            let opts = prometheus::Opts::new(name, name).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let counter = prometheus::CounterVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
@@ -184,7 +184,7 @@ impl PrometheusSink {
             f(gauge);
         } else {
             let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+            let opts = prometheus::Opts::new(name, name).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let gauge = prometheus::GaugeVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
@@ -206,7 +206,7 @@ impl PrometheusSink {
         } else {
             let buckets = self.config.buckets.clone();
             let namespace = &self.config.namespace;
-            let opts = prometheus::HistogramOpts::new(name.clone(), name.clone())
+            let opts = prometheus::HistogramOpts::new(name, name)
                 .buckets(buckets)
                 .namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
@@ -230,7 +230,7 @@ impl PrometheusSink {
             f(set);
         } else {
             let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+            let opts = prometheus::Opts::new(name, name).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let counter = prometheus::IntGaugeVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
@@ -240,7 +240,7 @@ impl PrometheusSink {
             // Send counter to flusher
             if let Some(ch) = self.flush_channel.as_mut() {
                 let c = counter.with_label_values(&keys[..]);
-                if let Err(e) = ch.send(c.clone()) {
+                if let Err(e) = ch.send(c) {
                     error!("Error sending Prometheus gauge to flusher: {}", e);
                 }
             }

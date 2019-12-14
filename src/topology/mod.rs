@@ -405,11 +405,11 @@ impl RunningTopology {
         }
     }
 
-    fn setup_outputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+    fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let output = new_pieces.outputs.remove(name).unwrap();
 
         for (sink_name, sink) in &self.config.sinks {
-            if sink.inputs.contains(name) {
+            if sink.inputs.iter().any(|i| i == name) {
                 output
                     .unbounded_send(fanout::ControlMessage::Add(
                         sink_name.clone(),
@@ -419,7 +419,7 @@ impl RunningTopology {
             }
         }
         for (transform_name, transform) in &self.config.transforms {
-            if transform.inputs.contains(name) {
+            if transform.inputs.iter().any(|i| i == name) {
                 output
                     .unbounded_send(fanout::ControlMessage::Add(
                         transform_name.clone(),

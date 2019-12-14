@@ -28,7 +28,7 @@ use string_cache::DefaultAtom as Atom;
 // LogPath = `containerName/Instance#.log`
 
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
-const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
+const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

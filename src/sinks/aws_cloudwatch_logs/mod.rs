@@ -350,10 +350,7 @@ fn partition(
         }
     };
 
-    let key = CloudwatchKey {
-        stream,
-        group: group.clone(),
-    };
+    let key = CloudwatchKey { stream, group };
 
     Some(PartitionInnerBuffer::new(event, key))
 }
@@ -380,7 +377,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> crate::Result<super::Healthc
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
 
-    let client = create_client(config.region.clone().try_into()?)?;
+    let client = create_client(config.region.try_into()?)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),

@@ -178,7 +178,7 @@ fn http(
             request
         });
 
-    let encoding = config.encoding.clone();
+    let encoding = config.encoding;
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)

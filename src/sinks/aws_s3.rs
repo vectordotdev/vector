@@ -212,9 +212,9 @@ impl Service<Request> for S3Sink {
         self.client
             .put_object(PutObjectRequest {
                 body: Some(request.body.into()),
-                bucket: request.bucket.into(),
-                key: request.key.into(),
-                content_encoding: request.content_encoding.into(),
+                bucket: request.bucket,
+                key: request.key,
+                content_encoding: request.content_encoding,
                 ..Default::default()
             })
             .instrument(info_span!("request"))
@@ -257,8 +257,8 @@ fn build_request(
     );
 
     Request {
-        body: inner.into(),
-        bucket: bucket.clone(),
+        body: inner,
+        bucket,
         key,
         content_encoding: if gzip { Some("gzip".to_string()) } else { None },
     }
