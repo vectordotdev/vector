@@ -82,8 +82,8 @@ function ChangelogSentence({release}) {
 
   return groupKeys.filter(key => !['docs', 'chore'].includes(key)).map((groupKey, idx) => (
     <>
-      {idx == (groupKeys.length - 1) ? ", and " : ", "}
-      <a href={`#${groupKey}`} className="contents__link">{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</a>
+      {idx == (groupKeys.length - 1) ? ', and ' : (idx == 0 ? '' : ', ')}
+      <a href={`#${groupKey}`} className="contents__link">{pluralize(commitTypeName(groupKey).toLowerCase(), groupedCommits[groupKey].length, true)}</a>
     </>
   ));
 }
@@ -136,7 +136,7 @@ function Notes({release, latest}) {
       </section>
       <section className="markdown">
         <p>
-          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
+          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
         </p>
 
         {posts.length > 0 && (
