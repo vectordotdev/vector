@@ -25,6 +25,7 @@ module.exports = {
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
+    image: 'img/open-source.png',
     prism: {
       theme: require('prism-react-renderer/themes/github'),
       darkTheme: require('prism-react-renderer/themes/dracula'),

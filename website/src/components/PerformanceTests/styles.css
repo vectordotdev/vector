@@ -9,7 +9,9 @@
   --vector-switcher-active-color: var(--ifm-background-color);
 
   background: var(--ifm-panel-background);
+  border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-panel-box-shadow);
   display: flex;
   justify-content: space-between;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
