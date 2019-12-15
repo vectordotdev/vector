@@ -5,16 +5,22 @@
 </p>
 
 ---
-<%- if metadata.new_post -%>
-
-**New post! [<%= metadata.new_post.title %>](<%= metadata.new_post.permalink %>)**
-
----
-<%- end -%>
 
 <p align="center">
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
+
+<%- if metadata.new_post -%>
+---
+
+<p align="center">
+  <strong>
+    New post! <a href="<%= metadata.new_post.permalink %>"><%= metadata.new_post.title %></a>
+  </strong>
+</p>
+
+---
+<%- end -%>
 
 Vector is a [high-performance][pages.index#performance] observability data router. It
 makes [collecting][docs.sources], [transforming][docs.transforms], and
