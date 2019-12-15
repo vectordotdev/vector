@@ -421,7 +421,7 @@ mod tests {
                 .into(),
         );
 
-        let mut transform = transform_pod_uid(None).unwrap();
+        let mut transform = transform_pod_uid().unwrap();
 
         let event = transform.transform(event).expect("Transformed");
 
@@ -438,7 +438,7 @@ mod tests {
             "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned().into(),
         );
 
-        let mut transform = transform_pod_uid(None).unwrap();
+        let mut transform = transform_pod_uid().unwrap();
 
         let event = transform.transform(event).expect("Transformed");
 
