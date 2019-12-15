@@ -77,7 +77,7 @@ nodes.
 
 ### Limiting Resources
 
-Vector is designed to be [_highly_ efficient][docs.performance], but this does
+Vector is designed to be [_highly_ efficient][pages.index#performance], but this does
 not preclude Vector from consuming an excess amount of resources in certain
 scenarios. This is not ideal as an agent where priority should be given to the
 primary service on the host. Therefore, it is recommended to limit Vector
@@ -121,7 +121,6 @@ where it left off.
 
 [docs.containers.docker]: /docs/setup/installation/containers/docker
 [docs.containers]: /docs/setup/installation/containers
-[docs.performance]: /docs/about/performance
 [docs.process-management#reloading]: /docs/administration/process-management#reloading
 [docs.roles.service]: /docs/setup/deployment/roles/service
 [docs.sinks.vector]: /docs/reference/sinks/vector
@@ -132,6 +131,7 @@ where it left off.
 [docs.topologies#centralized]: /docs/setup/deployment/topologies#centralized
 [docs.topologies#stream-based]: /docs/setup/deployment/topologies#stream-based
 [docs.updating]: /docs/administration/updating
+[pages.index#performance]: /#performance
 [urls.big_query_streaming]: https://cloud.google.com/bigquery/streaming-data-into-bigquery
 [urls.cgroups_limit_resources]: https://the.binbashtheory.com/control-resources-cgroups/
 [urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html

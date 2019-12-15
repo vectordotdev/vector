@@ -174,7 +174,11 @@ class Links
     end
 
     def fetch_page(name)
-      fetch!("pages", @pages, name)
+      if name == "index"
+        "/"
+      else
+        fetch!("pages", @pages, name)
+      end
     end
 
     def fetch_dynamic_url(name)

@@ -31,7 +31,7 @@ upstream clients or services. Relevant sources include the
 
 ### Performance Tuning
 
-Vector is designed, by default, to [take full advantage of all system resources][docs.performance],
+Vector is designed, by default, to [take full advantage of all system resources][pages.index#performance],
 which is usually preferred in the service role. As a result, there is nothing
 special you need to do to improve performance.
 
@@ -85,7 +85,7 @@ configuration steps necessary to improve performance.
 The hardware needed is highly dependent on your configuration and data volume.
 Typically, Vector is CPU bound and not memory bound, especially if all buffers
 are [configured to use the disk][docs.roles.service#on-disk-buffering]. Our
-[benchmarks][docs.performance] should give you a general idea of resource usage
+[benchmarks][pages.index#performance] should give you a general idea of resource usage
 in relation to specific pipelines and data volume.
 
 #### CPU
@@ -138,7 +138,6 @@ service, restarting without disruption is achieved by higher level design
 decisions, such as [load balancing][docs.roles.service#load-balancing].
 
 
-[docs.performance]: /docs/about/performance
 [docs.process-management#reloading]: /docs/administration/process-management#reloading
 [docs.roles.service#load-balancing]: /docs/setup/deployment/roles/service#load-balancing
 [docs.roles.service#on-disk-buffering]: /docs/setup/deployment/roles/service#on-disk-buffering
@@ -149,6 +148,7 @@ decisions, such as [load balancing][docs.roles.service#load-balancing].
 [docs.sources.tcp]: /docs/reference/sources/tcp
 [docs.sources.vector]: /docs/reference/sources/vector
 [docs.updating]: /docs/administration/updating
+[pages.index#performance]: /#performance
 [urls.aws_elb]: https://aws.amazon.com/elasticloadbalancing/
 [urls.haproxy]: https://www.haproxy.org/
 [urls.nginx]: https://www.nginx.com/

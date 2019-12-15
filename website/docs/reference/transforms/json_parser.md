@@ -298,7 +298,7 @@ The `json_parser` source has been involved in the following correctness tests:
 
 * [`wrapped_json_correctness`][urls.wrapped_json_correctness_test]
 
-Learn more in the [Correctness][docs.correctness] sections.
+Learn more in the [Correctness][pages.index#correctness] sections.
 
 ### Environment Variables
 
@@ -343,6 +343,6 @@ Parsing the `"message"` field would result the following structure:
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.correctness]: /docs/about/correctness
 [docs.data-model#log]: /docs/about/data-model#log
+[pages.index#correctness]: /#correctness
 [urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

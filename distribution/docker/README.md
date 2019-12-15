@@ -18,14 +18,14 @@
   <img src="https://res.cloudinary.com/timber/image/upload/v1561214425/vector_diagram_w26yw3.svg" alt="Vector">
 </p>
 
-Vector is a [high-performance][docs.performance] observability data router. It
+Vector is a [high-performance][pages.index#performance] observability data router. It
 makes [collecting][docs.sources], [transforming][docs.transforms], and
 [sending][docs.sinks] logs, metrics, and events easy. It decouples data
 collection & routing from your services, giving you control and data ownership,
-among [many other benefits][docs.use_cases].
+among many other benefits.
 
 Built in [Rust][urls.rust], Vector places high-value on
-[performance][docs.performance], [correctness][docs.correctness], and [operator
+[performance][pages.index#performance], [correctness][pages.index#correctness], and [operator
 friendliness][docs.administration]. It compiles to a single static binary and is
 designed to be [deployed][docs.deployment] across your entire infrastructure,
 serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
@@ -149,15 +149,14 @@ Vector's Docker source files are located [in it's Github repo][urls.vector_docke
 
 [docs.administration]: https://vector.dev/docs/administration
 [docs.configuration]: https://vector.dev/docs/setup/configuration
-[docs.correctness]: https://vector.dev/docs/about/correctness
 [docs.deployment]: https://vector.dev/docs/setup/deployment
-[docs.performance]: https://vector.dev/docs/about/performance
 [docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent
 [docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service
 [docs.sinks]: https://vector.dev/docs/reference/sinks
 [docs.sources]: https://vector.dev/docs/reference/sources
 [docs.transforms]: https://vector.dev/docs/reference/transforms
-[docs.use_cases]: https://vector.dev/docs/use_cases
+[pages.index#correctness]: https://vector.dev/#correctness
+[pages.index#performance]: https://vector.dev/#performance
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian

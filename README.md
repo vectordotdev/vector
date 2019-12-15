@@ -18,14 +18,14 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
-Vector is a [high-performance][docs.performance] observability data router. It
+Vector is a [high-performance][pages.index#performance] observability data router. It
 makes [collecting][docs.sources], [transforming][docs.transforms], and
 [sending][docs.sinks] logs, metrics, and events easy. It decouples data
 collection & routing from your services, giving you control and data ownership,
-among [many other benefits][docs.use_cases].
+among many other benefits.
 
 Built in [Rust][urls.rust], Vector places high-value on
-[performance][docs.performance], [correctness][docs.correctness], and [operator
+[performance][pages.index#performance], [correctness][pages.index#correctness], and [operator
 friendliness][docs.administration]. It compiles to a single static binary and is
 designed to be [deployed][docs.deployment] across your entire infrastructure,
 serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
@@ -70,8 +70,8 @@ simple and unified.
 
 ## Features
 
-* ***Fast*** - Built in [Rust][urls.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
-* **Correct** - Obsessed with [getting the details right][docs.correctness].
+* ***Fast*** - Built in [Rust][urls.rust], Vector is [fast and memory efficient][pages.index#performance]. No runtime. No garbage collector.
+* **Correct** - Obsessed with [getting the details right][pages.index#correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
 * **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service].
 * **Logs, Metrics, or Events** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
@@ -130,7 +130,6 @@ Or use your own [preferred method][docs.installation].
 [docs.concepts]: https://vector.dev/docs/about/concepts
 [docs.configuration]: https://vector.dev/docs/setup/configuration
 [docs.containers]: https://vector.dev/docs/setup/installation/containers
-[docs.correctness]: https://vector.dev/docs/about/correctness
 [docs.data-model.log]: https://vector.dev/docs/about/data-model/log
 [docs.data-model.metric]: https://vector.dev/docs/about/data-model/metric
 [docs.data_model]: https://vector.dev/docs/about/data-model
@@ -144,7 +143,6 @@ Or use your own [preferred method][docs.installation].
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems
 [docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers
-[docs.performance]: https://vector.dev/docs/about/performance
 [docs.process-management#reloading]: https://vector.dev/docs/administration/process-management#reloading
 [docs.process-management]: https://vector.dev/docs/administration/process-management
 [docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent
@@ -174,8 +172,9 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms.tokenizer]: https://vector.dev/docs/reference/transforms/tokenizer
 [docs.transforms]: https://vector.dev/docs/reference/transforms
 [docs.updating]: https://vector.dev/docs/administration/updating
-[docs.use_cases]: https://vector.dev/docs/use_cases
 [docs.validating]: https://vector.dev/docs/administration/validating
+[pages.index#correctness]: https://vector.dev/#correctness
+[pages.index#performance]: https://vector.dev/#performance
 [urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
