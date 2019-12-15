@@ -109,7 +109,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector:latest
+        image: ktff/vector-improve:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log

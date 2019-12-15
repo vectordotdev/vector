@@ -229,7 +229,7 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
     let mut rp_config = RegexParserConfig::default();
     // message field
     rp_config.regex =
-        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>*)$"
+        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$"
             .to_owned();
     // drop field
     rp_config
