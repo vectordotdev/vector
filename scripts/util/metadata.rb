@@ -196,6 +196,36 @@ class Metadata
     end
   end
 
+  def new_post
+    return @new_post if defined?(@new_post)
+
+    @new_post ||=
+      begin
+        last_post = posts.last
+        
+        if (Date.today - last_post.date) <= 30
+          last_post
+        else
+          nil
+        end
+      end
+  end
+
+  def new_release
+    return @new_post if defined?(@new_post)
+
+    @new_post ||=
+      begin
+        last_release = releases.releases_list.last
+        
+        if (Date.today - last_release.date) <= 30
+          last_release
+        else
+          nil
+        end
+      end
+  end
+
   def post_tags
     @post_tags ||= posts.collect(&:tags).flatten.uniq
   end

@@ -122,7 +122,7 @@ templates = Templates.new(ROOT_DIR, metadata)
 # Create missing release pages
 #
 
-metadata.releases.to_h.values.each do |release|
+metadata.releases_list.each do |release|
   template_path = "#{PAGES_ROOT}/releases/#{release.version}/download.js"
 
   if !File.exists?(template_path)

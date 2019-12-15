@@ -1,7 +1,6 @@
 <p align="center">
   <strong>
     <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.6.0<a/>
-
   </strong>
 </p>
 
@@ -14,6 +13,10 @@
 
      README.md.erb
 -->
+
+**New post! [Unit Testing Your Vector Config Files](https://vector.dev/blog/unit-testing-vector-config-files)**
+
+---
 
 <p align="center">
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
