@@ -109,14 +109,13 @@ fn file_source(
 ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
     let mut config = FileConfig::default();
 
-    // TODO: Having a configurable option for excluding namespaces, seams to be usefull.
-    // // TODO: Find out if there are some guarantee from Kubernetes that current build of
-    // // TODO  pod_uid as namespace_pod-name_some-number is a somewhat lasting decision.
-    // NOTE: pod_uid is unspecified and it has been found that on EKS it has different scheme.
-    // NOTE: as such excluding/including using path is hacky, instead, more proper source of
-    // NOTE: information should be used.
-    // NOTE: At best, excluding/including using path can be an optimization
-    // TODO: Exclude whole kube-system namespace properly
+    // TODO: Add exclude_namspace option, and with it in config exclude kube-system namespace.
+    // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
+    // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
+    config
+        .exclude
+        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*/*/*").into());
+
     // TODO: Add exclude_namspace option, and with it in config exclude namespace used by vector.
     // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
     config
@@ -275,6 +274,8 @@ fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform
     let namespace_regex = r"(?P<pod_namespace>[0-9a-z.\-]*)";
     let name_regex = r"(?P<pod_name>[0-9a-z.\-]*)";
     let uid_regex = r"(?P<object_uid>([0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}|[0-9A-Fa-f]{32}))";
+
+    // Definition of pod_uid has been well defined since Kubernetes 1.14 with https://github.com/kubernetes/kubernetes/pull/74441
 
     // Minikube 1.15, MicroK8s 1.15,1.14,1.16 , DigitalOcean 1.16 , Google Kubernetes Engine 1.13, 1.14, EKS 1.14
     // format: namespace_name_UID
