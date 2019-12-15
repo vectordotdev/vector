@@ -114,7 +114,7 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
   );
 }
 
-function ReleaseDownload() {
+function ReleaseDownload({version}) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {installation: installation, latest_release: latestRelease, releases}} = siteConfig.customFields;
@@ -131,9 +131,9 @@ function ReleaseDownload() {
 
   viewedNewRelease();
 
-  const [version, setVersion] = useState(latestRelease.version);
-  const selectedTab = version == latestRelease.version ? 'latest' : 'older';
-  const oldRelease = version == latestRelease.version ? oldReleases[0] : oldReleases.find(release => release.version == version);
+  const [selectedVersion, setVersion] = useState(version || latestRelease.version);
+  const selectedTab = selectedVersion == latestRelease.version ? 'latest' : 'older';
+  const oldRelease = selectedVersion == latestRelease.version ? oldReleases[0] : oldReleases.find(release => release.version == selectedVersion);
 
   return (
     <Layout title="Download Vector">

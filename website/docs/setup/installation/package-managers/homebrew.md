@@ -69,4 +69,4 @@ brew update && brew upgrade vector
 [docs.configuration]: /docs/setup/configuration
 [urls.homebrew]: https://brew.sh/
 [urls.homebrew_services]: https://github.com/Homebrew/homebrew-services
-[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_releases]: https://vector.dev/releases/latest

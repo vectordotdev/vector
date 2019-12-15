@@ -118,5 +118,5 @@ Vector.
 
 
 [docs.configuration]: /docs/setup/configuration
-[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_releases]: https://vector.dev/releases/latest
 [urls.windows_service]: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service

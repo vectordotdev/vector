@@ -206,4 +206,4 @@ Vector.
 [docs.configuration]: /docs/setup/configuration
 [urls.rpm]: https://rpm.org/
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
-[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_releases]: https://vector.dev/releases/latest

@@ -1,6 +1,7 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/download">Download 0.6.0<a/>
+    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.6.0<a/>
+
   </strong>
 </p>
 
@@ -63,8 +64,8 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.6.0][urls.v0.6.0], [changelog][urls.vector_changelog]
+* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [twitter][urls.vector_twitter], [mailing list][urls.mailing_list]
+* [**Releases**][urls.vector_releases] - [v0.6.0 (latest)][urls.v0.6.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -117,6 +118,16 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 ```
 
 Or use your own [preferred method][docs.installation].
+
+
+## Latest Posts & Announcements
+
+* [Unit Testing Your Vector Config Files](https://vector.dev/blog/unit-testing-vector-config-files)
+* [Windows Support Is Here!](https://vector.dev/blog/windows-support)
+* [ARMv7 & ARM64 Support on Linux](https://vector.dev/blog/arm-support-on-linux)
+* [Introducing Vector](https://vector.dev/blog/introducing-vector)
+
+[view all...][urls.vector_blog]
 
 ---
 
@@ -178,10 +189,11 @@ Or use your own [preferred method][docs.installation].
 [urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.6.0]: https://github.com/timberio/vector/releases/tag/v0.6.0
-[urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
+[urls.v0.6.0]: https://vector.dev/releases/0.6.0/download
+[urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community
-[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.vector_twitter]: https://twitter.com/timberdotio
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

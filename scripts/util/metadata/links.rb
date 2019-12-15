@@ -241,7 +241,7 @@ class Links
         "#{HOST}/releases/#{$1}"
 
       when /^v([a-z0-9\-\.]+)$/
-        "#{VECTOR_ROOT}/releases/tag/v#{$1}"
+        "#{HOST}/releases/#{$1}/download"
 
       when /^v([a-z0-9\-\.]+)_branch$/
         "#{VECTOR_ROOT}/tree/v#{$1}"

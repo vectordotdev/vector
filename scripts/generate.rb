@@ -119,6 +119,65 @@ metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 
 #
+# Create missing release pages
+#
+
+metadata.releases.to_h.values.each do |release|
+  template_path = "#{PAGES_ROOT}/releases/#{release.version}/download.js"
+
+  if !File.exists?(template_path)
+    dirname = File.dirname(template_path)
+
+    unless File.directory?(dirname)
+      FileUtils.mkdir_p(dirname)
+    end
+
+    contents =
+      <<~EOF
+      import React from 'react';
+
+      import ReleaseDownload from '@site/src/components/ReleaseDownload';
+
+      function Download() {
+        return <ReleaseDownload version="#{release.version}" />
+      }
+
+      export default Download;
+      EOF
+
+    File.open(template_path, 'w+') { |file| file.write(contents) }
+  end
+
+  template_path = "#{PAGES_ROOT}/releases/#{release.version}.js"
+
+  if !File.exists?(template_path)
+    contents =
+      <<~EOF
+      import React from 'react';
+
+      import Layout from '@theme/Layout';
+      import ReleaseNotes from '@site/src/components/ReleaseNotes';
+
+      function ReleaseNotesPage() {
+        const version = "#{release.version}";
+
+        return (
+          <Layout title={`Vector v${version} Release Notes`}>
+            <main>
+              <ReleaseNotes version={version} />
+            </main>
+          </Layout>
+        );
+      }
+
+      export default ReleaseNotesPage;
+      EOF
+
+    File.open(template_path, 'w+') { |file| file.write(contents) }
+  end
+end
+
+#
 # Create missing component templates
 #
 

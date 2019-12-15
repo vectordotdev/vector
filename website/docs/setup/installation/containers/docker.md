@@ -140,4 +140,4 @@ Vector's Docker source files are located [in it's Github repo][urls.vector_docke
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
-[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_releases]: https://vector.dev/releases/latest
