@@ -30,9 +30,7 @@ const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct KubernetesConfig {
-    pod_uid_regex: Option<String>,
-}
+pub struct KubernetesConfig {}
 
 #[typetag::serde(name = "kubernetes")]
 impl SourceConfig for KubernetesConfig {
@@ -54,7 +52,7 @@ impl SourceConfig for KubernetesConfig {
         let (file_recv, file_source) = file_source(name, globals)?;
 
         let mut transform_file = transform_file()?;
-        let mut transform_pod_uid = transform_pod_uid(self.pod_uid_regex.clone())?;
+        let mut transform_pod_uid = transform_pod_uid()?;
         let mut parse_message = parse_message()?;
 
         // Kubernetes source
@@ -274,12 +272,9 @@ fn transform_file() -> crate::Result<Box<dyn Transform>> {
 /// first succesfull one has been found. After that that regex will be
 /// always used.
 ///
-/// Users can specify their own regex which will be tryed out first.
-///
 /// If nothing succeds the message is still passed.
-fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform> {
+fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     let mut regexes = Vec::new();
-    regex.map(|s| regexes.push(s));
 
     let namespace_regex = r"(?P<pod_namespace>[0-9a-z.\-]*)";
     let name_regex = r"(?P<pod_name>[0-9a-z.\-]*)";
