@@ -452,5 +452,6 @@ fn kube_object_uid() {
             debug!(namespace,log=%line);
         }
     }
+
     panic!("Vector didn't log message: {:?}", message);
 }
