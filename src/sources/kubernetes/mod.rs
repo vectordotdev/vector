@@ -62,6 +62,7 @@ impl SourceConfig for KubernetesConfig {
             .filter_map(move |event| transform_file.transform(event))
             .filter_map(move |event| parse_message.transform(event))
             .filter_map(move |event| now.filter(event))
+            .map(remove_ending_newline)
             .filter_map(move |event| transform_pod_uid.transform(event))
             .forward(out.sink_map_err(drop))
             .map(drop)
@@ -109,18 +110,18 @@ fn file_source(
 ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
     let mut config = FileConfig::default();
 
-    // TODO: Add exclude_namspace option, and with it in config exclude kube-system namespace.
+    // TODO: Add exclude_namspace option, and with it, in config, exclude kube-system namespace.
     // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
     // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
     config
         .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*/*/*").into());
+        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
 
-    // TODO: Add exclude_namspace option, and with it in config exclude namespace used by vector.
+    // TODO: Add exclude_namspace option, and with it, in config, exclude namespace used by vector.
     // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
     config
         .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"*/vector*/*").into());
+        .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
 
     config
         .include
@@ -157,6 +158,15 @@ fn parse_message() -> crate::Result<ApplicableTransform> {
         transform_cri_message()?,
     ];
     Ok(ApplicableTransform::Candidates(transforms))
+}
+
+fn remove_ending_newline(mut event: Event) -> Event {
+    if let Some(ValueKind::Bytes(msg)) = event.as_mut_log().get_mut(&event::MESSAGE) {
+        if msg.ends_with(&['\n' as u8]) {
+            msg.truncate(msg.len() - 1);
+        }
+    }
+    event
 }
 
 struct DockerMessageTransformer {
@@ -219,7 +229,7 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
     let mut rp_config = RegexParserConfig::default();
     // message field
     rp_config.regex =
-        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>[^\n]*)[\n]?$"
+        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>*)$"
             .to_owned();
     // drop field
     rp_config
@@ -304,7 +314,7 @@ fn transform_pod_uid(regex: Option<String>) -> crate::Result<ApplicableTransform
         config.drop_field = true;
         config.drop_failed = true;
 
-        let transform = config.build().map_err(|e| {
+        let transform = RegexParser::build(&config).map_err(|e| {
             format!(
                 "Failed in creating pod_uid regex transform with error: {:?}",
                 e
