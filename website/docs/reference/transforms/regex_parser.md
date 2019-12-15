@@ -243,7 +243,7 @@ The `regex_parser` source has been involved in the following performance tests:
 
 * [`regex_parsing_performance`][urls.regex_parsing_performance_test]
 
-Learn more in the [Performance][docs.performance] sections.
+Learn more in the [Performance][pages.index#performance] sections.
 
 ### Regex Debugger
 
@@ -298,7 +298,7 @@ documentation][urls.regex_grouping_and_flags].
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.data-model.log]: /docs/about/data-model/log
 [docs.monitoring#logs]: /docs/administration/monitoring#logs
-[docs.performance]: /docs/about/performance
+[pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
 [urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance

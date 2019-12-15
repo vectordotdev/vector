@@ -662,7 +662,7 @@ controlled via the[`fingerprint_bytes`](#fingerprint_bytes) and[`ignored_header_
 
 This strategy avoids the common pitfalls of using device and inode names since
 inode names can be reused across files. This enables Vector to [properly tail
-files across various rotation strategies][docs.correctness].
+files across various rotation strategies][pages.index#correctness].
 
 ### File Read Order
 
@@ -734,9 +734,9 @@ read position will resume from the last checkpoint.
 [docs.configuration#data-directory]: /docs/setup/configuration#data-directory
 [docs.configuration#data_dir]: /docs/setup/configuration#data_dir
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.correctness]: /docs/about/correctness
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.data-model.log]: /docs/about/data-model/log
+[pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
 [urls.inode]: https://en.wikipedia.org/wiki/Inode

@@ -63,7 +63,7 @@ Supporting these platforms, properly, is Vector's core competency.
 [docs.manual.from-archives]: /docs/setup/installation/manual/from-archives
 [docs.package-managers.dpkg]: /docs/setup/installation/package-managers/dpkg
 [docs.package-managers.rpm]: /docs/setup/installation/package-managers/rpm
-[pages.index#performance]: /index#performance
+[pages.index#performance]: /#performance
 [pages.releases]: /releases
 [urls.arm]: https://en.wikipedia.org/wiki/ARM_architecture
 [urls.aws_arm_g2_announcement]: https://aws.amazon.com/about-aws/whats-new/2019/12/announcing-new-amazon-ec2-m6g-c6g-and-r6g-instances-powered-by-next-generation-arm-based-aws-graviton2-processors/
