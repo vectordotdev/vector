@@ -102,6 +102,7 @@ function DocItem(props) {
   const {url: siteUrl} = siteConfig;
   const {content: DocContent} = props;
   const {metadata} = DocContent;
+
   const {
     description,
     editUrl,
