@@ -8,7 +8,6 @@ import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 import MailingListForm from '@site/src/components/MailingListForm';
-import MDX from '@mdx-js/runtime';
 import MDXComponents from '@theme/MDXComponents';
 
 import classnames from 'classnames';
@@ -70,7 +69,7 @@ function UpgradeGuide({upgradeGuide, key}) {
   return (
     <div className="section">
       <AnchoredH3 id={upgradeGuide.id}>{upgradeGuide.title}</AnchoredH3>
-      <MDX components={MDXComponents} scope={{}}>{upgradeGuide.body}</MDX>
+      <div dangerouslySetInnerHTML={{__html: upgradeGuide.body}} />
     </div>
   );
 }
