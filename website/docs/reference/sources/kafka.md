@@ -231,7 +231,7 @@ The Kafka topics names to read events from. Regex is supported if the topic begi
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model#log] events.
 For example:
 
 ```javascript
@@ -298,5 +298,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

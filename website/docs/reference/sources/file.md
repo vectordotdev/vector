@@ -506,7 +506,7 @@ When `true` Vector will read from the beginning of new files, when `false` Vecto
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model#log] events.
 For example:
 
 ```javascript
@@ -735,7 +735,6 @@ read position will resume from the last checkpoint.
 [docs.configuration#data_dir]: /docs/setup/configuration#data_dir
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
 [pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)

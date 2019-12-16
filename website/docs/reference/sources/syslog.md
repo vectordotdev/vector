@@ -206,7 +206,7 @@ The unix socket path. *This should be absolute path.*
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model#log] events.
 For example:
 
 ```javascript
@@ -426,7 +426,6 @@ ingestion and parsing scheme.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
 [docs.sources.tcp]: /docs/reference/sources/tcp
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

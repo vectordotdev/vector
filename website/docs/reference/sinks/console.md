@@ -158,10 +158,6 @@ The [standard stream][urls.standard_streams] to write to.
 
 </Fields>
 
-## Output
-
-The `console` sink [streams](#streaming) [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
-
 ## How It Works
 
 ### Environment Variables

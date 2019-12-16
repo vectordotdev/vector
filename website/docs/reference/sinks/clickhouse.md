@@ -784,13 +784,6 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 </Fields>
 
-## Output
-
-The `clickhouse` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-
 ## How It Works
 
 ### Buffers & Batches

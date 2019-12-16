@@ -34,3 +34,49 @@ The name of the field to add. Accepts all \
 [supported types][docs.configuration#types]. Use `.` for adding nested \
 fields.\
 """
+
+
+[[transforms.add_fields.output.log.examples]]
+label = "Generic"
+body = """\
+Given the following configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+
+A [`log` event][docs.data-model.log] will be output with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6.0": "item1",
+  "field6.1": "item2",
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+
+While unrealistic, this example demonstrates the various accepted
+[types][docs.configuration#value-types] and how they're repsented in Vector's
+internal [log structure][docs.data-model.log].\
+"""

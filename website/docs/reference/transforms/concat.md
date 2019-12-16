@@ -20,6 +20,21 @@ The `concat` transform accepts [`log`][docs.data-model#log] events and allows yo
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
@@ -29,9 +44,29 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "concat" # example, must be: "concat"
   inputs = ["my-source-id"] # example
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
-  joiner = " " # example
   target = "dest_field_name" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED
+  type = "concat" # example, must be: "concat"
+  inputs = ["my-source-id"] # example
+  items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
+  target = "dest_field_name" # example
+  
+  # OPTIONAL
+  joiner = " " # default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -59,22 +94,22 @@ import Field from '@site/src/components/Field';
 
 ### items
 
-A list of substring definitons in the format of source_field[start..end]. For both start and end negative values are counted from the end of thestring.
+A list of substring definitons in the format of source_field[start..end]. For both start and end negative values are counted from the end of the string.
 
 
 </Field>
 
 
 <Field
-  common={true}
-  defaultValue={null}
+  common={false}
+  defaultValue={" "}
   enumValues={null}
-  examples={[" "]}
+  examples={[" ",",","_","+"]}
   name={"joiner"}
   nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -113,6 +148,44 @@ The name for the new label.
 
 </Fields>
 
+## Output
+
+The `concat` transform accepts [`log`][docs.data-model#log] events and allows you to concat (substrings) of other fields to a new one.
+For example:
+
+
+Given the following input log event:
+
+```json
+{
+  "message": "Hello world",
+  "month": "12",
+  "day": "25",
+  "year": "2020"
+}
+```
+
+And the following example configuration:
+
+```toml
+[transforms.concat_date]
+  type = "concat"
+  items = ["month", "day", "year"]
+  target = "date"
+  joiner = "/"
+```
+
+A log event will be output with the following structure:
+
+```json
+{
+  "message": "Hello world",
+  "date": "12/25/2020", // <-- new field
+  "month": "12",
+  "day": "25",
+  "year": "2020"
+}
+```
 
 ## How It Works
 

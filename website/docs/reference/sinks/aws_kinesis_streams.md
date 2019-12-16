@@ -616,36 +616,6 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
-<TabItem value="generic">
-
-```http
-POST / HTTP/1.1
-Host: kinesis.<region>.<domain>
-Content-Length: <byte_size>
-Content-Type: application/x-amz-json-1.1
-Connection: Keep-Alive 
-X-Amz-Target: Kinesis_20131202.PutRecords
-{
-    "Records": [
-        {
-            "Data": "<json_encoded_log>",
-            "PartitionKey": "<partition_key>"
-        },
-        {
-            "Data": "<json_encoded_log>",
-            "PartitionKey": "<partition_key>"
-        },
-        {
-            "Data": "<json_encoded_log>",
-            "PartitionKey": "<partition_key>"
-        },
-    ],
-    "StreamName": "<stream_name>"
-}
-```
-
-</TabItem>
-
 ## How It Works
 
 ### Authentication

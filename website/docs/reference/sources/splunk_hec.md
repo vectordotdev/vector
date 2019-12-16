@@ -96,27 +96,17 @@ If supplied, incoming requests must supply this token in the `Authorization` hea
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `splunk_hec` source ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs [`log`][docs.data-model#log] events.
+For example:
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="text"
-  values={[{"label":"Text","value":"text"},{"label":"JSON","value":"json"}]}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="text">
 
 Given the following input:
 
-```
+```text
 Hello world
 ```
 
-A [`log` event][docs.data-model.log] will be output with the
-following structure:
+A log event will be output with the following structure:
 
 ```json
 {
@@ -125,100 +115,7 @@ following structure:
   "splunk_channel": "FE0ECFAD-13D5-401B-847D-77833BD77131" // value of the `X-Splunk-Request-Channel` header
 
 }
-{
-  "timestamp": <2019-07-26T20:30:27.000443Z>,
-  "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
-  "host": "lorien.example.com",
-  "__REALTIME_TIMESTAMP": "1564173027000443",
-  "__MONOTONIC_TIMESTAMP": "98694000446",
-  "_BOOT_ID": "124c781146e841ae8d9b4590df8b9231",
-  "SYSLOG_FACILITY": "3",
-  "_UID": "0",
-  "_GID": "0",
-  "_CAP_EFFECTIVE": "3fffffffff",
-  "_MACHINE_ID": "c36e9ea52800a19d214cb71b53263a28",
-  "PRIORITY": "6",
-  "_TRANSPORT": "stdout",
-  "_STREAM_ID": "92c79f4b45c4457490ebdefece29995e",
-  "SYSLOG_IDENTIFIER": "ntpd",
-  "_PID": "2156",
-  "_COMM": "ntpd",
-  "_EXE": "/usr/sbin/ntpd",
-  "_CMDLINE": "ntpd: [priv]",
-  "_SYSTEMD_CGROUP": "/system.slice/ntpd.service",
-  "_SYSTEMD_UNIT": "ntpd.service",
-  "_SYSTEMD_SLICE": "system.slice",
-  "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
-}
-
 ```
-
-</TabItem>
-
-<TabItem value="json">
-
-Given the following input:
-
-```
-__REALTIME_TIMESTAMP=1564173027000443
-__MONOTONIC_TIMESTAMP=98694000446
-_BOOT_ID=124c781146e841ae8d9b4590df8b9231
-SYSLOG_FACILITY=3
-_UID=0
-_GID=0
-_CAP_EFFECTIVE=3fffffffff
-_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
-_HOSTNAME=lorien.example.com
-PRIORITY=6
-_TRANSPORT=stdout
-_STREAM_ID=92c79f4b45c4457490ebdefece29995e
-SYSLOG_IDENTIFIER=ntpd
-_PID=2156
-_COMM=ntpd
-_EXE=/usr/sbin/ntpd
-_CMDLINE=ntpd: [priv]
-_SYSTEMD_CGROUP=/system.slice/ntpd.service
-_SYSTEMD_UNIT=ntpd.service
-_SYSTEMD_SLICE=system.slice
-_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
-MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
-
-```
-
-A [`log` event][docs.data-model.log] will be output with the
-following structure:
-
-```json
-{
-  "timestamp": <2019-07-26T20:30:27.000443Z>,
-  "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
-  "host": "lorien.example.com",
-  "__REALTIME_TIMESTAMP": "1564173027000443",
-  "__MONOTONIC_TIMESTAMP": "98694000446",
-  "_BOOT_ID": "124c781146e841ae8d9b4590df8b9231",
-  "SYSLOG_FACILITY": "3",
-  "_UID": "0",
-  "_GID": "0",
-  "_CAP_EFFECTIVE": "3fffffffff",
-  "_MACHINE_ID": "c36e9ea52800a19d214cb71b53263a28",
-  "PRIORITY": "6",
-  "_TRANSPORT": "stdout",
-  "_STREAM_ID": "92c79f4b45c4457490ebdefece29995e",
-  "SYSLOG_IDENTIFIER": "ntpd",
-  "_PID": "2156",
-  "_COMM": "ntpd",
-  "_EXE": "/usr/sbin/ntpd",
-  "_CMDLINE": "ntpd: [priv]",
-  "_SYSTEMD_CGROUP": "/system.slice/ntpd.service",
-  "_SYSTEMD_UNIT": "ntpd.service",
-  "_SYSTEMD_SLICE": "system.slice",
-  "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
-}
-
-```
-
-</TabItem>
-</Tabs>
 
 More detail on the output schema is below.
 
@@ -295,7 +192,6 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
 [urls.splunk_hec_event_endpoint]: https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fevent
 [urls.splunk_hec_protocol]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 [urls.splunk_hec_raw_endpoint]: https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fraw

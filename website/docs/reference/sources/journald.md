@@ -202,11 +202,13 @@ The list of units names to monitor. If empty or not present, all units are accep
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model#log] events.
+For example:
+
 
 Given the following input:
 
-```
+```text
 __REALTIME_TIMESTAMP=1564173027000443
 __MONOTONIC_TIMESTAMP=98694000446
 _BOOT_ID=124c781146e841ae8d9b4590df8b9231
@@ -229,11 +231,9 @@ _SYSTEMD_UNIT=ntpd.service
 _SYSTEMD_SLICE=system.slice
 _SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
 MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
-
 ```
 
-A [`log` event][docs.data-model.log] will be output with the
-following structure:
+A log event will be output with the following structure:
 
 ```json
 {
@@ -261,8 +261,6 @@ following structure:
   "_SYSTEMD_SLICE": "system.slice",
   "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
 }
-
-```
 
 More detail on the output schema is below.
 
@@ -358,4 +356,3 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log

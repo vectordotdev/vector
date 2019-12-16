@@ -252,10 +252,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 </Fields>
 
-## Output
-
-The `vector` sink [streams](#streaming) [`log`][docs.data-model#log] events to another downstream [`vector` source][docs.sources.vector].
-
 ## How It Works
 
 ### Environment Variables

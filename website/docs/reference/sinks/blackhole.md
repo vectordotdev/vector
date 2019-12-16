@@ -126,10 +126,6 @@ The number of events that must be received in order to print a summary of activi
 
 </Fields>
 
-## Output
-
-The `blackhole` sink [streams](#streaming) [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
-
 ## How It Works
 
 ### Environment Variables

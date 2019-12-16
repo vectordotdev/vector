@@ -229,10 +229,6 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 </Fields>
 
-## Output
-
-The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-model#metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
-
 ## How It Works
 
 ### Authentication

@@ -159,7 +159,6 @@ A prefix that will be added to all metric names.
 The `statsd` sink [streams](#streaming) [`metric`][docs.data-model#metric] events to [StatsD][urls.statsd] metrics service.
 For example:
 
-<TabItem value="generic">
 
 ```text
 gorets:1|c
@@ -167,8 +166,6 @@ glork:320|ms
 gaugor:333|g
 uniques:765|s
 ```
-
-</TabItem>
 
 ## How It Works
 

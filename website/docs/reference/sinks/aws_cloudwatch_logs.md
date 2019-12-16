@@ -666,7 +666,6 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
-<TabItem value="generic">
 
 ```http
 POST / HTTP/1.1
@@ -697,8 +696,6 @@ X-Amz-Target: Logs_20140328.PutLogEvents
   ]
 }
 ```
-
-</TabItem>
 
 ## How It Works
 

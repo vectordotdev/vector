@@ -775,23 +775,27 @@ dns_servers = ["0.0.0.0:53"]
   inputs = ["my-source-id"]
 
   # A list of substring definitons in the format of source_field[start..end]. For
-  # both start and end negative values are counted from the end of thestring.
+  # both start and end negative values are counted from the end of the string.
   # 
   # * required
   # * type: [string]
   items = ["fist[..3]", "second[-5..]", "third[3..6]"]
-
-  # The string that is used to join all items.
-  # 
-  # * required
-  # * type: string
-  joiner = " "
 
   # The name for the new label.
   # 
   # * required
   # * type: string
   target = "dest_field_name"
+
+  # The string that is used to join all items.
+  # 
+  # * optional
+  # * default: " "
+  # * type: string
+  joiner = " "
+  joiner = ","
+  joiner = "_"
+  joiner = "+"
 
 # Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]

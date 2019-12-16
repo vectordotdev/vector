@@ -181,10 +181,6 @@ File name to write events to. See [Template Syntax](#template-syntax) for more i
 
 </Fields>
 
-## Output
-
-The `file` sink [streams](#streaming) [`log`][docs.data-model#log] events to a file.
-
 ## How It Works
 
 ### Dynamic file and directory creation

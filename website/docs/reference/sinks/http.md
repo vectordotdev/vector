@@ -821,6 +821,7 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
+
 <Tabs
   block={true}
   defaultValue="json"

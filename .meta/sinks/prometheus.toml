@@ -37,8 +37,10 @@ Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics
 
 [[sinks.prometheus.output.examples]]
 label = "Histograms"
-input.type = "json"
-input.body = """\
+body = """\
+Given the following histogram metric events:
+
+```json
 [
   {
     "histogram": {
@@ -52,10 +54,12 @@ input.body = """\
       "val": 0.546
     }
   }
-]\
-"""
-output.type = "text"
-output.body = """\
+]
+```
+
+This sink will output the following:
+
+```text
 # HELP response_time_s response_time_s
 # TYPE response_time_s histogram
 response_time_s_bucket{le="0.005"} 0
@@ -71,13 +75,16 @@ response_time_s_bucket{le="5.0"} 0
 response_time_s_bucket{le="10.0"} 0
 response_time_s_bucket{le="+Inf"} 0
 response_time_s_sum 0.789
-response_time_s_count 2\
+response_time_s_count 2
+```\
 """
 
 [[sinks.prometheus.output.examples]]
 label = "Counters"
-input.type = "json"
-input.body = """\
+body = """
+Given the following counter metric events:
+
+```json
 [
   {
     "counter": {
@@ -91,19 +98,23 @@ input.body = """\
       "val": 3
     }
   }
-]\
-"""
-output.type = "text"
-output.body = """\
+]
+
+This sink will output the following:
+
+```text
 # HELP logins logins
 # TYPE logins counter
 logins 4
+```\
 """
 
 [[sinks.prometheus.output.examples]]
 label = "Gauges"
-input.type = "json"
-input.body = """\
+body = """\
+Given the following gauge metric events:
+
+```json
 [
   {
     "gauge": {
@@ -119,11 +130,14 @@ input.body = """\
       "direction": "minus"
     }
   }
-]\
-"""
-output.type = "text"
-output.body = """\
+]
+```
+
+This sink will output the following:
+
+```text
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225
+```\
 """

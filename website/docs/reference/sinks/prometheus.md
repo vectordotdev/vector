@@ -181,6 +181,7 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
 For example:
 
+
 <Tabs
   block={true}
   defaultValue="histograms"
@@ -188,7 +189,7 @@ For example:
 
 <TabItem value="histograms">
 
-Given the following input:
+Given the following histogram metric events:
 
 ```json
 [
@@ -207,7 +208,7 @@ Given the following input:
 ]
 ```
 
-The following output will be produced:
+This sink will output the following:
 
 ```text
 # HELP response_time_s response_time_s
@@ -232,7 +233,7 @@ response_time_s_count 2
 
 <TabItem value="counters">
 
-Given the following input:
+Given the following counter metric events:
 
 ```json
 [
@@ -249,22 +250,20 @@ Given the following input:
     }
   }
 ]
-```
 
-The following output will be produced:
+This sink will output the following:
 
 ```text
 # HELP logins logins
 # TYPE logins counter
 logins 4
-
 ```
 
 </TabItem>
 
 <TabItem value="gauges">
 
-Given the following input:
+Given the following gauge metric events:
 
 ```json
 [
@@ -285,13 +284,12 @@ Given the following input:
 ]
 ```
 
-The following output will be produced:
+This sink will output the following:
 
 ```text
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225
-
 ```
 
 </TabItem>

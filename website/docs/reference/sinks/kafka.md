@@ -482,10 +482,6 @@ The Kafka topic name to write events to.
 
 </Fields>
 
-## Output
-
-The `kafka` sink [streams](#streaming) [`log`][docs.data-model#log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
-
 ## How It Works
 
 ### Environment Variables

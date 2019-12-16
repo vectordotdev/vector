@@ -98,6 +98,10 @@ The name of the field to add. Accepts all [supported types][docs.configuration#t
 
 ## Output
 
+The `add_fields` transform accepts [`log`][docs.data-model#log] events and allows you to add one or more log fields.
+For example:
+
+
 Given the following configuration:
 
 <CodeHeader fileName="vector.toml" />

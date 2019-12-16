@@ -1,5 +1,12 @@
-This component outputs [`<%= type %>` events][docs.data-model.<%= type %>].
+The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
+<% if component.sink? && component.batching? -%>
+Batches are flushed via the [`batch_size`](#batch_size) or
+[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
+batches](#buffers--batches) section.
+<%- end -%>
 <%- if examples.any? -%>
+For example:
+
 <%- if examples.size > 1 -%>
 
 <Tabs
@@ -13,18 +20,7 @@ This component outputs [`<%= type %>` events][docs.data-model.<%= type %>].
 <TabItem value="<%= example.label.slugify %>">
 <%- end -%>
 
-Given the following input:
-
-```
-<%= example.input %>
-```
-
-A [`<%= type %>` event][docs.data-model.<%= type %>] will be output with the
-following structure:
-
-```json
-<%= example.output %>
-```
+<%= example.body %>
 <%- if examples.size > 1 -%>
 
 </TabItem>
@@ -34,7 +30,7 @@ following structure:
 </Tabs>
 <%- end -%>
 
-<%- else -%>
+<%- elsif fields -%>
 For example:
 
 <%= fields_example(fields, breakout_top_keys: breakout_top_keys) %>

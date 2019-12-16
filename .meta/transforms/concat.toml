@@ -17,7 +17,9 @@ The name for the new label.\
 
 [transforms.concat.options.joiner]
 type = "string"
+default = " "
 examples = [" ", ",", "_", "+"]
+null = false
 optional = true
 description = """\
 The string that is used to join all items.\
@@ -29,6 +31,43 @@ examples = [["fist[..3]", "second[-5..]", "third[3..6]"]]
 null = false
 description = """\
 A list of substring definitons in the format of source_field[start..end]. \
-For both start and end negative values are counted from the end of the\
+For both start and end negative values are counted from the end of the \
 string.\
+"""
+
+[[transforms.concat.output.log.examples]]
+label = "Generic"
+body = """\
+Given the following input log event:
+
+```json
+{
+  "message": "Hello world",
+  "month": "12",
+  "day": "25",
+  "year": "2020"
+}
+```
+
+And the following example configuration:
+
+```toml
+[transforms.concat_date]
+  type = "concat"
+  items = ["month", "day", "year"]
+  target = "date"
+  joiner = "/"
+```
+
+A log event will be output with the following structure:
+
+```json
+{
+  "message": "Hello world",
+  "date": "12/25/2020", // <-- new field
+  "month": "12",
+  "day": "25",
+  "year": "2020"
+}
+```\
 """

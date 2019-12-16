@@ -677,13 +677,6 @@ Your Splunk HEC token. See [Setup](#setup) for more info.
 
 </Fields>
 
-## Output
-
-The `splunk_hec` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-
 ## How It Works
 
 ### Buffers & Batches

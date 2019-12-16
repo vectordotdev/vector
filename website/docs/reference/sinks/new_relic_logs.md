@@ -501,13 +501,6 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 </Fields>
 
-## Output
-
-The `new_relic_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-
 ## How It Works
 
 ### Buffers & Batches

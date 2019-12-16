@@ -69,7 +69,9 @@ UDP socket address to bind to.
 
 ## Output
 
-This component outputs [`metric` events][docs.data-model.metric].
+The `statsd` source ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model#metric] events.
+For example:
+
 
 import Tabs from '@theme/Tabs';
 
@@ -82,93 +84,25 @@ import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 
-Given the following input:
 
-```
-login.invocations:1|c
-```
-
-A [`metric` event][docs.data-model.metric] will be output with the
-following structure:
-
-```json
-{
-  "counter": {
-    "name": "login.invocations",
-    "val": 1,
-    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
-  }
-}
-```
 
 </TabItem>
 
 <TabItem value="gauge">
 
-Given the following input:
 
-```
-gas_tank:0.50|g
-```
-
-A [`metric` event][docs.data-model.metric] will be output with the
-following structure:
-
-```json
-{
-  "gauge": {
-    "name": "gas_tank",
-    "val": 0.5,
-    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
-  }
-}
-```
 
 </TabItem>
 
 <TabItem value="set">
 
-Given the following input:
 
-```
-unique_users:foo|s
-```
-
-A [`metric` event][docs.data-model.metric] will be output with the
-following structure:
-
-```json
-{
-  "set": {
-    "name": "unique_users",
-    "val": 1,
-    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
-  }
-}
-```
 
 </TabItem>
 
 <TabItem value="timerhistogram">
 
-Given the following input:
 
-```
-login.time:22|ms
-```
-
-A [`metric` event][docs.data-model.metric] will be output with the
-following structure:
-
-```json
-{
-  "timer": {
-    "name": "login.time",
-    "val": 22,
-    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
-  }
-}
-```
 
 </TabItem>
 </Tabs>

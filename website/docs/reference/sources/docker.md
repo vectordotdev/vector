@@ -150,7 +150,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model#log] events.
 For example:
 
 ```javascript
@@ -336,7 +336,6 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
 [urls.docker_daemon]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
 [urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

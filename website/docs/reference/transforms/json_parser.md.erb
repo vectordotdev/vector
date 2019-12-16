@@ -16,92 +16,12 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output.log -%>
 ## Output
 
-<Tabs
-  block={true}
-  defaultValue="simple"
-  values={[
-    { label: 'Simple', value: 'simple', },
-    { label: 'Wrapped', value: 'wrapped', },
-  ]
-}>
+<%= component_output(component, component.output.log, heading_depth: 3) %>
 
-<TabItem value="simple">
-
-Given the following log event:
-
-```
-{
-  "message": "{"key": "value"}"
-}
-```
-
-You can parse the JSON with:
-
-```toml
-[transforms.json]
-  inputs = ["<source_id>"]
-  type   = "json_parser"
-  field  = "message"
-```
-
-This would produce the following event as output:
-
-```javascript
-{
-  "key": "value"
-}
-```
-
-By default, Vector drops fields after parsing them via the `drop_field`
-option.
-
-</TabItem>
-<TabItem value="wrapped">
-
-It is possible to chain `json_parser` transforms to effectively "unwrap"
-nested JSON documents. For example, give this log event:
-
-```
-{
-  "message": "{"parent": "{\"child\": \"value2\"}"}"
-}
-```
-
-You could unwrap the JSON with the following transforms:
-
-```toml
-[transforms.root_json]
-  inputs = ["<source_id>"]
-  type   = "json_parser"
-  field  = "message"
-
-[transforms.parent_json]
-  inputs = ["root_json"]
-  type   = "json_parser"
-  field  = "parent"
-
-[transforms.child_json]
-  inputs = ["parent_json"]
-  type   = "json_parser"
-  field  = "child"
-```
-
-This would produce the following event as output:
-
-```javascript
-{
-  "child": "value2"
-}
-```
-
-By default, Vector drops fields after parsing them via the `drop_field`
-option.
-
-</TabItem>
-</Tabs>
-
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

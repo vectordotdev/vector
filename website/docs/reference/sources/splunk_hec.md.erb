@@ -13,12 +13,12 @@
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= fields(component.env_vars_list) %>
+<%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 ## Output
 
-<%= component_output(:log, component.output.log, heading_depth: 3) %>
+<%= component_output(component, component.output.log, heading_depth: 3) %>
 
 ## How It Works [[sort]]
 

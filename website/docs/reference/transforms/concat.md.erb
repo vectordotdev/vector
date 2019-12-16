@@ -16,7 +16,12 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output.log -%>
+## Output
 
+<%= component_output(component, component.output.log, heading_depth: 3) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

@@ -152,16 +152,17 @@ The maximum bytes size of incoming messages before they are discarded.
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model#log] events.
+For example:
+
 
 Given the following input:
 
-```
+```text
 2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
 ```
 
-A [`log` event][docs.data-model.log] will be output with the
-following structure:
+A log event will be output with the following structure:
 
 ```json
 {
@@ -169,7 +170,6 @@ following structure:
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
   "host": "<upstream_hostname>"
 }
-
 ```
 
 More detail on the output schema is below.
@@ -259,4 +259,3 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
