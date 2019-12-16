@@ -1,6 +1,7 @@
 ---
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
+posts_path: /blog/tags/transform-aws_ec2_metadata
 sidebar_label: "aws_ec2_metadata|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/aws_ec2_metadata.rs
 status: "prod-ready"
@@ -139,6 +140,231 @@ The interval in seconds at which the EC2 Metadata api will be called.
 
 </Fields>
 
+## Output
+
+This component outputs [`log` events][docs.data-model.log].
+For example:
+
+```javascript
+{
+  "ami-id": "ami-00068cd7555f543d5",
+  "availability-zone": "54.234.246.107",
+  "instance-id": "i-096fba6d03d36d262",
+  "local-hostname": "ip-172-31-93-227.ec2.internal",
+  "local-ipv4": "172.31.93.227",
+  "public-hostname": "ec2-54-234-246-107.compute-1.amazonaws.com",
+  "public-ipv4": "54.234.246.107",
+  "region": "us-east-1",
+  "role-name": "some_iam_role",
+  "subnet-id": "subnet-9d6713b9",
+  "vpc-id": "vpc-a51da4dc"
+}
+```
+More detail on the output schema is below.
+
+<Fields filters={true}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["ami-00068cd7555f543d5"]}
+  name={"ami-id"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### ami-id
+
+The `ami-id` that the current EC2 instance is using.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["54.234.246.107"]}
+  name={"availability-zone"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### availability-zone
+
+The `availability-zone` that the current EC2 instance is running in.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["i-096fba6d03d36d262"]}
+  name={"instance-id"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### instance-id
+
+The `instance-id` of the current EC2 instance.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["ip-172-31-93-227.ec2.internal"]}
+  name={"local-hostname"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### local-hostname
+
+The `local-hostname` of the current EC2 instance.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["172.31.93.227"]}
+  name={"local-ipv4"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### local-ipv4
+
+The `local-ipv4` of the current EC2 instance.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["ec2-54-234-246-107.compute-1.amazonaws.com"]}
+  name={"public-hostname"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### public-hostname
+
+The `public-hostname` of the current EC2 instance.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["54.234.246.107"]}
+  name={"public-ipv4"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### public-ipv4
+
+The `public-ipv4` of the current EC2 instance.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### region
+
+The[`region`](#region) that the current EC2 instance is running in.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["some_iam_role"]}
+  name={"role-name"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### role-name
+
+The `role-name` that the current EC2 instance is using.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["subnet-9d6713b9"]}
+  name={"subnet-id"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### subnet-id
+
+The `subnet-id` of the current EC2 instance's default network interface.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["vpc-a51da4dc"]}
+  name={"vpc-id"}
+  path={null}
+  required={false}
+  type={"string"}
+  >
+
+### vpc-id
+
+The `vpc-id` of the current EC2 instance's default network interface.
+
+
+</Field>
+
+
+</Fields>
+
 ## How It Works
 
 ### Environment Variables
@@ -153,3 +379,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
 [docs.data-model#log]: /docs/about/data-model#log
+[docs.data-model.log]: /docs/about/data-model/log
