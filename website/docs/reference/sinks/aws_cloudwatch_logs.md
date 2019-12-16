@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/aws_cloudwatch_logs.md.erb
 -->
 
-The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
+The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -63,7 +63,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -660,7 +660,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ## Output
 
-The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
+The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
@@ -815,13 +815,13 @@ You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration#template-syntax
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.guarantees]: /docs/about/guarantees
-[docs.monitoring#logs]: /docs/administration/monitoring#logs
-[pages.aws_components]: /components?providers%5B%5D=aws
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

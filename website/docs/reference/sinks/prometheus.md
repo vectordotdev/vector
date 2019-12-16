@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/prometheus.md.erb
 -->
 
-The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
+The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -53,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -178,7 +178,7 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 
 ## Output
 
-The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model#metric] events to [Prometheus][urls.prometheus] metrics service.
+The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
 For example:
 
 
@@ -414,14 +414,13 @@ ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
-[docs.data-model.metric#counters]: /docs/about/data-model/metric#counters
-[docs.data-model.metric#gauges]: /docs/about/data-model/metric#gauges
-[docs.data-model.metric#histogram]: /docs/about/data-model/metric#histogram
-[docs.data-model.metric#histograms]: /docs/about/data-model/metric#histograms
-[docs.data-model.metric#sets]: /docs/about/data-model/metric#sets
-[docs.data-model.metric]: /docs/about/data-model/metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.metric#counters]: /docs/about/data-model/metric/#counters
+[docs.data-model.metric#gauges]: /docs/about/data-model/metric/#gauges
+[docs.data-model.metric#histogram]: /docs/about/data-model/metric/#histogram
+[docs.data-model.metric#histograms]: /docs/about/data-model/metric/#histograms
+[docs.data-model.metric#sets]: /docs/about/data-model/metric/#sets
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710
 [urls.prometheus]: https://prometheus.io/

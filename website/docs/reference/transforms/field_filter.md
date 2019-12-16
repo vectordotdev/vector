@@ -16,13 +16,13 @@ title: "field_filter transform"
      website/docs/reference/transforms/field_filter.md.erb
 -->
 
-The `field_filter` transform accepts [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events and allows you to filter events by a log field's value.
+The `field_filter` transform accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -111,7 +111,7 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.issue_479]: https://github.com/timberio/vector/issues/479

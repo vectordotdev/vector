@@ -16,13 +16,13 @@ title: "add_tags transform"
      website/docs/reference/transforms/add_tags.md.erb
 -->
 
-The `add_tags` transform accepts [`metric`][docs.data-model#metric] events and allows you to add one or more metric tags.
+The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and allows you to add one or more metric tags.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -108,5 +108,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.metric]: /docs/about/data-model/metric/

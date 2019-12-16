@@ -19,13 +19,13 @@ unsupported_operating_systems: []
      website/docs/reference/sources/docker.md.erb
 -->
 
-The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model#log] events.
+The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -150,7 +150,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ## Output
 
-The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model#log] events.
+The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events.
 For example:
 
 ```javascript
@@ -334,8 +334,8 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.docker_daemon]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
 [urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

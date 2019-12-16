@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/clickhouse.md.erb
 -->
 
-The `clickhouse` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
+The `clickhouse` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -854,10 +854,10 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.guarantees]: /docs/about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [urls.gzip]: https://www.gzip.org/

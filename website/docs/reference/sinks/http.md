@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/http.md.erb
 -->
 
-The `http` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
+The `http` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -815,7 +815,7 @@ The full URI to make HTTP requests to. This should include the protocol and host
 
 ## Output
 
-The `http` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a generic HTTP endpoint.
+The `http` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint.
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
@@ -958,9 +958,9 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.guarantees]: /docs/about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http

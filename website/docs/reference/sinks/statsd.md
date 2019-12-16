@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/statsd.md.erb
 -->
 
-The `statsd` sink [streams](#streaming) [`metric`][docs.data-model#metric] events to [StatsD][urls.statsd] metrics service.
+The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -156,7 +156,7 @@ A prefix that will be added to all metric names.
 
 ## Output
 
-The `statsd` sink [streams](#streaming) [`metric`][docs.data-model#metric] events to [StatsD][urls.statsd] metrics service.
+The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
 For example:
 
 
@@ -184,6 +184,6 @@ The `statsd` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.statsd]: https://github.com/statsd/statsd

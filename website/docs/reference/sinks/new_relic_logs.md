@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/new_relic_logs.md.erb
 -->
 
-The `new_relic_logs` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
+The `new_relic_logs` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -571,10 +571,10 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.guarantees]: /docs/about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.new_new_relic_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+new_relic_logs
 [urls.new_relic]: https://newrelic.com/
 [urls.new_relic_log_api]: https://docs.newrelic.com/docs/logs/new-relic-logs/log-api/introduction-log-api

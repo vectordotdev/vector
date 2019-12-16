@@ -37,7 +37,7 @@ be configured to use `disk` based buffers:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -55,7 +55,7 @@ Each [sink][docs.sinks] will include documentation for its buffer options.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/components?at-least-once=true">View all at-least-once components</Jump>
+<Jump to="/components/?at-least-once=true">View all at-least-once components</Jump>
 
 </div>
 <div class="section">
@@ -91,7 +91,7 @@ criteria:
    tested.
 3. There are no major [open bugs][urls.vector_bug_issues] for the feature.
 
-<Jump to="/components?prod-ready=true">View all prod-ready components</Jump>
+<Jump to="/components/?prod-ready=true">View all prod-ready components</Jump>
 
 </div>
 <div class="section">
@@ -137,7 +137,7 @@ Head over to the [components section][pages.components] and use the guarantee
 filters.
 
 
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.sinks]: /docs/reference/sinks
-[pages.components]: /components
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.sinks]: /docs/reference/sinks/
+[pages.components]: /components/
 [urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

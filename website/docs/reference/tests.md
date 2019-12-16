@@ -708,9 +708,9 @@ The name of a transform, at the end of the test events extracted from this trans
 </Fields>
 
 
-[docs.data-model#counters]: /docs/about/data-model#counters
-[docs.data-model#gauges]: /docs/about/data-model#gauges
-[docs.data-model#histograms]: /docs/about/data-model#histograms
-[docs.data-model#sets]: /docs/about/data-model#sets
-[docs.data-model#tags]: /docs/about/data-model#tags
-[docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing
+[docs.data-model#counters]: /docs/about/data-model/#counters
+[docs.data-model#gauges]: /docs/about/data-model/#gauges
+[docs.data-model#histograms]: /docs/about/data-model/#histograms
+[docs.data-model#sets]: /docs/about/data-model/#sets
+[docs.data-model#tags]: /docs/about/data-model/#tags
+[docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing/

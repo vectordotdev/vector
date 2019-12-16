@@ -16,13 +16,13 @@ title: "split transform"
      website/docs/reference/transforms/split.md.erb
 -->
 
-The `split` transform accepts [`log`][docs.data-model#log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
+The `split` transform accepts [`log`][docs.data-model.log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -247,7 +247,6 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

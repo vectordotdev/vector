@@ -78,11 +78,11 @@ class Links
     value =
       case category
       when "assets"
-        fetch_asset(name)
+        fetch_asset_path(name)
       when "docs"
-        fetch_doc(name)
+        fetch_doc_path(name)
       when "pages"
-        fetch_page(name)
+        fetch_page_path(name)
       when "urls"
         fetch_url(name)
       else
@@ -104,8 +104,8 @@ class Links
   end
 
   def fetch_id(id)
-    # Docusaurus does not allow a leading `/`
-    fetch(id).gsub(/^#{DOCS_BASE_PATH}\//, "")
+    # Docusaurus does not allow a leading or trailing `/`
+    fetch(id).gsub(/^#{DOCS_BASE_PATH}\//, "").gsub(/\/$/, "")
   end
 
   private
@@ -150,7 +150,7 @@ class Links
       end
     end
 
-    def fetch_asset(name)
+    def fetch_asset_path(name)
       assets =
         @docs.
           select { |doc| doc.start_with?("/assets/") }.
@@ -162,7 +162,7 @@ class Links
       fetch!("assets", assets, name)
     end
 
-    def fetch_doc(name)
+    def fetch_doc_path(name)
       available_docs =
         if name.end_with?(".readme")
           @docs
@@ -170,14 +170,14 @@ class Links
           @docs.select { |doc| !doc.end_with?("/README.md") }
         end
 
-      DOCS_BASE_PATH + fetch!("docs", available_docs, name)
+      DOCS_BASE_PATH + fetch!("docs", available_docs, name) + "/"
     end
 
-    def fetch_page(name)
+    def fetch_page_path(name)
       if name == "index"
         "/"
       else
-        fetch!("pages", @pages, name)
+        fetch!("pages", @pages, name) + "/"
       end
     end
 

@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/console.md.erb
 -->
 
-The `console` sink [streams](#streaming) [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
+The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -195,9 +195,9 @@ The `console` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
 [urls.stdout]: https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)

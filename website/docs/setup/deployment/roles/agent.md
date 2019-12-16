@@ -119,18 +119,18 @@ continue running while Vector restarts. When Vector is restarted, it can resume
 where it left off.
 
 
-[docs.containers.docker]: /docs/setup/installation/containers/docker
-[docs.containers]: /docs/setup/installation/containers
-[docs.process-management#reloading]: /docs/administration/process-management#reloading
-[docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sinks.vector]: /docs/reference/sinks/vector
-[docs.sinks]: /docs/reference/sinks
-[docs.sources.file]: /docs/reference/sources/file
-[docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.sources.vector]: /docs/reference/sources/vector
-[docs.topologies#centralized]: /docs/setup/deployment/topologies#centralized
-[docs.topologies#stream-based]: /docs/setup/deployment/topologies#stream-based
-[docs.updating]: /docs/administration/updating
+[docs.containers.docker]: /docs/setup/installation/containers/docker/
+[docs.containers]: /docs/setup/installation/containers/
+[docs.process-management#reloading]: /docs/administration/process-management/#reloading
+[docs.roles.service]: /docs/setup/deployment/roles/service/
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
+[docs.sources.vector]: /docs/reference/sources/vector/
+[docs.topologies#centralized]: /docs/setup/deployment/topologies/#centralized
+[docs.topologies#stream-based]: /docs/setup/deployment/topologies/#stream-based
+[docs.updating]: /docs/administration/updating/
 [pages.index#performance]: /#performance
 [urls.big_query_streaming]: https://cloud.google.com/bigquery/streaming-data-into-bigquery
 [urls.cgroups_limit_resources]: https://the.binbashtheory.com/control-resources-cgroups/

@@ -103,7 +103,7 @@ Vector can be managed as a [Windows Service][urls.windows_service]:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/administration">Administration</Jump>
+<Jump to="/docs/administration/">Administration</Jump>
 
 ## Uninstalling
 
@@ -117,6 +117,6 @@ Follow the [install](#install) steps again, downloading the latest version of
 Vector.
 
 
-[docs.configuration]: /docs/setup/configuration
+[docs.configuration]: /docs/setup/configuration/
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.windows_service]: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service

@@ -16,13 +16,13 @@ title: "ansi_stripper transform"
      website/docs/reference/transforms/ansi_stripper.md.erb
 -->
 
-The `ansi_stripper` transform accepts [`log`][docs.data-model#log] events and allows you to strips ANSI characters from the specified field.
+The `ansi_stripper` transform accepts [`log`][docs.data-model.log] events and allows you to strips ANSI characters from the specified field.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -81,5 +81,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

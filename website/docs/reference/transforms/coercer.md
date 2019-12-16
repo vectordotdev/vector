@@ -16,13 +16,13 @@ title: "coercer transform"
      website/docs/reference/transforms/coercer.md.erb
 -->
 
-The `coercer` transform accepts [`log`][docs.data-model#log] events and allows you to coerce log fields into fixed types.
+The `coercer` transform accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -98,7 +98,7 @@ A definition of log field type conversions. They key is the log field name and t
 
 ## Output
 
-The `coercer` transform accepts [`log`][docs.data-model#log] events and allows you to coerce log fields into fixed types.
+The `coercer` transform accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types.
 For example:
 
 
@@ -159,7 +159,6 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

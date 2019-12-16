@@ -16,13 +16,13 @@ title: "remove_fields transform"
      website/docs/reference/transforms/remove_fields.md.erb
 -->
 
-The `remove_fields` transform accepts [`log`][docs.data-model#log] events and allows you to remove one or more log fields.
+The `remove_fields` transform accepts [`log`][docs.data-model.log] events and allows you to remove one or more log fields.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -77,5 +77,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

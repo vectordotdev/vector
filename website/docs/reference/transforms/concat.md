@@ -16,7 +16,7 @@ title: "concat transform"
      website/docs/reference/transforms/concat.md.erb
 -->
 
-The `concat` transform accepts [`log`][docs.data-model#log] events and allows you to concat (substrings) of other fields to a new one.
+The `concat` transform accepts [`log`][docs.data-model.log] events and allows you to concat (substrings) of other fields to a new one.
 
 ## Configuration
 
@@ -37,7 +37,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -50,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [transforms.my_transform_id]
@@ -150,7 +150,7 @@ The name for the new label.
 
 ## Output
 
-The `concat` transform accepts [`log`][docs.data-model#log] events and allows you to concat (substrings) of other fields to a new one.
+The `concat` transform accepts [`log`][docs.data-model.log] events and allows you to concat (substrings) of other fields to a new one.
 For example:
 
 
@@ -199,5 +199,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

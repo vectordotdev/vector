@@ -19,13 +19,13 @@ unsupported_operating_systems: []
      website/docs/reference/sources/statsd.md.erb
 -->
 
-The `statsd` source ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model#metric] events.
+The `statsd` source ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -69,7 +69,7 @@ UDP socket address to bind to.
 
 ## Output
 
-The `statsd` source ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model#metric] events.
+The `statsd` source ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events.
 For example:
 
 
@@ -126,6 +126,5 @@ more closely represent the metric's time in situations here it can be used. See
 the [metric][docs.data-model.metric] data model page for more info.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
-[docs.data-model.metric]: /docs/about/data-model/metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.metric]: /docs/about/data-model/metric/

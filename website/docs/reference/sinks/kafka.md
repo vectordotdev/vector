@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/kafka.md.erb
 -->
 
-The `kafka` sink [streams](#streaming) [`log`][docs.data-model#log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
+The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -519,8 +519,8 @@ The `kafka` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

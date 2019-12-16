@@ -20,19 +20,19 @@ method. Each installation guide provides it's own "Updating" section:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/setup/installation/containers/docker#updating">Docker</Jump>
+<Jump to="/docs/setup/installation/containers/docker/#updating">Docker</Jump>
 
 **Package managers**
 
-<Jump to="/docs/setup/installation/package-managers/dpkg#updating">DPKG</Jump>
-<Jump to="/docs/setup/installation/package-managers/homebrew#updating">Homebrew</Jump>
-<Jump to="/docs/setup/installation/package-managers/rpm#updating">RPM</Jump>
-<Jump to="/docs/setup/installation/package-managers/msi#updating">MSI</Jump>
+<Jump to="/docs/setup/installation/package-managers/dpkg/#updating">DPKG</Jump>
+<Jump to="/docs/setup/installation/package-managers/homebrew/#updating">Homebrew</Jump>
+<Jump to="/docs/setup/installation/package-managers/rpm/#updating">RPM</Jump>
+<Jump to="/docs/setup/installation/package-managers/msi/#updating">MSI</Jump>
 
 **Manual**
 
-<Jump to="/docs/setup/installation/manual/from-archives#updating">Updating from archives</Jump>
-<Jump to="/docs/setup/installation/manual/from-source#updating">Updating from source</Jump>
+<Jump to="/docs/setup/installation/manual/from-archives/#updating">Updating from archives</Jump>
+<Jump to="/docs/setup/installation/manual/from-source/#updating">Updating from source</Jump>
 
 ## Working Upstream
 
@@ -53,5 +53,5 @@ data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
 
 
-[docs.installation]: /docs/setup/installation
-[docs.topologies]: /docs/setup/deployment/topologies
+[docs.installation]: /docs/setup/installation/
+[docs.topologies]: /docs/setup/deployment/topologies/

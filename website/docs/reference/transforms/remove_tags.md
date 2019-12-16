@@ -16,13 +16,13 @@ title: "remove_tags transform"
      website/docs/reference/transforms/remove_tags.md.erb
 -->
 
-The `remove_tags` transform accepts [`metric`][docs.data-model#metric] events and allows you to remove one or more metric tags.
+The `remove_tags` transform accepts [`metric`][docs.data-model.metric] events and allows you to remove one or more metric tags.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -77,5 +77,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.metric]: /docs/about/data-model/metric/

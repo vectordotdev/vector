@@ -19,7 +19,7 @@ unsupported_operating_systems: ["macos","windows"]
      website/docs/reference/sources/journald.md.erb
 -->
 
-The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model#log] events.
+The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -202,7 +202,7 @@ The list of units names to monitor. If empty or not present, all units are accep
 
 ## Output
 
-The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model#log] events.
+The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
 For example:
 
 
@@ -354,5 +354,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

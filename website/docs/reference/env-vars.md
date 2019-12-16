@@ -171,6 +171,6 @@ Enables backtraces when errors are logged. Use this when debugging only since it
 </Fields>
 
 
-[docs.global-options]: /docs/reference/global-options
-[docs.monitoring#level]: /docs/administration/monitoring#level
-[pages.aws_components]: /components?providers%5B%5D=aws
+[docs.global-options]: /docs/reference/global-options/
+[docs.monitoring#level]: /docs/administration/monitoring/#level
+[pages.aws_components]: /components?providers%5B%5D=aws/

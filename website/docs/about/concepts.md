@@ -27,7 +27,7 @@ pipelines, allowing you to ingest, transform, and send data.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/components">View all components</Jump>
+<Jump to="/components/">View all components</Jump>
 
 ### Sources
 
@@ -39,7 +39,7 @@ for easy and consistent processing of your data. Examples of sources include
 [`file`][docs.sources.file], [`syslog`][docs.sources.syslog],
 [`tcp`][docs.sources.tcp], and [`stdin`][docs.sources.stdin].
 
-<Jump to="/docs/reference/sources">View all sources</Jump>
+<Jump to="/docs/reference/sources/">View all sources</Jump>
 
 ### Transforms
 
@@ -48,7 +48,7 @@ Vector. This might involve parsing, filtering, sampling, or aggregating. You can
 have any number of transforms in your pipeline and how they are composed is up
 to you.
 
-<Jump to="/docs/reference/transforms">View all transforms</Jump>
+<Jump to="/docs/reference/transforms/">View all transforms</Jump>
 
 ### Sinks
 
@@ -58,7 +58,7 @@ interacting with. For example, the [`tcp` sink][docs.sinks.tcp] will stream
 individual events, while the [`aws_s3` sink][docs.sinks.aws_s3] will buffer and
 flush data.
 
-<Jump to="/docs/reference/sinks">View all sinks</Jump>
+<Jump to="/docs/reference/sinks/">View all sinks</Jump>
 
 ## Events
 
@@ -66,7 +66,7 @@ All items (both logs and metrics) passing through Vector are known as an
 "event", which is explained in detail in the [data model][docs.data-model]
 section.
 
-<Jump to="/docs/about/data-model">View data model</Jump>
+<Jump to="/docs/about/data-model/">View data model</Jump>
 
 ## Pipelines
 
@@ -74,15 +74,15 @@ A "pipeline" is the end result of connecting [sources](#sources),
 [transforms](#transforms), and [sinks](#sinks). You can see a full example of a
 pipeline in the [configuration section][docs.configuration].
 
-<Jump to="/docs/setup/configuration">View configuration</Jump>
+<Jump to="/docs/setup/configuration/">View configuration</Jump>
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.data-model]: /docs/about/data-model
-[docs.data_model#event]: /docs/about/data-model#event
-[docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3
-[docs.sinks.tcp]: /docs/reference/sinks/tcp
-[docs.sources.file]: /docs/reference/sources/file
-[docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.sources.syslog]: /docs/reference/sources/syslog
-[docs.sources.tcp]: /docs/reference/sources/tcp
+[docs.configuration]: /docs/setup/configuration/
+[docs.data-model]: /docs/about/data-model/
+[docs.data_model#event]: /docs/about/data-model/#event
+[docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
+[docs.sinks.tcp]: /docs/reference/sinks/tcp/
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
+[docs.sources.syslog]: /docs/reference/sources/syslog/
+[docs.sources.tcp]: /docs/reference/sources/tcp/

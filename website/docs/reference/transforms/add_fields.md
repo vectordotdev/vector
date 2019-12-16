@@ -16,13 +16,13 @@ title: "add_fields transform"
      website/docs/reference/transforms/add_fields.md.erb
 -->
 
-The `add_fields` transform accepts [`log`][docs.data-model#log] events and allows you to add one or more log fields.
+The `add_fields` transform accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -98,7 +98,7 @@ The name of the field to add. Accepts all [supported types][docs.configuration#t
 
 ## Output
 
-The `add_fields` transform accepts [`log`][docs.data-model#log] events and allows you to add one or more log fields.
+The `add_fields` transform accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields.
 For example:
 
 
@@ -232,14 +232,13 @@ This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.configuration#types]: /docs/setup/configuration#types
-[docs.configuration#value-types]: /docs/setup/configuration#value-types
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log#special-characters]: /docs/about/data-model/log#special-characters
-[docs.data-model.log]: /docs/about/data-model/log
-[docs.data-model]: /docs/about/data-model
-[docs.transforms.lua]: /docs/reference/transforms/lua
-[docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.configuration#types]: /docs/setup/configuration/#types
+[docs.configuration#value-types]: /docs/setup/configuration/#value-types
+[docs.data-model.log#special-characters]: /docs/about/data-model/log/#special-characters
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
+[docs.transforms.lua]: /docs/reference/transforms/lua/
+[docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
 [urls.toml_array]: https://github.com/toml-lang/toml#array
 [urls.toml_table]: https://github.com/toml-lang/toml#table

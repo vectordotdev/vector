@@ -377,8 +377,8 @@ cp -av etc/systemd/vector.service /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.containers]: /docs/setup/installation/containers
-[docs.global-options#data-directory]: /docs/reference/global-options#data-directory
-[docs.global-options#data_dir]: /docs/reference/global-options#data_dir
-[docs.package_managers]: /docs/setup/installation/package-managers
+[docs.configuration]: /docs/setup/configuration/
+[docs.containers]: /docs/setup/installation/containers/
+[docs.global-options#data-directory]: /docs/reference/global-options/#data-directory
+[docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
+[docs.package_managers]: /docs/setup/installation/package-managers/

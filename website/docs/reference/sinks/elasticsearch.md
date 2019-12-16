@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/elasticsearch.md.erb
 -->
 
-The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
+The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -910,7 +910,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ## Output
 
-The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
+The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
@@ -1031,12 +1031,12 @@ You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration#template-syntax
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data_model]: /docs/about/data-model
-[docs.guarantees]: /docs/about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data_model]: /docs/about/data-model/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
 [urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch

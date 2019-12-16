@@ -16,13 +16,13 @@ title: "regex_parser transform"
      website/docs/reference/transforms/regex_parser.md.erb
 -->
 
-The `regex_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex].
+The `regex_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex].
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -294,10 +294,9 @@ More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
-[docs.monitoring#logs]: /docs/administration/monitoring#logs
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags

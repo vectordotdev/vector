@@ -16,13 +16,13 @@ title: "log_to_metric transform"
      website/docs/reference/transforms/log_to_metric.md.erb
 -->
 
-The `log_to_metric` transform accepts [`log`][docs.data-model#log] events and allows you to convert logs into one or more metrics.
+The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -552,12 +552,12 @@ for the next scrape, while other metrics sinks will proceed to forward the
 individual metrics for reduction in the metrics storage itself.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#counters]: /docs/about/data-model#counters
-[docs.data-model#gauges]: /docs/about/data-model#gauges
-[docs.data-model#histograms]: /docs/about/data-model#histograms
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model#sets]: /docs/about/data-model#sets
-[docs.data-model#tags]: /docs/about/data-model#tags
-[docs.data-model.metric]: /docs/about/data-model/metric
-[docs.sinks.prometheus]: /docs/reference/sinks/prometheus
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model#counters]: /docs/about/data-model/#counters
+[docs.data-model#gauges]: /docs/about/data-model/#gauges
+[docs.data-model#histograms]: /docs/about/data-model/#histograms
+[docs.data-model#sets]: /docs/about/data-model/#sets
+[docs.data-model#tags]: /docs/about/data-model/#tags
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
+[docs.sinks.prometheus]: /docs/reference/sinks/prometheus/

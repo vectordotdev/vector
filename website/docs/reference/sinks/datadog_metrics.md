@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/datadog_metrics.md.erb
 -->
 
-The `datadog_metrics` sink [batches](#buffers--batches) [`metric`][docs.data-model#metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
+The `datadog_metrics` sink [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -445,7 +445,7 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.datadog]: https://www.datadoghq.com
 [urls.new_datadog_metrics_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+datadog_metrics

@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/splunk_hec.md.erb
 -->
 
-The `splunk_hec` sink [batches](#buffers--batches) [`log`][docs.data-model#log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
+The `splunk_hec` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -755,10 +755,10 @@ your Spunk HTTP Collectory you'll be provided a[`host`](#host) and[`token`](#tok
 should supply to the[`host`](#host) and[`token`](#token) options.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.guarantees]: /docs/about/guarantees
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

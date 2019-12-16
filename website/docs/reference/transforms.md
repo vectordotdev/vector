@@ -23,7 +23,7 @@ import VectorComponents from '@site/src/components/VectorComponents';
 <VectorComponents titles={false} sinks={false} sources={false} />
 
 
-[docs.concepts#pipelines]: /docs/about/concepts#pipelines
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
+[docs.concepts#pipelines]: /docs/about/concepts/#pipelines
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/

@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sources/kafka.md.erb
 -->
 
-The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model#log] events.
+The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -231,7 +231,7 @@ The Kafka topics names to read events from. Regex is supported if the topic begi
 
 ## Output
 
-The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model#log] events.
+The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events.
 For example:
 
 ```javascript
@@ -296,6 +296,6 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

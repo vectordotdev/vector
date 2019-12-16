@@ -29,7 +29,7 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/deployment/topologies">Topologies</Jump>
 
 
-[docs.roles.agent]: /docs/setup/deployment/roles/agent
-[docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.roles]: /docs/setup/deployment/roles
-[docs.topologies]: /docs/setup/deployment/topologies
+[docs.roles.agent]: /docs/setup/deployment/roles/agent/
+[docs.roles.service]: /docs/setup/deployment/roles/service/
+[docs.roles]: /docs/setup/deployment/roles/
+[docs.topologies]: /docs/setup/deployment/topologies/

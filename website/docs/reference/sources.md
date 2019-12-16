@@ -28,11 +28,11 @@ import VectorComponents from '@site/src/components/VectorComponents';
 <VectorComponents titles={false} sinks={false} transforms={false} />
 
 
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.roles.agent]: /docs/setup/deployment/roles/agent
-[docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sources.file]: /docs/reference/sources/file
-[docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.sources.syslog]: /docs/reference/sources/syslog
-[docs.sources.tcp]: /docs/reference/sources/tcp
-[docs.sources.vector]: /docs/reference/sources/vector
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.roles.agent]: /docs/setup/deployment/roles/agent/
+[docs.roles.service]: /docs/setup/deployment/roles/service/
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
+[docs.sources.syslog]: /docs/reference/sources/syslog/
+[docs.sources.tcp]: /docs/reference/sources/tcp/
+[docs.sources.vector]: /docs/reference/sources/vector/

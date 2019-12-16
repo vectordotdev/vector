@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sinks/file.md.erb
 -->
 
-The `file` sink [streams](#streaming) [`log`][docs.data-model#log] events to a file.
+The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a file.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -225,7 +225,7 @@ You can read more about the complete syntax in the
 [template syntax section][docs.configuration#template-syntax].
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration#template-syntax
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

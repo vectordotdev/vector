@@ -16,13 +16,13 @@ title: "tokenizer transform"
      website/docs/reference/transforms/tokenizer.md.erb
 -->
 
-The `tokenizer` transform accepts [`log`][docs.data-model#log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
+The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -237,7 +237,6 @@ certain characters as special. These characters will be discarded:
 * `\` - Can be used to escape the above characters, Vector will treat them as literal.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

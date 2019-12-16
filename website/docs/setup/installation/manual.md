@@ -22,5 +22,5 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/installation/manual/from-source">From Source</Jump>
 
 
-[docs.containers]: /docs/setup/installation/containers
-[docs.operating_systems]: /docs/setup/installation/operating-systems
+[docs.containers]: /docs/setup/installation/containers/
+[docs.operating_systems]: /docs/setup/installation/operating-systems/

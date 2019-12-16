@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sources/vector.md.erb
 -->
 
-The `vector` source ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs [`log`][docs.data-model#log] and [`metric`][docs.data-model#metric] events.
+The `vector` source ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -51,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -154,8 +154,8 @@ Currently, Vector does not perform any application level message acknowledgement
 Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model#metric]: /docs/about/data-model#metric
-[docs.sinks.vector]: /docs/reference/sinks/vector
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
+[docs.sinks.vector]: /docs/reference/sinks/vector/
 [urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto

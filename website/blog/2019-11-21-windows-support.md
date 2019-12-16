@@ -51,9 +51,9 @@ pipelines. Vector aims to solve this, and supporting Windows is a big step
 towards accomplishing that vision.
 
 
-[docs.operating-systems.windows]: /docs/setup/installation/operating-systems/windows
-[docs.package-managers.msi]: /docs/setup/installation/package-managers/msi
-[pages.community]: /community
-[pages.releases]: /releases
+[docs.operating-systems.windows]: /docs/setup/installation/operating-systems/windows/
+[docs.package-managers.msi]: /docs/setup/installation/package-managers/msi/
+[pages.community]: /community/
+[pages.releases]: /releases/
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_tier_1_platform]: https://forge.rust-lang.org/release/platform-support.html#tier-1

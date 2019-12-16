@@ -242,16 +242,16 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
-[docs.concepts#pipelines]: /docs/about/concepts#pipelines
-[docs.data-model]: /docs/about/data-model
-[docs.guides]: /docs/setup/guides
-[docs.installation]: /docs/setup/installation
-[docs.process-management#flags]: /docs/administration/process-management#flags
-[docs.process-management#starting]: /docs/administration/process-management#starting
-[docs.sinks.console]: /docs/reference/sinks/console
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
-[docs.transforms]: /docs/reference/transforms
+[docs.concepts#pipelines]: /docs/about/concepts/#pipelines
+[docs.data-model]: /docs/about/data-model/
+[docs.guides]: /docs/setup/guides/
+[docs.installation]: /docs/setup/installation/
+[docs.process-management#flags]: /docs/administration/process-management/#flags
+[docs.process-management#starting]: /docs/administration/process-management/#starting
+[docs.sinks.console]: /docs/reference/sinks/console/
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms]: /docs/reference/transforms/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.toml]: https://github.com/toml-lang/toml

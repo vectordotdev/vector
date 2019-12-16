@@ -22,5 +22,5 @@ import VectorComponents from '@site/src/components/VectorComponents';
 <VectorComponents titles={false} sources={false} transforms={false} />
 
 
-[docs.concepts#pipelines]: /docs/about/concepts#pipelines
-[docs.data-model#event]: /docs/about/data-model#event
+[docs.concepts#pipelines]: /docs/about/concepts/#pipelines
+[docs.data-model#event]: /docs/about/data-model/#event

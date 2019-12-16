@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sources/file.md.erb
 -->
 
-The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model#log] events.
+The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -59,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -506,7 +506,7 @@ When `true` Vector will read from the beginning of new files, when `false` Vecto
 
 ## Output
 
-The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model#log] events.
+The[`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model.log] events.
 For example:
 
 ```javascript
@@ -731,10 +731,10 @@ Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
 
 
-[docs.configuration#data-directory]: /docs/setup/configuration#data-directory
-[docs.configuration#data_dir]: /docs/setup/configuration#data_dir
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
+[docs.configuration#data_dir]: /docs/setup/configuration/#data_dir
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)

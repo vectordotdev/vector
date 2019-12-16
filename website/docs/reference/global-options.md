@@ -93,6 +93,6 @@ default, are memory-based, but if you switch them to disk-based you'll need to
 specify a[`data_dir`](#data_dir).
 
 
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.transforms]: /docs/reference/transforms
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.transforms]: /docs/reference/transforms/

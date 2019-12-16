@@ -134,7 +134,7 @@ docker pull timberio/vector:nightly-alpine && \
 Vector's Docker source files are located [in it's Github repo][urls.vector_docker_source_files].
 
 
-[docs.configuration]: /docs/setup/configuration
+[docs.configuration]: /docs/setup/configuration/
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian

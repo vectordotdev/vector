@@ -16,13 +16,13 @@ title: "geoip transform"
      website/docs/reference/transforms/geoip.md.erb
 -->
 
-The[`geoip`](#geoip) transform accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+The[`geoip`](#geoip) transform accepts [`log`][docs.data-model.log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -119,7 +119,7 @@ The default field to insert the resulting GeoIP data into. See [output](#output)
 
 ## Output
 
-The[`geoip`](#geoip) transform accepts [`log`][docs.data-model#log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+The[`geoip`](#geoip) transform accepts [`log`][docs.data-model.log] events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 For example:
 
 ```javascript
@@ -306,8 +306,8 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.iana_time_zone_format]: https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones
 [urls.iana_time_zones]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [urls.iso3166-2]: https://en.wikipedia.org/wiki/ISO_3166-2

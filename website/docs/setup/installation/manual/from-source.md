@@ -294,15 +294,15 @@ Building steps:
   `target/<target triple>/release/vector` like in the previous case.
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.containers]: /docs/setup/installation/containers
-[docs.from_archives]: /docs/setup/installation/manual/from-archives
-[docs.global-options#data-directory]: /docs/reference/global-options#data-directory
-[docs.global-options#data_dir]: /docs/reference/global-options#data_dir
-[docs.glossary#buffer]: /docs/meta/glossary#buffer
-[docs.package_managers]: /docs/setup/installation/package-managers
-[docs.sources.docker]: /docs/reference/sources/docker
-[docs.sources.kafka]: /docs/reference/sources/kafka
+[docs.configuration]: /docs/setup/configuration/
+[docs.containers]: /docs/setup/installation/containers/
+[docs.from_archives]: /docs/setup/installation/manual/from-archives/
+[docs.global-options#data-directory]: /docs/reference/global-options/#data-directory
+[docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
+[docs.glossary#buffer]: /docs/meta/glossary/#buffer
+[docs.package_managers]: /docs/setup/installation/package-managers/
+[docs.sources.docker]: /docs/reference/sources/docker/
+[docs.sources.kafka]: /docs/reference/sources/kafka/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka

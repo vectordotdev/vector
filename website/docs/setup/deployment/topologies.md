@@ -71,4 +71,4 @@ The most durable and elastic topology. This topology is typically adopted for ve
 * **More expensive.** In addition the management cost, the added stream cluster will require more resources which will increase operational cost.
 
 
-[docs.roles]: /docs/setup/deployment/roles
+[docs.roles]: /docs/setup/deployment/roles/

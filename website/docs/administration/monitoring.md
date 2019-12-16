@@ -96,8 +96,8 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/guides/troubleshooting">Troubleshooting Guide</Jump>
 
 
-[docs.process-management#flags]: /docs/administration/process-management#flags
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.troubleshooting]: /docs/setup/guides/troubleshooting
+[docs.process-management#flags]: /docs/administration/process-management/#flags
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.troubleshooting]: /docs/setup/guides/troubleshooting/
 [urls.issue_230]: https://github.com/timberio/vector/issues/230

@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sources/udp.md.erb
 -->
 
-The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model#log] events.
+The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -51,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -152,7 +152,7 @@ The maximum bytes size of incoming messages before they are discarded.
 
 ## Output
 
-The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model#log] events.
+The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events.
 For example:
 
 
@@ -257,5 +257,5 @@ section.
 Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

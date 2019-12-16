@@ -189,7 +189,7 @@ Vector can be managed through the [Systemd][urls.systemd] service manager:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/administration">Administration</Jump>
+<Jump to="/docs/administration/">Administration</Jump>
 
 ## Uninstalling
 
@@ -203,7 +203,7 @@ Follow the [install](#install) steps again, downloading the latest version of
 Vector.
 
 
-[docs.configuration]: /docs/setup/configuration
+[docs.configuration]: /docs/setup/configuration/
 [urls.rpm]: https://rpm.org/
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_releases]: https://vector.dev/releases/latest

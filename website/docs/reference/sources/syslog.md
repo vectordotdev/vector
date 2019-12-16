@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sources/syslog.md.erb
 -->
 
-The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model#log] events.
+The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -206,7 +206,7 @@ The unix socket path. *This should be absolute path.*
 
 ## Output
 
-The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model#log] events.
+The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events.
 For example:
 
 ```javascript
@@ -424,8 +424,8 @@ recommend using the [`tcp` source][docs.sources.tcp] combined with the
 ingestion and parsing scheme.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.sources.tcp]: /docs/reference/sources/tcp
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.sources.tcp]: /docs/reference/sources/tcp/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

@@ -19,7 +19,7 @@ unsupported_operating_systems: []
      website/docs/reference/sources/stdin.md.erb
 -->
 
-The `stdin` source ingests data through standard input (STDIN) and outputs [`log`][docs.data-model#log] events.
+The `stdin` source ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -50,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -127,7 +127,7 @@ The maxiumum bytes size of a message before it is discarded.
 
 ## Output
 
-The `stdin` source ingests data through standard input (STDIN) and outputs [`log`][docs.data-model#log] events.
+The `stdin` source ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events.
 For example:
 
 
@@ -232,5 +232,5 @@ section.
 Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

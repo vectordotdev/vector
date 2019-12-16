@@ -21,13 +21,13 @@ serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
 from A to B.
 
 
-[docs.administration]: /docs/administration
-[docs.deployment]: /docs/setup/deployment
-[docs.roles.agent]: /docs/setup/deployment/roles/agent
-[docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.transforms]: /docs/reference/transforms
+[docs.administration]: /docs/administration/
+[docs.deployment]: /docs/setup/deployment/
+[docs.roles.agent]: /docs/setup/deployment/roles/agent/
+[docs.roles.service]: /docs/setup/deployment/roles/service/
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.transforms]: /docs/reference/transforms/
 [pages.index#correctness]: /#correctness
 [pages.index#performance]: /#performance
 [urls.rust]: https://www.rust-lang.org/

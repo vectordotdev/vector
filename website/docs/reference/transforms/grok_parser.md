@@ -16,13 +16,13 @@ title: "grok_parser transform"
      website/docs/reference/transforms/grok_parser.md.erb
 -->
 
-The `grok_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value with [Grok][urls.grok].
+The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value with [Grok][urls.grok].
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -201,9 +201,9 @@ While this is still plenty fast for most use cases we recommend using the
 performance issues.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [pages.index#performance]: /#performance
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/

@@ -116,7 +116,7 @@ A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. See [Timestamp 
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/components?log=true">View all log compatible components</Jump>
+<Jump to="/components/?log=true">View all log compatible components</Jump>
 
 ## How It Works
 
@@ -164,7 +164,7 @@ Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
 stored as UTC.
 
 
-[docs.sources]: /docs/reference/sources
-[docs.transforms.coercer]: /docs/reference/transforms/coercer
+[docs.sources]: /docs/reference/sources/
+[docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.issue_551]: https://github.com/timberio/vector/issues/551
 [urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html

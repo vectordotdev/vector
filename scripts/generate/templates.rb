@@ -161,7 +161,7 @@ class Templates
 
   def event_type_links(types)
     types.collect do |type|
-      "[`#{type}`][docs.data-model##{type}]"
+      "[`#{type}`][docs.data-model.#{type}]"
     end
   end
 

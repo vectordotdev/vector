@@ -147,14 +147,14 @@ docker pull timberio/vector:nightly-alpine && \
 Vector's Docker source files are located [in it's Github repo][urls.vector_docker_source_files].
 
 
-[docs.administration]: https://vector.dev/docs/administration
-[docs.configuration]: https://vector.dev/docs/setup/configuration
-[docs.deployment]: https://vector.dev/docs/setup/deployment
-[docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent
-[docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service
-[docs.sinks]: https://vector.dev/docs/reference/sinks
-[docs.sources]: https://vector.dev/docs/reference/sources
-[docs.transforms]: https://vector.dev/docs/reference/transforms
+[docs.administration]: https://vector.dev/docs/administration/
+[docs.configuration]: https://vector.dev/docs/setup/configuration/
+[docs.deployment]: https://vector.dev/docs/setup/deployment/
+[docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent/
+[docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service/
+[docs.sinks]: https://vector.dev/docs/reference/sinks/
+[docs.sources]: https://vector.dev/docs/reference/sources/
+[docs.transforms]: https://vector.dev/docs/reference/transforms/
 [pages.index#correctness]: https://vector.dev/#correctness
 [pages.index#performance]: https://vector.dev/#performance
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml

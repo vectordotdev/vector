@@ -16,7 +16,7 @@ title: "json_parser transform"
      website/docs/reference/transforms/json_parser.md.erb
 -->
 
-The `json_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value as JSON.
+The `json_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON.
 
 ## Configuration
 
@@ -37,7 +37,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -54,7 +54,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [transforms.my_transform_id]
@@ -202,7 +202,7 @@ If this setting is present, the parsed JSON will be inserted into the log as a s
 
 ## Output
 
-The `json_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value as JSON.
+The `json_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON.
 For example:
 
 
@@ -343,7 +343,7 @@ Parsing the `"message"` field would result the following structure:
 ```
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [pages.index#correctness]: /#correctness
 [urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

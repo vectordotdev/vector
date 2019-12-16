@@ -19,13 +19,13 @@ unsupported_operating_systems: []
      website/docs/reference/sources/splunk_hec.md.erb
 -->
 
-The `splunk_hec` source ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs [`log`][docs.data-model#log] events.
+The `splunk_hec` source ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs [`log`][docs.data-model.log] events.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -96,7 +96,7 @@ If supplied, incoming requests must supply this token in the `Authorization` hea
 
 ## Output
 
-The `splunk_hec` source ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs [`log`][docs.data-model#log] events.
+The `splunk_hec` source ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs [`log`][docs.data-model.log] events.
 For example:
 
 
@@ -190,8 +190,8 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [urls.splunk_hec_event_endpoint]: https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fevent
 [urls.splunk_hec_protocol]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints
 [urls.splunk_hec_raw_endpoint]: https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fraw
