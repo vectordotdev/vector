@@ -98,6 +98,10 @@ A definition of log field type conversions. They key is the log field name and t
 
 ## Output
 
+The `coercer` transform accepts [`log`][docs.data-model#log] events and allows you to coerce log fields into fixed types.
+For example:
+
+
 Given the following input:
 
 ```json

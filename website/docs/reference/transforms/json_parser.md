@@ -202,14 +202,14 @@ If this setting is present, the parsed JSON will be inserted into the log as a s
 
 ## Output
 
+The `json_parser` transform accepts [`log`][docs.data-model#log] events and allows you to parse a log field value as JSON.
+For example:
+
+
 <Tabs
   block={true}
   defaultValue="simple"
-  values={[
-    { label: 'Simple', value: 'simple', },
-    { label: 'Wrapped', value: 'wrapped', },
-  ]
-}>
+  values={[{"label":"Simple","value":"simple"},{"label":"Wrapped","value":"wrapped"}]}>
 
 <TabItem value="simple">
 
@@ -242,6 +242,7 @@ By default, Vector drops fields after parsing them via the[`drop_field`](#drop_f
 option.
 
 </TabItem>
+
 <TabItem value="wrapped">
 
 It is possible to chain `json_parser` transforms to effectively "unwrap"
@@ -249,7 +250,7 @@ nested JSON documents. For example, give this log event:
 
 ```
 {
-  "message": "{"parent": "{\"child\": \"value2\"}"}"
+  "message": "{"parent": "{"child": "value2"}"}"
 }
 ```
 
