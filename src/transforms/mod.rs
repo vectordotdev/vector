@@ -4,6 +4,7 @@ use snafu::Snafu;
 pub mod add_fields;
 pub mod add_tags;
 pub mod ansi_stripper;
+pub mod aws_ec2_metadata;
 pub mod coercer;
 pub mod concat;
 pub mod field_filter;

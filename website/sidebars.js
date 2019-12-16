@@ -150,6 +150,8 @@ module.exports = {
             
               "reference/transforms/ansi_stripper",
             
+              "reference/transforms/aws_ec2_metadata",
+            
               "reference/transforms/coercer",
             
               "reference/transforms/concat",

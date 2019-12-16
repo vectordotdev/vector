@@ -18500,6 +18500,26 @@ module.exports = {
 
       ]
     },
+    "aws_ec2_metadata": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "enrich",
+      "id": "aws_ec2_metadata_transform",
+      "name": "aws_ec2_metadata",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "coercer": {
       "beta": false,
       "delivery_guarantee": null,

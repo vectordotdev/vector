@@ -61,6 +61,7 @@ scopes:
   - add_fields transform
   - add_tags transform
   - ansi_stripper transform
+  - aws_ec2_metadata transform
   - coercer transform
   - concat transform
   - field_filter transform

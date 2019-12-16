@@ -718,6 +718,50 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   field = "message"
 
+# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+[transforms.aws_ec2_metadata]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `aws_ec2_metadata`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "aws_ec2_metadata"
+  type = "aws_ec2_metadata"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # A list of fields to include in each event.
+  # 
+  # * optional
+  # * default: ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
+  # * type: [string]
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
+
+  # Override the default EC2 Metadata host.
+  # 
+  # * optional
+  # * default: "http://169.254.169.254"
+  # * type: string
+  host = "http://169.254.169.254"
+
+  # Prepend a namespace to each field's key.
+  # 
+  # * optional
+  # * default: ""
+  # * type: string
+  namespace = ""
+
+  # The interval in seconds at which the EC2 Metadata api will be called.
+  # 
+  # * optional
+  # * default: 10
+  # * type: int
+  refresh_interval_secs = 10
+
 # Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
   #
