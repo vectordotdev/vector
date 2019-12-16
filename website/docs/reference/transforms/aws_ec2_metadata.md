@@ -1,11 +1,10 @@
 ---
-event_types: ["metric"]
-issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
-posts_path: /blog/tags/transform-add_tags
-sidebar_label: "add_tags|[\"metric\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
+event_types: ["log"]
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
+sidebar_label: "aws_ec2_metadata|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/aws_ec2_metadata.rs
 status: "prod-ready"
-title: "add_tags transform"
+title: "aws_ec2_metadata transform"
 ---
 
 <!--
@@ -16,7 +15,7 @@ title: "add_tags transform"
      website/docs/reference/transforms/aws_ec2_metadata.md.erb
 -->
 
-The `add_tags` transform accepts [`metric`][docs.data-model#metric] events and allows you to add one or more metric tags.
+The `aws_ec2_metadata` transform accepts [`log`][docs.data-model#log] events and allows you to enrich logs with AWS EC2 instance metadata.
 
 ## Configuration
 
@@ -26,13 +25,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "add_tags" # example, must be: "add_tags"
+  # REQUIRED
+  type = "aws_ec2_metadata" # example, must be: "aws_ec2_metadata"
   inputs = ["my-source-id"] # example
   
-  # REQUIRED - Tags
-  [transforms.my_transform_id.tags]
-    my_tag = "my value"
+  # OPTIONAL
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
+  host = "http://169.254.169.254" # default
+  namespace = "" # default
+  refresh_interval_secs = 10 # default
 ```
 
 ## Options
@@ -46,50 +47,92 @@ import Field from '@site/src/components/Field';
 
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]}
   enumValues={null}
-  examples={[]}
-  name={"tags"}
-  nullable={false}
+  examples={[["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]]}
+  name={"fields"}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
-  type={"table"}
+  type={"[string]"}
   unit={null}
   >
 
-### tags
+### fields
 
-A table of key/value pairs representing the tags to be added to the metric.
-
-<Fields filters={false}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"my_tag":"my value"},{"my_env_tag":"${ENV_VAR}"}]}
-  name={"`[tag-name]`"}
-  nullable={false}
-  path={"tags"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### `[tag-name]`
-
-The name of the tag to add. Due to the nature of metric tags, the value must be a string.
+A list of fields to include in each event.
 
 
 </Field>
 
 
-</Fields>
+<Field
+  common={true}
+  defaultValue={"http://169.254.169.254"}
+  enumValues={null}
+  examples={["http://169.254.169.254"]}
+  name={"host"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### host
+
+Override the default EC2 Metadata host.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={""}
+  enumValues={null}
+  examples={[""]}
+  name={"namespace"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### namespace
+
+Prepend a namespace to each field's key.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  name={"refresh_interval_secs"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### refresh_interval_secs
+
+The interval in seconds at which the EC2 Metadata api will be called.
+
 
 </Field>
 
@@ -109,4 +152,4 @@ section.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#metric]: /docs/about/data-model#metric
+[docs.data-model#log]: /docs/about/data-model#log
