@@ -18520,6 +18520,28 @@ module.exports = {
 
       ]
     },
+    "concat": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to concat (substrings) of other fields to a new one.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": [
+        "filter"
+      ],
+      "id": "concat_transform",
+      "name": "concat",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "field_filter": {
       "beta": true,
       "delivery_guarantee": null,

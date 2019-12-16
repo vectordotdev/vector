@@ -1,0 +1,34 @@
+[transforms.concat]
+allow_you_to_description = "concat (substrings) of other fields to a new one"
+beta = true
+function_category = ["filter"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.concat.options.target]
+type = "string"
+examples = ["dest_field_name"]
+null = false
+description = """\
+The name for the new label.\
+"""
+
+[transforms.concat.options.joiner]
+type = "string"
+examples = [" ", ",", "_", "+"]
+optional = true
+description = """\
+The string that is used to join all items.\
+"""
+
+[transforms.concat.options.items]
+type = "[string]"
+examples = [["fist[..3]", "second[-5..]", "third[3..6]"]]
+null = false
+description = """\
+A list of substring definitons in the format of source_field[start..end]. \
+For both start and end negative values are counted from the end of the\
+string.\
+"""
