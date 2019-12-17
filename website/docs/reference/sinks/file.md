@@ -205,7 +205,7 @@ event-by-event basis. It does not batch data.
 
 ### Template Syntax
 
-The[`path`](#path) options
+The [`path`](#path) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the

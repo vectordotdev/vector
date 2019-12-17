@@ -327,7 +327,7 @@ section.
 ### Exposing & Scraping
 
 The `prometheus` sink exposes data for scraping.
-The[`address`](#address) option determines the address and port the data is made available
+The [`address`](#address) option determines the address and port the data is made available
 on. You'll need to configure your networking so that the configured port is
 accessible by the downstream service doing the scraping.
 
@@ -351,7 +351,7 @@ examples on how you should align them.
 
 #### Default buckets
 
-The[`buckets`](#buckets) option defines the global default buckets for histograms:
+The [`buckets`](#buckets) option defines the global default buckets for histograms:
 
 ```toml
 [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]

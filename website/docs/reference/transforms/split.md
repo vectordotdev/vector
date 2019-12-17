@@ -67,7 +67,7 @@ import Field from '@site/src/components/Field';
 
 ### drop_field
 
-If `true` the[`field`](#field) will be dropped after parsing.
+If `true` the [`field`](#field) will be dropped after parsing.
 
 
 </Field>

@@ -275,7 +275,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 ### request_rate_limit_duration_secs
 
-The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -298,7 +298,7 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -404,7 +404,8 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 #### Disable Health Checks
 
-If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 
 ### Metric Types
 
@@ -428,9 +429,10 @@ The following matrix outlines how Vector metric types are mapped into Datadog me
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -442,7 +444,8 @@ with the Vector team by [opening an issie][urls.new_datadog_metrics_sink_issue].
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
+attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
+`request_retry_backoff_secs` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

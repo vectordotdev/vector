@@ -146,7 +146,7 @@ Include only entries from the current boot.
 
 ### data_dir
 
-The directory used to persist the journal checkpoint position. By default, the global[`data_dir`](#data_dir) is used. Please make sure the Vector project has write permissions to this dir. 
+The directory used to persist the journal checkpoint position. By default, the global [`data_dir`](#data_dir) is used. Please make sure the Vector project has write permissions to this dir. 
 
 
 </Field>

@@ -100,7 +100,7 @@ import Field from '@site/src/components/Field';
 
 ### drop_field
 
-If the specified[`field`](#field) should be dropped (removed) after parsing.
+If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
@@ -169,7 +169,7 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
 
 ### overwrite_target
 
-If[`target_field`](#target_field) is set and the log contains a field of the same name as the target, it will only be overwritten if this is set to `true`.
+If [`target_field`](#target_field) is set and the log contains a field of the same name as the target, it will only be overwritten if this is set to `true`.
 
 
 </Field>
@@ -238,7 +238,7 @@ This would produce the following event as output:
 }
 ```
 
-By default, Vector drops fields after parsing them via the[`drop_field`](#drop_field)
+By default, Vector drops fields after parsing them via the [`drop_field`](#drop_field)
 option.
 
 </TabItem>
@@ -281,7 +281,7 @@ This would produce the following event as output:
 }
 ```
 
-By default, Vector drops fields after parsing them via the[`drop_field`](#drop_field)
+By default, Vector drops fields after parsing them via the [`drop_field`](#drop_field)
 option.
 
 </TabItem>
@@ -312,7 +312,7 @@ section.
 
 ### Invalid JSON
 
-If the value for the specified[`field`](#field) is not valid JSON you can control keep or discard the event with the[`drop_invalid`](#drop_invalid) option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
+If the value for the specified [`field`](#field) is not valid JSON you can control keep or discard the event with the [`drop_invalid`](#drop_invalid) option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
 
 ### Key Conflicts
 

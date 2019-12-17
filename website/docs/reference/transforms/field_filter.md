@@ -58,7 +58,7 @@ import Field from '@site/src/components/Field';
 
 ### field
 
-The target log field to compare against the[`value`](#value).
+The target log field to compare against the [`value`](#value).
 
 
 </Field>
@@ -81,7 +81,7 @@ The target log field to compare against the[`value`](#value).
 
 ### value
 
-If the value of the specified[`field`](#field) matches this value then the event will be permitted, otherwise it is dropped.
+If the value of the specified [`field`](#field) matches this value then the event will be permitted, otherwise it is dropped.
 
 
 </Field>

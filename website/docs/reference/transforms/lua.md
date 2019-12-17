@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "lua" # example, must be: "lua"
   inputs = ["my-source-id"] # example
   source = """
-require("script") # a `script.lua` file must be in your[`search_dirs`](#search_dirs)
+require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
 
 if event["host"] == nil then
   local f = io.popen ("/bin/hostname")
@@ -81,7 +81,7 @@ A list of directories search when loading a Lua file via the `require` function.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["require(\"script\") # a `script.lua` file must be in your[`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
+  examples={["require(\"script\") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
   name={"source"}
   nullable={false}
   path={null}
@@ -120,7 +120,7 @@ import TabItem from '@theme/TabItem';
 
 <TabItem value="add_fields">
 
-Add a field to an event. Supply this as a the[`source`](#source) value:
+Add a field to an event. Supply this as a the [`source`](#source) value:
 
 ```lua
 # Add root level field
@@ -133,7 +133,7 @@ event["parent.child"] = "nested value"
 </TabItem>
 <TabItem value="remove_fields">
 
-Remove a field from an event. Supply this as a the[`source`](#source) value:
+Remove a field from an event. Supply this as a the [`source`](#source) value:
 
 ```lua
 # Remove root level field
@@ -146,7 +146,7 @@ event["parent.child"] = nil
 </TabItem>
 <TabItem value="drop_event">
 
-Drop an event entirely. Supply this as a the[`source`](#source) value:
+Drop an event entirely. Supply this as a the [`source`](#source) value:
 
 ```lua
 # Drop event entirely
@@ -179,7 +179,7 @@ section.
 
 ### Global Variables
 
-When evaluating the provided[`source`](#source), Vector will provide a single global
+When evaluating the provided [`source`](#source), Vector will provide a single global
 variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
@@ -219,7 +219,7 @@ event["parent.child"] = nil
 
 ### Search Directories
 
-Vector provides a[`search_dirs`](#search_dirs) option that allows you to specify absolute
+Vector provides a [`search_dirs`](#search_dirs) option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 

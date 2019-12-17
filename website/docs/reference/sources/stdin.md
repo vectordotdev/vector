@@ -215,7 +215,7 @@ The exact time the event was ingested.
 ### Context
 
 By default, the `stdin` source will add context
-keys to your events via the[`host_key`](#host_key)
+keys to your events via the [`host_key`](#host_key)
 options.
 
 ### Environment Variables

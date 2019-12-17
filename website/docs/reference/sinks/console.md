@@ -187,7 +187,8 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 #### Disable Health Checks
 
-If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 
 ### Streaming
 

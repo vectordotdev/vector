@@ -298,7 +298,7 @@ The behavior when the buffer becomes full.
 
 ### create_missing_group
 
-Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not already exist. This will ignore[`create_missing_stream`](#create_missing_stream) directly after creating the group and will create the first stream. 
+Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not already exist. This will ignore [`create_missing_stream`](#create_missing_stream) directly after creating the group and will create the first stream. 
 
 
 </Field>
@@ -482,7 +482,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 ### request_rate_limit_duration_secs
 
-The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -505,7 +505,7 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -732,8 +732,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured[`batch_timeout`](#batch_timeout) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured[`batch_size`](#batch_size) (default: `1049000 bytes`).
+1. The batch age meets or exceeds the configured [`batch_timeout`](#batch_timeout) (default: `1 seconds`).
+2. The batch size meets or exceeds the configured [`batch_size`](#batch_size) (default: `1049000 bytes`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
@@ -764,11 +764,12 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 #### Disable Health Checks
 
-If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 
 ### Partitioning
 
-Partitioning is controlled via the[`group_name`](#group_name) and[`stream_name`](#stream_name)
+Partitioning is controlled via the [`group_name`](#group_name) and [`stream_name`](#stream_name)
 options and allows you to dynamically partition data on the fly.
 You'll notice that Vector's [template sytax](#template-syntax) is supported
 for these options, enabling you to use field values as the partition's key.
@@ -776,9 +777,10 @@ for these options, enabling you to use field values as the partition's key.
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -790,11 +792,12 @@ with the Vector team by [opening an issie][urls.new_aws_cloudwatch_logs_sink_iss
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
+attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
+`request_retry_backoff_secs` options.
 
 ### Template Syntax
 
-The[`group_name`](#group_name) and[`stream_name`](#stream_name) options
+The [`group_name`](#group_name) and [`stream_name`](#stream_name) options
 support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the

@@ -275,7 +275,7 @@ The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a facil
 
 ### host
 
-The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where[`mode`](#mode) = `"unix"` the socket path will be used.
+The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the socket path will be used.
 
 
 </Field>
@@ -398,7 +398,7 @@ The version extracted from the [Syslog 5424][urls.syslog_5424] line. If a versio
 ### Context
 
 By default, the `syslog` source will add context
-keys to your events via the[`host_key`](#host_key)
+keys to your events via the [`host_key`](#host_key)
 options.
 
 ### Environment Variables

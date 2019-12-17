@@ -352,7 +352,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 #### crt_path
 
-Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,[`key_path`](#key_path) must also be set.
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, [`key_path`](#key_path) must also be set.
 
 
 </Field>
@@ -398,7 +398,7 @@ Enable TLS during connections to the remote.
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless[`key_pass`](#key_pass) above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) above is set.
 
 
 </Field>
@@ -421,7 +421,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless[`ke
 
 #### key_path
 
-Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set,[`crt_path`](#crt_path) must also be set.
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
 
 
 </Field>
@@ -509,7 +509,8 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 #### Disable Health Checks
 
-If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 
 ### Streaming
 

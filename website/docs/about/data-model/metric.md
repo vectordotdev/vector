@@ -154,7 +154,7 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-The metric data model is comprised of 6 types:[`aggregated_histogram`](#aggregated_histogram),[`aggregated_summary`](#aggregated_summary),[`counter`](#counter),[`distribution`](#distribution),[`gauge`](#gauge),[`set`](#set).
+The metric data model is comprised of 6 types: [`aggregated_histogram`](#aggregated_histogram), [`aggregated_summary`](#aggregated_summary), [`counter`](#counter), [`distribution`](#distribution), [`gauge`](#gauge), [`set`](#set).
 You'll notice that certain fields are shared across all types.
 
 import Fields from '@site/src/components/Fields';
@@ -176,7 +176,7 @@ import Field from '@site/src/components/Field';
 
 ### aggregated_histogram
 
-Also called a "timer". A[`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
 
 <Fields filters={false}>
 
@@ -342,7 +342,7 @@ The sum of all values contained within the summary.
 
 #### values
 
-The values contained within the summary that align with the[`quantiles`](#quantiles).
+The values contained within the summary that align with the [`quantiles`](#quantiles).
 
 
 </Field>

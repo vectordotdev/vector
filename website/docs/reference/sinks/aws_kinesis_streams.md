@@ -432,7 +432,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 ### request_rate_limit_duration_secs
 
-The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -455,7 +455,7 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -651,8 +651,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured[`batch_timeout`](#batch_timeout) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured[`batch_size`](#batch_size) (default: `1049000 bytes`).
+1. The batch age meets or exceeds the configured [`batch_timeout`](#batch_timeout) (default: `1 seconds`).
+2. The batch size meets or exceeds the configured [`batch_size`](#batch_size) (default: `1049000 bytes`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
@@ -683,7 +683,8 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 #### Disable Health Checks
 
-If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 
 ### Partitioning
 
@@ -691,7 +692,7 @@ By default, Vector issues random 16 byte values for each
 [Kinesis record's partition key][urls.aws_kinesis_partition_key], evenly
 distributing records across your Kinesis partitions. Depending on your use case
 this might not be sufficient since random distribution does not preserve order.
-To override this, you can supply the[`partition_key_field`](#partition_key_field) option. This option
+To override this, you can supply the [`partition_key_field`](#partition_key_field) option. This option
 represents a field on your event to use for the partition key value instead.
 This is useful if you have a field already on your event, and it also pairs
 nicely with the [`add_fields` transform][docs.transforms.add_fields].
@@ -701,7 +702,7 @@ nicely with the [`add_fields` transform][docs.transforms.add_fields].
 Kenisis requires a value for the partition key and therefore if the key is
 missing or the value is blank the event will be dropped and a
 [`warning` level log event][docs.monitoring#logs] will be logged. As such,
-the field specified in the[`partition_key_field`](#partition_key_field) option should always contain
+the field specified in the [`partition_key_field`](#partition_key_field) option should always contain
 a value.
 
 #### Values that exceed 256 characters
@@ -728,9 +729,10 @@ recondsidering your ordering policy to allow for even and random distribution.
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -742,7 +744,8 @@ with the Vector team by [opening an issie][urls.new_aws_kinesis_streams_sink_iss
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
+attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
+`request_retry_backoff_secs` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

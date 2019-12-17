@@ -389,7 +389,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 ### request_rate_limit_duration_secs
 
-The window used for the[`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -412,7 +412,7 @@ The window used for the[`request_rate_limit_num`](#request_rate_limit_num) optio
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -549,7 +549,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 #### crt_path
 
-Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,[`key_path`](#key_path) must also be set.
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, [`key_path`](#key_path) must also be set.
 
 
 </Field>
@@ -572,7 +572,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless[`key_pass`](#key_pass) above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) above is set.
 
 
 </Field>
@@ -595,7 +595,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless[`ke
 
 #### key_path
 
-Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set,[`crt_path`](#crt_path) must also be set.
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
 
 
 </Field>
@@ -693,8 +693,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured[`batch_timeout`](#batch_timeout) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured[`batch_size`](#batch_size) (default: `1049000 bytes`).
+1. The batch age meets or exceeds the configured [`batch_timeout`](#batch_timeout) (default: `1 seconds`).
+2. The batch size meets or exceeds the configured [`batch_size`](#batch_size) (default: `1049000 bytes`).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
@@ -725,14 +725,16 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 #### Disable Health Checks
 
-If you'd like to disable health checks for this sink you can set the[`healthcheck`](#healthcheck) option to `false`.
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
 
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the[`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and[`request_rate_limit_num`](#request_rate_limit_num) options to ensure Vector does not exceed the specified
+downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the[`request_in_flight_limit`](#request_in_flight_limit) option, which
+which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -744,15 +746,16 @@ with the Vector team by [opening an issie][urls.new_splunk_hec_sink_issue].
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the[`request_retry_attempts`](#request_retry_attempts) and[`request_retry_backoff_secs`](#request_retry_backoff_secs) options.
+attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
+`request_retry_backoff_secs` options.
 
 ### Setup
 
-In order to supply values for both the[`host`](#host) and[`token`](#token) options you must first
+In order to supply values for both the [`host`](#host) and [`token`](#token) options you must first
 setup a Splunk HTTP Event Collector. Please refer to the [Splunk setup
 docs][urls.splunk_hec_setup] for a guide on how to do this. Once you've setup
-your Spunk HTTP Collectory you'll be provided a[`host`](#host) and[`token`](#token) that you
-should supply to the[`host`](#host) and[`token`](#token) options.
+your Spunk HTTP Collectory you'll be provided a [`host`](#host) and [`token`](#token) that you
+should supply to the [`host`](#host) and [`token`](#token) options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

@@ -113,7 +113,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 #### increment_by_value
 
-If `true` the metric will be incremented by the[`field`](#field) value. If `false` the metric will be incremented by 1 regardless of the[`field`](#field) value.
+If `true` the metric will be incremented by the [`field`](#field) value. If `false` the metric will be incremented by 1 regardless of the [`field`](#field) value.
 
 
 </Field>
@@ -546,14 +546,14 @@ section.
 
 ### Multiple Metrics
 
-For clarification, when you convert a single `log` event into multiple[`metric`](#metric)
-events, the[`metric`](#metric) events are not emitted as a single array. They are emitted
+For clarification, when you convert a single `log` event into multiple [`metric`](#metric)
+events, the [`metric`](#metric) events are not emitted as a single array. They are emitted
 individually, and the downstream components treat them as individual events.
 Downstream components are not aware they were derived from a single log event.
 
 ### Null Fields
 
-If the target log[`field`](#field) contains a `null` value it will ignored, and a metric
+If the target log [`field`](#field) contains a `null` value it will ignored, and a metric
 will not be emitted.
 
 ### Reducing

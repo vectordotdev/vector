@@ -303,7 +303,7 @@ The `public-ipv4` of the current EC2 instance.
 
 ### region
 
-The[`region`](#region) that the current EC2 instance is running in.
+The [`region`](#region) that the current EC2 instance is running in.
 
 
 </Field>

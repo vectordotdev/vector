@@ -87,10 +87,10 @@ The list of DNS servers Vector will use to resolve DNS requests. When set Vector
 
 ### Data Directory
 
-Vector requires a[`data_dir`](#data_dir) value for on-disk operations. Currently, the only
+Vector requires a [`data_dir`](#data_dir) value for on-disk operations. Currently, the only
 operation using this directory are Vector's on-disk buffers. Buffers, by
 default, are memory-based, but if you switch them to disk-based you'll need to
-specify a[`data_dir`](#data_dir).
+specify a [`data_dir`](#data_dir).
 
 
 [docs.sinks]: /docs/reference/sinks/

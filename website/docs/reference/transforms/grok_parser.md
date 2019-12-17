@@ -66,7 +66,7 @@ import Field from '@site/src/components/Field';
 
 ### drop_field
 
-If `true` will drop the specified[`field`](#field) after parsing.
+If `true` will drop the specified [`field`](#field) after parsing.
 
 
 </Field>
@@ -89,7 +89,7 @@ If `true` will drop the specified[`field`](#field) after parsing.
 
 ### field
 
-The log field to execute the[`pattern`](#pattern) against. Must be a `string` value.
+The log field to execute the [`pattern`](#pattern) against. Must be a `string` value.
 
 
 </Field>

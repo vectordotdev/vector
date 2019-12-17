@@ -66,7 +66,7 @@ import Field from '@site/src/components/Field';
 
 ### drop_field
 
-If the specified[`field`](#field) should be dropped (removed) after parsing.
+If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
@@ -229,13 +229,13 @@ section.
 
 ### Failed Parsing
 
-If the[`field`](#field) value fails to parse against the provided[`regex`](#regex) then an error
+If the [`field`](#field) value fails to parse against the provided [`regex`](#regex) then an error
 will be [logged][docs.monitoring#logs] and the event will be kept or discarded
 depending on the `drop_failed` value.
 
 A failure includes any event that does not successfully parse against the
-provided[`regex`](#regex). This includes bad values as well as events missing the
-specified[`field`](#field).
+provided [`regex`](#regex). This includes bad values as well as events missing the
+specified [`field`](#field).
 
 ### Performance
 
@@ -266,7 +266,7 @@ You can name Regex captures with the `<name>` syntax. For example:
 ```
 
 Will capture `timestamp`, `level`, and `message`. All values are extracted as
-`string` values and must be coerced with the[`types`](#types) table.
+`string` values and must be coerced with the [`types`](#types) table.
 
 More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].

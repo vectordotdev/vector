@@ -136,7 +136,7 @@ for more info.
 There are cases where Vector interacts with formats that do not have a formal
 timestamp defintion, such as JSON. In these cases, Vector will ingest the
 timestamp in it's primitive form (string or integer). You can then coerce the
-field into a[`timestamp`](#timestamp) using the
+field into a [`timestamp`](#timestamp) using the
 [`coercer` transform][docs.transforms.coercer]. If you are parsing this data
 out of a string, all Vector parser transforms include a `types` option,
 allowing you to extract and coerce in one step.
