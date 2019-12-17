@@ -53,11 +53,7 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
           </li>
         );
       } else {
-        let categoryHref = '#!';
-
-        if(items[0].label == 'hidden') {
-          categoryHref = items[0].href;
-        }
+        let categoryHref = items[0].href;
 
         return (
           <li
