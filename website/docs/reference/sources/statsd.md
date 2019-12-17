@@ -120,10 +120,12 @@ section.
 
 ### Timestamp
 
-You'll notice that each metric contains a `timestamp` field. This is an optional
-descriptive field that represents when the metric was received. It helps to
-more closely represent the metric's time in situations here it can be used. See
-the [metric][docs.data-model.metric] data model page for more info.
+StatsD protocol does not provide support for sending metric timestamps. You'll
+notice that each parsed metric is assigned a `null` timestamp, which is a
+special value which means "a real time metric" (not historical one). Normally such
+`null` timestamps will be substrituted by current time by downstream sinks or
+3rd party services during sending/ingestion. See the [metric][docs.data-model.metric]
+data model page for more info.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
