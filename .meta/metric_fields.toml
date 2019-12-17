@@ -8,7 +8,7 @@ metrics are aggregated.
 
 [metric_fields.kind.enum]
 absolute = "The value is an absolute, stand-alone value. It can be used individually."
-incremental = "The value is incremental and is used to form a wholistic value by merging with other incremental values. Individually it does not tell the whle story."
+incremental = "The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."
 
 [metric_fields.name]
 type = "string"
@@ -41,7 +41,7 @@ Vector.\
 type = "struct"
 optional = true
 description = """\
-A single value that can _only_ be incremented, it cannot be incremented.\
+A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.\
 """
 
 [metric_fields.counter.fields.value]
@@ -80,7 +80,7 @@ A set represents a count of unique values, AKA the cardinality.\
 
 [metric_fields.set.fields.values]
 type = "[string]"
-examples = ["unique item 1", "unique item 2"]
+examples = [["unique item 1", "unique item 2"]]
 optional = false
 description = """\
 The list of unique values.\
@@ -104,7 +104,7 @@ The list of values contained within the distribution.\
 
 [metric_fields.distribution.fields.sample_rates]
 type = "[int]"
-examples = [[12.0, 43.3, 25.0]]
+examples = [[12, 43, 25]]
 optional = false
 description = """\
 The rate at which each individual value was sampled.\
@@ -122,7 +122,7 @@ configurable buckets. It also provides a sum of all observed values.\
 
 [metric_fields.aggregated_histogram.fields.buckets]
 type = "[double]"
-examples = [[0, 1, 2, 5, 10]]
+examples = [[1, 2, 5, 10, 25]]
 optional = false
 description = """\
 The buckets contained within this histogram.\
@@ -138,7 +138,7 @@ The number of values contained within each bucket.\
 
 [metric_fields.aggregated_histogram.fields.count]
 type = "int"
-examples = [25, 54]
+examples = [54]
 optional = false
 description = """\
 The total number of values contained within the histogram.\
@@ -146,7 +146,7 @@ The total number of values contained within the histogram.\
 
 [metric_fields.aggregated_histogram.fields.sum]
 type = "double"
-examples = [524.0, 22.2]
+examples = [524.0]
 optional = false
 description = """\
 The sum of all values contained within the histogram.\
@@ -168,12 +168,12 @@ type = "[double]"
 examples = [[0.1, 0.5, 0.75, 1.0]]
 optional = false
 description = """\
-The quantiles contained within the summary.\
+The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.\
 """
 
 [metric_fields.aggregated_summary.fields.values]
 type = "[double]"
-examples = [[25.0, 46.8, 23.0, 1.2]]
+examples = [[2.1, 4.68, 23.02, 120.1]]
 optional = false
 description = """\
 The values contained within the summary that align with the `quantiles`.\
@@ -181,7 +181,7 @@ The values contained within the summary that align with the `quantiles`.\
 
 [metric_fields.aggregated_summary.fields.count]
 type = "int"
-examples = [25, 54]
+examples = [54]
 optional = false
 description = """\
 The total number of values contained within the summary.\
@@ -189,7 +189,7 @@ The total number of values contained within the summary.\
 
 [metric_fields.aggregated_summary.fields.sum]
 type = "double"
-examples = [524.0, 22.2]
+examples = [524.0]
 optional = false
 description = """\
 The sum of all values contained within the summary.\

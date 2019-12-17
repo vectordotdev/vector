@@ -18,7 +18,7 @@ import SVG from 'react-inlinesvg';
 ## Description
 
 A `metric` event represents a numeric value. The types are heavily inspired by
-the Statsd and Prometheus models.
+the StatsD and Prometheus models.
 
 ## Examples
 
@@ -100,7 +100,7 @@ import TabItem from '@theme/TabItem';
   },
   "distribution": {
     "values": [2.21, 5.46, 10.22],
-    "sample_rates": [0.2, 0.5, 0.2]
+    "sample_rates": [5, 2, 5]
   }
 }
 ```
@@ -117,7 +117,7 @@ import TabItem from '@theme/TabItem';
     "host": "my.host.com"
   },
   "aggregated_histogram": {
-    "buckets": [0.1, 0.25, 0.5, 0.9, 0.99, 1.0],
+    "buckets": [1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
     "counts": [20, 10, 45, 12, 18, 92],
     "count": 197,
     "sum": 975.2
@@ -138,7 +138,7 @@ import TabItem from '@theme/TabItem';
   },
   "aggregated_summary": {
     "quantiles": [0.1, 0.25, 0.5, 0.9, 0.99, 1.0],
-    "values": [20, 10, 45, 12, 18, 92],
+    "values": [2, 3, 5, 8, 9, 10],
     "count": 197,
     "sum": 975.2
   }
@@ -150,8 +150,8 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-The metric data model is comprised of 5 types:[`set`](#set), You'll notice that certain
-fields are shared across all types.
+The metric data model is comprised of 6 types:[`aggregated_histogram`](#aggregated_histogram),[`aggregated_summary`](#aggregated_summary),[`counter`](#counter),[`distribution`](#distribution),[`gauge`](#gauge),[`set`](#set).
+You'll notice that certain fields are shared across all types.
 
 import Fields from '@site/src/components/Fields';
 
@@ -180,7 +180,7 @@ Also called a "timer". A[`aggregated_histogram`](#aggregated_histogram) samples 
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[[0,1,2,5,10]]}
+  examples={[[1,2,5,10,25]]}
   name={"buckets"}
   path={"aggregated_histogram"}
   required={true}
@@ -198,7 +198,7 @@ The buckets contained within this histogram.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[25,54]}
+  examples={[54]}
   name={"count"}
   path={"aggregated_histogram"}
   required={true}
@@ -234,7 +234,7 @@ The number of values contained within each bucket.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[524.0,22.2]}
+  examples={[524.0]}
   name={"sum"}
   path={"aggregated_histogram"}
   required={true}
@@ -275,7 +275,7 @@ Similar to a histogram, a summary samples observations (usually things like requ
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[25,54]}
+  examples={[54]}
   name={"count"}
   path={"aggregated_summary"}
   required={true}
@@ -302,7 +302,7 @@ The total number of values contained within the summary.
 
 #### quantiles
 
-The quantiles contained within the summary.
+The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
 
 
 </Field>
@@ -311,7 +311,7 @@ The quantiles contained within the summary.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[524.0,22.2]}
+  examples={[524.0]}
   name={"sum"}
   path={"aggregated_summary"}
   required={true}
@@ -329,7 +329,7 @@ The sum of all values contained within the summary.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[[25.0,46.8,23.0,1.2]]}
+  examples={[[2.1,4.68,23.02,120.1]]}
   name={"values"}
   path={"aggregated_summary"}
   required={true}
@@ -361,7 +361,7 @@ The values contained within the summary that align with the[`quantiles`](#quanti
 
 ### counter
 
-A single value that can _only_ be incremented, it cannot be incremented.
+A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.
 
 <Fields filters={false}>
 
@@ -409,7 +409,7 @@ A dsitribution represents a distribution of sampled values.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={[[12.0,43.3,25.0]]}
+  examples={[[12,43,25]]}
   name={"sample_rates"}
   path={"distribution"}
   required={true}
@@ -489,8 +489,8 @@ A specific point-in-time value for the gauge.
 
 <Field
   defaultValue={null}
-  enumValues={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a wholistic value by merging with other incremental values. Individually it does not tell the whle story."}}
-  examples={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a wholistic value by merging with other incremental values. Individually it does not tell the whle story."}}
+  enumValues={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
+  examples={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
   name={"kind"}
   path={null}
   required={true}
@@ -544,7 +544,7 @@ A set represents a count of unique values, AKA the cardinality.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={["unique item 1","unique item 2"]}
+  examples={[["unique item 1","unique item 2"]]}
   name={"values"}
   path={"set"}
   required={true}
