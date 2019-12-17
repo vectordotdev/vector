@@ -17,8 +17,12 @@ import SVG from 'react-inlinesvg';
 
 ## Description
 
-A `metric` event represents a numeric value. The types are heavily inspired by
-the StatsD and Prometheus models.
+A `metric` event represents a numerical operation to a time series. Operations
+offered are heavily inspired by the StatsD and Prometheus models, and determine
+the schema of the metric structure within Vector.
+
+When a metric event is sent to a sink the schema will be translated into the
+closest equivalent format of the sink protocol.
 
 ## Examples
 
