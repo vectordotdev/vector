@@ -388,7 +388,7 @@ class Templates
         -->
         EOF
     
-      content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
+      content.sub!(/\n## /, "#{notice}\n## ")
     end
 
     content

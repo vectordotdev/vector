@@ -75,7 +75,7 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
           {containers.map((container, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/containers/${container.id}`}> {container.name}</Link>
+              <Link to={`/docs/setup/installation/containers/${container.id}/`}> {container.name}</Link>
             </span>
           ))}
         </div>
@@ -86,7 +86,7 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
           {packageManagers.map((packageManager, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/package-managers/${packageManager.id}`}>{packageManager.name}</Link>
+              <Link to={`/docs/setup/installation/package-managers/${packageManager.id}/`}>{packageManager.name}</Link>
             </span>
           ))}
         </div>
@@ -97,7 +97,7 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
           {operatingSystems.map((operatingSystem, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}`}>{operatingSystem.name}</Link>
+              <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}/`}>{operatingSystem.name}</Link>
             </span>
           ))}
         </div>
@@ -105,9 +105,9 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
       <div>
         <div>Manual</div>
         <div>
-          <Link to="/docs/setup/installation/manual/from-archives">From archives</Link>
+          <Link to="/docs/setup/installation/manual/from-archives/">From archives</Link>
           &nbsp;•&nbsp;
-          <Link to="/docs/setup/installation/manual/from-source">From source</Link>
+          <Link to="/docs/setup/installation/manual/from-source/">From source</Link>
         </div>
       </div>
     </div>

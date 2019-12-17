@@ -29,7 +29,7 @@ function BlogPostItem(props) {
   const domain = domainTag ? domainTag.value : null;
 
   return (
-    <Link to={permalink} className={classnames('blog-post-item', 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
+    <Link to={permalink + '/'} className={classnames('blog-post-item', 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
       <article>
         <h2>{title}</h2>
         <div className="blog-post-item--subtitle">{description}</div>

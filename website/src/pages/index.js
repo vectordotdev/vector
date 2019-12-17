@@ -404,16 +404,16 @@ function Installation() {
 
         <div className="row">
           <div className="col">
-            <Jump to="/docs/setup/installation/containers">Containers</Jump>
+            <Jump to="/docs/setup/installation/containers/">Containers</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/package-managers">Package Managers</Jump>
+            <Jump to="/docs/setup/installation/package-managers/">Package Managers</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/operating-systems">Operating Systems</Jump>
+            <Jump to="/docs/setup/installation/operating-systems/">Operating Systems</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/manual">Manual</Jump>
+            <Jump to="/docs/setup/installation/manual/">Manual</Jump>
           </div>
         </div>
       </div>

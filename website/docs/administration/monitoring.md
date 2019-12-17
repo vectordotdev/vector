@@ -93,7 +93,7 @@ Please refer to our troubleshooting guide:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/guides/troubleshooting">Troubleshooting Guide</Jump>
+<Jump to="/docs/setup/guides/troubleshooting">Troubleshooting Guide</Jump>
 
 
 [docs.process-management#flags]: /docs/administration/process-management/#flags
