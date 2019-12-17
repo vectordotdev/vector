@@ -110,7 +110,8 @@ A log event will be output with the following structure:
   "_SYSTEMD_UNIT": "ntpd.service",
   "_SYSTEMD_SLICE": "system.slice",
   "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
-}\
+}
+```\
 """
 
 [sources.journald.output.log.fields."`[record-key]`"]
