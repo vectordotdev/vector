@@ -162,7 +162,7 @@ metadata.releases_list.each do |release|
         const version = "#{release.version}";
 
         return (
-          <Layout title={`Vector v${version} Release Notes`}>
+          <Layout title={`Vector v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
             <main>
               <ReleaseNotes version={version} />
             </main>

@@ -136,7 +136,7 @@ function ReleaseDownload({version}) {
   const oldRelease = selectedVersion == latestRelease.version ? oldReleases[0] : oldReleases.find(release => release.version == selectedVersion);
 
   return (
-    <Layout title="Download Vector">
+    <Layout title="Download Vector" description="Download Vector for your platform.">
       <header className={classnames('hero', styles.downloadHeroBanner)}>
         <div className="container">
           <div className={styles.downloadLine}>

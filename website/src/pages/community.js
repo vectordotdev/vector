@@ -15,7 +15,7 @@ function Community() {
   const {metadata: {team}} = siteConfig.customFields;
 
   return (
-    <Layout title="Community">
+    <Layout title="Community" description="Join the Vector community. Connect with the core Vector team and other Vector users.">
       <header className="hero">
         <div className="container container--fluid">
           <h1>Vector Community</h1>

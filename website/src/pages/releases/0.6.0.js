@@ -7,7 +7,7 @@ function ReleaseNotesPage() {
   const version = "0.6.0";
 
   return (
-    <Layout title={`Vector v${version} Release Notes`}>
+    <Layout title={`Vector v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
       <main>
         <ReleaseNotes version={version} />
       </main>
