@@ -2,7 +2,9 @@ use crate::{
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig},
+    sinks::util::{
+        retries::RetryLogic, rusoto, BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -106,10 +108,9 @@ impl CloudWatchMetricsSvc {
         Ok(Box::new(healthcheck))
     }
 
-    fn create_client(region: Region, _resolver: Resolver) -> crate::Result<CloudWatchClient> {
+    fn create_client(region: Region, resolver: Resolver) -> crate::Result<CloudWatchClient> {
         let p = DefaultCredentialsProvider::new()?;
-        // let d = rusoto::client(resolver)?;
-        let d = rusoto_core::HttpClient::new()?;
+        let d = rusoto::client(resolver)?;
 
         Ok(CloudWatchClient::new_with(d, p, region))
     }
