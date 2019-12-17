@@ -25,12 +25,12 @@ require 'net/http'
 # implement dynamic readers that can be found in the `#fetch_dynamic_url`
 # method.
 class Links
-  CATEGORIES = ["assets", "docs", "pages", "urls"]
-  VECTOR_ROOT = "https://github.com/timberio/vector"
-  VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
-  VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"
-  VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull"
-  TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness"
+  CATEGORIES = ["assets", "docs", "pages", "urls"].freeze
+  VECTOR_ROOT = "https://github.com/timberio/vector".freeze
+  VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit".freeze
+  VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues".freeze
+  VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull".freeze
+  TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness".freeze
 
   attr_reader :values
 
@@ -68,18 +68,21 @@ class Links
     id_parts = id.split(".", 2)
     category = id_parts[0]
     suffix = id_parts[1]
-    suffix_parts = suffix.split("#", 2)
-    name = suffix_parts[0]
-    section = suffix_parts[1]
+    hash_parts = suffix.split("#", 2)
+    name = hash_parts[0]
+    hash = hash_parts[1]
+    query_parts = name.split("?", 2)
+    name = query_parts[0]
+    query = query_parts[1]
 
-    base_value =
+    value =
       case category
       when "assets"
-        fetch_asset(name)
+        fetch_asset_path(name)
       when "docs"
-        fetch_doc(name)
+        fetch_doc_path(name)
       when "pages"
-        fetch_page(name)
+        fetch_page_path(name)
       when "urls"
         fetch_url(name)
       else
@@ -94,18 +97,23 @@ class Links
         )
       end
 
-    value = [base_value, section].compact.join("#")
+    value = [value, query].compact.join("?")
+    value = [value, hash].compact.join("#")
     @values[id] ||= value
     value
   end
 
   def fetch_id(id)
-    # Docusaurus does not allow a leading `/`
-    fetch(id).gsub(/^#{DOCS_BASE_PATH}\//, "")
+    # Docusaurus does not allow a leading or trailing `/`
+    fetch(id).gsub(/^#{DOCS_BASE_PATH}\//, "").gsub(/\/$/, "")
   end
 
   private
     def fetch!(namespace, items, name)
+      if @links[namespace] && @links[namespace][name]
+        return @links[namespace][name]
+      end
+      
       normalized_name = name.downcase.gsub(".", "/").gsub("-", "_").split("#", 2).first
 
       found_items =
@@ -142,7 +150,7 @@ class Links
       end
     end
 
-    def fetch_asset(name)
+    def fetch_asset_path(name)
       assets =
         @docs.
           select { |doc| doc.start_with?("/assets/") }.
@@ -154,7 +162,7 @@ class Links
       fetch!("assets", assets, name)
     end
 
-    def fetch_doc(name)
+    def fetch_doc_path(name)
       available_docs =
         if name.end_with?(".readme")
           @docs
@@ -162,11 +170,15 @@ class Links
           @docs.select { |doc| !doc.end_with?("/README.md") }
         end
 
-      DOCS_BASE_PATH + fetch!("docs", available_docs, name)
+      DOCS_BASE_PATH + fetch!("docs", available_docs, name) + "/"
     end
 
-    def fetch_page(name)
-      fetch!("pages", @pages, name)
+    def fetch_page_path(name)
+      if name == "index"
+        "/"
+      else
+        fetch!("pages", @pages, name) + "/"
+      end
     end
 
     def fetch_dynamic_url(name)
@@ -225,8 +237,11 @@ class Links
       when /^pr_([0-9]+)$/
         "#{VECTOR_PRS_ROOT}/#{$1}"
 
+      when /^release_notes_([a-z0-9_\.]*)$/
+        "#{HOST}/releases/#{$1}"
+
       when /^v([a-z0-9\-\.]+)$/
-        "#{VECTOR_ROOT}/releases/tag/v#{$1}"
+        "#{HOST}/releases/#{$1}/download"
 
       when /^v([a-z0-9\-\.]+)_branch$/
         "#{VECTOR_ROOT}/tree/v#{$1}"

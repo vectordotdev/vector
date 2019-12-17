@@ -6,46 +6,51 @@
  */
 import * as React from 'react';
 
-const useTheme = () => {
-  let defaultTheme = null;
+function determineTheme() {
+  let theme = null;
 
   // Make sure we're in the browser / client context
   if (typeof document !== 'undefined' && typeof window !== 'undefined') {
-    defaultTheme = document.querySelector('html').getAttribute('data-theme');
+    theme = document.querySelector('html').getAttribute('data-theme');
 
     // Reset the theme if it is a null like value
-    if (defaultTheme == '' || defaultTheme == 'null') {
-      defaultTheme = null;
+    if (theme == '' || theme == 'null') {
+      theme = null;
     }
 
-    if (defaultTheme === null)
-      defaultTheme = window.localStorage.getItem('theme');
+    if (theme === null)
+      theme = window.localStorage.getItem('theme');
 
-    if (defaultTheme === null && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      defaultTheme = 'dark';
+    if (theme === null && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      theme = 'dark';
     }
 
-    if (defaultTheme === null && window.matchMedia("(prefers-color-scheme: light)").matches) {
-      defaultTheme = '';
+    if (theme === null && window.matchMedia("(prefers-color-scheme: light)").matches) {
+      theme = '';
     }
 
-    if (defaultTheme === null) {
+    if (theme === null) {
       let utcDate = new Date();
       let offset = (new Date().getTimezoneOffset() / 60) * -1;
       let date = new Date(utcDate.getTime() + offset);
-      defaultTheme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : null);
+      theme = (date.getHours() >= 18 || date.getHours() < 7 ? 'dark' : null);
     }
   }
 
+  return theme;
+}
+
+const useTheme = () => {
+  let defaultTheme = determineTheme();
   const [theme, setTheme] = React.useState(defaultTheme);
 
-  // React.useEffect(() => {
-  //   try {
-  //     setTheme(localStorage.getItem('theme'));
-  //   } catch (err) {
-  //     console.error(err);
-  //   }
-  // }, [setTheme]);
+  React.useEffect(() => {
+    try {
+      setTheme(determineTheme());
+    } catch (err) {
+      console.error(err);
+    }
+  }, [setTheme]);
 
   const setThemeSyncWithLocalStorage = React.useCallback(
     nextTheme => {

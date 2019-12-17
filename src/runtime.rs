@@ -46,6 +46,18 @@ impl Runtime {
         self.rt.block_on(future)
     }
 
+    pub fn block_on_std<F>(&mut self, future: F) -> F::Output
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        use futures03::future::{FutureExt, TryFutureExt};
+
+        self.rt
+            .block_on(future.unit_error().boxed().compat())
+            .unwrap()
+    }
+
     pub fn shutdown_on_idle(self) -> impl Future<Item = (), Error = ()> {
         self.rt.shutdown_on_idle()
     }
@@ -58,6 +70,18 @@ impl Runtime {
 #[derive(Clone, Debug)]
 pub struct TaskExecutor {
     inner: tokio::runtime::TaskExecutor,
+}
+
+impl TaskExecutor {
+    pub fn spawn(&self, f: impl Future<Item = (), Error = ()> + Send + 'static) {
+        self.execute(f).unwrap()
+    }
+
+    pub fn spawn_std(&self, f: impl std::future::Future<Output = ()> + Send + 'static) {
+        use futures03::future::{FutureExt, TryFutureExt};
+
+        self.spawn(f.unit_error().boxed().compat());
+    }
 }
 
 impl<F> Executor<F> for TaskExecutor

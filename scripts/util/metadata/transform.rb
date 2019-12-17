@@ -1,19 +1,26 @@
 #encoding: utf-8
 
 require_relative "component"
+require_relative "output"
 
 class Transform < Component
   attr_reader :allow_you_to_description,
     :input_types,
+    :output,
     :output_types
 
   def initialize(hash)
     super(hash)
 
+    # init
+
     @allow_you_to_description = hash.fetch("allow_you_to_description")
     @input_types = hash.fetch("input_types")
+    @output = OpenStruct.new
     @output_types = hash.fetch("output_types")
     types_coercion = hash["types_coercion"] == true
+
+    # checks
 
     if @allow_you_to_description.strip[-1] == "."
       raise("#{self.class.name}#allow_you_to_description cannot not end with a period")
@@ -27,10 +34,24 @@ class Transform < Component
       raise("#{self.class.name}#output_types contains invalid values: #{invalid_types.inspect}")
     end
 
+    # output
+
+    output = hash["output"] || {}
+
+    if output["log"]
+      @output.log = Output.new(output["log"])
+    end
+
+    if output["metric"]
+      @output.metric = Output.new(output["metric"])
+    end
+
+    # types
+
     if types_coercion
       wildcard_option =
         {
-          "name" => "*",
+          "name" => "`[field-name]`",
           "category" => "requests",
           "enum" => {
             "bool" => "Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.",
@@ -40,13 +61,13 @@ class Transform < Component
             "timestamp" => "Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."
           },
           "examples" => [
-            {"name" => "status", "value" => "int"},
-            {"name" => "duration", "value" => "float"},
-            {"name" => "success", "value" => "bool"},
-            {"name" => "timestamp", "value" => "timestamp|%s", "comment" => "unix"},
-            {"name" => "timestamp", "value" => "timestamp|%+", "comment" => "iso8601 (date and time)"},
-            {"name" => "timestamp", "value" => "timestamp|%F", "comment" => "iso8601 (date)"},
-            {"name" => "timestamp", "value" => "timestamp|%a %b %e %T %Y", "comment" => "custom strptime format"},
+            {"status" => "int"},
+            {"duration" => "float"},
+            {"success" => "bool"},
+            {"timestamp" => "timestamp|%s"},
+            {"timestamp" => "timestamp|%+"},
+            {"timestamp" => "timestamp|%F"},
+            {"timestamp" => "timestamp|%a %b %e %T %Y"}
           ],
           "description" => "A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.",
           "null" => false,
@@ -60,9 +81,13 @@ class Transform < Component
           "common" => true,
           "description" => "Key/Value pairs representing mapped log field types.",
           "null" => true,
-          "options" => {"*" => wildcard_option},
+          "options" => {"`[field-name]`" => wildcard_option},
           "type" => "table"
         })
     end
+  end
+
+  def description
+    @desription ||= "Accepts #{input_types.to_sentence} events and allows you to #{allow_you_to_description}."
   end
 end

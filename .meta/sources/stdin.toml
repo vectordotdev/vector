@@ -26,15 +26,22 @@ The key name added to each event representing the current host.\
 
 [[sources.stdin.output.log.examples]]
 label = "Generic"
-input = """\
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1\
-"""
-output = """\
+body = """\
+Given the following input:
+
+```text
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+
+A log event will be output with the following structure:
+
+```json
 {
   "timestamp": <current_timestamp>,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
   "host": "<local_hostname>"
 }
+```\
 """
 
 [sources.stdin.output.log.fields.host]
@@ -58,5 +65,5 @@ type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 optional = false
 description = """\
-The exact time the event was ingested.
+The exact time the event was ingested.\
 """

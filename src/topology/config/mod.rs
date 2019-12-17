@@ -1,4 +1,11 @@
-use crate::{event::Event, sinks, sources, transforms};
+use crate::{
+    buffers::Acker,
+    conditions,
+    dns::Resolver,
+    event::{Event, Metric},
+    runtime::TaskExecutor,
+    sinks, sources, transforms,
+};
 use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
@@ -22,12 +29,16 @@ pub struct Config {
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
+    #[serde(default)]
+    pub tests: Vec<TestDefinition>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub dns_servers: Vec<String>,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -138,14 +149,35 @@ pub struct SinkOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug {
-    fn build(
-        &self,
-        acker: crate::buffers::Acker,
-    ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
+    fn build(&self, cx: SinkContext) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
 
     fn sink_type(&self) -> &'static str;
+}
+
+#[derive(Debug, Clone)]
+pub struct SinkContext {
+    pub(super) acker: Acker,
+    pub(super) resolver: Resolver,
+}
+
+impl SinkContext {
+    #[cfg(test)]
+    pub fn new_test(exec: TaskExecutor) -> Self {
+        Self {
+            acker: Acker::Null,
+            resolver: Resolver::new(Vec::new(), exec).unwrap(),
+        }
+    }
+
+    pub fn acker(&self) -> Acker {
+        self.acker.clone()
+    }
+
+    pub fn resolver(&self) -> Resolver {
+        self.resolver.clone()
+    }
 }
 
 pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
@@ -161,7 +193,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 
@@ -174,14 +206,64 @@ pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestDefinition {
+    pub name: String,
+    pub input: TestInput,
+    pub outputs: Vec<TestOutput>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(untagged)]
+pub enum TestInputValue {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestInput {
+    pub insert_at: String,
+    #[serde(default = "default_test_input_type", rename = "type")]
+    pub type_str: String,
+    pub value: Option<String>,
+    pub log_fields: Option<IndexMap<String, TestInputValue>>,
+    pub metric: Option<Metric>,
+}
+
+fn default_test_input_type() -> String {
+    "raw".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestOutput {
+    pub extract_from: String,
+    pub conditions: Vec<TestCondition>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TestCondition {
+    String(String),
+    Embedded(Box<dyn conditions::ConditionConfig>),
+}
+
 // Helper methods for programming construction during tests
 impl Config {
     pub fn empty() -> Self {
         Self {
-            global: GlobalOptions { data_dir: None },
+            global: GlobalOptions {
+                data_dir: None,
+                dns_servers: Vec::new(),
+            },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
+            tests: Vec::new(),
         }
     }
 

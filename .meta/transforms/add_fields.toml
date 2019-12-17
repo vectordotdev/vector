@@ -16,20 +16,67 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.fields.options."*"]
+[transforms.add_fields.options.fields.options."`[field-name]`"]
 type = "*"
 null = false
 examples = [
-  {name = "my_string_field", value = "string value"},
-  {name = "my_env_var_field", value = "${ENV_VAR}"},
-  {name = "my_int_field", value = 1},
-  {name = "my_float_field", value = 1.2},
-  {name = "my_bool_field", value = true},
-  {name = "my_timestamp_field", value = 1979-05-27T00:32:00.999999-07:00},
-  {name = "my_nested_fields", value = {key1 = "value1", key2 = "value2"}},
-  {name = "my_list", value = ["first", "second", "third"]},
+  {"my_string_field" = "string value"},
+  {"my_env_var_field" = "${ENV_VAR}"},
+  {"my_int_field" = 1},
+  {"my_float_field" = 1.2},
+  {"my_bool_field" = true},
+  {"my_timestamp_field" = 1979-05-27T00:32:00.999999-07:00},
+  {"my_nested_fields" = {key1 = "value1", key2 = "value2"}},
+  {"my_list" = ["first", "second", "third"]},
 ]
 description = """\
-A key/value pair representing the new log fields to be added. Accepts all \
-[supported types][docs.configuration#value_types]. Use `.` for adding nested fields.\
+The name of the field to add. Accepts all \
+[supported types][docs.configuration#types]. Use `.` for adding nested \
+fields.\
+"""
+
+
+[[transforms.add_fields.output.log.examples]]
+label = "Generic"
+body = """\
+Given the following configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+
+A [`log` event][docs.data-model.log] will be output with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6.0": "item1",
+  "field6.1": "item2",
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+
+While unrealistic, this example demonstrates the various accepted
+[types][docs.configuration#value-types] and how they're repsented in Vector's
+internal [log structure][docs.data-model.log].\
 """

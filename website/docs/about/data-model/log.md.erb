@@ -10,9 +10,11 @@ description: A deep dive into Vector's log event
 A `log` event is a structured represention of a point-in-time event. It contains
 an arbitrary set of fields (key/value pairs) that describe the event.
 
-## Schema
+## Examples
 
-<%= fields_example(metadata.log_fields_list, breakout_top_keys: false) %>
+<%= fields_example(metadata.log_fields_list) %>
+
+## Schema
 
 <%= fields(metadata.log_fields_list, heading_depth: 3) %>
 

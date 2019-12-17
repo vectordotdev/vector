@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{
@@ -75,7 +75,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let addr = self
             .address
             .to_socket_addrs()
@@ -99,7 +99,7 @@ impl SinkConfig for TcpSinkConfig {
         let sink = raw_tcp(
             self.address.clone(),
             addr,
-            acker,
+            cx.acker(),
             self.encoding.clone(),
             tls,
         );

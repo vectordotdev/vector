@@ -1,10 +1,10 @@
-FROM ubuntu:18.04
+FROM ruby:2.6
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
 RUN apt-get update && \
   apt-get install -y software-properties-common
-
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A1715D88E1DF1F24
 RUN add-apt-repository -y ppa:git-core/ppa
 
 RUN apt-get update && \

@@ -17,17 +17,15 @@ module.exports = {
         darkSrc: 'img/logo-dark.svg'
       },
       links: [
-        {to: 'components', label: 'Components', position: 'right'},
-        {to: 'docs', label: 'Docs', position: 'right'},
-        {to: 'blog', label: 'Blog', position: 'right'},
-        {to: 'download', label: 'Download', position: 'right'},
-        {
-          href: 'https://github.com/timberio/vector',
-          label: "GitHub",
-          position: 'right',
-        },
+        {to: 'components/', label: 'Components', position: 'left'},
+        {to: 'docs/', label: 'Docs', position: 'left'},
+        {to: 'blog/', label: 'Blog', position: 'left'},
+        {to: 'community/', label: 'Community', position: 'left'},
+        {to: 'releases/', label: 'Download', position: 'right'},
+        {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
+    image: 'img/open-graph.png',
     prism: {
       theme: require('prism-react-renderer/themes/github'),
       darkTheme: require('prism-react-renderer/themes/dracula'),
@@ -39,19 +37,19 @@ module.exports = {
           items: [
             {
               label: 'What is Vector?',
-              to: 'docs/about/what-is-vector',
+              to: 'docs/about/what-is-vector/',
             },
             {
               label: 'Concepts',
-              to: 'docs/about/concepts',
+              to: 'docs/about/concepts/',
             },
             {
               label: 'Data Model',
-              to: 'docs/about/data-model',
+              to: 'docs/about/data-model/',
             },
             {
               label: 'Guarantees',
-              to: 'docs/about/guarantees',
+              to: 'docs/about/guarantees/',
             },
           ],
         },
@@ -60,36 +58,36 @@ module.exports = {
           items: [
             {
               label: 'Sources',
-              to: 'docs/components/sources',
+              to: 'docs/reference/sources/',
             },
             {
               label: 'Transforms',
-              to: 'docs/components/trasnforms',
+              to: 'docs/reference/transforms/',
             },
             {
               label: 'Sinks',
-              to: 'docs/components/sinks',
+              to: 'docs/reference/sinks/',
             },
           ],
         },
         {
-          title: 'Docs',
+          title: 'Setup',
           items: [
             {
               label: 'Install',
-              to: 'docs/setup/installation',
+              to: 'docs/setup/installation/',
             },
             {
               label: 'Deployment',
-              to: 'docs/setup/deployment',
+              to: 'docs/setup/deployment/',
             },
             {
               label: 'Configuration',
-              to: 'docs/setup/configuration',
+              to: 'docs/setup/configuration/',
             },
             {
               label: 'Administration',
-              to: 'docs/administration',
+              to: 'docs/administration/',
             },
           ],
         },
@@ -105,12 +103,16 @@ module.exports = {
               to: 'https://github.com/timberio/vector',
             },
             {
+              label: 'Twitter',
+              to: 'https://twitter.com/timberdotio',
+            },
+            {
               label: 'Mailing List',
-              to: 'mailing-list',
+              to: 'mailing_list/',
             },
             {
               label: 'Blog',
-              to: '/blog',
+              to: 'blog/',
             },
           ],
         },
@@ -121,14 +123,28 @@ module.exports = {
         href: 'https://timber.io/',
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
-    }
+    },
+    googleAnalytics: {
+      trackingID: 'UA-79173230-9',
+    },
+    algolia: {
+      apiKey: '2356c5cb76b57b43624c6450b0a031cc',
+      indexName: 'timberio_vector',
+      algoliaOptions: {}, // Optional, if provided by Algolia
+    },
   },
   presets: [
     [
       '@docusaurus/preset-classic',
       {
+        blog: {
+          feedOptions: {
+            type: 'all',
+            copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
+          },
+        },
         docs: {
-          editUrl: 'https://github.com/timberio/vector/edit/master/website/docs/',
+          editUrl: 'https://github.com/timberio/vector/edit/master/website/',
           sidebarPath: require.resolve('./sidebars.js'),
         },
         theme: {
@@ -141,5 +157,6 @@ module.exports = {
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
     'https://at-ui.github.io/feather-font/css/iconfont.css',
+    ''
   ],
 };

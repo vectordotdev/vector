@@ -3,7 +3,7 @@
 class Field
   include Comparable
 
-  TYPES = ["*", "bool", "double", "int", "map", "string", "struct", "timestamp"]
+  TYPES = ["*", "bool", "double", "[double]", "int", "[int]", "map", "string", "[string]", "struct", "timestamp"].freeze
 
   class << self
     def build_struct(hash)
@@ -22,6 +22,7 @@ class Field
   end
 
   attr_reader :name,
+    :default,
     :description,
     :enum,
     :examples,
@@ -31,13 +32,18 @@ class Field
 
   def initialize(hash)
     @name = hash.fetch("name")
+    @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @optional = hash.fetch("optional")
     @type = hash.fetch("type")
 
+    if @type == "bool"
+      @examples = [true, false]
+    end
+
     if @type != "struct"
-      @examples = hash["examples"] || @enum || raise("#{self.class.name}#examples must be an array of examples")
+      @examples = @examples || hash["examples"] || @enum || raise("#{self.class.name}#examples must be an array of examples for #{@name}")
     end
 
     # Coercion
@@ -68,11 +74,7 @@ class Field
   end
 
   def <=>(other)
-    if name == "*"
-      1
-    else
-      name <=> other.name
-    end
+    name <=> other.name
   end
 
   def eql?(other)
@@ -93,5 +95,9 @@ class Field
 
   def required?
     !optional?
+  end
+
+  def wildcard?
+    name.start_with?("`<")
   end
 end

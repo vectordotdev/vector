@@ -7,27 +7,68 @@ description: Install Vector through the RPM package manager
 Vector can be installed through the [RPM package manager][urls.rpm] which is
 generally used on CentOS.
 
+<%- downloads = metadata.downloads(package_manager: :rpm) -%>
+<%- download_tabs = downloads.collect { |d| {label: d.arch, value: d.arch} } -%>
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Install
 
-1. Download the [Vector `.rpm file`][urls.vector_downloads.latest/vector-x86_64.rpm]
+<Tabs
+  block={true}
+  defaultValue="<%= download_tabs.first.fetch(:value) %>"
+  urlKey="arch"
+  values={<%= download_tabs.to_json %>}>
 
-   ```bash
-   curl -O [[[urls.vector_downloads.latest/vector-x86_64.rpm]]]
-   ```
+<%- downloads.each do |download| %>
+<TabItem value="<%= download.arch %>">
 
-2. Install the Vector `.rpm` package directly:
+1.  Download the Vector `.rpm` file:
 
-   ```bash
-   sudo rpm -i vector-x86_64.rpm
-   ```
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
 
-3. Start Vector:
+    <TabItem value="latest">
 
-   ```bash
-   sudo systemctl start vector
-   ```
+    ```bash
+    curl -O [[[urls.vector_downloads.<%= metadata.latest_version %>/<%= download.file_name %>]]]
+    ```
 
-   That's it! Proceed to [configure](#configuring) Vector for your use case.
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    curl -O [[[urls.vector_downloads.nightly/latest/<%= download.file_name %>]]]
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Install the Vector `.rpm` package directly:
+
+    ```bash
+    sudo rpm -i <%= download.file_name %>
+    ```
+
+3.  Start Vector:
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+    That's it! Proceed to [configure](#configuring) Vector for your use case.
+
+</TabItem>
+
+<%- end -%>
+
+</Tabs>
 
 ### Previous Versions
 

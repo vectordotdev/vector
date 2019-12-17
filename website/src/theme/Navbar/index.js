@@ -6,12 +6,12 @@
  */
 
 import React, {useCallback, useState} from 'react';
-import Toggle from 'react-toggle';
 
 import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
 import SearchBar from '@theme/SearchBar';
 import SVG from 'react-inlinesvg';
+import Toggle from '@theme/Toggle';
 
 import classnames from 'classnames';
 import {fetchNewPost} from '@site/src/exports/newPost';
@@ -39,14 +39,16 @@ function navLinkAttributes(label) {
     case 'download':
       const newRelease = fetchNewRelease();
 
-      if (newRelease) {
-        return {
-          badge: 'new',
-          badgeStyle: 'primary',
-        };
-      } else {
-        return {};
+      let downloadAttrs = {
+        icon: 'download'
       }
+
+      if (newRelease) {
+        downloadAttrs.badge = 'new';
+        downloadAttrs.badgeStyle = 'primary';
+      }
+
+      return downloadAttrs;
 
     case 'github':
       return {
@@ -59,33 +61,30 @@ function navLinkAttributes(label) {
   };
 }
 
-function NavLink(props) {
-  let attributes = navLinkAttributes(props.label) || {};
-  const toUrl = useBaseUrl(props.to);
+function NavLink({href, hideIcon, hideText, label, to}) {
+  let attributes = navLinkAttributes(label) || {};
+  const toUrl = useBaseUrl(to);
 
   return (
     <Link
       className="navbar__item navbar__link"
-      {...props}
-      {...(props.href
+      title={hideText ? label : null}
+      {...(href
         ? {
             target: '_blank',
             rel: 'noopener noreferrer',
-            href: props.href,
+            href: href,
           }
         : {
             activeClassName: 'navbar__link--active',
             to: toUrl,
           })}>
-      {attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {props.label}
+      {!hideIcon && attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
+      {!hideText && label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
 }
-
-const Moon = () => <span className={classnames(styles.toggle, styles.moon)} />;
-const Sun = () => <span className={classnames(styles.toggle, styles.sun)} />;
 
 function Navbar() {
   const context = useDocusaurusContext();
@@ -121,7 +120,7 @@ function Navbar() {
           'navbar-sidebar--show': sidebarShown,
         })}>
         <div className="navbar__inner">
-          <div className="navbar__items">
+          <div className="navbar__items navbar__items--left">
             <div
               aria-label="Navigation bar toggle"
               className="navbar__toggle"
@@ -148,7 +147,7 @@ function Navbar() {
             </div>
             <Link className="navbar__brand" to={baseUrl}>
               {logo != null && (
-                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} width="155px" />
+                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
               )}
               {title != null && (
                 <strong
@@ -167,7 +166,7 @@ function Navbar() {
             {links
               .filter(linkItem => linkItem.position === 'right')
               .map((linkItem, i) => (
-                <NavLink {...linkItem} key={i} />
+                <NavLink {...linkItem} hideText={true} key={i} />
               ))}
             {!disableDarkMode && (
               <Toggle
@@ -175,10 +174,6 @@ function Navbar() {
                 aria-label="Dark mode toggle"
                 checked={theme === 'dark'}
                 onChange={onToggleChange}
-                icons={{
-                  checked: <Moon />,
-                  unchecked: <Sun />,
-                }}
               />
             )}
             <SearchBar
@@ -198,7 +193,7 @@ function Navbar() {
           <div className="navbar-sidebar__brand">
             <Link className="navbar__brand" onClick={hideSidebar} to={baseUrl}>
               {logo != null && (
-                <img className="navbar__logo" src={logoUrl} alt={logo.alt} />
+                <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
               )}
               {title != null && <strong>{title}</strong>}
             </Link>
@@ -207,10 +202,6 @@ function Navbar() {
                 aria-label="Dark mode toggle in sidebar"
                 checked={theme === 'dark'}
                 onChange={onToggleChange}
-                icons={{
-                  checked: <Moon />,
-                  unchecked: <Sun />,
-                }}
               />
             )}
           </div>
@@ -222,6 +213,7 @@ function Navbar() {
                     <NavLink
                       className="menu__link"
                       {...linkItem}
+                      hideIcon={true}
                       onClick={hideSidebar}
                     />
                   </li>

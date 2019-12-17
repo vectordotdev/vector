@@ -3,23 +3,37 @@ title: Validating
 description: Validate Vector's configuration
 ---
 
-# Validating
+Vector provides a subcommand `validate` which checks the validity of any number
+of configuration files and then exits:
 
-Vector provides a subcommand `validate` which checks the validity of a
-configuration file and then exits:
+import Tabs from '@theme/Tabs';
 
-{% code-tabs %}
-{% code-tabs-item title="fields only" %}
+<Tabs
+  block={true}
+  defaultValue="fields"
+  values={[
+    { label: 'Fields Only', value: 'fields', },
+    { label: 'Fields and Topology', value: 'topology', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="fields">
+
 ```bash
-vector validate --config /etc/vector/vector.toml
+vector validate /etc/vector/vector.toml
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="fields + topology" %}
+
+</TabItem>
+<TabItem value="topology">
+
 ```bash
-vector validate --config /etc/vector/vector.toml --topology
+vector validate --topology /etc/vector/*.toml
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+
+</TabItem>
+</Tabs>
 
 The validate subcommand checks the correctness of fields for components defined
 within a configuration file, including:
@@ -39,29 +53,24 @@ expanding the above checks with the following:
 4. At least one [sink][docs.sinks] is defined.
 5. All `inputs` values contain at least one value (cannot be empty).
 6. All `inputs` values reference valid and upstream [source][docs.sources] or
-[transform][docs.transforms] components. See
-[composition][docs.configuration#composition] for more info.
+[transform][docs.transforms] components.
 
 To see other customization options for the `validate` subcommand run
 `vector validate --help`.
 
-## Validating Environment
+## Validating Environment
 
 Vector also provides a `--dry-run` option which prevents regular execution and
 instead validates a configuration file as well as the runtime environment:
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
-  defaultValue="manual"
+  defaultValue="config"
   values={[
     { label: 'Config Only', value: 'config', },
     { label: 'Config + Healthchecks', value: 'config_healthchecks', },
   ]
 }>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="config">
 
@@ -93,8 +102,7 @@ flag to also run health checks for all defined sinks.
 8. All [sinks][docs.sinks] are able to connect to their targets.
 
 
-[docs.configuration#composition]: /docs/setup/configuration#composition
-[docs.configuration#value-types]: /docs/setup/configuration#value-types
-[docs.sinks]: /docs/components/sinks
-[docs.sources]: /docs/components/sources
-[docs.transforms]: /docs/components/transforms
+[docs.configuration#value-types]: /docs/setup/configuration/#value-types
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.transforms]: /docs/reference/transforms/

@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -55,9 +56,10 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
-                  "setup/installation/operating-systems/raspberry-pi",
+                  "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
+                  "setup/installation/operating-systems/windows",
               ],
             },
             {
@@ -95,6 +97,7 @@ module.exports = {
           items: [
             "setup/guides",
             "setup/guides/getting-started",
+            "setup/guides/unit-testing",
             "setup/guides/troubleshooting",
           ]
         },
@@ -102,34 +105,36 @@ module.exports = {
     },
     {
       type: 'category',
-      label: 'Components',
+      label: 'Reference',
       items: [
-        "components",
+        "reference",
         {
           type: 'category',
           label: 'Sources',
           items: [
-            "components/sources",
+            "reference/sources",
             
-              "components/sources/docker",
+              "reference/sources/docker",
             
-              "components/sources/file",
+              "reference/sources/file",
             
-              "components/sources/journald",
+              "reference/sources/journald",
             
-              "components/sources/kafka",
+              "reference/sources/kafka",
             
-              "components/sources/statsd",
+              "reference/sources/splunk_hec",
             
-              "components/sources/stdin",
+              "reference/sources/statsd",
             
-              "components/sources/syslog",
+              "reference/sources/stdin",
             
-              "components/sources/tcp",
+              "reference/sources/syslog",
             
-              "components/sources/udp",
+              "reference/sources/tcp",
             
-              "components/sources/vector",
+              "reference/sources/udp",
+            
+              "reference/sources/vector",
             
           ]
         },
@@ -137,35 +142,43 @@ module.exports = {
           type: 'category',
           label: 'Transforms',
           items: [
-            "components/transforms",
+            "reference/transforms",
             
-              "components/transforms/add_fields",
+              "reference/transforms/add_fields",
             
-              "components/transforms/add_tags",
+              "reference/transforms/add_tags",
             
-              "components/transforms/coercer",
+              "reference/transforms/ansi_stripper",
             
-              "components/transforms/field_filter",
+              "reference/transforms/aws_ec2_metadata",
             
-              "components/transforms/grok_parser",
+              "reference/transforms/coercer",
             
-              "components/transforms/json_parser",
+              "reference/transforms/concat",
             
-              "components/transforms/log_to_metric",
+              "reference/transforms/field_filter",
             
-              "components/transforms/lua",
+              "reference/transforms/geoip",
             
-              "components/transforms/regex_parser",
+              "reference/transforms/grok_parser",
             
-              "components/transforms/remove_fields",
+              "reference/transforms/json_parser",
             
-              "components/transforms/remove_tags",
+              "reference/transforms/log_to_metric",
             
-              "components/transforms/sampler",
+              "reference/transforms/lua",
             
-              "components/transforms/split",
+              "reference/transforms/regex_parser",
             
-              "components/transforms/tokenizer",
+              "reference/transforms/remove_fields",
+            
+              "reference/transforms/remove_tags",
+            
+              "reference/transforms/sampler",
+            
+              "reference/transforms/split",
+            
+              "reference/transforms/tokenizer",
             
           ]
         },
@@ -173,43 +186,54 @@ module.exports = {
           type: 'category',
           label: 'Sinks',
           items: [
-            "components/sinks",
+            "reference/sinks",
             
-              "components/sinks/aws_cloudwatch_logs",
+              "reference/sinks/aws_cloudwatch_logs",
             
-              "components/sinks/aws_cloudwatch_metrics",
+              "reference/sinks/aws_cloudwatch_metrics",
             
-              "components/sinks/aws_kinesis_streams",
+              "reference/sinks/aws_kinesis_streams",
             
-              "components/sinks/aws_s3",
+              "reference/sinks/aws_s3",
             
-              "components/sinks/blackhole",
+              "reference/sinks/blackhole",
             
-              "components/sinks/clickhouse",
+              "reference/sinks/clickhouse",
             
-              "components/sinks/console",
+              "reference/sinks/console",
             
-              "components/sinks/datadog_metrics",
+              "reference/sinks/datadog_metrics",
             
-              "components/sinks/elasticsearch",
+              "reference/sinks/elasticsearch",
             
-              "components/sinks/file",
+              "reference/sinks/file",
             
-              "components/sinks/http",
+              "reference/sinks/http",
             
-              "components/sinks/kafka",
+              "reference/sinks/kafka",
             
-              "components/sinks/prometheus",
+              "reference/sinks/new_relic_logs",
             
-              "components/sinks/splunk_hec",
+              "reference/sinks/prometheus",
             
-              "components/sinks/statsd",
+              "reference/sinks/splunk_hec",
             
-              "components/sinks/tcp",
+              "reference/sinks/statsd",
             
-              "components/sinks/vector",
+              "reference/sinks/tcp",
+            
+              "reference/sinks/vector",
             
           ],
+        },
+        {
+          type: 'category',
+          label: 'Advanced',
+          items: [
+            "reference/env-vars",
+            "reference/global-options",
+            "reference/tests",
+          ]
         },
       ],
     },
@@ -217,12 +241,12 @@ module.exports = {
       type: 'category',
       label: 'Administration',
       items: [
+        "administration",
         "administration/process-management",
         "administration/monitoring",
         "administration/tuning",
         "administration/updating",
         "administration/validating",
-        "administration/env-vars",
       ],
     },
     {

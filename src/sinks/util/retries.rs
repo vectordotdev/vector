@@ -1,4 +1,4 @@
-use super::Error;
+use crate::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::borrow::Cow;
 use std::time::{Duration, Instant};
@@ -17,7 +17,7 @@ pub trait RetryLogic: Clone {
 }
 
 #[derive(Debug, Clone)]
-pub struct FixedRetryPolicy<L: RetryLogic> {
+pub struct FixedRetryPolicy<L> {
     remaining_attempts: usize,
     backoff: Duration,
     logic: L,

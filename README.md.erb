@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="<%= metadata.links.fetch("urls.vector_community") %>">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.mailing_list") %>">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install <%= metadata.latest_version %><a/>
+    <a href="<%= metadata.links.fetch("urls.vector_community") %>">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.mailing_list") %>">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_blog") %>">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="<%= metadata.links.fetch("urls.vector_download") %>">Download <%= metadata.latest_version %><a/>
   </strong>
 </p>
 
@@ -10,14 +10,26 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
-Vector is a [high-performance][docs.performance] observability data router. It
+<%- if metadata.new_post -%>
+---
+
+<p align="center">
+  <strong>
+    New post! <a href="<%= metadata.new_post.permalink %>"><%= metadata.new_post.title %></a>
+  </strong>
+</p>
+
+---
+<%- end -%>
+
+Vector is a [high-performance][pages.index#performance] observability data router. It
 makes [collecting][docs.sources], [transforming][docs.transforms], and
 [sending][docs.sinks] logs, metrics, and events easy. It decouples data
 collection & routing from your services, giving you control and data ownership,
-among [many other benefits][docs.use_cases].
+among many other benefits.
 
 Built in [Rust][urls.rust], Vector places high-value on
-[performance][docs.performance], [correctness][docs.correctness], and [operator
+[performance][pages.index#performance], [correctness][pages.index#correctness], and [operator
 friendliness][docs.administration]. It compiles to a single static binary and is
 designed to be [deployed][docs.deployment] across your entire infrastructure,
 serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
@@ -38,27 +50,32 @@ simple and unified.
 * [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
+* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started]
 
-#### [Components][https://vector.dev/components]
+#### Reference
 
-* [**Sources**][docs.sources] - 
-* [**Transforms**][docs.transforms]
-* [**Sinks**][docs.sinks]
+* [**Sources**][docs.sources] - <%= common_component_links(:source) %>
+* [**Transforms**][docs.transforms] - <%= common_component_links(:transform) %>
+* [**Sinks**][docs.sinks] - <%= common_component_links(:sink) %>
 
-* [**Administration**][docs.administration] - [process management][docs.process-management], [monitoring][docs.monitoring], [updating][docs.updating], [validating][docs.validating]
-* [**Guides**][docs.guides]
+#### Administration
+
+* [**Process management**][docs.process-management]
+* [**Monitoring**][docs.monitoring]
+* [**Updating**][docs.updating]
+* [**Validating**][docs.validating]
 
 #### Resources
 
-* [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v<%= metadata.latest_version %>][urls.v<%= metadata.latest_version %>], [changelog][urls.vector_changelog]
+* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [twitter][urls.vector_twitter], [mailing list][urls.mailing_list]
+* [**Releases**][urls.vector_releases] - [v<%= metadata.latest_version %> (latest)][urls.v<%= metadata.latest_version %>]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
 ## Features
 
-* ***Fast*** - Built in [Rust][urls.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
-* **Correct** - Obsessed with [getting the details right][docs.correctness].
+* ***Fast*** - Built in [Rust][urls.rust], Vector is [fast and memory efficient][pages.index#performance]. No runtime. No garbage collector.
+* **Correct** - Obsessed with [getting the details right][pages.index#correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
 * **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service].
 * **Logs, Metrics, or Events** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
@@ -103,45 +120,16 @@ Run the following in your terminal, then follow the on-screen instructions.
 <%= install_command %>
 ```
 
-Or view [platform specific installation instructions][docs.installation].
+Or use your own [preferred method][docs.installation].
 
 
-## Sources
+## Latest Posts & Announcements
 
-<%= components_table(metadata.sources.to_h.values.sort) %>
+<%- metadata.posts.reverse[0..4].each do |post| -%>
+* [<%= post.title %>](<%= post.permalink %>)
+<%- end -%>
 
-[+ request a new source][urls.new_source]
-
-
-## Transforms
-
-<%= components_table(metadata.transforms.to_h.values.sort) %>
-
-[+ request a new transform][urls.new_transform]
-
-
-## Sinks
-
-<%= components_table(metadata.sinks.to_h.values.sort) %>
-
-[+ request a new sink][urls.new_sink]
-
-
-## License
-
-Copyright <%= Time.now.year %>, Vector Authors. All rights reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may not
-use these files except in compliance with the License. You may obtain a copy
-of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-License for the specific language governing permissions and limitations under
-the License.
+[view all...][urls.vector_blog]
 
 ---
 

@@ -83,7 +83,7 @@ and disrupting service. The tradeoff is that repetitive logs will not be logged.
 
 Currently, Vector does not expose Metrics. [Issue #230][urls.issue_230]
 represents work to run internal Vector metrics through Vector's pipeline.
-Allowing you to define internal metrocs as a [source][docs.sources] and
+Allowing you to define internal metrics as a [source][docs.sources] and
 then define one of many metrics [sinks][docs.sinks] to collect those metrics,
 just as you would metrics from any other source.
 
@@ -93,11 +93,11 @@ Please refer to our troubleshooting guide:
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/guides/troubleshooting">Troubleshooting Guide</Jump>
+<Jump to="/docs/setup/guides/troubleshooting">Troubleshooting Guide</Jump>
 
 
-[docs.process-management#flags]: /docs/administration/process-management#flags
-[docs.sinks]: /docs/components/sinks
-[docs.sources]: /docs/components/sources
-[docs.troubleshooting]: /docs/setup/guides/troubleshooting
+[docs.process-management#flags]: /docs/administration/process-management/#flags
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.troubleshooting]: /docs/setup/guides/troubleshooting/
 [urls.issue_230]: https://github.com/timberio/vector/issues/230

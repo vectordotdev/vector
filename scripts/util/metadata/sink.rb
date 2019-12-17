@@ -1,9 +1,10 @@
 #encoding: utf-8
 
 require_relative "component"
+require_relative "output"
 
 class Sink < Component
-  EGRESS_METHODS = ["batching", "exposing", "streaming"]
+  EGRESS_METHODS = ["batching", "exposing", "streaming"].freeze
 
   attr_reader :buffer,
     :delivery_guarantee,
@@ -27,7 +28,6 @@ class Sink < Component
     encodings = hash["encodings"]
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
-    @output = OpenStruct.new
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
     tls_options = hash["tls_options"]
@@ -47,12 +47,8 @@ class Sink < Component
 
     # output
 
-    output = hash["output"] || {}
-    @output.examples = (output["examples"] || []).collect do |e|
-      s = OpenStruct.new(e)
-      s.input = OpenStruct.new(s.input) if s.input
-      s.output = OpenStruct.new(s.output) if s.output
-      s
+    if hash["output"]
+      @output = Output.new(hash["output"])
     end
 
     # Healthcheck option
@@ -112,12 +108,31 @@ class Sink < Component
     # Endpoint option
 
     if service_provider == "AWS"
-      @options.hostname =
+      @env_vars.AWS_ACCESS_KEY_ID =
         Option.new({
-          "name" => "endpoint",
-          "examples" => ["127.0.0.0:5000"],
-          "description" => "Custom endpoint for use with AWS-compatible services.",
+          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
+          "examples" => ["AKIAIOSFODNN7EXAMPLE"],
+          "name" => "AWS_ACCESS_KEY_ID",
           "null" => true,
+          "type" => "string"
+        })
+
+      @env_vars.AWS_SECRET_ACCESS_KEY =
+        Option.new({
+          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
+          "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
+          "name" => "AWS_SECRET_ACCESS_KEY",
+          "null" => true,
+          "type" => "string"
+        })
+
+      @options.endpoint =
+        Option.new({
+          "description" => "Custom endpoint for use with AWS-compatible services.",
+          "examples" => ["127.0.0.0:5000"],
+          "name" => "endpoint",
+          "null" => false,
+          "optional" => true,
           "type" => "string"
         })
     end
@@ -271,6 +286,10 @@ class Sink < Component
 
   def buffer?
     buffer == true
+  end
+
+  def description
+    @description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
   end
 
   def exposing?

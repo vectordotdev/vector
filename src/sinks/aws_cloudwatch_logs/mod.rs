@@ -1,18 +1,19 @@
 mod request;
 
 use crate::{
-    buffers::Acker,
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rusoto_core::{
     request::{BufferedHttpResponse, HttpClient},
     Region, RusotoError,
@@ -24,7 +25,7 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
+use std::{collections::HashMap, convert::TryInto, fmt};
 use tower::{
     buffer::Buffer,
     limit::{
@@ -60,14 +61,14 @@ pub struct CloudwatchLogsSinkConfig {
     pub create_missing_stream: Option<bool>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
 }
 
 pub struct CloudwatchLogsSvc {
@@ -96,7 +97,7 @@ type Svc = Buffer<
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
-    request_config: RequestConfig,
+    request_settings: TowerRequestSettings,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -106,15 +107,6 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Json,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct RequestConfig {
-    timeout_secs: u64,
-    rate_limit_duration_secs: u64,
-    rate_limit_num: u64,
-    retry_attempts: usize,
-    retry_backoff_secs: u64,
 }
 
 #[derive(Debug)]
@@ -130,20 +122,19 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch = self.batch.unwrap_or(1000, 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
-
         let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
+            .concurrency_limit(request.in_flight_limit)
             .service(CloudwatchLogsPartitionSvc::new(self.clone())?);
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc, acker)
+            let svc_sink = BatchServiceSink::new(svc, cx.acker())
                 .partitioned_batched_with_min(PartitionBuffer::new(Vec::new()), &batch)
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
@@ -165,31 +156,19 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsPartitionSvc {
     pub fn new(config: CloudwatchLogsSinkConfig) -> crate::Result<Self> {
-        let timeout_secs = config.request_timeout_secs.unwrap_or(60);
-        let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
-
-        let request_config = RequestConfig {
-            timeout_secs,
-            rate_limit_duration_secs,
-            rate_limit_num,
-            retry_attempts,
-            retry_backoff_secs,
-        };
+        let request_settings = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         Ok(Self {
             config,
             clients: HashMap::new(),
-            request_config,
+            request_settings,
         })
     }
 }
 
 impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogsPartitionSvc {
     type Response = ();
-    type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+    type Error = crate::Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -199,37 +178,23 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
     fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
         let (events, key) = req.into_parts();
 
-        let RequestConfig {
-            timeout_secs,
-            rate_limit_duration_secs,
-            rate_limit_num,
-            retry_attempts,
-            retry_backoff_secs,
-        } = self.request_config;
-
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
             let svc = {
-                let policy = FixedRetryPolicy::new(
-                    retry_attempts,
-                    Duration::from_secs(retry_backoff_secs),
-                    CloudwatchRetryLogic,
-                );
+                let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
 
                 let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key).unwrap();
-                let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout_secs));
+                let timeout = Timeout::new(cloudwatch, self.request_settings.timeout);
 
                 let buffer = Buffer::new(timeout, 1);
                 let retry = Retry::new(policy, buffer);
 
-                let rate = RateLimit::new(
-                    retry,
-                    Rate::new(
-                        rate_limit_num,
-                        Duration::from_secs(rate_limit_duration_secs),
-                    ),
+                let rate = Rate::new(
+                    self.request_settings.rate_limit_num,
+                    self.request_settings.rate_limit_duration,
                 );
+                let rate = RateLimit::new(retry, rate);
                 let concurrency = ConcurrencyLimit::new(rate, 1);
 
                 Buffer::new(concurrency, 1)
@@ -385,10 +350,7 @@ fn partition(
         }
     };
 
-    let key = CloudwatchKey {
-        stream,
-        group: group.clone(),
-    };
+    let key = CloudwatchKey { stream, group };
 
     Some(PartitionInnerBuffer::new(event, key))
 }
@@ -415,7 +377,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> crate::Result<super::Healthc
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
 
-    let client = create_client(config.region.clone().try_into()?)?;
+    let client = create_client(config.region.try_into()?)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -748,23 +710,22 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         region::RegionOrEndpoint,
+        runtime::Runtime,
         test_util::{block_on, random_lines_with_stream, random_string},
-        topology::config::SinkConfig,
+        topology::config::{SinkConfig, SinkContext},
     };
     use futures::Sink;
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
-    use tokio::runtime::current_thread::Runtime;
 
     const GROUP_NAME: &'static str = "vector-cw";
 
     #[test]
     fn cloudwatch_insert_log_event() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let stream_name = gen_name();
 
@@ -781,7 +742,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -813,7 +774,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_dynamic_group_and_stream_creation() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -830,7 +791,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -862,7 +823,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_batched() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let group_name = gen_name();
         let stream_name = gen_name();
@@ -884,7 +845,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -916,7 +877,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_partitioned() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = Runtime::single_threaded().unwrap();
 
         let stream_name = gen_name();
 
@@ -935,7 +896,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let timestamp = chrono::Utc::now();
 

@@ -1,15 +1,13 @@
 use crate::{
-    buffers::Acker,
     event::Event,
     region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
@@ -17,6 +15,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request,
 };
+use lazy_static::lazy_static;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -25,8 +24,6 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::time::Duration;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -44,21 +41,20 @@ pub struct ElasticSearchConfig {
     // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -81,10 +77,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common)?;
-        let sink = es(self, common, acker);
+        let sink = es(self, common, cx);
 
         Ok((sink, healthcheck))
     }
@@ -199,7 +195,7 @@ impl ElasticSearchCommon {
 fn es(
     config: &ElasticSearchConfig,
     common: ElasticSearchCommon,
-    acker: Acker,
+    cx: SinkContext,
 ) -> super::RouterSink {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
@@ -208,13 +204,7 @@ fn es(
     };
 
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
     let index = if let Some(idx) = &config.index {
         Template::from(idx.as_str())
@@ -222,12 +212,6 @@ fn es(
         Template::from("vector-%Y.%m.%d")
     };
     let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
 
     let headers = config
         .headers
@@ -247,7 +231,7 @@ fn es(
         gzip = false;
     }
 
-    let http_service = HttpService::builder()
+    let http_service = HttpService::builder(cx.resolver())
         .tls_settings(common.tls_settings.clone())
         .build(move |body: Vec<u8>| {
             let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
@@ -299,14 +283,8 @@ fn es(
             }
         });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
@@ -510,13 +488,12 @@ mod tests {
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         event,
         sinks::util::http::https_client,
         sinks::util::tls::TlsOptions,
-        test_util::{block_on, random_events_with_stream, random_string},
-        topology::config::SinkConfig,
+        test_util::{random_events_with_stream, random_string, runtime},
+        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::{Future, Sink};
@@ -527,6 +504,8 @@ mod integration_tests {
 
     #[test]
     fn structures_events_correctly() {
+        let mut rt = runtime();
+
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: Some("http://localhost:9200".into()),
@@ -538,7 +517,7 @@ mod integration_tests {
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, _hc) = config.build(Acker::Null).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event
@@ -549,10 +528,10 @@ mod integration_tests {
             .insert_explicit("foo".into(), "bar".into());
 
         let pump = sink.send(input_event.clone());
-        block_on(pump).unwrap();
+        rt.block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(&common)).unwrap();
+        rt.block_on(flush(&common)).unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", common.base_url, index))
@@ -616,21 +595,25 @@ mod integration_tests {
     }
 
     fn run_insert_tests(mut config: ElasticSearchConfig) {
+        let mut rt = runtime();
+
         let index = gen_index();
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, healthcheck) = config.build(Acker::Null).expect("Building config failed");
+        let (sink, healthcheck) = config
+            .build(SinkContext::new_test(rt.executor()))
+            .expect("Building config failed");
 
-        block_on(healthcheck).expect("Health check failed");
+        rt.block_on(healthcheck).expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        let _ = block_on(pump).expect("Sending events failed");
+        let _ = rt.block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&common)).expect("Flushing writes failed");
+        rt.block_on(flush(&common)).expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")

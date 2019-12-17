@@ -26,49 +26,71 @@ function Headings({headings, isChild}) {
   if (!headings.length) return null;
   return (
     <ul className={isChild ? '' : 'contents'}>
-      {headings.map(heading => (
-        <li key={heading.id}>
+      {headings.map(heading => {
+        let cleanValue = heading.value.replace('<code><', '<code>&lt;').replace('></code>', '&gt;</code>');
+
+        return <li key={heading.id}>
           <a
             href={`#${heading.id}`}
             className={LINK_CLASS_NAME}
-            dangerouslySetInnerHTML={{__html: heading.value}}
+            dangerouslySetInnerHTML={{__html: cleanValue}}
           />
           <Headings isChild headings={heading.children} />
         </li>
-      ))}
+      })}
     </ul>
   );
 }
 
-function Statuses({status, deliveryGuarantee}) {
-  if (!status && !deliveryGuarantee)
+function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOperatingSystems}) {
+  if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
+
+  let operatingSystemsEls = [];
+
+  (operatingSystems || []).forEach(operatingSystem => {
+    operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
+    operatingSystemsEls.push(<>, </>);
+  });
+
+  (unsupportedOperatingSystems || []).forEach(operatingSystem => {
+    operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
+    operatingSystemsEls.push(<>, </>);
+  });
+
+  operatingSystemsEls.pop();
 
   return (
     <div className="section">
-      <div className="title">Status</div>
+      <div className="title">Support</div>
       {status == "beta" &&
         <div>
-          <Link to="/docs/about/guarantees#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
+          <Link to="/docs/about/guarantees/#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
             <i className="feather icon-alert-triangle"></i> beta
           </Link>
         </div>}
       {status == "prod-ready" &&
         <div>
-          <Link to="/docs/about/guarantees#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
+          <Link to="/docs/about/guarantees/#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
             <i className="feather icon-award"></i> prod-ready
           </Link>
         </div>}
       {deliveryGuarantee == "best_effort" &&
         <div>
-          <Link to="/docs/about/guarantees#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
+          <Link to="/docs/about/guarantees/#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
             <i className="feather icon-shield-off"></i> best-effort
           </Link>
         </div>}
       {deliveryGuarantee == "at_least_once" &&
         <div>
-          <Link to="/docs/about/guarantees#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
+          <Link to="/docs/about/guarantees/#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
             <i className="feather icon-shield"></i> at-least-once
+          </Link>
+        </div>}
+      {operatingSystemsEls.length > 0 && 
+        <div>
+          <Link to="/docs/setup/installation/operating-systems/" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
+            <i className="feather icon-cpu"></i> {operatingSystemsEls}
           </Link>
         </div>}
     </div>
@@ -78,22 +100,34 @@ function Statuses({status, deliveryGuarantee}) {
 function DocItem(props) {
   const {siteConfig = {}} = useDocusaurusContext();
   const {url: siteUrl} = siteConfig;
-  const {metadata, content: DocContent} = props;
+  const {content: DocContent} = props;
+  const {metadata} = DocContent;
+
   const {
-    delivery_guarantee,
     description,
     editUrl,
-    event_types: eventTypes,
     image: metaImage,
-    issues_url: issuesUrl,
     keywords,
     lastUpdatedAt,
     lastUpdatedBy,
     permalink,
-    source_url: sourceUrl,
-    status,
     title,
+    version
   } = metadata;
+  const {
+    frontMatter: {
+      delivery_guarantee: deliveryGuarantee,
+      event_types: eventTypes,
+      hide_title: hideTitle,
+      hide_table_of_contents: hideTableOfContents,
+      issues_url: issuesUrl,
+      operating_systems: operatingSystems,
+      posts_path: postsPath,
+      source_url: sourceUrl,
+      status,
+      unsupported_operating_systems: unsupportedOperatingSystems,
+    },
+  } = DocContent;
 
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
 
@@ -120,31 +154,40 @@ function DocItem(props) {
           <div className="row">
             <div className="col">
               <div className={styles.docItemContainer}>
-                {!metadata.hide_title && (
-                  <header>
-                    <div className="badges">
-                      {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
-                      {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
-                    </div>
-                    <h1 className={styles.docTitle}>{metadata.title}</h1>
-                  </header>
-                )}
                 <article>
+                  {version && (
+                    <span
+                      style={{verticalAlign: 'top'}}
+                      className="badge badge--info">
+                      Version: {version}
+                    </span>
+                  )}
+
+                  {!metadata.hide_title && (
+                    <header>
+                      <div className="badges">
+                        {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
+                        {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
+                      </div>
+                      <h1 className={styles.docTitle}>{metadata.title}</h1>
+                    </header>
+                  )}
+                  
                   <div className="markdown">
                     <DocContent />
                   </div>
                 </article>
-                {!metadata.hide_pagination && (
-                  <div className="margin-vert--lg">
-                    <DocPaginator metadata={metadata} />
-                  </div>
-                )}
               </div>
+              {!metadata.hide_pagination && (
+                <div className={styles.paginator}>
+                  <DocPaginator metadata={metadata} />
+                </div>
+              )}
             </div>
             {DocContent.rightToc && (
               <div className="col col--3">
-                <div className={styles.tableOfContents}>
-                  <Statuses status={status} deliveryGuarantee={delivery_guarantee} />
+                <div className="table-of-contents">
+                  <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>
@@ -155,6 +198,7 @@ function DocItem(props) {
                     <div className="title">Resources</div>
                     <ul className="contents">
                       {editUrl && (<li><a href={editUrl} className="contents__link" target="_blank"><i className="feather icon-edit-1"></i> Edit this page</a></li>)}
+                      {postsPath && (<li><Link to={postsPath} className="contents__link"><i className="feather icon-book-open"></i> View Blog Posts</Link></li>)}
                       {issuesUrl && (<li><a href={issuesUrl} className="contents__link" target="_blank"><i className="feather icon-message-circle"></i> View Issues</a></li>)}
                       {sourceUrl && (<li><a href={sourceUrl} className="contents__link" target="_blank"><i className="feather icon-github"></i> View Source</a></li>)}
                     </ul>

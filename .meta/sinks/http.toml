@@ -1,20 +1,20 @@
 [sinks.http]
 batch_is_simple = true
 batch_size = 1049000
-batch_timeout = 5
+batch_timeout = 1
 buffer = true
 common = true
 compressions = ["gzip"]
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
-encodings = ["ndjson", "text"]
+encodings = ["ndjson", "json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-rate_limit_duration = 1
-rate_limit_num = 10
-retry_attempts = 10
-retry_backoff_secs = 1
+request_rate_limit_duration_secs = 1
+request_rate_limit_num = 10
+request_retry_attempts = 10
+request_retry_backoff_secs = 1
 request_in_flight_limit = 10
 request_timeout_secs = 30
 write_to_description = "a generic HTTP endpoint"
@@ -28,13 +28,13 @@ description = "Options for basic authentication."
 
 [sinks.http.options.basic_auth.options.password]
 type = "string"
-examples = ["password", "${PASSWORD_ENV_VAR}"]
+examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
 description = "The basic authentication password."
 
 [sinks.http.options.basic_auth.options.user]
 type = "string"
-examples = ["username"]
+examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
 description = "The basic authentication user name."
 
@@ -43,11 +43,11 @@ type = "table"
 null = true
 description = "Options for custom headers."
 
-[sinks.http.options.headers.options."*"]
+[sinks.http.options.headers.options."`[header-key]`"]
 type = "string"
 examples = [
-  {name = "Authorization", value = "${TOKEN_ENV_VAR}"},
-  {name = "X-Powered-By", value = "Vector"},
+  {"Authorization" = "${TOKEN_ENV_VAR}"},
+  {"X-Powered-By" = "Vector"},
 ]
 null = false
 description = "A custom header to be added to each outgoing HTTP request."
@@ -65,10 +65,27 @@ examples = ["https://10.22.212.22:9000/endpoint"]
 null = false
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
 
-[[sinks.elasticsearch.output.examples]]
+[[sinks.http.output.examples]]
+label = "JSON"
+body = """\
+```http
+POST <uri> HTTP/1.1
+Host: <uri.host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
+
+[
+  <json_encoded_log>,
+  <json_encoded_log>,
+  <json_encoded_log>,
+]
+```\
+"""
+
+[[sinks.http.output.examples]]
 label = "NDJSON"
-output.type = "http"
-ooutput.body = """\
+body = """\
+```http
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: application/x-ndjson
@@ -76,13 +93,14 @@ Content-Length: <byte_size>
 
 <json_encoded_log>
 <json_encoded_log>
-<json_encoded_log>\
+<json_encoded_log>
+```\
 """
 
 [[sinks.http.output.examples]]
 label = "Text"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: text/plain
@@ -90,5 +108,6 @@ Content-Length: <byte_size>
 
 <log.message>
 <log.message>
-<log.message>\
+<log.message>
+```\
 """

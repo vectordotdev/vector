@@ -11,10 +11,10 @@ encodings = ["ndjson", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-rate_limit_duration = 1
-rate_limit_num = 5
-retry_attempts = 5
-retry_backoff_secs = 1
+request_rate_limit_duration_secs = 1
+request_rate_limit_num =5
+request_retry_attempts = 5
+request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_s3_service_limits"
@@ -36,7 +36,7 @@ null = false
 description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 
 [sinks.aws_s3.options.filename_extension]
-type = "bool"
+type = "string"
 category = "Object Names"
 default = "log"
 null = false

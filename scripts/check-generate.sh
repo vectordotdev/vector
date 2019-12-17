@@ -29,7 +29,7 @@ if [[ -n "$changes" ]]; then
   echo ''
   echo 'This usually means that auto-generated sections were updated. '
   echo 'Instead, you should update the files in the /.meta dir and then run '
-  ecgo '`make generate`. See the ./DOCUMENTING.md guide for more info.'
+  echo '`make generate`. See the ./DOCUMENTING.md guide for more info.'
   exit 1
 else
   echo 'Nice! No generation changes detected.'

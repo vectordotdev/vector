@@ -7,14 +7,12 @@ Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides it's own "Updating" section:
 
 ---
-<%- updateable_methods = metadata.installation.to_h -%>
-<%- updateable_methods.delete(:operating_systems) -%>
-<%- updateable_methods.each do |category, methods| -%>
+<%- metadata.installation.to_h.slice(:containers, :package_managers).each do |category, methods| -%>
 
 **<%= category.to_s.humanize %>**
 
 <%- methods.each do |method| -%>
-<Jump to="[[[<%= method["name"] %>][docs.<%= category %>.<%= method["id"] %>#updating]]]"><%= method["name"] %></Jump>
+<Jump to="[[[docs.<%= category %>.<%= method["id"] %>#updating]]]"><%= method["name"] %></Jump>
 <%- end -%>
 <%- end -%>
 

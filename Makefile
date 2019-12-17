@@ -22,12 +22,12 @@ bench: ## Run internal benchmarks
 	@cargo bench --all
 
 build: ## Build the project
-	@cargo build
+	@cargo build --no-default-features --features="$${FEATURES:-default}"
 
 check: check-code check-fmt check-generate check-examples
 
-check-code: ## Checks code for compilation errors
-	@cargo check --all --all-features --all-targets
+check-code: ## Checks code for compilation errors (only default features)
+	@cargo check --all --all-targets
 
 check-fmt: ## Checks code formatting correctness
 	@cargo fmt -- --check
@@ -37,7 +37,7 @@ check-generate: ## Checks for pending `make generate` changes
 	@scripts/check-generate.sh
 
 check-examples: ## Validates the config examples
-	@find ./config/examples -name "*.toml" | xargs -I{} sh -c "cargo run -q -- validate --topology --deny-warnings -c {} || exit 255"
+	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-version: ## Checks that the version in Cargo.toml is up-to-date
 	@bundle install --gemfile=scripts/Gemfile --quiet

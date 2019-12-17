@@ -1,20 +1,22 @@
 import React, {useState} from 'react';
 
+import CheckboxList from '@site/src/components/CheckboxList';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 
+import _ from 'lodash';
 import classnames from 'classnames';
 import humanizeString from 'humanize-string';
-import queryString from 'query-string';
+import qs from 'qs';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
 function Component({delivery_guarantee, description, event_types, name, status, type}) {
   let path = null;
-  if(type == "source") path = `/docs/components/sources/${name}`;
-  if(type == "transform") path = `/docs/components/transforms/${name}`;
-  if(type == "sink") path = `/docs/components/sinks/${name}`;
+  if(type == "source") path = `/docs/reference/sources/${name}/`;
+  if(type == "transform") path = `/docs/reference/transforms/${name}/`;
+  if(type == "sink") path = `/docs/reference/sinks/${name}/`;
 
   return (
     <Link to={path} className="vector-component">
@@ -24,17 +26,17 @@ function Component({delivery_guarantee, description, event_types, name, status, 
       </div>
       <div className="vector-component--badges">
         {event_types.includes("log") ?
-          <span className="badge badge--secondary" title="This component works with log event types"><i className="feather icon-database"></i> log</span> :
+          <span className="badge badge--primary" title="This component works with log event types">L</span> :
           ''}
         {event_types.includes("metric") ?
-          <span className="badge badge--secondary" title="This component works with metric event types"><i className="feather icon-bar-chart"></i> metric</span> :
+          <span className="badge badge--primary" title="This component works with metric event types">M</span> :
           ''}
         {status == "beta" ?
-          <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i> beta</span> :
-          <span className="badge badge--primary" title="This component has passed reliability standards that make it production ready"><i className="feather icon-award"></i> prod-ready</span>}
+          <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i></span> :
+          <span className="badge badge--primary" title="This component has passed reliability standards that make it production ready"><i className="feather icon-award"></i></span>}
         {delivery_guarantee == "best_effort" ?
-          <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i> best-effort</span> :
-          <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i> at-least-once</span>}
+          <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i></span> :
+          <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i></span>}
       </div>
     </Link>
   );
@@ -80,7 +82,7 @@ function Components({components, headingLevel, titles}) {
           </>:
           ''}
         <hr />
-        <Jump to="https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature" target="_blank" icon="plus-circle">
+        <Jump to="https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature" target="_blank" icon="plus-circle">
           Request a new component
         </Jump>
       </>
@@ -95,43 +97,6 @@ function Components({components, headingLevel, titles}) {
   }
 }
 
-function FilterList({label, icon, values, currentState, setState}) {
-  if (values.size == 0)
-    return null;
-
-  const valuesArray = Array.from(values);
-
-  return (
-    <span className="vector-components--filters--section">
-      <div className="vector-components--filters--section--title">
-        {label}
-      </div>
-      {valuesArray.map((value, idx) => {
-        let label = typeof value === 'string' ? humanizeString(value) : value;
-
-        return (
-          <label key={idx}>
-            <input
-              type="checkbox"
-              onChange={(event) => {
-                let newValues = new Set(currentState);
-
-                if (event.currentTarget.checked)
-                  newValues.add(value);
-                else
-                  newValues.delete(value);
-
-                setState(newValues);
-              }}
-              checked={currentState.has(value)} />
-            {label} {icon ? <i className={`feather icon-${icon}`}></i> : ''}
-          </label>
-        );
-      })}
-    </span>
-  );
-}
-
 function VectorComponents(props) {
   //
   // Base Variables
@@ -141,7 +106,7 @@ function VectorComponents(props) {
   const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
-  const queryObj = props.location ? queryString.parse(props.location.search) : {};
+  const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
 
   let components = [];
   if (props.sources || props.sources == undefined) components = components.concat(Object.values(sources));
@@ -154,9 +119,10 @@ function VectorComponents(props) {
   //
 
   const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
-  const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['providers']));
+  const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['functions']));
   const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
   const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
+  const [onlyOperatingSystems, setOnlyOperatingSystems] = useState(new Set(queryObj['operating-systems']));
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
   const [onlyProviders, setOnlyProviders] = useState(new Set(queryObj['providers']));
   const [searchTerm, setSearchTerm] = useState(null);
@@ -188,6 +154,10 @@ function VectorComponents(props) {
     components = components.filter(component => component.event_types.includes("metric"));
   }
 
+  if (onlyOperatingSystems.size > 0) {
+    components = components.filter(component => Array.from(onlyOperatingSystems).every(x => component.operating_systems.includes(x)));
+  }
+
   if (onlyProductionReady) {
     components = components.filter(component => component.status == "prod-ready");
   }
@@ -200,17 +170,30 @@ function VectorComponents(props) {
   // Filter options
   //
 
-  const serviceProvidersArr =
-    components.filter(component => component.service_provider).
-    map(component => component.service_provider).
-    sort((a, b) => (a > b) ? 1 : -1);
-  const serviceProviders = new Set(serviceProvidersArr);
+  const operatingSystems = new Set(
+    _(components).
+      map(component => component.operating_systems).
+      flatten().
+      uniq().
+      compact().
+      sort().
+      value());
 
-  const functionCategoriesArr =
-    components.filter(component => component.function_category).
-    map(component => component.function_category).
-    sort((a, b) => (a > b) ? 1 : -1);
-  const functionCategories = new Set(functionCategoriesArr);
+  const serviceProviders = new Set(
+    _(components).
+      map(component => component.service_provider).
+      uniq().
+      compact().
+      sort().
+      value());
+
+  const functionCategories = new Set(
+    _(components).
+      map(component => component.function_category).
+      uniq().
+      compact().
+      sort().
+      value());
 
   //
   // Rendering
@@ -218,68 +201,98 @@ function VectorComponents(props) {
 
   return (
     <div className={classnames('vector-components', {'vector-components--cols': filterColumn})}>
-      <div className="vector-components--filters">
-        <div className="vector-components--filters--search">
+      <div className="filters">
+        <div className="search">
           <input
             type="text"
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
             placeholder="🔍 Search..." />
         </div>
-        <div className="vector-components--filters--checkboxes">
-          <span className="vector-components--filters--section">
-            <div className="vector-components--filters--section--title">
-              <Link to="/docs/about/data-model" title="Learn more about Vector's event types">
-                Event types <i className="feather icon-info"></i>
-              </Link>
-            </div>
+        <div className="filter">
+          <div className="filter--label">
+            <Link to="/docs/about/data-model/" title="Learn more about Vector's event types">
+              Event types <i className="feather icon-info"></i>
+            </Link>
+          </div>
+          <div className="filter--choices">
             <label title="Show only components that work with log event types.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyLog(event.currentTarget.checked)}
-                checked={onlyLog} />
-              Log <i className="feather icon-database"></i>
+                checked={onlyLog} /> Log
             </label>
             <label title="Show only components that work with metric event types.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyMetric(event.currentTarget.checked)}
-                checked={onlyMetric} />
-              Metric <i className="feather icon-bar-chart"></i>
+                checked={onlyMetric} /> Metric
             </label>
-          </span>
-          <span className="vector-components--filters--section">
-            <div className="vector-components--filters--section--title">
-              <Link to="/docs/about/guarantees" title="Learn more about Vector's guarantees">
-                Guarantees <i className="feather icon-info"></i>
-              </Link>
-            </div>
+          </div>
+        </div>
+        <div className="filter">
+          <div className="filter--label">
+            <Link to="/docs/about/guarantees/" title="Learn more about Vector's guarantees">
+              Guarantees <i className="feather icon-info"></i>
+            </Link>
+          </div>
+          <div className="filter--choices">
             <label title="Show only components that offer an at-least-once delivery guarantee.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyAtLeastOnce(event.currentTarget.checked)}
                 checked={onlyAtLeastOnce} />
-              At-least-once <i className="feather icon-shield"></i>
+              <i className="feather icon-shield"></i> At-least-once
             </label>
             <label title="Show only production ready components.">
               <input
                 type="checkbox"
                 onChange={(event) => setOnlyProductionReady(event.currentTarget.checked)}
                 checked={onlyProductionReady} />
-              Prod-ready <i className="feather icon-award"></i>
+              <i className="feather icon-award"></i> Prod-ready
             </label>
-          </span>
-          <FilterList
-            label="Providers"
-            icon="cloud"
-            values={serviceProviders}
-            currentState={onlyProviders}
-            setState={setOnlyProviders} />
-          <FilterList
-            label="Functions"
-            values={functionCategories}
-            currentState={onlyFunctions}
-            setState={setOnlyFunctions} />
+          </div>
         </div>
+        <div className="filter">
+          <div className="filter--label">Functions</div>
+          <div className="filter--choices">
+            <CheckboxList
+              label="Functions"
+              icon="code"
+              values={functionCategories}
+              currentState={onlyFunctions}
+              setState={setOnlyFunctions} />
+          </div>
+        </div>
+        {serviceProviders.size > 0 && (
+          <div className="filter">
+            <div className="filter--label">Providers</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Providers"
+                icon="cloud"
+                values={serviceProviders}
+                currentState={onlyProviders}
+                setState={setOnlyProviders} />
+            </div>
+          </div>
+        )}
+        {operatingSystems.size > 0 && (
+          <div className="filter">
+            <div className="filter--label">
+              <Link to="/docs/setup/installation/operating-systems/" title="Learn more about Vector's operating systems">
+                Operating Systems
+              </Link>
+            </div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Operating Systems"
+                icon="cpu"
+                values={operatingSystems}
+                currentState={onlyOperatingSystems}
+                setState={setOnlyOperatingSystems} />
+            </div>
+          </div>
+        )}
       </div>
       <div className="vector-components--results">
         <Components components={components} headingLevel={props.headingLevel} titles={titles} />
