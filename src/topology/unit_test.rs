@@ -161,7 +161,7 @@ fn build_unit_test(
         "raw" => match definition.input.value.as_ref() {
             Some(v) => Event::from(v.clone()),
             None => {
-                errors.push(format!("input type 'raw' requires the field 'value'"));
+                errors.push("input type 'raw' requires the field 'value'".to_string());
                 Event::from("")
             }
         },
@@ -181,7 +181,7 @@ fn build_unit_test(
                 }
                 event
             } else {
-                errors.push(format!("input type 'log' requires the field 'log_fields'"));
+                errors.push("input type 'log' requires the field 'log_fields'".to_string());
                 Event::from("")
             }
         }
@@ -189,7 +189,7 @@ fn build_unit_test(
             if let Some(metric) = &definition.input.metric {
                 Event::Metric(metric.clone())
             } else {
-                errors.push(format!("input type 'log' requires the field 'log_fields'"));
+                errors.push("input type 'log' requires the field 'log_fields'".to_string());
                 Event::from("")
             }
         }
@@ -244,7 +244,7 @@ fn build_unit_test(
                     transforms.insert(
                         name.clone(),
                         UnitTestTransform {
-                            transform: transform,
+                            transform,
                             next: outputs.into_iter().map(|(k, _)| k).collect(),
                         },
                     );
@@ -294,7 +294,7 @@ fn build_unit_test(
         }
         UnitTestCheck{
             extract_from: o.extract_from.clone(),
-            conditions: conditions,
+            conditions,
         }
     }).collect();
 
@@ -304,8 +304,8 @@ fn build_unit_test(
         Ok(UnitTest {
             name: definition.name.clone(),
             input: (definition.input.insert_at.clone(), input_event),
-            transforms: transforms,
-            checks: checks,
+            transforms,
+            checks,
         })
     }
 }
