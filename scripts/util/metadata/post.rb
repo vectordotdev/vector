@@ -37,8 +37,24 @@ class Post
     self.<=>(other) == 0
   end
 
+  def sink?(name)
+    tag?("sink: #{name}")
+  end
+
+  def source?(name)
+    tag?("source: #{name}")
+  end
+
+  def tag?(name)
+    tags.any? { |tag| tag == name }
+  end
+
+  def transform?(name)
+    tag?("transform: #{name}")
+  end
+
   def type?(name)
-    tags.any? { |tag| tag == "type: announcement" }
+    tag?("type: announcement")
   end
 
   def to_h

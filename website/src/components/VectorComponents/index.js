@@ -14,9 +14,9 @@ import './styles.css';
 
 function Component({delivery_guarantee, description, event_types, name, status, type}) {
   let path = null;
-  if(type == "source") path = `/docs/reference/sources/${name}`;
-  if(type == "transform") path = `/docs/reference/transforms/${name}`;
-  if(type == "sink") path = `/docs/reference/sinks/${name}`;
+  if(type == "source") path = `/docs/reference/sources/${name}/`;
+  if(type == "transform") path = `/docs/reference/transforms/${name}/`;
+  if(type == "sink") path = `/docs/reference/sinks/${name}/`;
 
   return (
     <Link to={path} className="vector-component">
@@ -210,7 +210,7 @@ function VectorComponents(props) {
         </div>
         <div className="filter">
           <div className="filter--label">
-            <Link to="/docs/about/data-model" title="Learn more about Vector's event types">
+            <Link to="/docs/about/data-model/" title="Learn more about Vector's event types">
               Event types <i className="feather icon-info"></i>
             </Link>
           </div>
@@ -231,7 +231,7 @@ function VectorComponents(props) {
         </div>
         <div className="filter">
           <div className="filter--label">
-            <Link to="/docs/about/guarantees" title="Learn more about Vector's guarantees">
+            <Link to="/docs/about/guarantees/" title="Learn more about Vector's guarantees">
               Guarantees <i className="feather icon-info"></i>
             </Link>
           </div>
@@ -279,7 +279,7 @@ function VectorComponents(props) {
         {operatingSystems.size > 0 && (
           <div className="filter">
             <div className="filter--label">
-              <Link to="/docs/installation/operating-systems" title="Learn more about Vector's operating systems">
+              <Link to="/docs/setup/installation/operating-systems/" title="Learn more about Vector's operating systems">
                 Operating Systems
               </Link>
             </div>

@@ -1,7 +1,6 @@
 ---
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
-posts_path: /blog/tags/transform-add_tags
 sidebar_label: "add_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
 status: "prod-ready"

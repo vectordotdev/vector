@@ -1,7 +1,6 @@
 ---
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
-posts_path: /blog/tags/transform-remove_tags
 sidebar_label: "remove_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_tags.rs
 status: "prod-ready"

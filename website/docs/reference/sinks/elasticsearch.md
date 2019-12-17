@@ -3,7 +3,6 @@ delivery_guarantee: "best_effort"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
 operating_systems: ["linux","macos","windows"]
-posts_path: /blog/tags/sink-elasticsearch
 sidebar_label: "elasticsearch|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
 status: "beta"

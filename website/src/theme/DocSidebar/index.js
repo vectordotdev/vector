@@ -70,7 +70,7 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
               className={classnames('menu__link', {
                 'menu__link--sublist': collapsible,
               })}
-              to={categoryHref}
+              to={categoryHref + "/"}
               onClick={
                 collapsible && categoryHref == '#!' ? () => setCollapsed(!collapsed) : undefined
               }>
@@ -109,7 +109,7 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
           <Link
             activeClassName="menu__link--active"
             className="menu__link"
-            to={href}
+            to={href + "/"}
             onClick={onItemClick}>
             {processedLabel}
             {eventTypes.length > 0 &&

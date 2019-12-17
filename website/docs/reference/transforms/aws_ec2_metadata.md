@@ -1,7 +1,6 @@
 ---
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
-posts_path: /blog/tags/transform-aws_ec2_metadata
 sidebar_label: "aws_ec2_metadata|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/aws_ec2_metadata.rs
 status: "prod-ready"
@@ -16,13 +15,13 @@ title: "aws_ec2_metadata transform"
      website/docs/reference/transforms/aws_ec2_metadata.md.erb
 -->
 
-The `aws_ec2_metadata` transform accepts [`log`][docs.data-model#log] events and allows you to enrich logs with AWS EC2 instance metadata.
+The `aws_ec2_metadata` transform accepts [`log`][docs.data-model.log] events and allows you to enrich logs with AWS EC2 instance metadata.
 
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration"/ >
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -142,7 +141,7 @@ The interval in seconds at which the EC2 Metadata api will be called.
 
 ## Output
 
-This component outputs [`log` events][docs.data-model.log].
+The `aws_ec2_metadata` transform accepts [`log`][docs.data-model.log] events and allows you to enrich logs with AWS EC2 instance metadata.
 For example:
 
 ```javascript
@@ -377,6 +376,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-[docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
-[docs.data-model#log]: /docs/about/data-model#log
-[docs.data-model.log]: /docs/about/data-model/log
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/

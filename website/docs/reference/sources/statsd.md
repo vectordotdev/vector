@@ -3,7 +3,6 @@ delivery_guarantee: "best_effort"
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22
 operating_systems: ["linux","macos","windows"]
-posts_path: /blog/tags/source-statsd
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/statsd/mod.rs
 status: "beta"

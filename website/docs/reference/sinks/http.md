@@ -3,7 +3,6 @@ delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
 operating_systems: ["linux","macos","windows"]
-posts_path: /blog/tags/sink-http
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"

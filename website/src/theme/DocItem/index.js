@@ -65,31 +65,31 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
       <div className="title">Support</div>
       {status == "beta" &&
         <div>
-          <Link to="/docs/about/guarantees#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
+          <Link to="/docs/about/guarantees/#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
             <i className="feather icon-alert-triangle"></i> beta
           </Link>
         </div>}
       {status == "prod-ready" &&
         <div>
-          <Link to="/docs/about/guarantees#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
+          <Link to="/docs/about/guarantees/#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
             <i className="feather icon-award"></i> prod-ready
           </Link>
         </div>}
       {deliveryGuarantee == "best_effort" &&
         <div>
-          <Link to="/docs/about/guarantees#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
+          <Link to="/docs/about/guarantees/#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
             <i className="feather icon-shield-off"></i> best-effort
           </Link>
         </div>}
       {deliveryGuarantee == "at_least_once" &&
         <div>
-          <Link to="/docs/about/guarantees#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
+          <Link to="/docs/about/guarantees/#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
             <i className="feather icon-shield"></i> at-least-once
           </Link>
         </div>}
       {operatingSystemsEls.length > 0 && 
         <div>
-          <Link to="/docs/setup/installation/operating-systems" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
+          <Link to="/docs/setup/installation/operating-systems/" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
             <i className="feather icon-cpu"></i> {operatingSystemsEls}
           </Link>
         </div>}

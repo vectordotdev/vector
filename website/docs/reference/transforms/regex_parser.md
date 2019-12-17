@@ -1,7 +1,6 @@
 ---
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
-posts_path: /blog/tags/transform-regex_parser
 sidebar_label: "regex_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
 status: "prod-ready"

@@ -1,7 +1,6 @@
 ---
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
-posts_path: /blog/tags/transform-field_filter
 sidebar_label: "field_filter|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 status: "beta"

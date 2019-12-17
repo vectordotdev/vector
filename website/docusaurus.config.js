@@ -17,11 +17,11 @@ module.exports = {
         darkSrc: 'img/logo-dark.svg'
       },
       links: [
-        {to: 'components', label: 'Components', position: 'left'},
-        {to: 'docs', label: 'Docs', position: 'left'},
-        {to: 'blog', label: 'Blog', position: 'left'},
-        {to: 'community', label: 'Community', position: 'left'},
-        {to: 'releases', label: 'Download', position: 'right'},
+        {to: 'components/', label: 'Components', position: 'left'},
+        {to: 'docs/', label: 'Docs', position: 'left'},
+        {to: 'blog/', label: 'Blog', position: 'left'},
+        {to: 'community/', label: 'Community', position: 'left'},
+        {to: 'releases/', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },

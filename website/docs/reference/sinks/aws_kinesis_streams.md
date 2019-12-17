@@ -3,7 +3,6 @@ delivery_guarantee: "at_least_once"
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22
 operating_systems: ["linux","macos","windows"]
-posts_path: /blog/tags/sink-aws_kinesis_streams
 sidebar_label: "aws_kinesis_streams|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
 status: "beta"

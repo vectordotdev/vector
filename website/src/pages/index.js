@@ -278,13 +278,13 @@ function Integrations() {
           <div className={styles.componentsCanvas} id="component-canvas"></div>
           <ul>
             {Object.keys(sources).map((key, index) => (
-              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}`}>{sources[key].name}</Link></li>
+              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}/`}>{sources[key].name}</Link></li>
             ))}
             {Object.keys(transforms).map((key, index) => (
-              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}`}>{transforms[key].name}</Link></li>
+              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}/`}>{transforms[key].name}</Link></li>
             ))}
             {Object.keys(sinks).map((key, index) => (
-              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}`}>{sinks[key].name}</Link></li>
+              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}/`}>{sinks[key].name}</Link></li>
             ))}
           </ul>
         </div>
