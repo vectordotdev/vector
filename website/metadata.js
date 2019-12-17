@@ -5214,7 +5214,7 @@ module.exports = {
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
       {
-        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+        "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
         "commits": [
 
         ],
@@ -5222,7 +5222,7 @@ module.exports = {
         "title": "The `file` and `console` sinks now require `encoding`"
       },
       {
-        "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+        "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
         "commits": [
 
         ],
@@ -17726,7 +17726,7 @@ module.exports = {
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
         {
-          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+          "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
           "commits": [
 
           ],
@@ -17734,7 +17734,7 @@ module.exports = {
           "title": "The `file` and `console` sinks now require `encoding`"
         },
         {
-          "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+          "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
           "commits": [
 
           ],

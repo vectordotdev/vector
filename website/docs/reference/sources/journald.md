@@ -261,6 +261,7 @@ A log event will be output with the following structure:
   "_SYSTEMD_SLICE": "system.slice",
   "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
 }
+```
 
 More detail on the output schema is below.
 

@@ -21,7 +21,6 @@
     "humanize-string": "^2.1.0",
     "pluralize": "^8.0.0",
     "prismjs": "^1.17.1",
-    "@mdx-js/runtime": "^1.5.1",
     "qs": "^6.9.1",
     "react": "^16.8.4",
     "react-dom": "^16.8.4",

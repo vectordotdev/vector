@@ -254,11 +254,13 @@ id = "encoding-guide"
 commits = []
 title = "The `file` and `console` sinks now require `encoding`"
 body = """\
+<p>
 The `file` and `console` sinks now require an explicit `encoding` option. The \
 previous implicit nature was confusing and this should eliminate any suprises \
 related to the output encoding format. Migration is easy:
+</p>
 
-```diff
+<pre>
  [sinks.my_console_sink]
    type = "console"
 +  encoding = "json" # or "text"
@@ -267,7 +269,7 @@ related to the output encoding format. Migration is easy:
  [sinks.my_file_sink]
    type = "file"
 +  encoding = "json" # or "text"
-```
+</pre>
 """
 
 [[releases."0.6.0".upgrade_guides]]
@@ -275,12 +277,14 @@ id = "datadog-guide"
 commits = []
 title = "The `datadog` sink has been renamed to `datadog_metrics`"
 body = """\
+<p>
 The `datadog` sink was incorrectly named since we'll be adding future support \
 for DataDog logs. Migrating is as simple as renaming your sink:
+</p>
 
-```diff
+<pre>
  [sinks.my_sink]
 -  type = "datadog"
 +  type = "datadog_metrics"
-```
+</pre>
 """
