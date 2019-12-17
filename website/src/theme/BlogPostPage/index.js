@@ -49,7 +49,7 @@ function BlogPostPage(props) {
           </section>
           <section className={classnames('panel', 'bleed', styles.mailingList)} style={{textAlign: 'center'}}>
             <div className={styles.mailingListTitle}>
-              Vector In Your Inbox
+              <i className="feather icon-mail"></i> Vector In Your Inbox!
             </div>
             <p>
               One email on the 1st of the month. No spam, ever.
