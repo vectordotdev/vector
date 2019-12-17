@@ -166,333 +166,6 @@ import Field from '@site/src/components/Field';
 
 <Field
   defaultValue={null}
-  enumValues={null}
-  examples={null}
-  name={"aggregated_histogram"}
-  path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### aggregated_histogram
-
-Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[[1,2,5,10,25]]}
-  name={"buckets"}
-  path={"aggregated_histogram"}
-  required={true}
-  type={"[double]"}
-  >
-
-#### buckets
-
-The buckets contained within this histogram.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[54]}
-  name={"count"}
-  path={"aggregated_histogram"}
-  required={true}
-  type={"int"}
-  >
-
-#### count
-
-The total number of values contained within the histogram.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[[1,5,25,2,5]]}
-  name={"counts"}
-  path={"aggregated_histogram"}
-  required={true}
-  type={"[int]"}
-  >
-
-#### counts
-
-The number of values contained within each bucket.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[524.0]}
-  name={"sum"}
-  path={"aggregated_histogram"}
-  required={true}
-  type={"double"}
-  >
-
-#### sum
-
-The sum of all values contained within the histogram.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={null}
-  name={"aggregated_summary"}
-  path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### aggregated_summary
-
-Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
-
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[54]}
-  name={"count"}
-  path={"aggregated_summary"}
-  required={true}
-  type={"int"}
-  >
-
-#### count
-
-The total number of values contained within the summary.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[[0.1,0.5,0.75,1.0]]}
-  name={"quantiles"}
-  path={"aggregated_summary"}
-  required={true}
-  type={"[double]"}
-  >
-
-#### quantiles
-
-The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[524.0]}
-  name={"sum"}
-  path={"aggregated_summary"}
-  required={true}
-  type={"double"}
-  >
-
-#### sum
-
-The sum of all values contained within the summary.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[[2.1,4.68,23.02,120.1]]}
-  name={"values"}
-  path={"aggregated_summary"}
-  required={true}
-  type={"[double]"}
-  >
-
-#### values
-
-The values contained within the summary that align with the [`quantiles`](#quantiles).
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={null}
-  name={"counter"}
-  path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### counter
-
-A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[2.6,5.0]}
-  name={"value"}
-  path={"counter"}
-  required={true}
-  type={"double"}
-  >
-
-#### value
-
-The value to increment the counter by. Can only be positive.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={null}
-  name={"distribution"}
-  path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### distribution
-
-A dsitribution represents a distribution of sampled values.
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[[12,43,25]]}
-  name={"sample_rates"}
-  path={"distribution"}
-  required={true}
-  type={"[int]"}
-  >
-
-#### sample_rates
-
-The rate at which each individual value was sampled.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[[12.0,43.3,25.2]]}
-  name={"values"}
-  path={"distribution"}
-  required={true}
-  type={"[double]"}
-  >
-
-#### values
-
-The list of values contained within the distribution.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={null}
-  name={"gauge"}
-  path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### gauge
-
-A gauge represents a point-in-time value that can increase and decrease. Vector's internal gauge type represents changes to that value. Gauges should be used to track fluctuations in values, like current memory or CPU usage.
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[554222.0]}
-  name={"value"}
-  path={"gauge"}
-  required={true}
-  type={"double"}
-  >
-
-#### value
-
-A specific point-in-time value for the gauge.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  defaultValue={null}
   enumValues={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
   examples={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
   name={"kind"}
@@ -531,46 +204,6 @@ The metric name.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={null}
-  name={"set"}
-  path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### set
-
-A set represents a count of unique values, AKA the cardinality.
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[["unique item 1","unique item 2"]]}
-  name={"values"}
-  path={"set"}
-  required={true}
-  type={"[string]"}
-  >
-
-#### values
-
-The list of unique values.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
   examples={[{"host":"my.host.com"}]}
   name={"tags"}
   path={null}
@@ -600,6 +233,395 @@ Tags that add additional metadata or context to the metric. These are simple key
 
 The metric timestamp, representing when the metric was created/ingested within Vector.
 
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"type"}
+  path={null}
+  required={true}
+  type={"struct"}
+  >
+
+### type
+
+A metric must be one of 6 types.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"aggregated_histogram"}
+  path={"type"}
+  required={false}
+  type={"struct"}
+  >
+
+#### aggregated_histogram
+
+Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[1,2,5,10,25]]}
+  name={"buckets"}
+  path={"type.aggregated_histogram"}
+  required={true}
+  type={"[double]"}
+  >
+
+##### buckets
+
+The buckets contained within this histogram.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[54]}
+  name={"count"}
+  path={"type.aggregated_histogram"}
+  required={true}
+  type={"int"}
+  >
+
+##### count
+
+The total number of values contained within the histogram.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[1,5,25,2,5]]}
+  name={"counts"}
+  path={"type.aggregated_histogram"}
+  required={true}
+  type={"[int]"}
+  >
+
+##### counts
+
+The number of values contained within each bucket.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[524.0]}
+  name={"sum"}
+  path={"type.aggregated_histogram"}
+  required={true}
+  type={"double"}
+  >
+
+##### sum
+
+The sum of all values contained within the histogram.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"aggregated_summary"}
+  path={"type"}
+  required={false}
+  type={"struct"}
+  >
+
+#### aggregated_summary
+
+Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[54]}
+  name={"count"}
+  path={"type.aggregated_summary"}
+  required={true}
+  type={"int"}
+  >
+
+##### count
+
+The total number of values contained within the summary.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[0.1,0.5,0.75,1.0]]}
+  name={"quantiles"}
+  path={"type.aggregated_summary"}
+  required={true}
+  type={"[double]"}
+  >
+
+##### quantiles
+
+The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[524.0]}
+  name={"sum"}
+  path={"type.aggregated_summary"}
+  required={true}
+  type={"double"}
+  >
+
+##### sum
+
+The sum of all values contained within the summary.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[2.1,4.68,23.02,120.1]]}
+  name={"values"}
+  path={"type.aggregated_summary"}
+  required={true}
+  type={"[double]"}
+  >
+
+##### values
+
+The values contained within the summary that align with the [`quantiles`](#quantiles).
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"counter"}
+  path={"type"}
+  required={false}
+  type={"struct"}
+  >
+
+#### counter
+
+A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[2.6,5.0]}
+  name={"value"}
+  path={"type.counter"}
+  required={true}
+  type={"double"}
+  >
+
+##### value
+
+The value to increment the counter by. Can only be positive.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"distribution"}
+  path={"type"}
+  required={false}
+  type={"struct"}
+  >
+
+#### distribution
+
+A dsitribution represents a distribution of sampled values.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[12,43,25]]}
+  name={"sample_rates"}
+  path={"type.distribution"}
+  required={true}
+  type={"[int]"}
+  >
+
+##### sample_rates
+
+The rate at which each individual value was sampled.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[12.0,43.3,25.2]]}
+  name={"values"}
+  path={"type.distribution"}
+  required={true}
+  type={"[double]"}
+  >
+
+##### values
+
+The list of values contained within the distribution.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"gauge"}
+  path={"type"}
+  required={false}
+  type={"struct"}
+  >
+
+#### gauge
+
+A gauge represents a point-in-time value that can increase and decrease. Vector's internal gauge type represents changes to that value. Gauges should be used to track fluctuations in values, like current memory or CPU usage.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[554222.0]}
+  name={"value"}
+  path={"type.gauge"}
+  required={true}
+  type={"double"}
+  >
+
+##### value
+
+A specific point-in-time value for the gauge.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"set"}
+  path={"type"}
+  required={false}
+  type={"struct"}
+  >
+
+#### set
+
+A set represents a count of unique values, AKA the cardinality.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[["unique item 1","unique item 2"]]}
+  name={"values"}
+  path={"type.set"}
+  required={true}
+  type={"[string]"}
+  >
+
+##### values
+
+The list of unique values.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
