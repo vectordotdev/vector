@@ -108,7 +108,20 @@ impl CloudWatchMetricsSvc {
         Ok(Box::new(healthcheck))
     }
 
-    fn create_client(region: Region, resolver: Resolver) -> crate::Result<CloudWatchClient> {
+    #[cfg_attr(not(test), allow(unused_mut))]
+    fn create_client(mut region: Region, resolver: Resolver) -> crate::Result<CloudWatchClient> {
+        #[cfg(test)]
+        {
+            // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
+            region = match region {
+                Region::Custom { endpoint, .. } => Region::Custom {
+                    name: "us-east-1".into(),
+                    endpoint,
+                },
+                _ => panic!("Only Custom regions are supported for CloudWatchClient testing"),
+            };
+        }
+
         let p = DefaultCredentialsProvider::new()?;
         let d = rusoto::client(resolver)?;
 
