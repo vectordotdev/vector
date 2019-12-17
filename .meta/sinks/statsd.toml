@@ -26,7 +26,8 @@ description = "A prefix that will be added to all metric names."
 
 [[sinks.statsd.output.examples]]
 label = "Generic"
-output.type = "text"
-output.body = """\
-gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s\
+body = """\
+```text
+gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s
+```\
 """

@@ -185,10 +185,10 @@ pub fn unix(
                 let host_key = host_key.clone();
 
                 let span = info_span!("connection");
-                let path = if let Some(addr) = peer_addr.clone() {
+                let path = if let Some(addr) = peer_addr {
                     if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                         span.record("peer_path", &field::debug(&path));
-                        Some(path.clone())
+                        Some(path)
                     } else {
                         None
                     }

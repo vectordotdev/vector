@@ -109,9 +109,8 @@ description = "When using the AWS provider, the [AWS region][urls.aws_elasticsea
 
 [[sinks.elasticsearch.output.examples]]
 label = "Generic"
-type = "http"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST <host>/_bulk HTTP/1.1
 Host: <host>
 Content-Type: application/x-ndjson
@@ -122,5 +121,6 @@ Content-Length: <byte_size>
 { "index" : { "_index" : "<index>" } }
 <json_encoded_log>
 { "index" : { "_index" : "<index>" } }
-<json_encoded_log>\
+<json_encoded_log>
+```\
 """

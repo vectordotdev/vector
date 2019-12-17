@@ -358,10 +358,7 @@ fn partition(
         }
     };
 
-    let key = CloudwatchKey {
-        stream,
-        group: group.clone(),
-    };
+    let key = CloudwatchKey { stream, group };
 
     Some(PartitionInnerBuffer::new(event, key))
 }

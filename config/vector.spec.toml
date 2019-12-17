@@ -16,7 +16,7 @@
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# /docs/setup/configuration
+# /docs/setup/configuration/
 
 # ------------------------------------------------------------------------------
 # Global
@@ -718,6 +718,50 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   field = "message"
 
+# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+[transforms.aws_ec2_metadata]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `aws_ec2_metadata`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "aws_ec2_metadata"
+  type = "aws_ec2_metadata"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # A list of fields to include in each event.
+  # 
+  # * optional
+  # * default: ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
+  # * type: [string]
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
+
+  # Override the default EC2 Metadata host.
+  # 
+  # * optional
+  # * default: "http://169.254.169.254"
+  # * type: string
+  host = "http://169.254.169.254"
+
+  # Prepend a namespace to each field's key.
+  # 
+  # * optional
+  # * default: ""
+  # * type: string
+  namespace = ""
+
+  # The interval in seconds at which the EC2 Metadata api will be called.
+  # 
+  # * optional
+  # * default: 10
+  # * type: int
+  refresh_interval_secs = 10
+
 # Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
   #
@@ -757,6 +801,45 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+
+# Accepts `log` events and allows you to concat (substrings) of other fields to a new one.
+[transforms.concat]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `concat`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "concat"
+  type = "concat"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # A list of substring definitons in the format of source_field[start..end]. For
+  # both start and end negative values are counted from the end of the string.
+  # 
+  # * required
+  # * type: [string]
+  items = ["fist[..3]", "second[-5..]", "third[3..6]"]
+
+  # The name for the new label.
+  # 
+  # * required
+  # * type: string
+  target = "dest_field_name"
+
+  # The string that is used to join all items.
+  # 
+  # * optional
+  # * default: " "
+  # * type: string
+  joiner = " "
+  joiner = ","
+  joiner = "_"
+  joiner = "+"
 
 # Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]

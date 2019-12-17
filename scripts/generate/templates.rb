@@ -78,9 +78,9 @@ class Templates
     render("#{partials_path}/_component_header.md", binding).strip
   end
 
-  def component_output(type, output, breakout_top_keys: false, heading_depth: 1)
+  def component_output(component, output, breakout_top_keys: false, heading_depth: 1)
     examples = output.examples
-    fields = output.fields.to_h.values.sort
+    fields = output.fields ? output.fields.to_h.values.sort : []
     render("#{partials_path}/_component_output.md", binding).strip
   end
 
@@ -161,7 +161,7 @@ class Templates
 
   def event_type_links(types)
     types.collect do |type|
-      "[`#{type}`][docs.data-model##{type}]"
+      "[`#{type}`][docs.data-model.#{type}]"
     end
   end
 
@@ -173,7 +173,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields, breakout_top_keys: false)
+  def fields_example(fields)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -388,7 +388,7 @@ class Templates
         -->
         EOF
     
-      content.sub!(/\n---\n\n/, "\n---\n#{notice}\n")
+      content.sub!(/\n## /, "#{notice}\n## ")
     end
 
     content
@@ -398,11 +398,6 @@ class Templates
     strip <<~EOF
     #{write_verb_link(sink)} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
     EOF
-  end
-
-  def sink_output(component)
-    examples = component.output.examples
-    render("#{partials_path}/_sink_output.md", binding).strip
   end
 
   def source_description(source)

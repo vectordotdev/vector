@@ -97,6 +97,7 @@ class Metadata
 
     hash["sources"].collect do |source_name, source_hash|
       source_hash["name"] = source_name
+      source_hash["posts"] = posts.select { |post| post.source?(source_name) }
       source = Source.new(source_hash)
       @sources.send("#{source_name}=", source)
     end
@@ -105,6 +106,7 @@ class Metadata
 
     hash["transforms"].collect do |transform_name, transform_hash|
       transform_hash["name"] = transform_name
+      transform_hash["posts"] = posts.select { |post| post.transform?(transform_name) }
       transform = Transform.new(transform_hash)
       @transforms.send("#{transform_name}=", transform)
     end
@@ -113,6 +115,7 @@ class Metadata
 
     hash["sinks"].collect do |sink_name, sink_hash|
       sink_hash["name"] = sink_name
+      sink_hash["posts"] = posts.select { |post| post.sink?(sink_name) }
 
       sink =
         case sink_hash.fetch("egress_method")
@@ -194,6 +197,36 @@ class Metadata
     releases_list.select do |other_release|
       other_release > release
     end
+  end
+
+  def new_post
+    return @new_post if defined?(@new_post)
+
+    @new_post ||=
+      begin
+        last_post = posts.last
+        
+        if (Date.today - last_post.date) <= 30
+          last_post
+        else
+          nil
+        end
+      end
+  end
+
+  def new_release
+    return @new_post if defined?(@new_post)
+
+    @new_post ||=
+      begin
+        last_release = releases.releases_list.last
+        
+        if (Date.today - last_release.date) <= 30
+          last_release
+        else
+          nil
+        end
+      end
   end
 
   def post_tags

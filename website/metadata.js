@@ -227,7 +227,7 @@ module.exports = {
     ]
   },
   "latest_post": {
-    "author_id": "ash",
+    "author_id": "ashley",
     "date": "2019-11-25",
     "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
@@ -5197,7 +5197,7 @@ module.exports = {
         "title": "Windows Support Is Here!"
       },
       {
-        "author_id": "ash",
+        "author_id": "ashley",
         "date": "2019-11-25",
         "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
         "id": "unit-testing-vector-config-files",
@@ -5214,7 +5214,7 @@ module.exports = {
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
       {
-        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+        "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
         "commits": [
 
         ],
@@ -5222,7 +5222,7 @@ module.exports = {
         "title": "The `file` and `console` sinks now require `encoding`"
       },
       {
-        "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+        "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
         "commits": [
 
         ],
@@ -5281,7 +5281,7 @@ module.exports = {
       "title": "Windows Support Is Here!"
     },
     {
-      "author_id": "ash",
+      "author_id": "ashley",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -17709,7 +17709,7 @@ module.exports = {
           "title": "Windows Support Is Here!"
         },
         {
-          "author_id": "ash",
+          "author_id": "ashley",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
@@ -17726,7 +17726,7 @@ module.exports = {
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
         {
-          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+          "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
           "commits": [
 
           ],
@@ -17734,7 +17734,7 @@ module.exports = {
           "title": "The `file` and `console` sinks now require `encoding`"
         },
         {
-          "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+          "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
           "commits": [
 
           ],
@@ -18392,41 +18392,49 @@ module.exports = {
   "team": [
     {
       "avatar": "https://github.com/a-rodin.png",
+      "github": "https://github.com/a-rodin",
       "id": "alex",
       "name": "Alexander"
     },
     {
       "avatar": "https://github.com/loony-bean.png",
+      "github": "https://github.com/loony-bean",
       "id": "alexey",
       "name": "Alexey"
     },
     {
       "avatar": "https://github.com/Jeffail.png",
-      "id": "ash",
-      "name": "Ash"
+      "github": "https://github.com/Jeffail",
+      "id": "ashley",
+      "name": "Ashley"
     },
     {
       "avatar": "https://github.com/binarylogic.png",
+      "github": "https://github.com/binarylogic",
       "id": "ben",
       "name": "Ben"
     },
     {
       "avatar": "https://github.com/bruceg.png",
+      "github": "https://github.com/bruceg",
       "id": "bruce",
       "name": "Bruce"
     },
     {
       "avatar": "https://github.com/ktff.png",
+      "github": "https://github.com/ktff",
       "id": "kruno",
       "name": "Kruno"
     },
     {
       "avatar": "https://github.com/LucioFranco.png",
+      "github": "https://github.com/LucioFranco",
       "id": "lucio",
       "name": "Lucio"
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
+      "github": "https://github.com/lukesteensen",
       "id": "luke",
       "name": "Luke"
     }
@@ -18492,6 +18500,26 @@ module.exports = {
 
       ]
     },
+    "aws_ec2_metadata": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "enrich",
+      "id": "aws_ec2_metadata_transform",
+      "name": "aws_ec2_metadata",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "coercer": {
       "beta": false,
       "delivery_guarantee": null,
@@ -18507,6 +18535,28 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "concat": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to concat (substrings) of other fields to a new one.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": [
+        "filter"
+      ],
+      "id": "concat_transform",
+      "name": "concat",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 

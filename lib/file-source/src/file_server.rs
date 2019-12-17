@@ -99,7 +99,7 @@ impl FileServer {
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .unwrap_or(time::SystemTime::now())
+                .unwrap_or_else(|_| time::SystemTime::now())
         });
 
         for (path, file_id) in existing_files {

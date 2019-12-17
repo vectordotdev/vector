@@ -29,12 +29,12 @@
 }
 
 @media (max-width: 996px) {
-  .hero .mailing-list form input[type="email"] {
+  .mailing-list form input[type="email"] {
     display: block;
     max-width: none;
   }
 
-  .hero .mailing-list form .button {
+  .mailing-list form .button {
     display: block;
     margin: var(--ifm-spacing-vertical) 0 0 0;
     width: 100%;

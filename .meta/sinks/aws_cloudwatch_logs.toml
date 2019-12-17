@@ -72,8 +72,8 @@ description = "Dynamically create a [log stream][urls.aws_cw_logs_stream_name] i
 
 [[sinks.aws_cloudwatch_logs.output.examples]]
 label = "Generic"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST / HTTP/1.1
 Host: logs.<region>.<domain>
 X-Amz-Date: <date>
@@ -100,5 +100,6 @@ X-Amz-Target: Logs_20140328.PutLogEvents
       "message": "<json_encoded_log>"
     }
   ]
-}\
+}
+```\
 """

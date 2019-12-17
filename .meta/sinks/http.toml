@@ -67,8 +67,8 @@ description = "The full URI to make HTTP requests to. This should include the pr
 
 [[sinks.http.output.examples]]
 label = "JSON"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: application/x-ndjson
@@ -78,13 +78,14 @@ Content-Length: <byte_size>
   <json_encoded_log>,
   <json_encoded_log>,
   <json_encoded_log>,
-]\
+]
+```\
 """
 
 [[sinks.http.output.examples]]
 label = "NDJSON"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: application/x-ndjson
@@ -92,13 +93,14 @@ Content-Length: <byte_size>
 
 <json_encoded_log>
 <json_encoded_log>
-<json_encoded_log>\
+<json_encoded_log>
+```\
 """
 
 [[sinks.http.output.examples]]
 label = "Text"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST <uri> HTTP/1.1
 Host: <uri.host>
 Content-Type: text/plain
@@ -106,5 +108,6 @@ Content-Length: <byte_size>
 
 <log.message>
 <log.message>
-<log.message>\
+<log.message>
+```\
 """

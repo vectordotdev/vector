@@ -64,9 +64,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
         Format::Json => {
             let list = EncodedList {
-                sources: sources,
-                transforms: transforms,
-                sinks: sinks,
+                sources,
+                transforms,
+                sinks,
             };
             println!("{}", serde_json::to_string(&list).unwrap());
         }

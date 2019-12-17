@@ -3,7 +3,7 @@
 class Field
   include Comparable
 
-  TYPES = ["*", "bool", "double", "int", "map", "string", "struct", "timestamp"].freeze
+  TYPES = ["*", "bool", "double", "[double]", "int", "[int]", "map", "string", "[string]", "struct", "timestamp"].freeze
 
   class << self
     def build_struct(hash)

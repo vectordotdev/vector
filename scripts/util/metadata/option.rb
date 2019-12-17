@@ -44,6 +44,9 @@ class Option
     @enum = hash["enum"]
     @examples = hash["examples"] || []
     @name = hash.fetch("name")
+    if !hash.key?("null")
+      raise hash.inspect
+    end
     @null = hash.fetch("null")
     @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true

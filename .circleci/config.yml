@@ -218,6 +218,7 @@ jobs:
           - xpack.ssl.certificate=certs/localhost.crt
           - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
+      - image: timberiodev/mock-ec2-metadata:latest
     steps:
       - checkout
       - setup_remote_docker:
