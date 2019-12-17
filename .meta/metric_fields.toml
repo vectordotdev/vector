@@ -1,90 +1,57 @@
+[metric_fields.kind]
+type = "string"
+optional = false
+description = """\
+The metric value kind. This determines how the value is merged downstream if \
+metrics are aggregated.
+"""
+
+[metric_fields.kind.enum]
+absolute = "The value is an absolute, stand-alone value. It can be used individually."
+incremental = "The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."
+
+[metric_fields.name]
+type = "string"
+examples = ["login.count", "response_time"]
+optional = false
+description = """\
+The metric name.\
+"""
+
+[metric_fields.tags]
+type = "map"
+examples = [{host = "my.host.com"}]
+optional = false
+description = """\
+Tags that add additional metadata or context to the metric. These are simple \
+key/value pairs in `string` format and cannot be nested.\
+"""
+
+[metric_fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The metric timestamp, representing when the metric was created/ingested within \
+Vector.\
+"""
+
+
 [metric_fields.counter]
 type = "struct"
 optional = true
 description = """\
-A single value that can _only_ be incremented, it cannot be incremented.\
+A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.\
 """
 
-[metric_fields.counter.fields.name]
-type = "string"
-examples = ["login.count"]
-optional = false
-description = """\
-The metric name.\
-"""
-
-[metric_fields.counter.fields.val]
+[metric_fields.counter.fields.value]
 type = "double"
-examples = [10.2]
+examples = [2.6, 5.0]
 optional = false
 description = """\
-Amount to increment.\
+The value to increment the counter by. Can only be positive.\
 """
 
-[metric_fields.counter.fields.tags]
-type = "map"
-examples = [{host = "my.host.com"}]
-optional = false
-description = """\
-The metric name.\
-"""
-
-[metric_fields.counter.fields.timestamp]
-type = "timestamp"
-examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
-description = """\
-Time metric was created/ingested.\
-"""
-
-[metric_fields.histogram]
-type = "struct"
-optional = true
-description = """\
-Also called a "timer". A `histogram` represents the frequency distribution of a \
-value. This is commonly used for timings, helping to understand quantiles, max, \
-min, and other aggregations.\
-"""
-
-[metric_fields.histogram.fields.name]
-type = "string"
-examples = ["duration_ms"]
-optional = false
-description = """\
-The metric name.\
-"""
-
-[metric_fields.histogram.fields.val]
-type = "double"
-examples = [2.6]
-optional = false
-description = """\
-Specific value.\
-"""
-
-[metric_fields.histogram.fields.sample_rate]
-type = "double"
-examples = [1]
-optional = true
-description = """\
-The bucket/distribution the metric is a part of.\
-"""
-
-[metric_fields.histogram.fields.tags]
-type = "map"
-examples = [{host = "my.host.com"}]
-optional = false
-description = """\
-The metric name.\
-"""
-
-[metric_fields.histogram.fields.timestamp]
-type = "timestamp"
-examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
-description = """\
-Time metric was created/ingested.\
-"""
 
 [metric_fields.gauge]
 type = "struct"
@@ -95,45 +62,14 @@ Vector's internal gauge type represents changes to that value. Gauges should be 
 used to track fluctuations in values, like current memory or CPU usage.\
 """
 
-[metric_fields.gauge.fields.direction]
-type = "string"
-enum = ["plus", "minus"]
-optional = false
-description = """\
-The direction to increase or decrease the gauge value.\
-"""
-
-[metric_fields.gauge.fields.name]
-type = "string"
-examples = ["memory_rss"]
-optional = false
-description = """\
-The metric name.\
-"""
-
-[metric_fields.gauge.fields.val]
+[metric_fields.gauge.fields.value]
 type = "double"
 examples = [554222.0]
 optional = false
 description = """\
-Specific value.\
+A specific point-in-time value for the gauge.\
 """
 
-[metric_fields.gauge.fields.tags]
-type = "map"
-examples = [{host = "my.host.com"}]
-optional = false
-description = """\
-The metric name.\
-"""
-
-[metric_fields.gauge.fields.timestamp]
-type = "timestamp"
-examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
-description = """\
-Time metric was created/ingested.\
-"""
 
 [metric_fields.set]
 type = "struct"
@@ -142,34 +78,119 @@ description = """\
 A set represents a count of unique values, AKA the cardinality.\
 """
 
-[metric_fields.set.fields.name]
-type = "string"
-examples = ["unique_users"]
+[metric_fields.set.fields.values]
+type = "[string]"
+examples = [["unique item 1", "unique item 2"]]
 optional = false
 description = """\
-The metric name.\
+The list of unique values.\
 """
 
-[metric_fields.set.fields.val]
+
+[metric_fields.distribution]
+type = "struct"
+optional = true
+description = """\
+A dsitribution represents a distribution of sampled values.\
+"""
+
+[metric_fields.distribution.fields.values]
+type = "[double]"
+examples = [[12.0, 43.3, 25.2]]
+optional = false
+description = """\
+The list of values contained within the distribution.\
+"""
+
+[metric_fields.distribution.fields.sample_rates]
+type = "[int]"
+examples = [[12, 43, 25]]
+optional = false
+description = """\
+The rate at which each individual value was sampled.\
+"""
+
+
+[metric_fields.aggregated_histogram]
+type = "struct"
+optional = true
+description = """\
+Also called a "timer". A `aggregated_histogram` samples observations (usually \
+things like request durations or response sizes) and counts them in \
+configurable buckets. It also provides a sum of all observed values.\
+"""
+
+[metric_fields.aggregated_histogram.fields.buckets]
+type = "[double]"
+examples = [[1, 2, 5, 10, 25]]
+optional = false
+description = """\
+The buckets contained within this histogram.\
+"""
+
+[metric_fields.aggregated_histogram.fields.counts]
+type = "[int]"
+examples = [[1, 5, 25, 2, 5]]
+optional = false
+description = """\
+The number of values contained within each bucket.\
+"""
+
+[metric_fields.aggregated_histogram.fields.count]
+type = "int"
+examples = [54]
+optional = false
+description = """\
+The total number of values contained within the histogram.\
+"""
+
+[metric_fields.aggregated_histogram.fields.sum]
 type = "double"
-examples = [12]
+examples = [524.0]
 optional = false
 description = """\
-Specific value.\
+The sum of all values contained within the histogram.\
 """
 
-[metric_fields.set.fields.tags]
-type = "map"
-examples = [{host = "my.host.com"}]
-optional = false
+
+[metric_fields.aggregated_summary]
+type = "struct"
+optional = true
 description = """\
-The metric name.\
+Similar to a histogram, a summary samples observations (usually things like \
+request durations and response sizes). While it also provides a total count \
+of observations and a sum of all observed values, it calculates configurable \
+quantiles over a sliding time window.
 """
 
-[metric_fields.set.fields.timestamp]
-type = "timestamp"
-examples = ["2019-11-01T21:15:47.443232Z"]
+[metric_fields.aggregated_summary.fields.quantiles]
+type = "[double]"
+examples = [[0.1, 0.5, 0.75, 1.0]]
 optional = false
 description = """\
-Time metric was created/ingested.\
+The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.\
+"""
+
+[metric_fields.aggregated_summary.fields.values]
+type = "[double]"
+examples = [[2.1, 4.68, 23.02, 120.1]]
+optional = false
+description = """\
+The values contained within the summary that align with the `quantiles`.\
+"""
+
+[metric_fields.aggregated_summary.fields.count]
+type = "int"
+examples = [54]
+optional = false
+description = """\
+The total number of values contained within the summary.\
+"""
+
+[metric_fields.aggregated_summary.fields.sum]
+type = "double"
+examples = [524.0]
+optional = false
+description = """\
+The sum of all values contained within the summary.\
 """

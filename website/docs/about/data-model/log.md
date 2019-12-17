@@ -20,7 +20,7 @@ import SVG from 'react-inlinesvg';
 A `log` event is a structured represention of a point-in-time event. It contains
 an arbitrary set of fields (key/value pairs) that describe the event.
 
-## Schema
+## Examples
 
 ```javascript
 {
@@ -30,6 +30,8 @@ an arbitrary set of fields (key/value pairs) that describe the event.
   "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
+
+## Schema
 
 import Fields from '@site/src/components/Fields';
 

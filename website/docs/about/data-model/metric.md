@@ -18,77 +18,335 @@ import SVG from 'react-inlinesvg';
 ## Description
 
 A `metric` event represents a numeric value. The types are heavily inspired by
-the Statsd and Prometheus models.
+the StatsD and Prometheus models.
 
-## Schema
+## Examples
 
 import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="counter"
-  values={[{"label":"counter","value":"counter"},{"label":"gauge","value":"gauge"},{"label":"histogram","value":"histogram"},{"label":"set","value":"set"}]}>
-
 import TabItem from '@theme/TabItem';
 
+<Tabs
+  defaultValue="counter"
+  select={true}
+  values={[
+    { label: 'Counter', value: 'counter', },
+    { label: 'Gauge', value: 'gauge', },
+    { label: 'Set', value: 'set', },
+    { label: 'Distribution', value: 'distribution', },
+    { label: 'Aggregated Histogram', value: 'aggregated_histogram', },
+    { label: 'Aggregated Summary', value: 'aggregated_summary', },
+  ]
+}>
 <TabItem value="counter">
 
-```javascript
+```json
 {
   "name": "login.count",
-  "host": "my.host.com",
   "timestamp": "2019-11-01T21:15:47+00:00",
-  "val": 10.2
+  "kind": "absolute",
+  "tags": {
+    "host": "my.host.com"
+  },
+  "counter": {
+    "value": 24.2
+  }
 }
 ```
 
 </TabItem>
 <TabItem value="gauge">
 
-```javascript
+```json
 {
-  "direction": "plus",
   "name": "memory_rss",
-  "host": "my.host.com",
   "timestamp": "2019-11-01T21:15:47+00:00",
-  "val": 554222.0
-}
-```
-
-</TabItem>
-<TabItem value="histogram">
-
-```javascript
-{
-  "name": "duration_ms",
-  "sample_rate": 1,
-  "host": "my.host.com",
-  "timestamp": "2019-11-01T21:15:47+00:00",
-  "val": 2.6
+  "kind": "absolute",
+  "tags": {
+    "host": "my.host.com"
+  },
+  "counter": {
+    "value": 51200000000.0
+  }
 }
 ```
 
 </TabItem>
 <TabItem value="set">
 
-```javascript
+```json
 {
-  "name": "unique_users",
-  "host": "my.host.com",
+  "name": "user_names",
   "timestamp": "2019-11-01T21:15:47+00:00",
-  "val": 12
+  "kind": "absolute",
+  "tags": {
+    "host": "my.host.com"
+  },
+  "set": {
+    "values": ["bob", "sam", "ben"]
+  }
 }
 ```
 
 </TabItem>
+<TabItem value="distribution">
 
+```json
+{
+  "name": "response_time_ms",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "kind": "absolute",
+  "tags": {
+    "host": "my.host.com"
+  },
+  "distribution": {
+    "values": [2.21, 5.46, 10.22],
+    "sample_rates": [5, 2, 5]
+  }
+}
+```
+
+</TabItem>
+<TabItem value="aggregated_histogram">
+
+```json
+{
+  "name": "response_time_ms",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "kind": "absolute",
+  "tags": {
+    "host": "my.host.com"
+  },
+  "aggregated_histogram": {
+    "buckets": [1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
+    "counts": [20, 10, 45, 12, 18, 92],
+    "count": 197,
+    "sum": 975.2
+  }
+}
+```
+
+</TabItem>
+<TabItem value="aggregated_summary">
+
+```json
+{
+  "name": "response_time_ms",
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "kind": "absolute",
+  "tags": {
+    "host": "my.host.com"
+  },
+  "aggregated_summary": {
+    "quantiles": [0.1, 0.25, 0.5, 0.9, 0.99, 1.0],
+    "values": [2, 3, 5, 8, 9, 10],
+    "count": 197,
+    "sum": 975.2
+  }
+}
+```
+
+</TabItem>
 </Tabs>
+
+## Schema
+
+The metric data model is comprised of 6 types:[`aggregated_histogram`](#aggregated_histogram),[`aggregated_summary`](#aggregated_summary),[`counter`](#counter),[`distribution`](#distribution),[`gauge`](#gauge),[`set`](#set).
+You'll notice that certain fields are shared across all types.
 
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"aggregated_histogram"}
+  path={null}
+  required={false}
+  type={"struct"}
+  >
+
+### aggregated_histogram
+
+Also called a "timer". A[`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[1,2,5,10,25]]}
+  name={"buckets"}
+  path={"aggregated_histogram"}
+  required={true}
+  type={"[double]"}
+  >
+
+#### buckets
+
+The buckets contained within this histogram.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[54]}
+  name={"count"}
+  path={"aggregated_histogram"}
+  required={true}
+  type={"int"}
+  >
+
+#### count
+
+The total number of values contained within the histogram.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[1,5,25,2,5]]}
+  name={"counts"}
+  path={"aggregated_histogram"}
+  required={true}
+  type={"[int]"}
+  >
+
+#### counts
+
+The number of values contained within each bucket.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[524.0]}
+  name={"sum"}
+  path={"aggregated_histogram"}
+  required={true}
+  type={"double"}
+  >
+
+#### sum
+
+The sum of all values contained within the histogram.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"aggregated_summary"}
+  path={null}
+  required={false}
+  type={"struct"}
+  >
+
+### aggregated_summary
+
+Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[54]}
+  name={"count"}
+  path={"aggregated_summary"}
+  required={true}
+  type={"int"}
+  >
+
+#### count
+
+The total number of values contained within the summary.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[0.1,0.5,0.75,1.0]]}
+  name={"quantiles"}
+  path={"aggregated_summary"}
+  required={true}
+  type={"[double]"}
+  >
+
+#### quantiles
+
+The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[524.0]}
+  name={"sum"}
+  path={"aggregated_summary"}
+  required={true}
+  type={"double"}
+  >
+
+#### sum
+
+The sum of all values contained within the summary.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[2.1,4.68,23.02,120.1]]}
+  name={"values"}
+  path={"aggregated_summary"}
+  required={true}
+  type={"[double]"}
+  >
+
+#### values
+
+The values contained within the summary that align with the[`quantiles`](#quantiles).
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
 
 
 <Field
@@ -103,7 +361,7 @@ import Field from '@site/src/components/Field';
 
 ### counter
 
-A single value that can _only_ be incremented, it cannot be incremented.
+A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.
 
 <Fields filters={false}>
 
@@ -111,70 +369,74 @@ A single value that can _only_ be incremented, it cannot be incremented.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={["login.count"]}
-  name={"name"}
-  path={"counter"}
-  required={true}
-  type={"string"}
-  >
-
-#### name
-
-The metric name.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"my.host.com"}]}
-  name={"tags"}
-  path={"counter"}
-  required={true}
-  type={"map"}
-  >
-
-#### tags
-
-The metric name.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-01T21:15:47+00:00"]}
-  name={"timestamp"}
-  path={"counter"}
-  required={true}
-  type={"timestamp"}
-  >
-
-#### timestamp
-
-Time metric was created/ingested.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[10.2]}
-  name={"val"}
+  examples={[2.6,5.0]}
+  name={"value"}
   path={"counter"}
   required={true}
   type={"double"}
   >
 
-#### val
+#### value
 
-Amount to increment.
+The value to increment the counter by. Can only be positive.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={null}
+  name={"distribution"}
+  path={null}
+  required={false}
+  type={"struct"}
+  >
+
+### distribution
+
+A dsitribution represents a distribution of sampled values.
+
+<Fields filters={false}>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[12,43,25]]}
+  name={"sample_rates"}
+  path={"distribution"}
+  required={true}
+  type={"[int]"}
+  >
+
+#### sample_rates
+
+The rate at which each individual value was sampled.
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={[[12.0,43.3,25.2]]}
+  name={"values"}
+  path={"distribution"}
+  required={true}
+  type={"[double]"}
+  >
+
+#### values
+
+The list of values contained within the distribution.
 
 
 </Field>
@@ -204,89 +466,17 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
 
 <Field
   defaultValue={null}
-  enumValues={["plus","minus"]}
-  examples={["plus","minus"]}
-  name={"direction"}
-  path={"gauge"}
-  required={true}
-  type={"string"}
-  >
-
-#### direction
-
-The direction to increase or decrease the gauge value.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={["memory_rss"]}
-  name={"name"}
-  path={"gauge"}
-  required={true}
-  type={"string"}
-  >
-
-#### name
-
-The metric name.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"my.host.com"}]}
-  name={"tags"}
-  path={"gauge"}
-  required={true}
-  type={"map"}
-  >
-
-#### tags
-
-The metric name.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-01T21:15:47+00:00"]}
-  name={"timestamp"}
-  path={"gauge"}
-  required={true}
-  type={"timestamp"}
-  >
-
-#### timestamp
-
-Time metric was created/ingested.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
   enumValues={null}
   examples={[554222.0]}
-  name={"val"}
+  name={"value"}
   path={"gauge"}
   required={true}
   type={"double"}
   >
 
-#### val
+#### value
 
-Specific value.
+A specific point-in-time value for the gauge.
 
 
 </Field>
@@ -299,112 +489,37 @@ Specific value.
 
 <Field
   defaultValue={null}
-  enumValues={null}
-  examples={null}
-  name={"histogram"}
+  enumValues={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
+  examples={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
+  name={"kind"}
   path={null}
-  required={false}
-  type={"struct"}
-  >
-
-### histogram
-
-Also called a "timer". A[`histogram`](#histogram) represents the frequency distribution of a value. This is commonly used for timings, helping to understand quantiles, max, min, and other aggregations.
-
-<Fields filters={false}>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={["duration_ms"]}
-  name={"name"}
-  path={"histogram"}
   required={true}
   type={"string"}
   >
 
-#### name
+### kind
+
+The metric value kind. This determines how the value is merged downstream if metrics are aggregated.
+
+
+
+</Field>
+
+
+<Field
+  defaultValue={null}
+  enumValues={null}
+  examples={["login.count","response_time"]}
+  name={"name"}
+  path={null}
+  required={true}
+  type={"string"}
+  >
+
+### name
 
 The metric name.
 
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[1]}
-  name={"sample_rate"}
-  path={"histogram"}
-  required={false}
-  type={"double"}
-  >
-
-#### sample_rate
-
-The bucket/distribution the metric is a part of.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"my.host.com"}]}
-  name={"tags"}
-  path={"histogram"}
-  required={true}
-  type={"map"}
-  >
-
-#### tags
-
-The metric name.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-01T21:15:47+00:00"]}
-  name={"timestamp"}
-  path={"histogram"}
-  required={true}
-  type={"timestamp"}
-  >
-
-#### timestamp
-
-Time metric was created/ingested.
-
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[2.6]}
-  name={"val"}
-  path={"histogram"}
-  required={true}
-  type={"double"}
-  >
-
-#### val
-
-Specific value.
-
-
-</Field>
-
-
-</Fields>
 
 </Field>
 
@@ -429,17 +544,22 @@ A set represents a count of unique values, AKA the cardinality.
 <Field
   defaultValue={null}
   enumValues={null}
-  examples={["unique_users"]}
-  name={"name"}
+  examples={[["unique item 1","unique item 2"]]}
+  name={"values"}
   path={"set"}
   required={true}
-  type={"string"}
+  type={"[string]"}
   >
 
-#### name
+#### values
 
-The metric name.
+The list of unique values.
 
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -449,14 +569,14 @@ The metric name.
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
   name={"tags"}
-  path={"set"}
+  path={null}
   required={true}
   type={"map"}
   >
 
-#### tags
+### tags
 
-The metric name.
+Tags that add additional metadata or context to the metric. These are simple key/value pairs in `string` format and cannot be nested.
 
 
 </Field>
@@ -467,38 +587,15 @@ The metric name.
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
-  path={"set"}
+  path={null}
   required={true}
   type={"timestamp"}
   >
 
-#### timestamp
+### timestamp
 
-Time metric was created/ingested.
+The metric timestamp, representing when the metric was created/ingested within Vector.
 
-
-</Field>
-
-
-<Field
-  defaultValue={null}
-  enumValues={null}
-  examples={[12]}
-  name={"val"}
-  path={"set"}
-  required={true}
-  type={"double"}
-  >
-
-#### val
-
-Specific value.
-
-
-</Field>
-
-
-</Fields>
 
 </Field>
 

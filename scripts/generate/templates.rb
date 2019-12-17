@@ -173,7 +173,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields, breakout_top_keys: false)
+  def fields_example(fields)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
