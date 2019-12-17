@@ -237,13 +237,18 @@ fn make_jwt(creds: &Credentials) -> crate::Result<Jwt<JwtClaims>> {
     Ok(Jwt::new(claims, rsa_key, None))
 }
 
+const BODY_PREFIX: &str = "{\"messages\":[";
+const BODY_SUFFIX: &str = "]}";
+
 fn make_body(logs: Vec<u8>) -> Vec<u8> {
-    let mut body = BytesMut::with_capacity(logs.len() + 16);
-    body.put("{\"messages\":[");
+    // It would be cleaner to use serde_json, but doing it manually is
+    // more efficient and not much more complicated.
+    let mut body = BytesMut::with_capacity(logs.len() + BODY_PREFIX.len() + BODY_SUFFIX.len());
+    body.put(BODY_PREFIX);
     if logs.len() > 0 {
         body.put(&logs[..logs.len() - 1]);
     }
-    body.put("]}");
+    body.put(BODY_SUFFIX);
 
     body.into_iter().collect()
 }
