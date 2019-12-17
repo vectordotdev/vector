@@ -93,6 +93,7 @@ bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
 prometheus = "0.4.2"
 hyper = "0.12.35"
+hyper-openssl = "0.7"
 hyper-tls = "0.3.2"
 native-tls = "0.2.3"
 openssl = "0.10.26"
