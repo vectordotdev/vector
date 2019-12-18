@@ -1,8 +1,9 @@
+mod udp;
+
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
     sources::tcp::{RawTcpSource, TcpConfig},
-    sources::udp::{udp, UdpConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use futures::sync::mpsc;
@@ -20,7 +21,7 @@ pub struct SocketConfig {
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp(TcpConfig),
-    Udp(UdpConfig),
+    Udp(udp::UdpConfig),
 }
 
 impl SocketConfig {
@@ -50,7 +51,7 @@ impl SourceConfig for SocketConfig {
             }
             Mode::Udp(config) => {
                 let host_key = config.host_key.clone().unwrap_or(event::HOST.clone());
-                Ok(udp(config.address, host_key, out))
+                Ok(udp::udp(config.address, host_key, out))
             }
         }
     }
@@ -66,7 +67,8 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
-    use super::{SocketConfig, TcpConfig, UdpConfig};
+    use super::udp::UdpConfig;
+    use super::{SocketConfig, TcpConfig};
     use crate::event;
     use crate::runtime;
     use crate::test_util::{block_on, collect_n, next_addr, send_lines, wait_for_tcp};
