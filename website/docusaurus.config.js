@@ -61,7 +61,7 @@ module.exports = {
             },
             {
               label: 'Transforms',
-              to: 'docs/reference/trasnforms',
+              to: 'docs/reference/transforms',
             },
             {
               label: 'Sinks',

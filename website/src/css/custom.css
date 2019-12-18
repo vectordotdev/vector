@@ -374,25 +374,28 @@ table.comparison tr td.bar.vector .bar {
  */
 
 .container--narrow {
+  box-sizing: border-box;
   max-width: 760px;
-  padding: 0;
 }
 
 .container--bleed > .bleed,
 .container--bleed > section > p > img,
 .container--bleed > section > .code-header,
 .container--bleed > section > pre {
-  margin-left: calc( -1 * ( var(--ifm-container-width) - 760px ) / 2 );
-  margin-right: calc( -1 * ( var(--ifm-container-width) - 760px ) / 2 );
-  max-width: var(--ifm-container-width);
+  position: relative;
+  left: calc( -1 * ( ( ( var(--ifm-container-width) - 760px ) / 2 ) + var(--ifm-spacing-vertical)) );
+  max-width: none;
+  width: var(--ifm-container-width);
 }
 
 @media (max-width: 996px) {
   .container--bleed > .bleed,
+  .container--bleed > section > p > img,
   .container--bleed > section > .code-header,
   .container--bleed > section > pre {
-    margin-left: 0;
-    margin-right: 0;
+    position: static;
+    max-width: 100%;
+    width: auto;
   }
 }
 
@@ -1448,6 +1451,7 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 .markdown > img,
 .markdown > svg {
   display: block;
+  height: auto;
   margin: 0 auto;
 }
 .markdown > img,
