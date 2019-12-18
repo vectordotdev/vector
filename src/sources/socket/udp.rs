@@ -1,4 +1,5 @@
 use crate::event::Event;
+use crate::sources::Source;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -24,7 +25,7 @@ impl UdpConfig {
     }
 }
 
-pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> super::Source {
+pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> Source {
     let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     Box::new(
