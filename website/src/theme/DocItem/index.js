@@ -166,8 +166,8 @@ function DocItem(props) {
                   {!metadata.hide_title && (
                     <header>
                       <div className="badges">
-                        {eventTypes && eventTypes.includes("log") && <span className="badge badge--primary" title="This component works with log events.">LOG</span>}
-                        {eventTypes && eventTypes.includes("metric") && <span className="badge badge--primary" title="This component works with metric events.">METRIC</span>}
+                        {eventTypes && eventTypes.includes("log") && <Link to="/docs/about/data-model/log/" className="badge badge--primary" title="This component works with log events.">LOG</Link>}
+                        {eventTypes && eventTypes.includes("metric") && <Link to="/docs/about/data-model/metric/" className="badge badge--primary" title="This component works with metric events.">METRIC</Link>}
                       </div>
                       <h1 className={styles.docTitle}>{metadata.title}</h1>
                     </header>

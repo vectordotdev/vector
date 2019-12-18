@@ -54,7 +54,7 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
       <div>
         <div>Version</div>
         <div>
-          {version} • {date} • <Link to={releaseNotesPath}>release notes</Link>
+          {version} • {date}{releaseNotesPath && <> • <Link to={releaseNotesPath}>release notes</Link></>}
         </div>
       </div>
       <div>
@@ -196,16 +196,16 @@ function ReleaseDownload({version}) {
                 placeholder="Select a version..."
                 value={olderOptions.find(option => option.value == oldRelease.version)}
                 onChange={(selectedOption) => setVersion(selectedOption ? selectedOption.value : null)} />
-              <DownloadTable version={oldRelease.version} date={oldRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${oldRelease.version}`} />
+              <DownloadTable version={oldRelease.version} date={oldRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${oldRelease.version}/`} />
             </TabItem>
             <TabItem value="latest">
-              <DownloadTable version={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}`} />
+              <DownloadTable version={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}/`} />
             </TabItem>
             <TabItem value="nightly">
               <Alert fill={true} type="warning">
                 Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.
               </Alert>
-              <DownloadTable version="nightly" date={nightlyDate} downloads={nightlyDownloads} releaseNotesPath="fdsf" />
+              <DownloadTable version="nightly" date={nightlyDate} downloads={nightlyDownloads} />
             </TabItem>
             </Tabs>
           </div>
