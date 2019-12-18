@@ -328,15 +328,18 @@ mod integration_tests {
         }
     }
 
+    fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+        config(topic)
+            .build(SinkContext::new_test(runtime().executor()))
+            .expect("Building sink failed")
+    }
+
     #[test]
     fn publish_events() {
         crate::test_util::trace_init();
 
         let (topic, subscription) = create_topic_subscription();
-        let config = config(&topic);
-        let (sink, healthcheck) = config
-            .build(SinkContext::new_test(runtime().executor()))
-            .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(&topic);
 
         block_on(healthcheck).expect("Health check failed");
 
@@ -357,6 +360,14 @@ mod integration_tests {
             let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
             assert_eq!(data, expected);
         }
+    }
+
+    #[test]
+    fn checks_for_valid_topic() {
+        let (topic, _subscription) = create_topic_subscription();
+        let topic = format!("BAD{}", topic);
+        let (_sink, healthcheck) = config_build(&topic);
+        block_on(healthcheck).expect_err("Health check did not fail");
     }
 
     fn create_topic_subscription() -> (String, String) {
