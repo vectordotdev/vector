@@ -423,7 +423,7 @@ class Templates
           name = sidebar_label
         end
 
-        "<Jump to=\"#{path}\">#{name}</Jump>"
+        "<Jump to=\"#{path}/\">#{name}</Jump>"
       end.
       join("\n")
   end

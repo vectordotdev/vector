@@ -213,7 +213,7 @@ function ReleaseDownload({version}) {
         <section>
           <div className={classnames('container', styles.downloadGetStartedContainer)}>
             <h2>Ready to get started?</h2>
-            <Jump to="/docs/setup/guides/getting-started">
+            <Jump to="/docs/setup/guides/getting-started/">
               <i className="feather icon-book-open"></i> Follow the getting started guide
             </Jump>
           </div>

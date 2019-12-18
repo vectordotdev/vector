@@ -17,8 +17,8 @@ look at the [topologies][docs.roles] you can create.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/setup/deployment/roles">Roles</Jump>
-<Jump to="/docs/setup/deployment/topologies">Topologies</Jump>
+<Jump to="/docs/setup/deployment/roles/">Roles</Jump>
+<Jump to="/docs/setup/deployment/topologies/">Topologies</Jump>
 
 
 [docs.roles.agent]: /docs/setup/deployment/roles/agent/

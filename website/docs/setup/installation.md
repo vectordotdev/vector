@@ -59,10 +59,10 @@ Disables prompts and installs without input.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/setup/installation/containers">Containers</Jump>
-<Jump to="/docs/setup/installation/manual">Manual</Jump>
-<Jump to="/docs/setup/installation/operating-systems">Operating systems</Jump>
-<Jump to="/docs/setup/installation/package-managers">Package managers</Jump>
+<Jump to="/docs/setup/installation/containers/">Containers</Jump>
+<Jump to="/docs/setup/installation/manual/">Manual</Jump>
+<Jump to="/docs/setup/installation/operating-systems/">Operating systems</Jump>
+<Jump to="/docs/setup/installation/package-managers/">Package managers</Jump>
 
 
 
