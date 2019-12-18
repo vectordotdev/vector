@@ -167,6 +167,7 @@ fn remove_ending_newline(mut event: Event) -> Event {
     event
 }
 
+#[derive(Debug)]
 struct DockerMessageTransformer {
     json_parser: JsonParser,
     atom_time: Atom,
@@ -268,11 +269,11 @@ fn transform_file() -> crate::Result<Box<dyn Transform>> {
 }
 
 /// Contains several regexes that can parse common forms of pod_uid.
-/// On first message, regexes are tryed out one after the other until
+/// On the first message, regexes are tried out one after the other until
 /// first succesfull one has been found. After that that regex will be
 /// always used.
 ///
-/// If nothing succeds the message is still passed.
+/// If nothing succeeds the message is still passed.
 fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     let mut regexes = Vec::new();
 
@@ -321,9 +322,9 @@ fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     Ok(ApplicableTransform::Candidates(transforms))
 }
 
-/// Contains several transforms. On first message, transforms are tryed
-/// out one after the other until first succesfull one has been found.
-/// After that that transform will always be used.
+/// Contains several transforms. On the first message, transforms are tried
+/// out one after the other until the first successful one has been found.
+/// After that the transform will always be used.
 ///
 /// If nothing succeds the message is still passed.
 enum ApplicableTransform {
