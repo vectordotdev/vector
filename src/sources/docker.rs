@@ -374,9 +374,7 @@ impl DockerSource {
 
                     // Include image check
                     if let Some(images) = self.esb.core.config.include_images.as_ref() {
-                        let image_check = images
-                            .iter()
-                            .any(|image| container.image.starts_with(image));
+                        let image_check = images.iter().any(|image| &container.image == image);
                         if !images.is_empty() && !image_check {
                             continue;
                         }
