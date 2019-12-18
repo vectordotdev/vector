@@ -30,9 +30,7 @@ macro_rules! assert_downcast_matches {
 }
 
 pub fn make_tcp_socket_source_config(addr: SocketAddr) -> sources::socket::SocketConfig {
-    sources::socket::SocketConfig::new(sources::socket::Mode::Tcp(sources::tcp::TcpConfig::new(
-        addr.into(),
-    )))
+    sources::socket::SocketConfig::make_tcp_config(addr)
 }
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);

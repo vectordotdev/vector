@@ -1,5 +1,5 @@
-use super::util::{SocketListenAddr, TcpSource};
 use crate::event::{self, Event};
+use crate::sources::util::{SocketListenAddr, TcpSource};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use serde::{Deserialize, Serialize};
