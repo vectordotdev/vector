@@ -48,6 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_s3" # example, must be: "aws_s3"
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
+  compression = "gzip" # example, enum
   endpoint = "127.0.0.0:5000" # example
   region = "us-east-1" # example
   
@@ -69,6 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_s3" # example, must be: "aws_s3"
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
+  compression = "gzip" # example, enum
   endpoint = "127.0.0.0:5000" # example
   region = "us-east-1" # example
   
@@ -301,6 +303,29 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
+  name={"compression"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### compression
+
+The compression mechanism to use.
+
 
 </Field>
 

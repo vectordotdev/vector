@@ -42,6 +42,16 @@ default = "log"
 null = false
 description = "The extension to use in the object name."
 
+[sinks.aws_s3.options.compression]
+type = "string"
+common = true
+null = false
+description = "The compression mechanism to use."
+
+[sinks.aws_s3.options.compression.enum]
+gzip = "GZIP compression"
+none = "No compression"
+
 [sinks.aws_s3.options.filename_time_format]
 type = "string"
 category = "Object Names"

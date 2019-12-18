@@ -47,8 +47,8 @@ data_dir = "/var/lib/vector"
 [transforms.apache_sampler]
   inputs       = ["apache_parser"]
   type         = "sampler"
-  hash_field   = "request_id"                  # sample _entire_ requests
   rate         = 50                            # only keep 50%
+  pass_list    = []
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
@@ -65,7 +65,7 @@ data_dir = "/var/lib/vector"
   bucket       = "my-log-archives"
   key_prefix   = "date=%Y-%m-%d"               # daily partitions, hive friendly format
   batch_size   = 10000000                      # 10mb uncompressed
-  gzip         = true                          # compress final objects
+  compression  = "gzip"                        # compress final objects
   encoding     = "ndjson"                      # new line delimited JSON
 ```
 
