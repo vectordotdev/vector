@@ -3,11 +3,9 @@ use futures::Future;
 use hyper::service::service_fn_ok;
 use hyper::{Body, Response, Server};
 use std::net::SocketAddr;
-use vector::test_util::{
-    make_tcp_socket_source_config, next_addr, random_lines, send_lines, wait_for_tcp,
-};
+use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
-    runtime, sinks,
+    runtime, sinks, sources,
     topology::{self, config},
 };
 
@@ -24,7 +22,10 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", make_tcp_socket_source_config(in_addr));
+                config.add_source(
+                    "in",
+                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                );
                 config.add_sink(
                     "out",
                     &["in"],
@@ -72,7 +73,10 @@ fn benchmark_http_gzip(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", make_tcp_socket_source_config(in_addr));
+                config.add_source(
+                    "in",
+                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                );
                 config.add_sink(
                     "out",
                     &["in"],
