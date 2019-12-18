@@ -135,7 +135,7 @@ function Notes({release, latest}) {
       </section>
       <section className="markdown">
         <p>
-          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
+          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community/">let us know what you think</Link>!
         </p>
 
         {posts.length > 0 && (
