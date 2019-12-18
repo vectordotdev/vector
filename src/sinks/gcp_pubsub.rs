@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     event::Event,
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
@@ -81,7 +80,7 @@ impl SinkConfig for PubsubConfig {
             None
         };
 
-        let sink = self.service(cx.acker(), &creds)?;
+        let sink = self.service(&cx, &creds)?;
         let healthcheck = self.healthcheck(&creds)?;
 
         Ok((sink, healthcheck))
@@ -99,7 +98,7 @@ impl SinkConfig for PubsubConfig {
 impl PubsubConfig {
     fn service(
         &self,
-        acker: Acker,
+        cx: &SinkContext,
         creds: &Option<PubsubCreds>,
     ) -> crate::Result<super::RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
@@ -109,25 +108,24 @@ impl PubsubConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let creds = creds.clone();
 
-        let http_service =
-            HttpService::builder()
-                .tls_settings(tls_settings)
-                .build(move |logs: Vec<u8>| {
-                    let mut builder = hyper::Request::builder();
-                    builder.method(Method::POST);
-                    builder.uri(uri.clone());
-                    builder.header("Content-Type", "application/json");
+        let http_service = HttpService::builder(cx.resolver())
+            .tls_settings(tls_settings)
+            .build(move |logs: Vec<u8>| {
+                let mut builder = hyper::Request::builder();
+                builder.method(Method::POST);
+                builder.uri(uri.clone());
+                builder.header("Content-Type", "application/json");
 
-                    let mut request = builder.body(make_body(logs)).unwrap();
-                    if let Some(creds) = creds.as_ref() {
-                        creds.apply(&mut request);
-                    }
+                let mut request = builder.body(make_body(logs)).unwrap();
+                if let Some(creds) = creds.as_ref() {
+                    creds.apply(&mut request);
+                }
 
-                    request
-                });
+                request
+            });
 
         let sink = request
-            .batch_sink(HttpRetryLogic, http_service, acker)
+            .batch_sink(HttpRetryLogic, http_service, cx.acker())
             .batched_with_min(Buffer::new(false), &batch)
             .with_flat_map(|event| iter_ok(Some(encode_event(event))));
 
@@ -312,7 +310,10 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{block_on, random_events_with_stream, random_string, runtime};
+    use crate::{
+        runtime::Runtime,
+        test_util::{block_on, random_events_with_stream, random_string},
+    };
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
@@ -328,18 +329,21 @@ mod integration_tests {
         }
     }
 
-    fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
-        config(topic)
-            .build(SinkContext::new_test(runtime().executor()))
-            .expect("Building sink failed")
+    fn config_build(
+        rt: &Runtime,
+        topic: &str,
+    ) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+        let cx = SinkContext::new_test(rt.executor());
+        config(topic).build(cx).expect("Building sink failed")
     }
 
     #[test]
     fn publish_events() {
         crate::test_util::trace_init();
 
+        let rt = Runtime::new().unwrap();
         let (topic, subscription) = create_topic_subscription();
-        let (sink, healthcheck) = config_build(&topic);
+        let (sink, healthcheck) = config_build(&rt, &topic);
 
         block_on(healthcheck).expect("Health check failed");
 
@@ -364,9 +368,10 @@ mod integration_tests {
 
     #[test]
     fn checks_for_valid_topic() {
+        let rt = Runtime::new().unwrap();
         let (topic, _subscription) = create_topic_subscription();
         let topic = format!("BAD{}", topic);
-        let (_sink, healthcheck) = config_build(&topic);
+        let (_sink, healthcheck) = config_build(&rt, &topic);
         block_on(healthcheck).expect_err("Health check did not fail");
     }
 

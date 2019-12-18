@@ -1,5 +1,6 @@
 use crate::runtime::TaskExecutor;
 use futures::{future, Future};
+use hyper::client::connect::dns::{Name, Resolve};
 use snafu::{futures01::FutureExt, ResultExt};
 use std::{
     fmt,
@@ -97,6 +98,19 @@ impl Iterator for LookupIp {
             LookupIp::Single(ip) => ip.take(),
             LookupIp::Query(iter) => iter.next(),
         }
+    }
+}
+
+impl Resolve for Resolver {
+    type Addrs = LookupIp;
+    type Future = Box<dyn Future<Item = Self::Addrs, Error = std::io::Error> + Send + 'static>;
+
+    fn resolve(&self, name: Name) -> Self::Future {
+        let fut = self.lookup_ip(name.as_str()).map_err(|e| {
+            use std::io;
+            io::Error::new(io::ErrorKind::Other, e)
+        });
+        Box::new(fut)
     }
 }
 

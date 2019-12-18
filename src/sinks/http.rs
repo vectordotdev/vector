@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     event::{self, Event},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
@@ -96,7 +95,7 @@ impl SinkConfig for HttpSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let sink = http(self.clone(), cx.acker(), tls.clone())?;
+        let sink = http(self.clone(), cx, tls.clone())?;
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
@@ -118,7 +117,7 @@ impl SinkConfig for HttpSinkConfig {
 
 fn http(
     config: HttpSinkConfig,
-    acker: Acker,
+    cx: SinkContext,
     tls_settings: TlsSettings,
 ) -> crate::Result<super::RouterSink> {
     let uri = build_uri(&config.uri)?;
@@ -135,54 +134,53 @@ fn http(
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |mut body: Vec<u8>| {
-                let mut builder = hyper::Request::builder();
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |mut body: Vec<u8>| {
+            let mut builder = hyper::Request::builder();
 
-                let method = match method {
-                    HttpMethod::Post => Method::POST,
-                    HttpMethod::Put => Method::PUT,
-                };
+            let method = match method {
+                HttpMethod::Post => Method::POST,
+                HttpMethod::Put => Method::PUT,
+            };
 
-                builder.method(method);
+            builder.method(method);
 
-                builder.uri(uri.clone());
+            builder.uri(uri.clone());
 
-                match encoding {
-                    Encoding::Text => builder.header("Content-Type", "text/plain"),
-                    Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
-                    Encoding::Json => {
-                        body.insert(0, b'[');
-                        body.pop(); // remove trailing comma from last record
-                        body.push(b']');
-                        builder.header("Content-Type", "application/json")
-                    }
-                };
-
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
+            match encoding {
+                Encoding::Text => builder.header("Content-Type", "text/plain"),
+                Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+                Encoding::Json => {
+                    body.insert(0, b'[');
+                    body.pop(); // remove trailing comma from last record
+                    body.push(b']');
+                    builder.header("Content-Type", "application/json")
                 }
+            };
 
-                if let Some(headers) = &headers {
-                    for (header, value) in headers.iter() {
-                        builder.header(header.as_str(), value.as_str());
-                    }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
+
+            if let Some(headers) = &headers {
+                for (header, value) in headers.iter() {
+                    builder.header(header.as_str(), value.as_str());
                 }
+            }
 
-                let mut request = builder.body(body).unwrap();
+            let mut request = builder.body(body).unwrap();
 
-                if let Some(auth) = &basic_auth {
-                    auth.apply(request.headers_mut());
-                }
+            if let Some(auth) = &basic_auth {
+                auth.apply(request.headers_mut());
+            }
 
-                request
-            });
+            request
+        });
 
     let encoding = config.encoding.clone();
     let sink = request
-        .batch_sink(HttpRetryLogic, http_service, acker)
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
@@ -291,12 +289,12 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches,
         runtime::Runtime,
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
+        topology::config::SinkContext,
     };
     use bytes::Buf;
     use futures::{sync::mpsc, Future, Sink, Stream};
@@ -382,13 +380,15 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let sink = http(config, Acker::Null, TlsSettings::default()).unwrap();
+        let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let sink = http(config, cx, TlsSettings::default()).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         let _ = rt.block_on(pump).unwrap();
@@ -440,13 +440,15 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let sink = http(config, Acker::Null, TlsSettings::default()).unwrap();
+        let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let sink = http(config, cx, TlsSettings::default()).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         let _ = rt.block_on(pump).unwrap();
@@ -498,13 +500,15 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let sink = http(config, Acker::Null, TlsSettings::default()).unwrap();
+        let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let sink = http(config, cx, TlsSettings::default()).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        let mut rt = Runtime::new().unwrap();
         rt.spawn(server);
 
         let _ = rt.block_on(pump).unwrap();

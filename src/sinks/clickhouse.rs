@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     event::Event,
     sinks::util::{
         http::{HttpRetryLogic, HttpService, Response},
@@ -48,7 +47,7 @@ inventory::submit! {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = clickhouse(self.clone(), cx.acker())?;
+        let sink = clickhouse(self.clone(), cx)?;
         let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
 
         Ok((sink, healtcheck))
@@ -77,7 +76,7 @@ impl ClickHouseBasicAuthConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -95,28 +94,27 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
-                let mut builder = hyper::Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |body: Vec<u8>| {
+            let mut builder = hyper::Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
 
-                builder.header("Content-Type", "application/x-ndjson");
+            builder.header("Content-Type", "application/x-ndjson");
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
-                }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
 
-                let mut request = builder.body(body).unwrap();
+            let mut request = builder.body(body).unwrap();
 
-                if let Some(auth) = &basic_auth {
-                    auth.apply(request.headers_mut());
-                }
+            if let Some(auth) = &basic_auth {
+                auth.apply(request.headers_mut());
+            }
 
-                request
-            });
+            request
+        });
 
     let sink = request
         .batch_sink(
@@ -124,7 +122,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
                 inner: HttpRetryLogic,
             },
             http_service,
-            acker,
+            cx.acker(),
         )
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event: Event| iter_ok(encode_event(event)));

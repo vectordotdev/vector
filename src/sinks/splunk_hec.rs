@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     event::{self, Event, ValueKind},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
@@ -70,7 +69,7 @@ inventory::submit! {
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        let sink = hec(self.clone(), cx.acker())?;
+        let sink = hec(self.clone(), cx)?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
 
         Ok((sink, healthcheck))
@@ -85,7 +84,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -105,27 +104,26 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
 
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
-                let mut builder = Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |body: Vec<u8>| {
+            let mut builder = Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
 
-                builder.header("Content-Type", "application/json");
+            builder.header("Content-Type", "application/json");
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
-                }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
 
-                builder.header("Authorization", token.clone());
+            builder.header("Authorization", token.clone());
 
-                builder.body(body).unwrap()
-            });
+            builder.body(body).unwrap()
+        });
 
     let sink = request
-        .batch_sink(HttpRetryLogic, http_service, acker)
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
@@ -260,10 +258,10 @@ mod tests {
 #[cfg(feature = "splunk-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string, runtime},
+        topology::config::SinkContext,
         Event,
     };
     use futures::Sink;
@@ -275,8 +273,9 @@ mod integration_tests {
     #[test]
     fn splunk_insert_message() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text), cx).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -306,8 +305,9 @@ mod integration_tests {
     #[test]
     fn splunk_insert_many() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text), cx).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -338,8 +338,9 @@ mod integration_tests {
     #[test]
     fn splunk_custom_fields() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -371,8 +372,9 @@ mod integration_tests {
     #[test]
     fn splunk_hostname() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -409,13 +411,14 @@ mod integration_tests {
     #[test]
     fn splunk_configure_hostname() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
         let config = super::HecSinkConfig {
             host_field: "roast".into(),
             ..config(Encoding::Json)
         };
 
-        let sink = sinks::splunk_hec::hec(config, Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config, cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());

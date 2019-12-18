@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
@@ -105,7 +104,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = DatadogSvc::new(self.clone(), cx.acker())?;
+        let sink = DatadogSvc::new(self.clone(), cx)?;
         let healthcheck = DatadogSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }
@@ -120,7 +119,7 @@ impl SinkConfig for DatadogConfig {
 }
 
 impl DatadogSvc {
-    pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+    pub fn new(config: DatadogConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
         let batch = config.batch.unwrap_or(20, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -128,7 +127,7 @@ impl DatadogSvc {
             .parse::<Uri>()
             .context(super::UriParseError)?;
 
-        let http_service = HttpService::new(move |body: Vec<u8>| {
+        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
@@ -146,7 +145,7 @@ impl DatadogSvc {
         };
 
         let sink = request
-            .batch_sink(HttpRetryLogic, datadog_http_service, acker)
+            .batch_sink(HttpRetryLogic, datadog_http_service, cx.acker())
             .batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
