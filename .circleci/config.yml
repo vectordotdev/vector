@@ -776,7 +776,6 @@ jobs:
       - run:
           name: Release S3
           command: |
-            export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-s3
 
