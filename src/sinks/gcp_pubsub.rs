@@ -16,7 +16,6 @@ use hyper::{
     Body, Client, Request,
 };
 use hyper_tls::HttpsConnector;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -55,12 +54,6 @@ enum BuildError {
 
 inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
 }
 
 #[typetag::serde(name = "gcp_pubsub")]
@@ -102,7 +95,7 @@ impl PubsubConfig {
         creds: &Option<PubsubCreds>,
     ) -> crate::Result<super::RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.unwrap_with(&Default::default());
 
         let uri = self.uri(":publish")?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
