@@ -150,10 +150,10 @@ impl PubsubConfig {
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => {
                     // If there are credentials configured, the
-                    // generated token needs to be periodically
-                    // regenerated.
-                    // This is a bit of a hack, but I'm not sure where
-                    // else to reliably spawn the regeneration task.
+                    // generated OAuth token needs to be periodically
+                    // regenerated. Since the health check runs at
+                    // startup, after a successful health check is a
+                    // good place to create the regeneration task.
                     creds.map(|creds| creds.spawn_regenerate_token());
                     Ok(())
                 }
