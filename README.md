@@ -43,7 +43,7 @@ simple and unified.
      README.md.erb
 -->
 
-## [Documentation](https://docs.vector.dev/)
+## [Documentation](https://vector.dev/docs/)
 
 #### About
 

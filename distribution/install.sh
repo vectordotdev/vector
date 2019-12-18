@@ -29,8 +29,8 @@ header() {
 
 $_divider
 Website: https://vector.dev
-Docs: https://docs.vector.dev
-Community: https://vector.dev/community
+Docs: https://vector.dev/docs/
+Community: https://vector.dev/community/
 $_divider
 
 EOF
@@ -193,7 +193,7 @@ install_from_archive() {
     printf "\n"
     printf "$_indent vector --config ~/.vector/vector.toml\n"
     printf "\n"
-    printf "$_prompt More information at https://docs.vector.dev\n"
+    printf "$_prompt More information at https://vector.dev/docs/\n"
 
     local _retval=$?
 
@@ -240,7 +240,7 @@ install_from_deb() {
     printf "\n"
     printf "$_indent sudo systemctl start vector\n"
     printf "\n"
-    printf "$_prompt More information at https://docs.vector.dev\n"
+    printf "$_prompt More information at https://vector.dev/docs/\n"
 }
 
 install_from_rpm() {
@@ -280,7 +280,7 @@ install_from_rpm() {
     printf "\n"
     printf "$_indent sudo systemctl start vector\n"
     printf "\n"
-    printf "$_prompt More information at https://docs.vector.dev\n"
+    printf "$_prompt More information at https://vector.dev/docs/\n"
 }
 
 # ------------------------------------------------------------------------------
