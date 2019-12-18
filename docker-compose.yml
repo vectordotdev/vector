@@ -78,3 +78,9 @@ services:
       image: timberiodev/mock-ec2-metadata:latest 
       ports: 
         - "8111:8111"
+    gcloud-pubsub:
+      image: messagebird/gcloud-pubsub-emulator
+      ports:
+        - 8681-8682:8681-8682
+      environment:
+        - PUBSUB_PROJECT1=testproject,topic1:subscription1

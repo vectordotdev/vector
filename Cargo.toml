@@ -84,6 +84,10 @@ prost = "0.5"
 prost-derive = "0.5"
 prost-types = "0.5"
 
+# GCP
+goauth = "0.6.0"
+smpl_jwt = "0.4.0"
+
 # External libs
 derivative = "1.0"
 chrono = "0.4.6"
@@ -194,28 +198,29 @@ nightly = []
 
 # Testing-related features
 docker = [
+  "clickhouse-integration-tests",
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
-  "clickhouse-integration-tests",
+  "docker-integration-tests",
+  "ec2-metadata-integration-tests",
   "es-integration-tests",
+  "gcp-pubsub-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
-  "splunk-integration-tests",
-  "docker-integration-tests",
-  "ec2-metadata-integration-tests"
+  "splunk-integration-tests"
 ]
+clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
-clickhouse-integration-tests = []
+docker-integration-tests = []
+ec2-metadata-integration-tests = []
 es-integration-tests = []
+gcp-pubsub-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
-docker-integration-tests = []
-ec2-metadata-integration-tests = []
-
 
 kubernetes = ["kubernetes-integration-tests"]
 kubernetes-integration-tests = []

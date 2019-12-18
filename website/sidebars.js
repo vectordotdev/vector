@@ -208,6 +208,8 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_pubsub",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",

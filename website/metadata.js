@@ -17968,6 +17968,28 @@ module.exports = {
 
       ]
     },
+    "gcp_pubsub": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Pubsub][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "gcp_pubsub_sink",
+      "name": "gcp_pubsub",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",

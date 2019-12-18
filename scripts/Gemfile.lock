@@ -45,6 +45,7 @@ GEM
       thread_safe (~> 0.1)
     unindent (1.0)
     word_wrap (1.0.0)
+    yard (0.9.20)
     zeitwerk (2.1.10)
 
 PLATFORMS
@@ -62,6 +63,7 @@ DEPENDENCIES
   toml-rb (~> 2.0)
   unindent (~> 1.0)
   word_wrap (~> 1.0)
+  yard (~> 0.9)
 
 RUBY VERSION
    ruby 2.6.3p62

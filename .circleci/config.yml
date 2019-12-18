@@ -219,6 +219,9 @@ jobs:
           - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
       - image: timberiodev/mock-ec2-metadata:latest
+      - image: messagebird/gcloud-pubsub-emulator
+        environment:
+          - PUBSUB_PROJECT1=testproject,topic1:subscription1
     steps:
       - checkout
       - setup_remote_docker:

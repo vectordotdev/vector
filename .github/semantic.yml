@@ -88,6 +88,7 @@ scopes:
   - datadog_metrics sink
   - elasticsearch sink
   - file sink
+  - gcp_pubsub sink
   - http sink
   - kafka sink
   - new_relic_logs sink
