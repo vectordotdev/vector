@@ -2,11 +2,10 @@ use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
 use tempfile::tempdir;
 use vector::test_util::{
-    block_on, count_receive, make_tcp_socket_source_config, next_addr, send_lines,
-    shutdown_on_idle, wait_for_tcp,
+    block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks};
+use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -25,7 +24,10 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", make_tcp_socket_source_config(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
@@ -60,7 +62,10 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", make_tcp_socket_source_config(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
@@ -97,7 +102,10 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", make_tcp_socket_source_config(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
