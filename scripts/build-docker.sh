@@ -49,7 +49,7 @@ if [[ "$CHANNEL" == "latest" ]]; then
 
   for i in $version_exact $version_minor_x $version_major_x latest; do
     build alpine $i
-    build debin $i
+    build debian $i
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
   for i in nightly-$DATE nightly; do
