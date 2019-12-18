@@ -6,11 +6,12 @@ use rand::distributions::{Alphanumeric, Uniform};
 use rand::prelude::*;
 use vector::event::Event;
 use vector::test_util::{
-    block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, count_receive, make_tcp_socket_source_config, next_addr, send_lines,
+    shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::config::TransformConfig;
 use vector::topology::{self, config};
-use vector::{runtime, sinks, sources, transforms};
+use vector::{runtime, sinks, transforms};
 
 mod batch;
 mod buffering;
@@ -41,10 +42,6 @@ criterion_main!(
     event::event
 );
 
-fn make_tcp_socket_config(tcp_config: sources::tcp::TcpConfig) -> sources::socket::SocketConfig {
-    sources::socket::SocketConfig::new(sources::socket::Mode::Tcp(tcp_config))
-}
-
 fn benchmark_simple_pipe(c: &mut Criterion) {
     let num_lines: usize = 100_000;
     let line_size: usize = 100;
@@ -58,10 +55,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr.into())),
-                    );
+                    config.add_source("in", make_tcp_socket_source_config(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -107,10 +101,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr.into())),
-                    );
+                    config.add_source("in", make_tcp_socket_source_config(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -156,10 +147,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr.into())),
-                    );
+                    config.add_source("in", make_tcp_socket_source_config(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -206,10 +194,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr.into())),
-                    );
+                    config.add_source("in", make_tcp_socket_source_config(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -267,14 +252,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in1",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr1.into())),
-                    );
-                    config.add_source(
-                        "in2",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr2.into())),
-                    );
+                    config.add_source("in1", make_tcp_socket_source_config(in_addr1));
+                    config.add_source("in2", make_tcp_socket_source_config(in_addr2));
                     config.add_sink(
                         "out1",
                         &["in1", "in2"],
@@ -330,10 +309,7 @@ fn benchmark_transforms(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr.into())),
-                    );
+                    config.add_source("in", make_tcp_socket_source_config(in_addr));
                     config.add_transform(
                         "parser",
                         &["in"],
@@ -443,14 +419,8 @@ fn benchmark_complex(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in1",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr1.into())),
-                    );
-                    config.add_source(
-                        "in2",
-                        make_tcp_socket_config(sources::tcp::TcpConfig::new(in_addr2.into())),
-                    );
+                    config.add_source("in1", make_tcp_socket_source_config(in_addr1));
+                    config.add_source("in2", make_tcp_socket_source_config(in_addr2));
                     config.add_transform(
                         "parser",
                         &["in1", "in2"],
