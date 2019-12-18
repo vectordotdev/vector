@@ -43,7 +43,7 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.6.0/vector-x86_64.rpm
+    curl -O https://packages.timber.io/vector/0.6.X/vector-x86_64.rpm
     ```
 
     </TabItem>
@@ -88,7 +88,7 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.6.0/vector-aarch64.rpm
+    curl -O https://packages.timber.io/vector/0.6.X/vector-aarch64.rpm
     ```
 
     </TabItem>
@@ -133,7 +133,7 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bash
-    curl -O https://packages.timber.io/vector/0.6.0/vector-armv7hl.rpm
+    curl -O https://packages.timber.io/vector/0.6.X/vector-armv7hl.rpm
     ```
 
     </TabItem>
