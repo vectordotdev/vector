@@ -227,94 +227,77 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{self, Event},
-        test_util::random_string,
-    };
+    use crate::event::{self, Event};
     use std::collections::HashMap;
 
     #[test]
-    fn kinesis_encode_event_text() {
+    fn firehose_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &None, &Encoding::Text).unwrap();
+        let event = encode_event(message.clone().into(), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
 
     #[test]
-    fn kinesis_encode_event_json() {
+    fn firehose_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let event = encode_event(event, &None, &Encoding::Json).unwrap();
+        let event = encode_event(event, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
-
-    #[test]
-    fn kinesis_encode_event_custom_partition_key() {
-        let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("key".into(), "some_key".into());
-        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
-
-        assert_eq!(&event.data[..], "hello world".as_bytes());
-        assert_eq!(&event.partition_key, &"some_key".to_string());
-    }
-
-    #[test]
-    fn kinesis_encode_event_custom_partition_key_limit() {
-        let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("key".into(), random_string(300).into());
-        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
-
-        assert_eq!(&event.data[..], "hello world".as_bytes());
-        assert_eq!(event.partition_key.len(), 256);
-    }
 }
 
-#[cfg(feature = "kinesis-integration-tests")]
+#[cfg(feature = "firehose-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
     use crate::{
         region::RegionOrEndpoint,
         runtime,
-        test_util::{random_lines_with_stream, random_string},
+        sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchConfig, Provider},
+        test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
     };
-    use futures::{Future, Sink};
+    use futures::Sink;
     use rusoto_core::Region;
-    use rusoto_kinesis::{KinesisFirehose, KinesisFirehoseClient};
-    use std::sync::Arc;
+    use rusoto_firehose::{
+        CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
+        KinesisFirehoseClient,
+    };
+    use serde_json::{json, Value};
+    use std::{thread, time::Duration};
 
     #[test]
-    fn kinesis_put_records() {
+    fn firehose_put_records() {
         let stream = gen_stream();
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4568".into(),
+            endpoint: "http://localhost:4573".into(),
         };
 
         ensure_stream(region.clone(), stream.clone());
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
+            encoding: Encoding::Json, // required for ES destination w/ localstack
             batch: BatchConfig {
                 batch_size: Some(2),
                 batch_timeout: None,
             },
-            ..Default::default()
+            request: TowerRequestConfig {
+                request_timeout_secs: Some(10),
+                request_retry_attempts: Some(0),
+                ..Default::default()
+            },
         };
 
         let mut rt = runtime::Runtime::new().unwrap();
@@ -322,94 +305,66 @@ mod integration_tests {
 
         let sink = KinesisFirehoseService::new(config, cx).unwrap();
 
-        let timestamp = chrono::Utc::now().timestamp_millis();
-
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(1));
 
-        let timestamp = timestamp as f64 / 1000.0;
-        let records = rt
-            .block_on(fetch_records(stream.clone(), timestamp, region))
+        let config = ElasticSearchConfig {
+            provider: Some(Provider::Aws),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
+            index: Some(stream.clone()),
+            ..Default::default()
+        };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        let client = reqwest::Client::builder()
+            .build()
+            .expect("Could not build HTTP client");
+
+        let response = client
+            .get(&format!("{}/{}/_search", common.base_url, stream))
+            .json(&json!({
+                "query": { "query_string": { "query": "*" } }
+            }))
+            .send()
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
 
-        let mut output_lines = records
+        assert_eq!(input.len() as u64, response.total());
+        let input = input
             .into_iter()
-            .map(|e| String::from_utf8(e.data.to_vec()).unwrap())
+            .map(|rec| serde_json::to_value(rec.into_log().unflatten()).unwrap())
             .collect::<Vec<_>>();
-
-        input_lines.sort();
-        output_lines.sort();
-        assert_eq!(output_lines, input_lines)
+        for hit in response.into_hits() {
+            let event = hit.into_document().unwrap();
+            assert!(input.contains(&event));
+        }
     }
 
-    fn fetch_records(
-        stream_name: String,
-        timestamp: f64,
-        region: Region,
-    ) -> impl Future<Item = Vec<rusoto_kinesis::Record>, Error = ()> {
-        let client = Arc::new(KinesisFirehoseClient::new(region));
+    fn ensure_stream(region: Region, delivery_stream_name: String) {
+        let client = KinesisFirehoseClient::new(region);
 
-        let stream_name1 = stream_name.clone();
-        let describe = rusoto_kinesis::DescribeStreamInput {
-            stream_name,
+        let es_config = ElasticsearchDestinationConfiguration {
+            index_name: delivery_stream_name.clone(),
+            domain_arn: "doesn't matter".into(),
+            role_arn: "doesn't matter".into(),
+            type_name: "doesn't matter".into(),
             ..Default::default()
         };
 
-        let client1 = client.clone();
-        let client2 = client.clone();
-
-        client
-            .describe_stream(describe)
-            .map_err(|e| panic!("{:?}", e))
-            .map(|res| {
-                res.stream_description
-                    .shards
-                    .into_iter()
-                    .next()
-                    .expect("No shards")
-            })
-            .map(|shard| shard.shard_id)
-            .and_then(move |shard_id| {
-                let req = rusoto_kinesis::GetShardIteratorInput {
-                    stream_name: stream_name1,
-                    shard_id,
-                    shard_iterator_type: "AT_TIMESTAMP".into(),
-                    timestamp: Some(timestamp),
-                    ..Default::default()
-                };
-
-                client1
-                    .get_shard_iterator(req)
-                    .map_err(|e| panic!("{:?}", e))
-            })
-            .map(|iter| iter.shard_iterator.expect("No iterator age produced"))
-            .and_then(move |shard_iterator| {
-                let req = rusoto_kinesis::GetRecordsInput {
-                    shard_iterator,
-                    // limit: Some(limit),
-                    limit: None,
-                };
-
-                client2.get_records(req).map_err(|e| panic!("{:?}", e))
-            })
-            .map(|records| records.records)
-    }
-
-    fn ensure_stream(region: Region, stream_name: String) {
-        let client = KinesisFirehoseClient::new(region);
-
-        let req = rusoto_kinesis::CreateStreamInput {
-            stream_name,
-            shard_count: 1,
+        let req = CreateDeliveryStreamInput {
+            delivery_stream_name,
+            elasticsearch_destination_configuration: Some(es_config),
+            ..Default::default()
         };
 
-        match client.create_stream(req).sync() {
+        match client.create_delivery_stream(req).sync() {
             Ok(_) => (),
-            Err(e) => println!("Unable to check the stream {:?}", e),
+            Err(e) => println!("Unable to create the delivery stream {:?}", e),
         };
     }
 
