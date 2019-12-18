@@ -10,7 +10,6 @@ pub mod splunk_hec;
 pub mod statsd;
 pub mod stdin;
 pub mod syslog;
-pub mod tcp;
 mod util;
 pub mod vector;
 

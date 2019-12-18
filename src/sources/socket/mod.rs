@@ -1,13 +1,14 @@
+mod tcp;
 mod udp;
 
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
-    sources::tcp::{RawTcpSource, TcpConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -20,13 +21,31 @@ pub struct SocketConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpConfig),
+    Tcp(tcp::TcpConfig),
     Udp(udp::UdpConfig),
 }
 
 impl SocketConfig {
-    pub fn new(mode: Mode) -> Self {
-        Self { mode }
+    pub fn make_tcp_config(addr: SocketAddr) -> Self {
+        Self {
+            mode: Mode::Tcp(tcp::TcpConfig::new(addr.into())),
+        }
+    }
+}
+
+impl From<tcp::TcpConfig> for SocketConfig {
+    fn from(config: tcp::TcpConfig) -> Self {
+        SocketConfig {
+            mode: Mode::Tcp(config),
+        }
+    }
+}
+
+impl From<udp::UdpConfig> for SocketConfig {
+    fn from(config: udp::UdpConfig) -> Self {
+        SocketConfig {
+            mode: Mode::Udp(config),
+        }
     }
 }
 
@@ -44,7 +63,7 @@ impl SourceConfig for SocketConfig {
     ) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let tcp = RawTcpSource {
+                let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
                 tcp.run(config.address, config.shutdown_timeout_secs, out)
@@ -67,8 +86,9 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
+    use super::tcp::TcpConfig;
     use super::udp::UdpConfig;
-    use super::{SocketConfig, TcpConfig};
+    use super::SocketConfig;
     use crate::event;
     use crate::runtime;
     use crate::test_util::{block_on, collect_n, next_addr, send_lines, wait_for_tcp};
@@ -88,7 +108,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = SocketConfig::new(super::Mode::Tcp(TcpConfig::new(addr.into())))
+        let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
@@ -111,7 +131,7 @@ mod test {
         let mut config = TcpConfig::new(addr.into());
         config.max_length = 10;
 
-        let server = SocketConfig::new(super::Mode::Tcp(config))
+        let server = SocketConfig::from(config)
             .build("default", &GlobalOptions::default(), tx)
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
@@ -171,7 +191,7 @@ mod test {
     fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, runtime::Runtime) {
         let addr = next_addr();
 
-        let server = SocketConfig::new(super::Mode::Udp(UdpConfig::new(addr)))
+        let server = SocketConfig::from(UdpConfig::new(addr))
             .build("default", &GlobalOptions::default(), sender)
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
