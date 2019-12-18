@@ -10,7 +10,7 @@ Today we're very excited to open source the Vector project! Vector is a tool for
 
 <!--truncate-->
 
-# Why build Vector?
+## Why build Vector?
 
 We decided to build Vector because we believe that **existing tools take too narrow a view of the problem of building observability infrastructure**. Whether they're limited to working with a single storage system, not performant enough to handle your volume of data, or simply not flexible enough to let you do all the things you want with your data, the tools available today inevitably end up as a small part of a larger pipeline that your team must build and maintain.
 
@@ -22,7 +22,7 @@ Assembling and maintaining these pipelines piecemeal can be a tough and unreward
 
 Finally, there are teams with the resources and organizational willpower to **build their own solutions**. This gives you an enormous amount of flexibility and power, but with an equally impressive price tag in engineering time.
 
-# What is Vector?
+## What is Vector?
 
 So what exactly is Vector and how is it a better solution to this problem? At first glance, Vector looks a lot like some other logging infrastructure tools you might be familiar with. It can ingest data in a number of ways (tailing files, syslog messages over the network, etc), it can process that data in flight (regex and JSON parsing, filtering, sampling, etc), and it can send the raw or processed data to a variety of external systems for storage and querying. Whether it's rsyslog, logstash, fluentd, or another example, it's more likely than not that something with this basic set of features is running in your infrastructure.
 
@@ -34,7 +34,7 @@ On top of this basic functionality, Vector adds a few important enhancements:
 
 The end result is a tool that can **be** your pipeline, rather than just another component in it. We hope to enable the full flexibility and power of a custom built solution with a tiny fraction of the required investment. There have been a few other projects aimed in this direction (heka and cernan are two big inspirations), but with Vector we think we can take the ease of use and breadth of capabilities to another level.
 
-# Try it out!
+## Try it out!
 
 We're still very early in the process of building Vector, but it's already at a stage where we believe it's competitive with existing tools and ready to be trialed for production use. Not every feature mentioned above is present yet, but we're happy with the foundation and working quickly to flesh everything out. If you're interested in giving it a try, check out the project on GitHub, our docs, and please reach out! We'd love to hear about your use cases and are excited to see where we can take this project together.
 
