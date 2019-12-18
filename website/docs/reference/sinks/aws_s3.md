@@ -84,7 +84,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
-  filename_extension = true # default
+  filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
   
@@ -378,14 +378,14 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
   common={false}
   defaultValue={"log"}
   enumValues={null}
-  examples={[true,false]}
+  examples={["log"]}
   name={"filename_extension"}
   nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"bool"}
+  type={"string"}
   unit={null}
   >
 

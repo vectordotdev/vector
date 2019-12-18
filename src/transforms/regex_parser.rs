@@ -179,9 +179,15 @@ impl Transform for RegexParser {
     }
 }
 
+const ELLIPSIS: &str = "[...]";
+
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
-        format!("{}[...]", &s[..maxlen - 5]).into()
+        let mut len = maxlen - ELLIPSIS.len();
+        while !s.is_char_boundary(len) {
+            len -= 1;
+        }
+        format!("{}{}", &s[..len], ELLIPSIS).into()
     } else {
         s.into()
     }
@@ -335,5 +341,11 @@ mod tests {
         assert_eq!(log[&"check".into()], ValueKind::Boolean(false));
         assert_eq!(log[&"status".into()], ValueKind::Integer(1234));
         assert_eq!(log[&"time".into()], ValueKind::Float(6789.01));
+    }
+
+    #[test]
+    fn regex_parser_truncate_utf8() {
+        let message = "hello 😁 this is test";
+        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
     }
 }

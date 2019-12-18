@@ -36,7 +36,7 @@ null = false
 description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 
 [sinks.aws_s3.options.filename_extension]
-type = "bool"
+type = "string"
 category = "Object Names"
 default = "log"
 null = false

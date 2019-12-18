@@ -100,7 +100,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   common={false}
   defaultValue={false}
   enumValues={null}
-  examples={[true,false]}
+  examples={[false,true]}
   name={"increment_by_value"}
   nullable={false}
   path={"metrics"}

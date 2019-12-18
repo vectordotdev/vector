@@ -69,7 +69,7 @@ import TabItem from '@theme/TabItem';
 4.  Start Vector:
 
     ```bat
-    .\bin\vector --config vector\vector.toml
+    .\bin\vector --config config\vector.toml
     ```
 
     That's it! Proceed to [configure](#configuring) Vector for your use case.

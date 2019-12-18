@@ -83,7 +83,7 @@ A table of key/value pairs representing the keys to be added to the event.
 
 #### `[field-name]`
 
-The name of the field to add. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
+The name of the field to add. Accepts all [supported types][docs.configuration#types]. Use `.` for adding nested fields.
 
 
 </Field>
@@ -229,8 +229,8 @@ special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration#environment-variables
+[docs.configuration#types]: /docs/setup/configuration#types
 [docs.configuration#value-types]: /docs/setup/configuration#value-types
-[docs.configuration#value_types]: /docs/setup/configuration#value_types
 [docs.data-model#log]: /docs/about/data-model#log
 [docs.data-model.log#special-characters]: /docs/about/data-model/log#special-characters
 [docs.data-model.log]: /docs/about/data-model/log

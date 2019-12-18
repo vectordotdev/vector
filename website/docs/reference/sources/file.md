@@ -50,10 +50,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - General
   ignore_older = 86400 # example, no default, seconds
-  start_at_beginning = true # default
+  start_at_beginning = false # default
   
   # OPTIONAL - Priority
-  oldest_first = true # default
+  oldest_first = false # default
 ```
 
 </TabItem>
@@ -73,7 +73,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # example, no default, seconds
   max_line_bytes = 102400 # default, bytes
-  start_at_beginning = true # default
+  start_at_beginning = false # default
   
   # OPTIONAL - Context
   file_key = "file" # default
@@ -85,7 +85,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   
   # OPTIONAL - Priority
   max_read_bytes = 2048 # default, bytes
-  oldest_first = true # default
+  oldest_first = false # default
   
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
@@ -460,7 +460,7 @@ When[`message_start_indicator`](#message_start_indicator) is present, this sets 
   common={true}
   defaultValue={false}
   enumValues={null}
-  examples={[true,false]}
+  examples={[false,true]}
   name={"oldest_first"}
   nullable={true}
   path={null}
@@ -483,7 +483,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
   common={true}
   defaultValue={false}
   enumValues={null}
-  examples={[true,false]}
+  examples={[false,true]}
   name={"start_at_beginning"}
   nullable={false}
   path={null}
