@@ -5,7 +5,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Avatar({className, id, inline, nameSuffix, size, subTitle, vertical}) {
+function Avatar({className, id, inline, nameSuffix, rel, size, subTitle, vertical}) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {team}} = siteConfig.customFields;
@@ -30,7 +30,7 @@ function Avatar({className, id, inline, nameSuffix, size, subTitle, vertical}) {
           src={member.avatar}
         />
         <div className="avatar__intro">
-          <div className="avatar__name">{member.name}{nameSuffix}</div>
+          <div className="avatar__name"><a href={member.github} target="_blank" rel={rel}>{member.name}</a>{nameSuffix}</div>
           {subTitle !== false && <small className="avatar__subtitle">{subTitle || 'Vector core team'}</small>}
         </div>
       </div>

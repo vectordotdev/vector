@@ -16,10 +16,13 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output -%>
 ## Output
 
-<%= sink_output(component) %>
+<%= component_output(component, component.output) %>
 
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
+
+<%- end -%>

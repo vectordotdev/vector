@@ -8,11 +8,11 @@ module PostProcessors
   class OptionLinker
     class << self
       def link!(content)
-        content.scan(/[^\[]`([a-z][a-z_.]*)`/).collect do |matches|
+        content.scan(/ `([a-z][a-z_.]*)`/).collect do |matches|
           option = matches.first
 
           if content.include?("## #{option}")
-            content.gsub!(/[^\[]`#{option}`/, "[`#{option}`](##{option.slugify})")
+            content.gsub!(/ `#{option}`/, " [`#{option}`](##{option.slugify})")
           end
         end
 

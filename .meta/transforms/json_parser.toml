@@ -52,3 +52,78 @@ log as a sub-object with this name. \
 If a field with the same name already exists, the parser will fail and \
 produce an error.\
 """
+
+[[transforms.json_parser.output.log.examples]]
+label = "Simple"
+body = """\
+Given the following log event:
+
+```
+{
+  "message": "{"key": "value"}"
+}
+```
+
+You can parse the JSON with:
+
+```toml
+[transforms.json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "key": "value"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.\
+"""
+
+[[transforms.json_parser.output.log.examples]]
+label = "Wrapped"
+body = """\
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this log event:
+
+```
+{
+  "message": "{"parent": "{\"child\": \"value2\"}"}"
+}
+```
+
+You could unwrap the JSON with the following transforms:
+
+```toml
+[transforms.root_json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+
+[transforms.parent_json]
+  inputs = ["root_json"]
+  type   = "json_parser"
+  field  = "parent"
+
+[transforms.child_json]
+  inputs = ["parent_json"]
+  type   = "json_parser"
+  field  = "child"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "child": "value2"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.\
+"""

@@ -46,7 +46,7 @@ fn build_tests(path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
-    let paths = if opts.paths.len() > 0 {
+    let paths = if !opts.paths.is_empty() {
         &opts.paths
     } else {
         &DEFAULT_CONFIG_PATHS
@@ -55,7 +55,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     for (i, p) in paths.iter().enumerate() {
         let path_str = p.to_str().unwrap_or("");
         if i > 0 {
-            println!("");
+            println!();
         }
         println!("Running {} tests", path_str);
         match build_tests(p) {

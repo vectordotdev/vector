@@ -1,0 +1,113 @@
+[transforms.aws_ec2_metadata]
+allow_you_to_description = "enrich logs with AWS EC2 instance metadata"
+common = false 
+function_category = "enrich"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.aws_ec2_metadata.options.namespace]
+type = "string"
+common = true
+default = ""
+null = true
+description = "Prepend a namespace to each field's key."
+
+[transforms.aws_ec2_metadata.options.fields]
+type = "[string]"
+common = true 
+default = [
+    "instance-id",
+    "local-hostname", 
+    "local-ipv4",
+    "public-hostname",
+    "public-ipv4",
+    "ami-id",
+    "availability-zone",
+    "vpc-id",
+    "subnet-id",
+    "region"
+]
+description = "A list of fields to include in each event." 
+null = true
+
+[transforms.aws_ec2_metadata.options.refresh_interval_secs]
+type = "int"
+common = true 
+default = 10
+null = true
+description = "The interval in seconds at which the EC2 Metadata api will be called."
+
+[transforms.aws_ec2_metadata.options.host]
+type = "string"
+common = true 
+default = "http://169.254.169.254"
+null = true
+description = "Override the default EC2 Metadata host."
+
+[transforms.aws_ec2_metadata.output.log.fields.ami-id]
+type = "string"
+optional = true
+examples = ["ami-00068cd7555f543d5"]
+description = "The `ami-id` that the current EC2 instance is using."
+
+[transforms.aws_ec2_metadata.output.log.fields.availability-zone]
+type = "string"
+optional = true
+examples = ["54.234.246.107"]
+description = "The `availability-zone` that the current EC2 instance is running in."
+
+[transforms.aws_ec2_metadata.output.log.fields.instance-id]
+type = "string"
+optional = true
+examples = ["i-096fba6d03d36d262"]
+description = "The `instance-id` of the current EC2 instance."
+
+[transforms.aws_ec2_metadata.output.log.fields.local-hostname]
+type = "string"
+optional = true
+examples = ["ip-172-31-93-227.ec2.internal"]
+description = "The `local-hostname` of the current EC2 instance."
+
+[transforms.aws_ec2_metadata.output.log.fields.local-ipv4]
+type = "string"
+optional = true
+examples = ["172.31.93.227"]
+description = "The `local-ipv4` of the current EC2 instance."
+
+[transforms.aws_ec2_metadata.output.log.fields.public-hostname]
+type = "string"
+optional = true
+examples = ["ec2-54-234-246-107.compute-1.amazonaws.com"]
+description = "The `public-hostname` of the current EC2 instance."
+
+[transforms.aws_ec2_metadata.output.log.fields.public-ipv4]
+type = "string"
+optional = true
+examples = ["54.234.246.107"]
+description = "The `public-ipv4` of the current EC2 instance."
+
+[transforms.aws_ec2_metadata.output.log.fields.region]
+type = "string"
+optional = true
+examples = ["us-east-1"]
+description = "The `region` that the current EC2 instance is running in."
+
+[transforms.aws_ec2_metadata.output.log.fields.role-name]
+type = "string"
+optional = true
+examples = ["some_iam_role"]
+description = "The `role-name` that the current EC2 instance is using."
+
+[transforms.aws_ec2_metadata.output.log.fields.subnet-id]
+type = "string"
+optional = true
+examples = ["subnet-9d6713b9"]
+description = "The `subnet-id` of the current EC2 instance's default network interface."
+
+[transforms.aws_ec2_metadata.output.log.fields.vpc-id]
+type = "string"
+optional = true
+examples = ["vpc-a51da4dc"]
+description = "The `vpc-id` of the current EC2 instance's default network interface."

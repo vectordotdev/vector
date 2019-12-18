@@ -219,7 +219,7 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     }
 }
 
-fn stats(values: &Vec<f64>, counts: &Vec<u32>) -> Option<DatadogStats> {
+fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     if values.len() != counts.len() {
         return None;
     }
@@ -351,7 +351,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                         r#type: DatadogMetricType::Gauge,
                         interval: None,
                         points: vec![DatadogPoint(ts, values.len() as f64)],
-                        tags: tags.clone(),
+                        tags,
                     }]),
                     _ => None,
                 },
@@ -494,7 +494,7 @@ mod tests {
     #[test]
     fn test_dense_stats() {
         // https://github.com/DataDog/dd-agent/blob/master/tests/core/test_histogram.py
-        let values = (0..20).into_iter().map(f64::from).collect();
+        let values = (0..20).into_iter().map(f64::from).collect::<Vec<_>>();
         let counts = vec![1; 20];
 
         assert_eq!(
@@ -513,8 +513,8 @@ mod tests {
 
     #[test]
     fn test_sparse_stats() {
-        let values = (1..5).into_iter().map(f64::from).collect();
-        let counts = (1..5).into_iter().collect();
+        let values = (1..5).into_iter().map(f64::from).collect::<Vec<_>>();
+        let counts = (1..5).into_iter().collect::<Vec<_>>();
 
         assert_eq!(
             stats(&values, &counts),

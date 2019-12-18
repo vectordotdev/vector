@@ -133,11 +133,11 @@ Next, try experimenting by adding more [transforms][docs.transforms] to your
 pipeline before moving onto the next guide.
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.installation]: /docs/setup/installation
-[docs.sinks.console#encoding]: /docs/reference/sinks/console#encoding
-[docs.sinks.console]: /docs/reference/sinks/console
-[docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
-[docs.transforms]: /docs/reference/transforms
+[docs.configuration]: /docs/setup/configuration/
+[docs.data-model#event]: /docs/about/data-model/#event
+[docs.installation]: /docs/setup/installation/
+[docs.sinks.console#encoding]: /docs/reference/sinks/console/#encoding
+[docs.sinks.console]: /docs/reference/sinks/console/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms]: /docs/reference/transforms/

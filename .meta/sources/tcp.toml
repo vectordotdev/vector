@@ -47,15 +47,22 @@ The timeout before a connection is forcefully closed during shutdown.\
 
 [[sources.tcp.output.log.examples]]
 label = "Generic"
-input = """\
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1\
-"""
-output = """\
+body = """\
+Given the following input:
+
+```text
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+
+A log event will be output with the following structure:
+
+```json
 {
   "timestamp": <current_timestamp>,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
   "host": "<upstream_hostname>"
 }
+```\
 """
 
 [sources.tcp.output.log.fields.host]

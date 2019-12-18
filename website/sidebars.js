@@ -97,8 +97,8 @@ module.exports = {
           items: [
             "setup/guides",
             "setup/guides/getting-started",
-            "setup/guides/troubleshooting",
             "setup/guides/unit-testing",
+            "setup/guides/troubleshooting",
           ]
         },
       ],
@@ -150,7 +150,11 @@ module.exports = {
             
               "reference/transforms/ansi_stripper",
             
+              "reference/transforms/aws_ec2_metadata",
+            
               "reference/transforms/coercer",
+            
+              "reference/transforms/concat",
             
               "reference/transforms/field_filter",
             

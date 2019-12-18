@@ -1,39 +1,47 @@
 [[team]]
 id = "alex"
 avatar = "https://github.com/a-rodin.png"
+github = "https://github.com/a-rodin"
 name = "Alexander"
 
 [[team]]
 id = "alexey"
 avatar = "https://github.com/loony-bean.png"
+github = "https://github.com/loony-bean"
 name = "Alexey"
 
 [[team]]
-id = "ash"
+id = "ashley"
 avatar = "https://github.com/Jeffail.png"
-name = "Ash"
+github = "https://github.com/Jeffail"
+name = "Ashley"
 
 [[team]]
 id = "ben"
 avatar = "https://github.com/binarylogic.png"
+github = "https://github.com/binarylogic"
 name = "Ben"
 
 [[team]]
 id = "bruce"
 avatar = "https://github.com/bruceg.png"
+github = "https://github.com/bruceg"
 name = "Bruce"
 
 [[team]]
 id = "kruno"
 avatar = "https://github.com/ktff.png"
+github = "https://github.com/ktff"
 name = "Kruno"
 
 [[team]]
 id = "lucio"
 avatar = "https://github.com/LucioFranco.png"
+github = "https://github.com/LucioFranco"
 name = "Lucio"
 
 [[team]]
 id = "luke"
 avatar = "https://github.com/lukesteensen.png"
+github = "https://github.com/lukesteensen"
 name = "Luke"

@@ -69,7 +69,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         .map(|s| {
             s.split(',')
                 .map(|s| s.trim())
-                .filter(|s| s.len() > 0)
+                .filter(|s| !s.is_empty())
                 .collect()
         })
         .collect();
@@ -104,7 +104,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             sources.insert(name, example);
         }
 
-        if sources.len() > 0 {
+        if !sources.is_empty() {
             config.sources = Some(sources);
         }
     }
@@ -149,7 +149,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             );
         }
 
-        if transforms.len() > 0 {
+        if !transforms.is_empty() {
             config.transforms = Some(transforms);
         }
     }
@@ -179,13 +179,13 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                         .last()
                         .map(|s| vec![s.to_owned()])
                         .or_else(|| {
-                            if source_names.len() > 0 {
+                            if !source_names.is_empty() {
                                 Some(source_names.clone())
                             } else {
                                 None
                             }
                         })
-                        .unwrap_or(vec!["TODO".to_owned()]),
+                        .unwrap_or_else(|| vec!["TODO".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
                     healthcheck: true,
                     inner: example,
@@ -193,12 +193,12 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             );
         }
 
-        if sinks.len() > 0 {
+        if !sinks.is_empty() {
             config.sinks = Some(sinks);
         }
     }
 
-    if errs.len() > 0 {
+    if !errs.is_empty() {
         errs.iter().for_each(|e| eprintln!("Generate error: {}", e));
         return exitcode::CONFIG;
     }

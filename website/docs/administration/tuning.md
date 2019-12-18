@@ -22,5 +22,5 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/deployment/roles/agent#limiting-resources">View limiting resources section</Jump>
 
 
-[docs.roles.agent]: /docs/setup/deployment/roles/agent
+[docs.roles.agent]: /docs/setup/deployment/roles/agent/
 [urls.rust]: https://www.rust-lang.org/

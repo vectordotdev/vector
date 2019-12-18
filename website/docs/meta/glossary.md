@@ -10,7 +10,7 @@ The gloassary contains common terms and their definitions.
 
 ## Benchmark
 
-"Benchmark" refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks][docs.performance] section.
+"Benchmark" refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks][pages.index#performance] section.
 
 ## Binary
 
@@ -142,17 +142,17 @@ reducing cost, etc.
 "Vector" is the name of this project.
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.data-model.log]: /docs/about/data-model/log
-[docs.data-model.metric]: /docs/about/data-model/metric
-[docs.data_model]: /docs/about/data-model
-[docs.guides]: /docs/setup/guides
-[docs.performance]: /docs/about/performance
-[docs.roles]: /docs/setup/deployment/roles
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.topologies]: /docs/setup/deployment/topologies
-[docs.transforms]: /docs/reference/transforms
+[docs.configuration]: /docs/setup/configuration/
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
+[docs.data_model]: /docs/about/data-model/
+[docs.guides]: /docs/setup/guides/
+[docs.roles]: /docs/setup/deployment/roles/
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.topologies]: /docs/setup/deployment/topologies/
+[docs.transforms]: /docs/reference/transforms/
+[pages.index#performance]: /#performance
 [urls.rust]: https://www.rust-lang.org/
 [urls.toml]: https://github.com/toml-lang/toml
 [urls.toml_table]: https://github.com/toml-lang/toml#table
