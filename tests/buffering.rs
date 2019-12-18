@@ -5,16 +5,11 @@ use prost::Message;
 use tempfile::tempdir;
 use vector::event::{self, Event};
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, make_tcp_socket_source_config, next_addr, random_lines, receive, send_lines,
+    shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks, sources};
-
-fn make_tcp_socket_source_config(
-    tcp_config: sources::tcp::TcpConfig,
-) -> sources::socket::SocketConfig {
-    sources::socket::SocketConfig::new(sources::socket::Mode::Tcp(tcp_config))
-}
+use vector::{buffers::BufferConfig, runtime, sinks};
 
 #[cfg(unix)]
 #[test]
@@ -29,10 +24,7 @@ fn test_buffering() {
 
     // Run vector while sink server is not running, and then shut it down abruptly
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -60,10 +52,7 @@ fn test_buffering() {
 
     // Start sink server, then run vector again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -126,10 +115,7 @@ fn test_max_size() {
 
     // Run vector while sink server is not running, and then shut it down abruptly
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -156,10 +142,7 @@ fn test_max_size() {
 
     // Start sink server, then run vector again. It should send the lines from the first run that fit in the limited space
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -202,14 +185,8 @@ fn test_max_size_resume() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source(
-        "in1",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr1.into())),
-    );
-    config.add_source(
-        "in2",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr2.into())),
-    );
+    config.add_source("in1", make_tcp_socket_source_config(in_addr1));
+    config.add_source("in2", make_tcp_socket_source_config(in_addr2));
     config.add_sink(
         "out",
         &["in1", "in2"],
@@ -262,10 +239,7 @@ fn test_reclaim_disk_space() {
 
     // Run vector while sink server is not running, and then shut it down abruptly
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -302,10 +276,7 @@ fn test_reclaim_disk_space() {
 
     // Start sink server, then run vector again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],

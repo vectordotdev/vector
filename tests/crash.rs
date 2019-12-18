@@ -2,8 +2,8 @@ use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
     test_util::{
-        block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
-        wait_for_tcp,
+        block_on, make_tcp_socket_source_config, next_addr, random_lines, receive, runtime,
+        send_lines, shutdown_on_idle, wait_for_tcp,
     },
     topology::{
         self,
@@ -49,12 +49,6 @@ impl Sink for PanicSink {
     }
 }
 
-fn make_tcp_socket_source_config(
-    tcp_config: sources::tcp::TcpConfig,
-) -> sources::socket::SocketConfig {
-    sources::socket::SocketConfig::new(sources::socket::Mode::Tcp(tcp_config))
-}
-
 #[test]
 fn test_sink_panic() {
     let num_lines: usize = 10;
@@ -63,10 +57,7 @@ fn test_sink_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -145,10 +136,7 @@ fn test_sink_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_sink(
         "out",
         &["in"],
@@ -212,10 +200,7 @@ fn test_source_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_source("error", ErrorSourceConfig);
     config.add_sink(
         "out",
@@ -281,10 +266,7 @@ fn test_source_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        make_tcp_socket_source_config(sources::tcp::TcpConfig::new(in_addr.into())),
-    );
+    config.add_source("in", make_tcp_socket_source_config(in_addr));
     config.add_source("panic", PanicSourceConfig);
     config.add_sink(
         "out",

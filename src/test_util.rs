@@ -1,6 +1,7 @@
 use crate::runtime::Runtime;
 use crate::Event;
 
+use crate::sources;
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -26,6 +27,12 @@ macro_rules! assert_downcast_matches {
             got => panic!("assertion failed: got wrong error variant {:?}", got),
         }
     }};
+}
+
+pub fn make_tcp_socket_source_config(addr: SocketAddr) -> sources::socket::SocketConfig {
+    sources::socket::SocketConfig::new(sources::socket::Mode::Tcp(sources::tcp::TcpConfig::new(
+        addr.into(),
+    )))
 }
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
