@@ -17971,7 +17971,7 @@ module.exports = {
     "gcp_pubsub": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Batches log events to [Pubsub][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
+      "description": "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
       "event_types": [
         "log"
       ],

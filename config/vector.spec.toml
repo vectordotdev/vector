@@ -2849,7 +2849,7 @@ end
   encoding = "ndjson"
   encoding = "text"
 
-# Batches `log` events to Pubsub via the REST Interface.
+# Batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface.
 [sinks.gcp_pubsub]
   #
   # General
