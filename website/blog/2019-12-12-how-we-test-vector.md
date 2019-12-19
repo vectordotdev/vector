@@ -125,10 +125,10 @@ systems correctly.
 When we talked about unit tests, we mentioned that one area where they start to
 break down is when testing functions with a very large space of possible inputs.
 While you can do your best to think about that input space and come up with the
-edge cases that need handled, the problem is that you'll likely be thinking
-about the same cases when writing your unit tests as you are when writing the
-implementation. And since you're only human, there's no guarantee that those are
-the only cases you'll need to think about.
+edge cases that need to be handled, the problem is that you'll likely be
+thinking about the same cases when writing your unit tests as you are when
+writing the implementation. And since you're only human, there's no guarantee
+that those are the only cases you'll need to think about.
 
 These shortcomings of the human mind are what generative tests seek to address.
 Instead of requiring the developer to come up with interesting inputs to feed
@@ -213,7 +213,7 @@ One of the most popular and influential fuzz testing tools is [american fuzzy
 lop][7]. It is a coverage-guided, genetic fuzzer, which means that it watches
 your program's execution with various random inputs and uses that information to
 evolve new inputs that cover as many execution paths as possible. This makes it
-extremely effective at find edge cases where your program could crash, hang,
+extremely effective at finding edge cases where your program could crash, hang,
 etc.
 
 Fuzzing is an extremely powerful technique for testing parsers. While it's easy
@@ -238,7 +238,7 @@ a target that directly accepts raw bytes, build it with the proper
 instrumentation, and wrap it to be driven by the fuzzer. Since we are not
 actively changing the tokenizer parser, we simply did a session of fuzzing
 manually on a developer's machine (using the excellent [`cargo-fuzz`][13]),
-collected failing inputs and addresses them one by one, continuing until the
+collected failing inputs and addressed them one by one, continuing until the
 fuzzer had run for a significant amount of time without finding any crashes.
 Finally, we wrote [unit tests][14] around those inputs to catch any regressions.
 As we do more active development of our own parsers in the future, we will
