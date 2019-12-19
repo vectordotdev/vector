@@ -150,7 +150,7 @@ A Google Cloud API key used to authenticate access the pubsub project and topic.
 
 ### batch_size
 
-The maximum size of a batch before it is flushed.
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -173,7 +173,7 @@ The maximum size of a batch before it is flushed.
 
 ### batch_timeout
 
-The maximum age of a batch before it is flushed.
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -338,7 +338,7 @@ The filename for a Google Cloud service account credentials JSON file used to au
 
 ### healthcheck
 
-Enables/disables the sink healthcheck upon start.
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 
 </Field>
@@ -384,7 +384,7 @@ The project name to which to publish logs.
 
 ### request_in_flight_limit
 
-The maximum number of in-flight requests allowed at any given time.
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -407,7 +407,7 @@ The maximum number of in-flight requests allowed at any given time.
 
 ### request_rate_limit_duration_secs
 
-The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option
+The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -430,7 +430,7 @@ The window used for the [`request_rate_limit_num`](#request_rate_limit_num) opti
 
 ### request_rate_limit_num
 
-The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window.
+The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -453,7 +453,7 @@ The maximum number of requests allowed within the [`request_rate_limit_duration_
 
 ### request_retry_attempts
 
-The maximum number of retries to make for failed requests.
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -476,7 +476,7 @@ The maximum number of retries to make for failed requests.
 
 ### request_retry_backoff_secs
 
-The amount of time to wait before attempting a failed request again.
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
@@ -695,8 +695,83 @@ The topic within the project to which to publish logs.
 
 </Fields>
 
+## How It Works
 
+### Buffers & Batches
+
+import SVG from 'react-inlinesvg';
+
+<SVG src="/img/buffers-and-batches-serial.svg" />
+
+The `gcp_pubsub` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
+
+*Batches* are flushed when 1 of 2 conditions are met:
+
+1. The batch age meets or exceeds the configured [`batch_timeout`](#batch_timeout) (default: `1 seconds`).
+2. The batch size meets or exceeds the configured [`batch_size`](#batch_size) (default: `10485760 bytes`).
+
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+
+### Health Checks
+
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+If the health check fails an error will be logged and Vector will proceed to
+start.
+
+#### Require Health Checks
+
+If you'd like to exit immediately upon a health check failure, you can
+pass the `--require-healthy` flag:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
+
+#### Disable Health Checks
+
+If you'd like to disable health checks for this sink you can set the
+`healthcheck` option to `false`.
+
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
+`request_rate_limit_num` options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][urls.new_gcp_pubsub_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
+`request_retry_backoff_secs` options.
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.gcp_pubsub]: https://cloud.google.com/pubsub/
 [urls.gcp_pubsub_rest]: https://cloud.google.com/pubsub/docs/reference/rest/
+[urls.new_gcp_pubsub_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_pubsub
