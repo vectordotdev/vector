@@ -17793,7 +17793,7 @@ module.exports = {
     "aws_kinesis_firehose": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).",
+      "description": "Batches log events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).",
       "event_types": [
         "log"
       ],
@@ -17805,7 +17805,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [

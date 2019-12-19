@@ -1652,7 +1652,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Batches `log` events to AWS Kinesis Data Firehose via the `PutRecordBatch` API endpoint.
+# Batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.
 [sinks.aws_kinesis_firehose]
   #
   # General
@@ -1671,12 +1671,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # The AWS region of the target Kinesis Firehose delivery stream resides.
   # 
