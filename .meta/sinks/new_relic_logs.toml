@@ -1,4 +1,5 @@
 [sinks.new_relic_logs]
+title = "New Relic Logs"
 batch_is_simple = true
 batch_size = 524000
 batch_timeout = 1
@@ -16,7 +17,7 @@ request_retry_backoff_secs = 1
 request_in_flight_limit = 100
 request_timeout_secs = 30
 service_provider = "New Relic"
-write_to_description = "[New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api]"
+write_to_description = "[New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api]"
 
 [sinks.new_relic_logs.options.license_key]
 type = "string"

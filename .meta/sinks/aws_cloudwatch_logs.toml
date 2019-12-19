@@ -1,4 +1,5 @@
 [sinks.aws_cloudwatch_logs]
+title = "AWS Cloudwatch Logs"
 batch_size = 1049000
 batch_timeout = 1
 beta = true
@@ -18,7 +19,7 @@ request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_cw_logs_service_limits"
 service_provider = "AWS"
-write_to_description = "[AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
+write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"

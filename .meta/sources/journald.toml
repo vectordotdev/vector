@@ -1,4 +1,5 @@
 [sources.journald]
+title = "Journald"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

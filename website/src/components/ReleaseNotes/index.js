@@ -6,6 +6,7 @@ import BlogPostTags from '@site/src/components/BlogPostTags';
 import Changelog from '@site/src/components/Changelog';
 import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
+import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import MailingListForm from '@site/src/components/MailingListForm';
 import MDXComponents from '@theme/MDXComponents';
@@ -257,11 +258,15 @@ function ReleaseNotes({version}) {
   }
 
   return (
-    <div className={styles.containers}>
-      <Sidebar releases={releasesList} release={release} />
-      <Notes release={release} latest={latest} />
-      <TableOfContents release={release} />
-    </div>
+    <Layout title={`v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
+      <main>
+        <div className={styles.containers}>
+          <Sidebar releases={releasesList} release={release} />
+          <Notes release={release} latest={latest} />
+          <TableOfContents release={release} />
+        </div>
+      </main>
+    </Layout>
   );
 }
 

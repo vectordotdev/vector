@@ -1,4 +1,5 @@
 [sinks.aws_s3]
+title = "AWS S3"
 batch_is_simple = true
 batch_size = 10490000
 batch_timeout = 300
@@ -19,7 +20,7 @@ request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_s3_service_limits"
 service_provider = "AWS"
-write_to_description = "[AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
+write_to_description = "[Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
 
 [sinks.aws_s3.options.bucket]
 type = "string"

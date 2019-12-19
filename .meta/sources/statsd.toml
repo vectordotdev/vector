@@ -1,4 +1,5 @@
 [sources.statsd]
+title = "Statsd"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

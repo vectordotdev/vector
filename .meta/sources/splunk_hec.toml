@@ -1,4 +1,5 @@
 [sources.splunk_hec]
+title = "Splunk HEC"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

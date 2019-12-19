@@ -1,4 +1,5 @@
 [transforms.concat]
+title = "Concat"
 allow_you_to_description = "concat (substrings) of other fields to a new one"
 beta = true
 function_category = ["filter"]

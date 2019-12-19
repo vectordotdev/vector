@@ -17749,7 +17749,7 @@ module.exports = {
     "aws_cloudwatch_logs": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
+      "description": "Batches log events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
       "event_types": [
         "log"
       ],
@@ -17771,7 +17771,7 @@ module.exports = {
     "aws_cloudwatch_metrics": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Streams metric events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
+      "description": "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
       "event_types": [
         "metric"
       ],
@@ -17793,7 +17793,7 @@ module.exports = {
     "aws_kinesis_streams": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
+      "description": "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
       "event_types": [
         "log"
       ],
@@ -17815,7 +17815,7 @@ module.exports = {
     "aws_s3": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
+      "description": "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
       "event_types": [
         "log"
       ],
@@ -17905,7 +17905,7 @@ module.exports = {
     "datadog_metrics": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Batches metric events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
+      "description": "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
       "event_types": [
         "metric"
       ],
@@ -18037,7 +18037,7 @@ module.exports = {
     "new_relic_logs": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].",
+      "description": "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api].",
       "event_types": [
         "log"
       ],
@@ -18081,7 +18081,7 @@ module.exports = {
     "splunk_hec": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to a [Splunk HTTP Event Collector][urls.splunk_hec].",
+      "description": "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec].",
       "event_types": [
         "log"
       ],

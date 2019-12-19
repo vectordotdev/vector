@@ -1409,7 +1409,7 @@ end
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
 
-# Batches `log` events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.
+# Batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint.
 [sinks.aws_cloudwatch_logs]
   #
   # General
@@ -1610,7 +1610,7 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-# Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
+# Streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `aws_cloudwatch_metrics`.
@@ -1652,7 +1652,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
+# Batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
   #
   # General
@@ -1832,7 +1832,7 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-# Batches `log` events to AWS S3 via the `PutObject` API endpoint.
+# Batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint.
 [sinks.aws_s3]
   #
   # General
@@ -2385,7 +2385,7 @@ end
   encoding = "json"
   encoding = "text"
 
-# Batches `metric` events to Datadog metrics service using HTTP API.
+# Batches `metric` events to Datadog's metrics service using HTTP API.
 [sinks.datadog_metrics]
   #
   # General
@@ -3485,7 +3485,7 @@ end
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-# Batches `log` events to New Relic via their log API.
+# Batches `log` events to New Relic's log service via their log API.
 [sinks.new_relic_logs]
   #
   # General
@@ -3698,7 +3698,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Batches `log` events to a Splunk HTTP Event Collector.
+# Batches `log` events to a Splunk's HTTP Event Collector.
 [sinks.splunk_hec]
   #
   # General
