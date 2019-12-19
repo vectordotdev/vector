@@ -2,7 +2,8 @@ use approx::assert_relative_eq;
 use futures::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
-use sinks::tcp::{self, TcpSinkConfig};
+use sinks::socket::SocketSinkConfig;
+use sinks::util::tcp::Encoding;
 use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
@@ -321,10 +322,6 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
     facility as u8 | severity as u8
 }
 
-fn tcp_json_sink(address: String) -> TcpSinkConfig {
-    TcpSinkConfig {
-        address,
-        encoding: tcp::Encoding::Json,
-        tls: None,
-    }
+fn tcp_json_sink(address: String) -> SocketSinkConfig {
+    SocketSinkConfig::make_tcp_config(address, Encoding::Json, None)
 }
