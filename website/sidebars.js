@@ -192,6 +192,8 @@ module.exports = {
             
               "reference/sinks/aws_cloudwatch_metrics",
             
+              "reference/sinks/aws_kinesis_firehose",
+            
               "reference/sinks/aws_kinesis_streams",
             
               "reference/sinks/aws_s3",

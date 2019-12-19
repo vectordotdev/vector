@@ -94,8 +94,8 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-struct ElasticSearchCommon {
-    base_url: String,
+pub struct ElasticSearchCommon {
+    pub base_url: String,
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
@@ -117,7 +117,7 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
+    pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))

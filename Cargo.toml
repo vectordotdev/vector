@@ -70,6 +70,7 @@ rusoto_logs = "0.41.0"
 rusoto_cloudwatch = "0.41.0"
 rusoto_kinesis = "0.41.0"
 rusoto_credential = "0.41.1"
+rusoto_firehose = "0.41.0"
 
 # Tower
 tower = "0.1.1"
@@ -204,11 +205,14 @@ docker = [
   "docker-integration-tests",
   "ec2-metadata-integration-tests",
   "es-integration-tests",
+  "firehose-integration-tests",
   "gcp-pubsub-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
-  "splunk-integration-tests"
+  "splunk-integration-tests",
+  "docker-integration-tests",
+  "ec2-metadata-integration-tests",
 ]
 clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
@@ -216,6 +220,7 @@ cloudwatch-metrics-integration-tests = []
 docker-integration-tests = []
 ec2-metadata-integration-tests = []
 es-integration-tests = []
+firehose-integration-tests = []
 gcp-pubsub-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []
