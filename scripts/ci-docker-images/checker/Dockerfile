@@ -13,7 +13,7 @@ RUN rustup component add rustfmt
 
 # Install Ruby dependencies
 ENV LC_ALL C.UTF-8
-RUN gem install bundler
+RUN gem install bundler -v '~> 2.0.0'
 COPY checker/Gemfile Gemfile
 RUN bundle install
 RUN rm Gemfile
