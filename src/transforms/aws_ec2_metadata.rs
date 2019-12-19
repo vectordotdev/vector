@@ -135,8 +135,8 @@ impl TransformConfig for Ec2Metadata {
 
                 client.run().await;
             }
-                // TODO: Once #1338 is done we can fetch the current span
-                .instrument(info_span!("aws_ec2_metadata: worker")),
+            // TODO: Once #1338 is done we can fetch the current span
+            .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
         Ok(Box::new(Ec2MetadataTransform { state: read }))
