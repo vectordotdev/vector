@@ -8,7 +8,6 @@ use futures::{Future, Poll, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
-use native_tls::TlsConnector;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -92,13 +91,27 @@ impl HttpServiceBuilder {
     }
 }
 
-pub fn https_client(
-    tls: TlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>>> {
-    let mut http = HttpConnector::new(1);
+pub fn connector(
+    resolver: Resolver,
+    tls_settings: TlsSettings,
+) -> crate::Result<HttpsConnector<HttpConnector<Resolver>>> {
+    let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
-    let tls = TlsConnector::builder().use_tls_settings(tls).build()?;
-    let https = HttpsConnector::from((http, tls));
+
+    let mut tls = native_tls::TlsConnector::builder();
+
+    tls.use_tls_settings(tls_settings);
+
+    let https = HttpsConnector::from((http, tls.build()?));
+
+    Ok(https)
+}
+
+pub fn https_client(
+    resolver: Resolver,
+    tls: TlsSettings,
+) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector<Resolver>>>> {
+    let https = connector(resolver, tls)?;
     Ok(hyper::Client::builder().build(https))
 }
 

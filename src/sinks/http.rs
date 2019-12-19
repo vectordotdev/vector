@@ -1,4 +1,5 @@
 use crate::{
+    dns::Resolver,
     event::{self, Event},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
@@ -95,11 +96,12 @@ impl SinkConfig for HttpSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let sink = http(self.clone(), cx, tls.clone())?;
+        let sink = http(self.clone(), cx.clone(), tls.clone())?;
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
-                let healthcheck = healthcheck(healthcheck_uri, self.basic_auth.clone(), tls)?;
+                let healthcheck =
+                    healthcheck(healthcheck_uri, self.basic_auth.clone(), cx.resolver(), tls)?;
                 Ok((sink, healthcheck))
             }
             None => Ok((sink, Box::new(future::ok(())))),
@@ -190,6 +192,7 @@ fn http(
 fn healthcheck(
     uri: String,
     auth: Option<BasicAuth>,
+    resolver: Resolver,
     tls_settings: TlsSettings,
 ) -> crate::Result<super::Healthcheck> {
     let uri = build_uri(&uri)?;
@@ -199,7 +202,7 @@ fn healthcheck(
         auth.apply(request.headers_mut());
     }
 
-    let client = https_client(tls_settings)?;
+    let client = https_client(resolver, tls_settings)?;
 
     let healthcheck = client
         .request(request)
