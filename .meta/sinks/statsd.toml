@@ -1,4 +1,5 @@
 [sinks.statsd]
+title = "Statsd"
 beta = true
 buffer = false
 common = false

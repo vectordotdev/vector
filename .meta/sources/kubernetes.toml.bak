@@ -1,4 +1,5 @@
 [sources.kubernetes]
+title = "Kubernetes"
 beta = true
 delivery_guarantee = "best_effort"
 function_category = "collect"

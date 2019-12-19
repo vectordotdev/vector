@@ -1,4 +1,5 @@
 [sources.file]
+title = "File"
 beta = false
 common = true
 delivery_guarantee = "best_effort"

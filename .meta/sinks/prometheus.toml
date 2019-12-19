@@ -1,4 +1,5 @@
 [sinks.prometheus]
+title = "Prometheus"
 beta = true
 buffer = false
 common = true

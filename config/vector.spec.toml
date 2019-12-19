@@ -1409,7 +1409,7 @@ end
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
 
-# Batches `log` events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.
+# Batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint.
 [sinks.aws_cloudwatch_logs]
   #
   # General
@@ -1428,12 +1428,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # The group name of the target CloudWatch Logs stream.
   # 
@@ -1610,7 +1604,7 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-# Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
+# Streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `aws_cloudwatch_metrics`.
@@ -1625,12 +1619,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # A namespace that will isolate different metrics from each other.
   # 
@@ -1819,7 +1807,7 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-# Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
+# Batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
   #
   # General
@@ -1838,12 +1826,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # The AWS region of the target Kinesis stream resides.
   # 
@@ -1999,7 +1981,7 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-# Batches `log` events to AWS S3 via the `PutObject` API endpoint.
+# Batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint.
 [sinks.aws_s3]
   #
   # General
@@ -2032,12 +2014,6 @@ end
   # * enum: "gzip" or "none"
   compression = "gzip"
   compression = "none"
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # The AWS region of the target S3 bucket.
   # 
@@ -2552,7 +2528,7 @@ end
   encoding = "json"
   encoding = "text"
 
-# Batches `metric` events to Datadog metrics service using HTTP API.
+# Batches `metric` events to Datadog's metrics service using HTTP API.
 [sinks.datadog_metrics]
   #
   # General
@@ -3016,6 +2992,234 @@ end
   encoding = "ndjson"
   encoding = "text"
 
+# Batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface.
+[sinks.gcp_pubsub]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `gcp_pubsub`.
+  # 
+  # * required
+  # * type: string
+  # * must be: "gcp_pubsub"
+  type = "gcp_pubsub"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  # 
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The project name to which to publish logs.
+  # 
+  # * required
+  # * type: string
+  project = "vector-123456"
+
+  # The topic within the project to which to publish logs.
+  # 
+  # * required
+  # * type: string
+  topic = "this-is-a-topic"
+
+  # A Google Cloud API key used to authenticate access the pubsub project and
+  # topic. Either this or `credentials_path` must be set.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the pubsub project and topic. Either this or `api_key`
+  # must be set.
+  # 
+  # * optional
+  # * no default
+  # * type: string
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 10485760
+  # * type: int
+  # * unit: bytes
+  batch_size = 10485760
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  # * type: int
+  request_in_flight_limit = 5
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_rate_limit_duration_secs = 1
+
+  # The maximum number of requests allowed within the
+  # `request_rate_limit_duration_secs` window.
+  # 
+  # * optional
+  # * default: 100
+  # * type: int
+  request_rate_limit_num = 100
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 9223372036854775807
+  # * type: int
+  request_retry_attempts = 9223372036854775807
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 1
+  # * type: int
+  # * unit: seconds
+  request_retry_backoff_secs = 1
+
+  # The maximum time a request can take before being aborted. It is highly
+  # recommended that you do not lower value below the service's internal timeout,
+  # as this could create orphaned requests, pile on retries, and result in
+  # deuplicate data downstream.
+  # 
+  # * optional
+  # * default: 60
+  # * type: int
+  # * unit: seconds
+  request_timeout_secs = 60
+
+  #
+  # Buffer
+  #
+
+  [sinks.gcp_pubsub.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Tls
+  #
+
+  [sinks.gcp_pubsub.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    # 
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
   #
@@ -3424,7 +3628,7 @@ end
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-# Batches `log` events to New Relic via their log API.
+# Batches `log` events to New Relic's log service via their log API.
 [sinks.new_relic_logs]
   #
   # General
@@ -3637,7 +3841,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Batches `log` events to a Splunk HTTP Event Collector.
+# Batches `log` events to a Splunk's HTTP Event Collector.
 [sinks.splunk_hec]
   #
   # General

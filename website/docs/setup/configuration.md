@@ -48,7 +48,6 @@ data_dir = "/var/lib/vector"
   inputs       = ["apache_parser"]
   type         = "sampler"
   rate         = 50                            # only keep 50%
-  pass_list    = []
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]

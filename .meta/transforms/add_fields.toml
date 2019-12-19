@@ -1,4 +1,5 @@
 [transforms.add_fields]
+title = "Add Fields"
 allow_you_to_description = "add one or more log fields"
 common = false
 function_category = "shape"

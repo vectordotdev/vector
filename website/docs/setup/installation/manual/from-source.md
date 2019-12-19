@@ -67,7 +67,7 @@ import Tabs from '@theme/Tabs';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.0 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.X | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -230,7 +230,7 @@ Building steps:
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.0 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.X | \
       tar xzf - -C vector --strip-components=1
     ```
 

@@ -1,4 +1,5 @@
 [sinks.clickhouse]
+title = "Clickhouse"
 batch_size = 1049000
 batch_timeout = 1
 beta = true

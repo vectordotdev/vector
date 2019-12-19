@@ -1,0 +1,28 @@
+<%- component = metadata.sinks.gcp_pubsub -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+<%- if component.output -%>
+## Output
+
+<%= component_output(component, component.output) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+<%- end -%>

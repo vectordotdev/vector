@@ -99,7 +99,7 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
 
 function DocItem(props) {
   const {siteConfig = {}} = useDocusaurusContext();
-  const {url: siteUrl} = siteConfig;
+  const {title: siteTitle, url: siteUrl} = siteConfig;
   const {content: DocContent} = props;
   const {metadata} = DocContent;
 
@@ -134,7 +134,7 @@ function DocItem(props) {
   return (
     <div>
       <Head>
-        {title && <title>{title}</title>}
+        {title && <title>{title} | Docs | {siteTitle}</title>}
         {description && <meta name="description" content={description} />}
         {description && (
           <meta property="og:description" content={description} />

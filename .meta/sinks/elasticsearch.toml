@@ -1,4 +1,5 @@
 [sinks.elasticsearch]
+title = "Elasticsearch"
 batch_size = 10490000
 batch_timeout = 1
 beta = true

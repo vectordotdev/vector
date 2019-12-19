@@ -38,7 +38,7 @@ RUN apt-get remove docker docker-engine docker.io
 RUN apt-get update && apt-get install -y docker.io
 
 # Install gems to reduce setup time
-RUN gem install bundler
+RUN gem install bundler -v '~> 2.0.0'
 COPY checker/Gemfile Gemfile
 RUN bundle install
 RUN rm Gemfile
