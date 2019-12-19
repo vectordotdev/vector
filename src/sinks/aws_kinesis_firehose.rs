@@ -15,13 +15,13 @@ use rusoto_firehose::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt, sync::Arc};
+use std::{convert::TryInto, fmt};
 use tower::Service;
 use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
 pub struct KinesisFirehoseService {
-    client: Arc<KinesisFirehoseClient>,
+    client: KinesisFirehoseClient,
     config: KinesisFirehoseSinkConfig,
 }
 
@@ -81,10 +81,7 @@ impl KinesisFirehoseService {
         config: KinesisFirehoseSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(create_client(
-            config.region.clone().try_into()?,
-            cx.resolver(),
-        )?);
+        let client = create_client(config.region.clone().try_into()?, cx.resolver())?;
 
         let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
