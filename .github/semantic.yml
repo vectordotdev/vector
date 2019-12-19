@@ -80,6 +80,7 @@ scopes:
   # sinks
   - aws_cloudwatch_logs sink
   - aws_cloudwatch_metrics sink
+  - aws_kinesis_firehose sink
   - aws_kinesis_streams sink
   - aws_s3 sink
   - blackhole sink
