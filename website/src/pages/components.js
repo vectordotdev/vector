@@ -21,7 +21,7 @@ function Components(props) {
   }, []);
 
   return (
-    <Layout title="Components" description="Browse and search all Vector components.">
+    <Layout title="Components - Sources, Transforms, & Sinks" description="Browse and search all of Vector's components: sources, transforms, and sinks. Filter by event type, guarantee, function, operating system, and provider.">
       <header className={classnames('hero', styles.componentsHero)}>
         <div className="container container--fluid">
           <canvas width="2000" height="300"></canvas>
