@@ -17,6 +17,7 @@ request_retry_attempts = 9223372036854775807
 request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 60
+service_provider = "Google"
 write_to_description = "[Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest]"
 tls_options = []
 

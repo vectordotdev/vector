@@ -1429,12 +1429,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # The group name of the target CloudWatch Logs stream.
   # 
   # * required
@@ -1626,12 +1620,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # A namespace that will isolate different metrics from each other.
   # 
   # * required
@@ -1671,12 +1659,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # The AWS region of the target Kinesis stream resides.
   # 
@@ -1865,12 +1847,6 @@ end
   # * enum: "gzip" or "none"
   compression = "gzip"
   compression = "none"
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * required
-  # * type: string
-  endpoint = "127.0.0.0:5000"
 
   # The AWS region of the target S3 bucket.
   # 

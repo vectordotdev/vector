@@ -47,7 +47,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
-  endpoint = "127.0.0.0:5000" # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
@@ -70,7 +69,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
-  endpoint = "127.0.0.0:5000" # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
@@ -354,29 +352,6 @@ The encoding format used to serialize the events before outputting.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-Custom endpoint for use with AWS-compatible services.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["{{ file }}","ec2/{{ instance_id }}","group-name"]}
   name={"group_name"}
   nullable={false}
@@ -605,59 +580,6 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs st
 
 </Fields>
 
-## Env Vars
-
-<Fields filters={true}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["AKIAIOSFODNN7EXAMPLE"]}
-  name={"AWS_ACCESS_KEY_ID"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### AWS_ACCESS_KEY_ID
-
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
-  name={"AWS_SECRET_ACCESS_KEY"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### AWS_SECRET_ACCESS_KEY
-
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
-
-
-</Field>
-
-
-</Fields>
-
 ## Output
 
 The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
@@ -698,25 +620,6 @@ X-Amz-Target: Logs_20140328.PutLogEvents
 ```
 
 ## How It Works
-
-### Authentication
-
-Vector checks for AWS credentials in the following order:
-
-1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
-
-If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring#logs].
-
-#### Obtaining an access key
-
-In general, we recommend using instance profiles/roles whenever possible. In
-cases where this is not possible you can generate an AWS access key for any user
-within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
-how to do this.
 
 ### Buffers & Batches
 
@@ -823,15 +726,9 @@ You can read more about the complete syntax in the
 [docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.guarantees]: /docs/about/guarantees/
-[docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[pages.aws_components]: /components?providers%5B%5D=aws/
-[urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
-[urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [urls.aws_cw_logs_group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-[urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

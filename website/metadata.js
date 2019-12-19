@@ -17761,7 +17761,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17783,7 +17783,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17805,7 +17805,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17827,7 +17827,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17983,7 +17983,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": null,
+      "service_provider": "Google",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
