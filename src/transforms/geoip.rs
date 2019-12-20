@@ -57,9 +57,9 @@ impl TransformConfig for GeoipConfig {
 impl Geoip {
     pub fn new(dbreader: maxminddb::Reader<Vec<u8>>, source: Atom, target: String) -> Self {
         Geoip {
-            dbreader: dbreader,
-            source: source,
-            target: target,
+            dbreader,
+            source,
+            target,
         }
     }
 }
@@ -87,7 +87,7 @@ impl Transform for Geoip {
                     if let Some(continent_code) = continent_code {
                         event.as_mut_log().insert_explicit(
                             Atom::from(format!("{}.continent_code", target_field)),
-                            ValueKind::from(continent_code.to_string()),
+                            ValueKind::from(continent_code),
                         );
                     }
 
@@ -95,7 +95,7 @@ impl Transform for Geoip {
                     if let Some(iso_code) = iso_code {
                         event.as_mut_log().insert_explicit(
                             Atom::from(format!("{}.country_code", target_field)),
-                            ValueKind::from(iso_code.to_string()),
+                            ValueKind::from(iso_code),
                         );
                     }
 
@@ -103,7 +103,7 @@ impl Transform for Geoip {
                     if let Some(time_zone) = time_zone {
                         event.as_mut_log().insert_explicit(
                             Atom::from(format!("{}.timezone", target_field)),
-                            ValueKind::from(time_zone.to_string()),
+                            ValueKind::from(time_zone),
                         );
                     }
 
@@ -127,7 +127,7 @@ impl Transform for Geoip {
                     if let Some(postal_code) = postal_code {
                         event.as_mut_log().insert_explicit(
                             Atom::from(format!("{}.postal_code", target_field)),
-                            ValueKind::from(postal_code.to_string()),
+                            ValueKind::from(postal_code),
                         );
                     }
                 }

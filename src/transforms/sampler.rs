@@ -13,6 +13,7 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
+    #[serde(default)]
     pub pass_list: Vec<String>,
 }
 

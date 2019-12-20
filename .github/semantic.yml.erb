@@ -2,36 +2,48 @@
 titleOnly: true
 
 types:
-  - chore
-  - docs
-  - enhancement
-  - feat
-  - fix
-  - perf
+  - chore               # An internal change that should not be communicated to Vector users.
+  - docs                # A change relating to Vector's documentation.
+  - enhancement         # Anything that enhances it's subject.
+  - feat                # An entirely new feature, such as a new platform, source, transform, or sink.
+  - fix                 # A bug fix.
+  - perf                # A change that enhancements performance.
 
 scopes:
-  - buffers
-  - cli
-  - config
-  - log data model
-  - metric data model
-  - networking
-  - new source
-  - new transform
-  - new sink
-  - observability
-  - operations
-  - security
-  - testing
-  - topology
+  - buffers             # Anything related to Vector's buffers, serialization, etc.
+  - cli                 # Anything related to Vector's CLI.
+  - config              # Anything related to Vector's configuration as a whole.
+  - docs                # Anything related to documentation.
+  - log data model      # Anything related to the log event data model.
+  - metric data model   # Anything related to the metric event data model.
+  - networking          # Anything related to Vector's networking (DNS, HTTP, TCP, etc).
+  - new platform        # A new platform, operating system, architecture, etc.
+  - new source          # A new Vector source.
+  - new transform       # A new Vector transform.
+  - new sink            # A new Vector sink.
+  - observability       # Anything related to observing Vector (internal logs, metrics, etc).
+  - operations          # Anything related to /scripts, CI, etc.
+  - platforms           # Anything related to Vector's supported platforms.
+  - security            # Anything related to security.
+  - testing             # Anything related to testing.
+  - topology            # Anything related to Vector's topology code.
+  - website             # Anything related to the website (not docs).
+
+  # platforms
+  <%- metadata.platforms.each do |platform|  -%>
+  - <%= platform.name %> platform
+  <%- end -%>
+
   # sources
   <%- metadata.sources.to_h.values.sort.each do |source| -%>
   - <%= source.name %> source
   <%- end -%>
+
   # transforms
   <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
   - <%= transform.name %> transform
   <%- end -%>
+
   # sinks
   <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
   - <%= sink.name %> sink

@@ -65,14 +65,12 @@ impl FileWatcher {
             } else {
                 (Box::new(io::BufReader::new(MultiGzDecoder::new(reader))), 0)
             }
+        } else if too_old {
+            let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
+            (Box::new(reader), pos)
         } else {
-            if too_old {
-                let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
-                (Box::new(reader), pos)
-            } else {
-                let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
-                (Box::new(reader), pos)
-            }
+            let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
+            (Box::new(reader), pos)
         };
 
         Ok(FileWatcher {

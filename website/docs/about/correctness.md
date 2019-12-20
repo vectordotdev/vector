@@ -2,7 +2,7 @@
 title: Correctness
 ---
 
-Like our [performance tests][docs.performance], our correctness tests use the
+Like our [performance tests][pages.index#performance], our correctness tests use the
 same [test harness][urls.test_harness]. To learn more, click on each test, or
 visit the ["How It Works" section][urls.test_harness#how-it-works] in the test
 harness README.
@@ -24,7 +24,7 @@ harness README.
 ⚠️ = unknown, please click into the test for an explanation
 
 
-[docs.performance]: /docs/about/performance
+[pages.index#performance]: /#performance
 [urls.disk_buffer_persistence_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness
 [urls.file_rotate_create_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness
 [urls.file_rotate_truncate_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness

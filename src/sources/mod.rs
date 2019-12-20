@@ -5,6 +5,7 @@ pub mod file;
 pub mod journald;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod kubernetes;
 pub mod socket;
 pub mod splunk_hec;
 pub mod statsd;

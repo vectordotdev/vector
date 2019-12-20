@@ -42,6 +42,8 @@ pub fn trace_init() {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_env_filter(env)
         .finish();
+
+    let _ = tracing_log::LogTracer::init();
     let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
 }
 

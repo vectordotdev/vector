@@ -1,5 +1,5 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
@@ -9,7 +9,7 @@ use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core::{RusotoError, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_kinesis::{
     Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
@@ -65,8 +65,8 @@ inventory::submit! {
 impl SinkConfig for KinesisSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        let sink = KinesisService::new(config, cx.acker())?;
-        let healthcheck = healthcheck(self.clone())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let sink = KinesisService::new(config, cx)?;
         Ok((Box::new(sink), healthcheck))
     }
 
@@ -82,9 +82,12 @@ impl SinkConfig for KinesisSinkConfig {
 impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
-        acker: Acker,
+        cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
+        let client = Arc::new(create_client(
+            config.region.clone().try_into()?,
+            cx.resolver(),
+        )?);
 
         let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -94,7 +97,7 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let sink = request
-            .batch_sink(KinesisRetryLogic, kinesis, acker)
+            .batch_sink(KinesisRetryLogic, kinesis, cx.acker())
             .batched_with_min(Vec::new(), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
@@ -168,8 +171,8 @@ enum HealthcheckError {
     NoMatchingStreamName { stream_name: String },
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
-    let client = KinesisClient::new(config.region.try_into()?);
+fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
+    let client = create_client(config.region.try_into()?, resolver)?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -192,6 +195,15 @@ fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
         });
 
     Ok(Box::new(fut))
+}
+
+fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisClient> {
+    use rusoto_credential::DefaultCredentialsProvider;
+
+    let p = DefaultCredentialsProvider::new()?;
+    let d = crate::sinks::util::rusoto::client(resolver)?;
+
+    Ok(KinesisClient::new_with(d, p, region))
 }
 
 fn encode_event(
@@ -312,10 +324,10 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        buffers::Acker,
         region::RegionOrEndpoint,
         runtime,
         test_util::{random_lines_with_stream, random_string},
+        topology::config::SinkContext,
     };
     use futures::{Future, Sink};
     use rusoto_core::Region;
@@ -344,8 +356,9 @@ mod integration_tests {
         };
 
         let mut rt = runtime::Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = KinesisService::new(config, Acker::Null).unwrap();
+        let sink = KinesisService::new(config, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 

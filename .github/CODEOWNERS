@@ -32,6 +32,7 @@
 /src/sinks/clickhouse.rs @a-rodin
 /src/sinks/console.rs @lukesteensen
 /src/sinks/elasticsearch.rs @LucioFranco
+/src/sinks/gcp_pubsub.rs @bruceg
 /src/sinks/http.rs @LucioFranco
 /src/sinks/kafka.rs @lukesteensen
 /src/sinks/prometheus.rs @loony-bean

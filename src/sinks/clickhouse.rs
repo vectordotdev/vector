@@ -1,8 +1,8 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::Event,
     sinks::util::{
-        http::{HttpRetryLogic, HttpService, Response},
+        http::{https_client, HttpRetryLogic, HttpService, Response},
         retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
@@ -13,8 +13,7 @@ use futures::{stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
-use hyper::{Body, Client, Request};
-use hyper_tls::HttpsConnector;
+use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -48,8 +47,8 @@ inventory::submit! {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = clickhouse(self.clone(), cx.acker())?;
-        let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
+        let healtcheck = healthcheck(cx.resolver(), &self)?;
+        let sink = clickhouse(self.clone(), cx)?;
 
         Ok((sink, healtcheck))
     }
@@ -77,7 +76,7 @@ impl ClickHouseBasicAuthConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -95,28 +94,27 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
-                let mut builder = hyper::Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |body: Vec<u8>| {
+            let mut builder = hyper::Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
 
-                builder.header("Content-Type", "application/x-ndjson");
+            builder.header("Content-Type", "application/x-ndjson");
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
-                }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
 
-                let mut request = builder.body(body).unwrap();
+            let mut request = builder.body(body).unwrap();
 
-                if let Some(auth) = &basic_auth {
-                    auth.apply(request.headers_mut());
-                }
+            if let Some(auth) = &basic_auth {
+                auth.apply(request.headers_mut());
+            }
 
-                request
-            });
+            request
+        });
 
     let sink = request
         .batch_sink(
@@ -124,7 +122,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
                 inner: HttpRetryLogic,
             },
             http_service,
-            acker,
+            cx.acker(),
         )
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
@@ -139,17 +137,17 @@ fn encode_event(event: Event) -> Option<Vec<u8>> {
     Some(body)
 }
 
-fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> super::Healthcheck {
+fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<super::Healthcheck> {
     // TODO: check if table exists?
-    let uri = format!("{}/?query=SELECT%201", host);
+    let uri = format!("{}/?query=SELECT%201", config.host);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
-    if let Some(auth) = &basic_auth {
+    if let Some(auth) = &config.basic_auth {
         auth.apply(request.headers_mut());
     }
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let client = https_client(resolver, tls)?;
     let healthcheck = client
         .request(request)
         .map_err(|err| err.into())
@@ -158,7 +156,7 @@ fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> s
             status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
         });
 
-    Box::new(healthcheck)
+    Ok(Box::new(healthcheck))
 }
 
 fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {

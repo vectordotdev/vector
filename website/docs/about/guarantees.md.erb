@@ -2,12 +2,22 @@
 title: Guarantees
 ---
 
-Vector was designed with a focus on providing clear guarantees. Below you'll
-find a support matrix so you know exactly what type of guarantee you can expect
-for your combination of sources and sinks. This helps you make the appropriate
-tradeoffs or your usecase.
+Faults in distributed systems are like green Skittles, we all wish they'd never
+happen but in reality the best we can do is understand and control the damage
+they cause. In event streaming pipelines that means understanding delivery
+and stability guarantees and their implications on your overall system.
 
-## Delivery Gaurantees
+Vector attempts to make it clear which guarantees you can expect from it. We
+categorize all components by their targetted delivery guarantee and also by
+their general stability. This helps you make the appropriate tradeoffs for your
+usecase.
+
+Here you can find an overview of delivery guarantee types and their meaning as
+well as how we label the stability of our components. Next, you can head over to
+the [components page][pages.components] and use filters to see which components
+support specific guarantees.
+
+## Delivery Guarantees
 
 <div class="section-list">
 <div class="section">
@@ -37,7 +47,8 @@ be configured to use `disk` based buffers:
     max_size = 104900000 # 100MiB
 ```
 
-Each [sink][docs.sinks] will include documentation for its buffer options.
+Refer to each [sink's][docs.sinks] documentation for further guidance on its
+buffer options.
 
 </Alert>
 
@@ -50,11 +61,14 @@ Each [sink][docs.sinks] will include documentation for its buffer options.
 
 A `best-effort` delivery guarantee means that Vector will make a best effort to
 deliver each event, but cannot _guarantee_ delivery. This is usually due to 
-limitations of the underlying protocol; outside the sccope of Vector. It's
-important to note that while data is possible, it is usually rare and Vector
-does everything within it's control to ensure data is not lost. For more info,
-see the ["Do I need at least once delivery?"](#do-i-need-at-least-once-delivery)
-FAQ.
+limitations of the underlying protocol; outside the scope of Vector. It's
+important to note that while data loss is possible, it is usually rare and
+Vector does everything within it's control to ensure data is not lost. For more
+info, see the
+["Do I need at least once delivery?"](#do-i-need-at-least-once-delivery) FAQ.
+
+Note that this is _not_ the same as at-most-once delivery, as it is still
+possible for Vector to introduce duplicates under extreme circumstances.
 
 </div>
 </div>
@@ -66,10 +80,9 @@ FAQ.
 
 ### Prod-Ready
 
-The `prod-ready` status is a _subjective_ status defined by the Vector team
+The `prod-ready` status is a _subjective_ status defined by the Vector team,
 intended to give you a general idea of a feature's reliability for production
-environments. A feature is `prod-ready` if it means the following general
-criteria:
+environments. A feature is `prod-ready` if it meets the following criteria:
 
 1. A meaningful amount of users (generally >50) have been using the feature in
    a production environment for sustained periods without issue.
@@ -114,8 +127,8 @@ limitations of the underlying protocol.
 No, Vector does not support exactly once delivery. There are future plans to
 partially support this for sources and sinks that support it (Kafka, for
 example), but it remains unclear if Vector will ever be able to achieve this.
-We recommend [subscribing to our mailing list](https://vector.dev), which will
-keep you in the loop if this ever changes.
+We recommend [subscribing to our mailing list](https://vector.dev/community),
+which will keep you in the loop if this ever changes.
 
 ### How can I find components that meet these guarantees?
 
