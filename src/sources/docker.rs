@@ -23,7 +23,7 @@ use std::{collections::HashMap, env};
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
 
-/// The begining of image names of vector docker images packaged by vector. 
+/// The begining of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 
 lazy_static! {
