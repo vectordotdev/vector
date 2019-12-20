@@ -1,4 +1,5 @@
 use crate::{
+    dns::Resolver,
     event::Event,
     region::{self, RegionOrEndpoint},
     sinks::util::{
@@ -79,7 +80,7 @@ inventory::submit! {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(&common)?;
+        let healthcheck = healthcheck(cx.resolver(), &common)?;
         let sink = es(self, common, cx);
 
         Ok((sink, healthcheck))
@@ -328,7 +329,10 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck> {
+fn healthcheck(
+    resolver: Resolver,
+    common: &ElasticSearchCommon,
+) -> crate::Result<super::Healthcheck> {
     let (uri, mut builder) = common.request_builder(Method::GET, "/_cluster/health");
     match &common.credentials {
         None => {
@@ -346,7 +350,7 @@ fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck
     let request = builder.body(Body::empty())?;
 
     Ok(Box::new(
-        https_client(common.tls_settings.clone())?
+        https_client(resolver, common.tls_settings.clone())?
             .request(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
@@ -517,7 +521,8 @@ mod integration_tests {
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+        let (sink, _hc) = config.build(cx.clone()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event
@@ -531,7 +536,7 @@ mod integration_tests {
         rt.block_on(pump).unwrap();
 
         // make sure writes all all visible
-        rt.block_on(flush(&common)).unwrap();
+        rt.block_on(flush(cx.resolver(), &common)).unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", common.base_url, index))
@@ -601,9 +606,8 @@ mod integration_tests {
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, healthcheck) = config
-            .build(SinkContext::new_test(rt.executor()))
-            .expect("Building config failed");
+        let cx = SinkContext::new_test(rt.executor());
+        let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
         rt.block_on(healthcheck).expect("Health check failed");
 
@@ -613,7 +617,8 @@ mod integration_tests {
         let _ = rt.block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        rt.block_on(flush(&common)).expect("Flushing writes failed");
+        rt.block_on(flush(cx.resolver(), &common))
+            .expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -652,11 +657,14 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(common: &ElasticSearchCommon) -> impl Future<Item = (), Error = crate::Error> {
+    fn flush(
+        resolver: Resolver,
+        common: &ElasticSearchCommon,
+    ) -> impl Future<Item = (), Error = crate::Error> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        https_client(common.tls_settings.clone())
+        https_client(resolver, common.tls_settings.clone())
             .expect("Could not build client to flush")
             .request(request)
             .map_err(|source| dbg!(source).into())
