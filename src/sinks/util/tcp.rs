@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    sinks::{BuildError, Healthcheck, DnsError, RouterSink, SocketAddressError},
+    sinks::{BuildError, Healthcheck, DNSError, RouterSink},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -78,7 +78,7 @@ impl TcpSinkConfig {
 
         let ip_addr = cx
             .resolver()
-            .lookup_ip(uri.host().ok_or(BuildError::MissingHost)?)
+            .lookup_ip(uri.host().ok_or(TcpBuildError::MissingHost)?)
             // This is fine to do here because this is just receiving on a channel
             // and does not require access to the reactor/timer.
             .wait()
@@ -88,7 +88,7 @@ impl TcpSinkConfig {
                 address: self.address.clone(),
             }))?;
 
-        let port = uri.port_part().ok_or(BuildError::MissingPort)?.as_u16();
+        let port = uri.port_part().ok_or(TcpBuildError::MissingPort)?.as_u16();
         let addr = SocketAddr::new(ip_addr, port);
 
         let tls = match self.tls {
