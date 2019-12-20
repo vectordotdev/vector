@@ -13,6 +13,18 @@
 require_relative "setup"
 
 #
+# Consts
+#
+
+COMPETITORS = ["filebeat", "fluentbit", "fluentd", "logstash", "metricbeat", "splunk forwarder", "telegraf"]
+FRAMEWORKS = ["angular", "backbone", "django", "drupal", "ember", "express", "laravel", "meteor", "materialize", "rails", "react", "ruby on rails", "spring", "symfony",   "vue"]
+PLATFORMS = ["aws", "docker", "ec2", "ec2", "gcp", "heroku", "kubernetes", "lambda", "linux", "netlify", "raspbian", "windows", "wordpress"]
+PROGRAMMING_LANGUAGES = ["c", "c++", "c#", "clojure", "elixir", "erlang", "go", "golang", "java", "javascript", "kotlin", "lua", "node", "php", "python", "scala", "ruby", "rust", "typescript", "webassembly"]
+SINK_SERVICES = ["blob store", "datadog", "honeycomb", "humio", "logdna", "loggly", "object store", "papertrail", "sematext", "splunk", "stackdriver", "sumologic"]
+SOURCE_SERVICES = ["apache web server", "auth0", "fastly", "memcached", "mysql", "nginx", "postgresql", "redis", "rds"]
+SOURCE_TERMS = ["application", "microservice", "service"]
+
+#
 # Functions
 #
 
@@ -20,9 +32,12 @@ def name_variations(name)
   [
     name.humanize.downcase,
     name.gsub(/^aws_/, "").humanize.downcase,
+    name.gsub(/^azure_/, "").humanize.downcase,
+    name.gsub(/^datadog_/, "").humanize.downcase,
     name.gsub(/^gcp_/, "").humanize.downcase,
     name.gsub(/_logs$/, "").humanize.downcase,
-    name.gsub(/_metrics$/, "").humanize.downcase
+    name.gsub(/_metrics$/, "").humanize.downcase,
+    name.gsub(/^new_relic_/, "").humanize.downcase
   ].uniq
 end
 
@@ -32,45 +47,24 @@ end
 
 metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 
-source_names =
-  [
-    metadata.sources_list.collect(&:name),
-    "apache",
-    "application",
-    "ec2",
-    "ecs",
-    "fluentbit",
-    "fluentd",
-    "drupal",
-    "kubernetes",
-    "java",
-    "linux",
-    "nginx",
-    "python",
-    "rails",
-    "ruby",
-    "ruby on rails",
-    "windows",
-    "wordpress"
-  ].
-  flatten.
+sources =
+  (
+    metadata.sources_list.collect(&:name) +
+    FRAMEWORKS +
+    PLATFORMS +
+    PROGRAMMING_LANGUAGES +
+    SOURCE_SERVICES +
+    SOURCE_TERMS
+  ).
   collect{ |name| name_variations(name) }.
   flatten.
   uniq
 
-sink_names =
-  [
-    metadata.sinks_list.collect(&:name),
-    "datadog",
-    "fluentbit",
-    "fluentd",
-    "gcp_object_store",
-    "gcp_stackdriver_logs",
-    "gcp_stackdriver_metrics",
-    "honeycomb",
-    "papertrail",
-    "splunk"
-  ].
+sinks =
+  (
+    metadata.sinks_list.collect(&:name) +
+    SINK_SERVICES
+  ).
   flatten.
   collect{ |name| name_variations(name) }.
   flatten.
@@ -80,20 +74,27 @@ sink_names =
 # Execute
 #
 
-source_names.each do |source_name|
-  puts "#{source_name} logging"
-  puts "#{source_name} metrics"
+(sources + sinks).each do |subject|
+  puts "analyze #{subject} logs"
+  puts "backup #{subject} logs"
+  puts "parse #{subject} logs"
+  puts "search #{subject} logs"
+  puts "#{subject} logs"
+  puts "#{subject} logging"
+  puts "#{subject} metrics"
+  puts "#{subject} monitoring"
+  puts "#{subject} observability"
 end
 
-sink_names.each do |sink_name|
-  puts "#{sink_name} logging"
-  puts "#{sink_name} metrics"
+sinks.each do |sink|
+  puts "send logs to #{sink}"
+  puts "send metrics to #{sink}"
 end
 
-source_names.each do |source_name|
-  sink_names.each do |sink_name|
-    puts "#{source_name} to #{sink_name}"
-    puts "#{source_name} logs to #{sink_name}"
-    puts "#{source_name} metrics to #{sink_name}"
+sources.each do |source|
+  sinks.each do |sink|
+    puts "#{source} to #{sink}"
+    puts "#{source} logs to #{sink}"
+    puts "#{source} metrics to #{sink}"
   end
 end
