@@ -1,5 +1,6 @@
 ---
 title: "What is Vector?"
+description: "High-level description of the Vector observability data collector and router."
 ---
 
 import SVG from 'react-inlinesvg';

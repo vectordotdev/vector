@@ -1,5 +1,6 @@
 ---
 title: Glossary
+description: "Vector documentation glossary of terms"
 ---
 
 The gloassary contains common terms and their definitions.

@@ -1,5 +1,6 @@
 ---
 title: Guarantees
+description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
 ---
 
 Faults in distributed systems are like green Skittles, we all wish they'd never

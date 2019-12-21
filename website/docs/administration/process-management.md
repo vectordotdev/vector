@@ -1,5 +1,6 @@
 ---
 title: Process Management
+description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---
 
 This document covers how to manage the Vector process using various process
