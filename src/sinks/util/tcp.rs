@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    sinks::{BuildError, Healthcheck, DNSError, RouterSink},
+    sinks::{BuildError, DNSError, Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
