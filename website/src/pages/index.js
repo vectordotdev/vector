@@ -434,7 +434,7 @@ function Home() {
 
   return (
     <Layout description={siteConfig.description}>
-      <header className={classnames('hero', styles.indexHeroBanner)}>
+      <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (
             <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>

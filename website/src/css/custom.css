@@ -573,6 +573,7 @@ header.hero h1 {
   align-items: center;
   min-height: 200px;
   padding: 3em 0;
+  position: relative;
   text-align: center;
 }
 .hero .hero__subtitle {
@@ -599,7 +600,12 @@ header.hero h1 {
 .hero .hero__buttons .button:last-child {
   margin-right: 0;
 }
-
+.hero.hero--full-height {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc( 100vh - var(--ifm-navbar-height) );
+}   
 @media (max-width: 996px) {
   .hero {
     min-height: 100px;

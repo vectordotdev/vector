@@ -60,7 +60,6 @@
   animation-fill-mode: forwards;
   background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
   background-position: center center;
-  min-height: calc( 100vh - var(--ifm-navbar-height) );
 }
 
 .indexHeroDiagram {
