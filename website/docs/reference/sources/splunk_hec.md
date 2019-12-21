@@ -152,7 +152,7 @@ The raw log message, unaltered.
 
 ### splunk_channel
 
-The exact time the event was ingested.
+The Splunk channel, value of the `X-Splunk-Request-Channel` header.
 
 
 </Field>
