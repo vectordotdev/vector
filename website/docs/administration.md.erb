@@ -2,7 +2,6 @@
 title: Administration
 description: "How to administer and operate Vector."
 sidebar_label: hidden
-description: Administrating Vector
 hide_pagination: true
 ---
 
