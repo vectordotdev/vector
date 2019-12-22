@@ -61,44 +61,49 @@ def create_release_meta_file!(current_commits, new_version)
     end
 
   if new_commits.any?
-    commits = existing_commits + new_commits
-
-    File.open(release_meta_path, 'w+') do |file|
-      file.write(
+    if existing_commits.any?
+      words =
         <<~EOF
-        [releases."#{new_version}"]
-        date = #{Time.now.utc.to_date.to_toml}
-        commits = #{commits.to_toml}
+        I found #{new_commits.length} new commits since you last generated:
+
+            #{release_meta_path}
+
+        So I don't erase any other work in that file, please manually add the
+        following commit lines:
+
+        #{new_commits.to_toml.indent(4)}
+
+        Done? Ready to proceed?
         EOF
-      )
-    end
+      
+      if get(words, ["y", "n"]) == "n"
+        error!("Ok, re-run this command when you're ready.")
+      end
+    else
+      File.open(release_meta_path, 'w+') do |file|
+        file.write(
+          <<~EOF
+          [releases."#{new_version}"]
+          date = #{Time.now.utc.to_date.to_toml}
+          commits = #{commits.to_toml}
+          EOF
+        )
+      end
 
-    words =
-      <<~EOF
-      I found #{new_commits.length} new commits for this release, and I've placed them in:
+      words =
+        <<~EOF
+        I've created a release meta file here:
 
-        #{release_meta_path}
+          #{release_meta_path}
 
-      Please modify and reword as necessary.
+        I recommend reviewing the commits and fixing any mistakes.
 
-      Ready to proceed?
-      EOF
+        Ready to proceed?
+        EOF
 
-    if get(words, ["y", "n"]) == "n"
-      error!("Ok, re-run this command when you're ready.")
-    end
-  else
-    words =
-      <<~EOF
-      No new commits found for this release. Existing commits can be found in:
-
-        #{release_meta_path}
-
-      Ready to proceed?
-      EOF
-
-    if get(words, ["y", "n"]) == "n"
-      error!("Ok, re-run this command when you're ready.")
+      if get(words, ["y", "n"]) == "n"
+        error!("Ok, re-run this command when you're ready.")
+      end
     end
   end
 
@@ -106,8 +111,7 @@ def create_release_meta_file!(current_commits, new_version)
 end
 
 def get_commit_log(last_version)
-  last_commit = `git rev-parse HEAD`.chomp
-  range = "v#{last_version}...#{last_commit}"
+  range = "v#{last_version}...master"
   `git log #{range} --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
 end
 

@@ -51,10 +51,6 @@ class CommitScope
       end
   end
 
-  def component_url
-    "https://docs.vector.dev/usage/configuration/#{component_type.pluralize}/#{component_name}"
-  end
-
   def new_component?
     !component_type.nil? && component_name.nil?
   end
@@ -93,5 +89,14 @@ class CommitScope
           nil
         end
       end
+  end
+
+  def to_h
+    {
+      category: category,
+      component_name: component_name,
+      component_type: component_type,
+      name: name
+    }
   end
 end

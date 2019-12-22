@@ -8,7 +8,8 @@
 
 set -euo pipefail
 
-CHANNEL=$(scripts/util/release-channel.sh)
+CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
+VERSION=${VERSION:-$(scripts/version.sh)}
 
 #
 # Setup
@@ -48,15 +49,15 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   cmp <(curl https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   cmp <(curl -L https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
-  # Upload the specific version
-  echo "Uploading all artifacts to s3://packages.timber.io/vector/$VERSION/"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/$VERSION/" --recursive --sse --acl public-read
-  echo "Uploaded archives"
+  version_exact=$VERSION
+  version_minor_x=$(echo $VERSION | sed 's/\.[0-9]*$/.X/g')
+  version_major_x=$(echo $VERSION | sed 's/\.[0-9]*\.[0-9]*$/.X/g')
 
-  # Update the "latest" files
-  echo "Uploading all artifacts to s3://packages.timber.io/vector/latest/"
-  aws s3 rm --recursive "s3://packages.timber.io/vector/latest/"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/latest/" --recursive --sse --acl public-read
+  for i in $version_exact $version_minor_x $version_major_x latest; do
+    # Upload the specific version
+    echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
+    aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
+  done
   echo "Uploaded archives"
 
   # Set up redirects for historical locations
@@ -68,8 +69,9 @@ elif [[ "$CHANNEL" == "latest" ]]; then
     --acl public-read
 
   # Verify that the files exist and can be downloaded
-  cmp <(curl https://packages.timber.io/vector/$VERSION/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
-  cmp <(curl https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  for i in $version_exact $version_minor_x $version_major_x latest; do
+    cmp <(curl https://packages.timber.io/vector/$i/vector-x86_64-unknown-linux-musl.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+  done
   cmp <(curl -L https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz --fail) "$td/vector-x86_64-unknown-linux-musl.tar.gz"
 fi
 

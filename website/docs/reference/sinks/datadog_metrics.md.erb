@@ -16,10 +16,12 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output -%>
 ## Output
 
-<%= sink_output(component) %>
+<%= component_output(component, component.output) %>
 
+<%- end -%>
 ## How It Works [[sort]]
 
 ### Metric Types

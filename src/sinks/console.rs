@@ -120,6 +120,23 @@ mod test {
     }
 
     #[test]
+    fn encodes_set() {
+        let event = Event::Metric(Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        });
+        assert_eq!(
+            Ok(r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#.to_string()),
+            encode_event(event, &Encoding::Text)
+        );
+    }
+
+    #[test]
     fn encodes_histogram_without_timestamp() {
         let event = Event::Metric(Metric {
             name: "glork".into(),

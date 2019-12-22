@@ -118,7 +118,7 @@ impl Metric {
                 },
             ) => {
                 if buckets == buckets2 && counts.len() == counts2.len() {
-                    for (i, c) in counts2.into_iter().enumerate() {
+                    for (i, c) in counts2.iter().enumerate() {
                         counts[i] += c;
                     }
                     *count += count2;

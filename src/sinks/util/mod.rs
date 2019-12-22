@@ -2,6 +2,7 @@ pub mod batch;
 pub mod buffer;
 pub mod http;
 pub mod retries;
+pub mod rusoto;
 pub mod service;
 pub mod tls;
 

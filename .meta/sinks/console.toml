@@ -1,4 +1,5 @@
 [sinks.console]
+title = "Console"
 buffer = false
 common = false
 delivery_guarantee = "best_effort"
