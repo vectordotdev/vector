@@ -11,7 +11,7 @@
   force = false
 
 [[redirects]]
-  from = "/mailing_list"
+  from = "/mailing_list/"
   to = "/community/"
   status = 301
   force = false
