@@ -18387,50 +18387,6 @@ module.exports = {
 
       ]
     },
-    "tcp": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the TCP protocol and outputs log events.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "receive",
-      "id": "tcp_source",
-      "name": "tcp",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "source",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "udp": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the UDP protocol and outputs log events.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "receive",
-      "id": "udp_source",
-      "name": "udp",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "source",
-      "unsupported_operating_systems": [
-
-      ]
-    },
     "vector": {
       "beta": true,
       "delivery_guarantee": "best_effort",

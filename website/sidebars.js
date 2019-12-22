@@ -132,10 +132,6 @@ module.exports = {
             
               "reference/sources/syslog",
             
-              "reference/sources/tcp",
-            
-              "reference/sources/udp",
-            
               "reference/sources/vector",
             
           ]

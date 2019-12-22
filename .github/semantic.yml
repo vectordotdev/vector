@@ -54,8 +54,6 @@ scopes:
   - statsd source
   - stdin source
   - syslog source
-  - tcp source
-  - udp source
   - vector source
 
   # transforms

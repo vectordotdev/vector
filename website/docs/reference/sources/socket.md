@@ -46,6 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   type = "socket" # example, must be: "socket"
   address = "0.0.0.0:9000" # example
+  mode = "tcp" # example
 ```
 
 </TabItem>
@@ -58,6 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "socket" # example, must be: "socket"
   address = "0.0.0.0:9000" # example
+  mode = "tcp" # example
   
   # OPTIONAL - General
   max_length = 102400 # default, bytes
@@ -97,7 +99,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. 
+The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets. 
 
 
 </Field>
@@ -120,7 +122,7 @@ The address to listen for connections on, or "systemd#N" to use the Nth socket p
 
 ### host_key
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host. Valid for "tcp" and "udp" sockets.  See [Context](#context) for more info.
 
 
 </Field>
@@ -143,7 +145,30 @@ The key name added to each event representing the current host. See [Context](#c
 
 ### max_length
 
-The maximum bytes size of incoming messages before they are discarded.
+The maximum bytes size of incoming messages before they are discarded. Valid for "tcp" and "udp" sockets. 
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["tcp","udp"]}
+  name={"mode"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### mode
+
+Specifies what type of socket to use. Valid options are "tcp" and "udp". 
 
 
 </Field>
@@ -166,7 +191,7 @@ The maximum bytes size of incoming messages before they are discarded.
 
 ### shutdown_timeout_secs
 
-The timeout before a connection is forcefully closed during shutdown.
+The timeout before a connection is forcefully closed during shutdown. Valid only for "tcp" sockets. 
 
 
 </Field>
