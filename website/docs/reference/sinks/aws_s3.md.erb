@@ -16,18 +16,15 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output -%>
 ## Output
 
-<%= sink_output(component) %>
+<%= component_output(component, component.output) %>
 
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
-
-### Columnar Formats
-
-Vector has plans to support column formats, such as ORC and Parquet, in
-[`v0.6`][urls.vector_roadmap].
 
 ### Object Naming
 
@@ -35,7 +32,7 @@ By default, Vector will name your S3 objects in the following format:
 
 <Tabs
   block={true}
-  defaultValue="manual"
+  defaultValue="without_compression"
   values={[
     { label: 'Without Compression', value: 'without_compression', },
     { label: 'With Compression', value: 'with_compression', },

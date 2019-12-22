@@ -3,7 +3,7 @@ use crate::{
     event::proto,
     sinks::tcp::TcpSink,
     sinks::util::SinkExt,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
@@ -11,7 +11,7 @@ use futures::{future, Future, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -26,23 +26,39 @@ impl VectorSinkConfig {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Missing host in address field"))]
+    MissingHost,
+    #[snafu(display("Missing port in address field"))]
+    MissingPort,
+}
+
 inventory::submit! {
     SinkDescription::new_without_default::<VectorSinkConfig>("vector")
 }
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let addr = self
-            .address
-            .to_socket_addrs()
-            .context(super::SocketAddressError)?
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let uri = self.address.parse::<http::Uri>()?;
+
+        let ip_addr = cx
+            .resolver()
+            .lookup_ip(uri.host().ok_or(BuildError::MissingHost)?)
+            // This is fine to do here because this is just receiving on a channel
+            // and does not require access to the reactor/timer.
+            .wait()
+            .context(super::DNSError)?
             .next()
             .ok_or(Box::new(super::BuildError::DNSFailure {
                 address: self.address.clone(),
             }))?;
 
-        let sink = vector(self.address.clone(), addr, acker);
+        let port = uri.port_part().ok_or(BuildError::MissingPort)?.as_u16();
+        let addr = SocketAddr::new(ip_addr, port);
+
+        let sink = vector(self.address.clone(), addr, cx.acker());
         let healthcheck = super::tcp::tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))

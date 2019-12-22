@@ -5,7 +5,7 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{
@@ -13,7 +13,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
@@ -34,6 +34,10 @@ enum BuildError {
     TlsIdentityError { source: native_tls::Error },
     #[snafu(display("Could not export identity to DER: {}", source))]
     DerExportError { source: openssl::error::ErrorStack },
+    #[snafu(display("Missing host in address field"))]
+    MissingHost,
+    #[snafu(display("Missing port in address field"))]
+    MissingPort,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -75,15 +79,23 @@ inventory::submit! {
 
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let addr = self
-            .address
-            .to_socket_addrs()
-            .context(super::SocketAddressError)?
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let uri = self.address.parse::<http::Uri>()?;
+
+        let ip_addr = cx
+            .resolver()
+            .lookup_ip(uri.host().ok_or(BuildError::MissingHost)?)
+            // This is fine to do here because this is just receiving on a channel
+            // and does not require access to the reactor/timer.
+            .wait()
+            .context(super::DNSError)?
             .next()
             .ok_or(Box::new(super::BuildError::DNSFailure {
                 address: self.address.clone(),
             }))?;
+
+        let port = uri.port_part().ok_or(BuildError::MissingPort)?.as_u16();
+        let addr = SocketAddr::new(ip_addr, port);
 
         let tls = match self.tls {
             Some(ref tls) => {
@@ -99,7 +111,7 @@ impl SinkConfig for TcpSinkConfig {
         let sink = raw_tcp(
             self.address.clone(),
             addr,
-            acker,
+            cx.acker(),
             self.encoding.clone(),
             tls,
         );

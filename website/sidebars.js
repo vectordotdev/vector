@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -96,8 +97,8 @@ module.exports = {
           items: [
             "setup/guides",
             "setup/guides/getting-started",
-            "setup/guides/troubleshooting",
             "setup/guides/unit-testing",
+            "setup/guides/troubleshooting",
           ]
         },
       ],
@@ -120,6 +121,8 @@ module.exports = {
               "reference/sources/journald",
             
               "reference/sources/kafka",
+            
+              "reference/sources/splunk_hec",
             
               "reference/sources/statsd",
             
@@ -145,9 +148,17 @@ module.exports = {
             
               "reference/transforms/add_tags",
             
+              "reference/transforms/ansi_stripper",
+            
+              "reference/transforms/aws_ec2_metadata",
+            
               "reference/transforms/coercer",
             
+              "reference/transforms/concat",
+            
               "reference/transforms/field_filter",
+            
+              "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",
             
@@ -181,6 +192,8 @@ module.exports = {
             
               "reference/sinks/aws_cloudwatch_metrics",
             
+              "reference/sinks/aws_kinesis_firehose",
+            
               "reference/sinks/aws_kinesis_streams",
             
               "reference/sinks/aws_s3",
@@ -197,9 +210,13 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_pubsub",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",
+            
+              "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
             

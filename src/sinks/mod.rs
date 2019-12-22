@@ -3,6 +3,7 @@ use snafu::Snafu;
 
 pub mod aws_cloudwatch_logs;
 pub mod aws_cloudwatch_metrics;
+pub mod aws_kinesis_firehose;
 pub mod aws_kinesis_streams;
 pub mod aws_s3;
 pub mod blackhole;
@@ -11,9 +12,11 @@ pub mod console;
 pub mod datadog_metrics;
 pub mod elasticsearch;
 pub mod file;
+pub mod gcp_pubsub;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod new_relic_logs;
 pub mod prometheus;
 pub mod splunk_hec;
 pub mod statsd;

@@ -58,8 +58,8 @@ description = "Specifies the log fields when the input type is 'log'."
 type = "*"
 null = false
 examples = [
-  {name = "message", value = "some message contents"},
-  {name = "host", value = "myhost"},
+  {message = "some message contents"},
+  {host = "myhost"},
 ]
 description = """\
 A key/value pair representing a field to be added to the input event.\
@@ -104,8 +104,8 @@ description = "Key/value pairs representing [metric tags][docs.data-model#tags].
 [testing.tests.options.input.options.metric.options.tags.options."`[tag-name]`"]
 type = "string"
 examples = [
-  {name = "host", value = "foohost"},
-  {name = "region", value = "us-east-1"},
+  {host = "foohost"},
+  {region = "us-east-1"},
 ]
 null = false
 common = true
@@ -158,7 +158,7 @@ description = "A table that defines a unit test expected output."
 
 [testing.tests.options.outputs.options.extract_from]
 type = "string"
-examples = ["bar"]
+examples = ["foo"]
 common = true
 null = false
 description = """\
@@ -190,7 +190,7 @@ available.\
 type = "string"
 null = true
 examples = [
-  { name = "message.eq", value = "this is the content to match against" }
+  { "message.eq" = "this is the content to match against" }
 ]
 common = true
 description = """\
@@ -201,7 +201,7 @@ Check whether a fields contents exactly matches the value specified.\
 type = "string"
 null = true
 examples = [
-  { name = "method.neq", value = "POST" }
+  { "method.neq" = "POST" }
 ]
 common = true
 description = """\
@@ -212,7 +212,7 @@ Check whether a fields contents does not match the value specified.\
 type = "bool"
 null = true
 examples = [
-  { name = "host.exists", value = true }
+  { "host.exists" = true }
 ]
 common = true
 description = """\

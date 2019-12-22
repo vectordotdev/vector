@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use futures::{future, try_ready, Async, AsyncSink, Future, Sink};
@@ -71,7 +71,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         // Checks
         if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
@@ -80,7 +80,7 @@ impl SinkConfig for PrometheusSinkConfig {
         }
 
         // Build
-        let sink = Box::new(PrometheusSink::new(self.clone(), acker));
+        let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
@@ -163,7 +163,7 @@ impl PrometheusSink {
             f(counter);
         } else {
             let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+            let opts = prometheus::Opts::new(name, name).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let counter = prometheus::CounterVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
@@ -184,7 +184,7 @@ impl PrometheusSink {
             f(gauge);
         } else {
             let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+            let opts = prometheus::Opts::new(name, name).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let gauge = prometheus::GaugeVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
@@ -206,7 +206,7 @@ impl PrometheusSink {
         } else {
             let buckets = self.config.buckets.clone();
             let namespace = &self.config.namespace;
-            let opts = prometheus::HistogramOpts::new(name.clone(), name.clone())
+            let opts = prometheus::HistogramOpts::new(name, name)
                 .buckets(buckets)
                 .namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
@@ -230,7 +230,7 @@ impl PrometheusSink {
             f(set);
         } else {
             let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
+            let opts = prometheus::Opts::new(name, name).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let counter = prometheus::IntGaugeVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
@@ -240,7 +240,7 @@ impl PrometheusSink {
             // Send counter to flusher
             if let Some(ch) = self.flush_channel.as_mut() {
                 let c = counter.with_label_values(&keys[..]);
-                if let Err(e) = ch.send(c.clone()) {
+                if let Err(e) = ch.send(c) {
                     error!("Error sending Prometheus gauge to flusher: {}", e);
                 }
             }

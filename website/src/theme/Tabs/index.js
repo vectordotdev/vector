@@ -7,11 +7,49 @@
 
 import React, {useState, useEffect, Children} from 'react';
 
+import Select from 'react-select';
+
 import classnames from 'classnames';
 import queryString from 'query-string';
 
+function ListSwitcher({block, centered, className, style, values, selectedValue, setSelectedValue}) {
+  return (
+    <div className={centered ? "tabs--centered" : ""}>
+      <ul
+        className={classnames('tabs', className, {
+          'tabs--block': block,
+        })}
+        style={style}
+        >
+        {values.map(({value, label}) => (
+          <li
+            className={classnames('tab-item', {
+              'tab-item--active': selectedValue === value,
+            })}
+            key={value}
+            onClick={() => setSelectedValue(value)}>
+            {label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+function SelectSwitcher({selectedValue, setSelectedValue, values}) {
+  return (
+    <Select
+      className='react-select-container'
+      classNamePrefix='react-select'
+      options={values}
+      isClearable={false}
+      placeholder="Select a version..."
+      value={values.find(option => option.value == selectedValue)}
+      onChange={(selectedOption) => setSelectedValue(selectedOption ? selectedOption.value : null)} />
+  );
+}
+
 function Tabs(props) {
-  const {block, centered, children, defaultValue, style, values, urlKey} = props;
+  const {block, centered, children, defaultValue, select, style, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -25,25 +63,9 @@ function Tabs(props) {
 
   return (
     <div>
-      {values.length > 1 && <div className={centered ? "tabs--centered" : ""}>
-        <ul
-          className={classnames('tabs', props.className, {
-            'tabs--block': block,
-          })}
-          style={style}
-          >
-          {values.map(({value, label}) => (
-            <li
-              className={classnames('tab-item', {
-                'tab-item--active': selectedValue === value,
-              })}
-              key={value}
-              onClick={() => setSelectedValue(value)}>
-              {label}
-            </li>
-          ))}
-        </ul>
-      </div>}
+      {values.length > 1 && (select ?
+        <SelectSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
+        <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
       <div className="margin-vert--md">
         {
           Children.toArray(children).filter(

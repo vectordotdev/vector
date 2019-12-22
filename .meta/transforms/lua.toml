@@ -1,4 +1,5 @@
 [transforms.lua]
+title = "LUA"
 allow_you_to_description = "transform events with a full embedded [Lua][urls.lua] engine"
 beta = true
 common = true

@@ -1,14 +1,13 @@
 use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
-    buffers::Acker,
     test_util::{
         block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
     },
     topology::{
         self,
-        config::{self, GlobalOptions},
+        config::{self, GlobalOptions, SinkContext},
     },
     Event, {sinks, sources},
 };
@@ -20,7 +19,7 @@ struct PanicSink;
 impl config::SinkConfig for PanicSink {
     fn build(
         &self,
-        _acker: Acker,
+        _cx: SinkContext,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
@@ -99,7 +98,7 @@ struct ErrorSink;
 impl config::SinkConfig for ErrorSink {
     fn build(
         &self,
-        _acker: Acker,
+        _cx: SinkContext,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }

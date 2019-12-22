@@ -278,13 +278,13 @@ function Integrations() {
           <div className={styles.componentsCanvas} id="component-canvas"></div>
           <ul>
             {Object.keys(sources).map((key, index) => (
-              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}`}>{sources[key].name}</Link></li>
+              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}/`}>{sources[key].name}</Link></li>
             ))}
             {Object.keys(transforms).map((key, index) => (
-              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}`}>{transforms[key].name}</Link></li>
+              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}/`}>{transforms[key].name}</Link></li>
             ))}
             {Object.keys(sinks).map((key, index) => (
-              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}`}>{sinks[key].name}</Link></li>
+              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}/`}>{sinks[key].name}</Link></li>
             ))}
           </ul>
         </div>
@@ -404,16 +404,16 @@ function Installation() {
 
         <div className="row">
           <div className="col">
-            <Jump to="/docs/setup/installation/containers">Containers</Jump>
+            <Jump to="/docs/setup/installation/containers/">Containers</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/package-managers">Package Managers</Jump>
+            <Jump to="/docs/setup/installation/package-managers/">Package Managers</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/operating-systems">Operating Systems</Jump>
+            <Jump to="/docs/setup/installation/operating-systems/">Operating Systems</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/manual">Manual</Jump>
+            <Jump to="/docs/setup/installation/manual/">Manual</Jump>
           </div>
         </div>
       </div>
@@ -433,22 +433,20 @@ function Home() {
   }, []);
 
   return (
-    <Layout
-      title={`${siteConfig.title}: ${siteConfig.tagline}`}
-      description={siteConfig.description}>
-      <header className={classnames('hero', styles.indexHeroBanner)}>
+    <Layout description={siteConfig.description}>
+      <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (
-            <a href="/" className={styles.indexAnnouncement}>
+            <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
-              v{newRelease.version} has been released! Download now.
-            </a>
+              v{newRelease.version} has been released! View release notes.
+            </Link>
           )}
           {!newRelease && newPost && (
-            <a href="/" className={styles.indexAnnouncement}>
+            <Link to={`/blog/${newPost.id}`} className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
               {newPost.title}
-            </a>
+            </Link>
           )}
           <h1>Vector Makes Observability Data Simple</h1>
           <p className="hero__subtitle">

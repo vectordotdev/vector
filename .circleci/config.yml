@@ -2,11 +2,28 @@
 # Job Macros
 #
 
+docker-machine: &docker-machine
+  machine:
+    image: ubuntu-1604:201903-01
+    docker_layer_caching: true
+  resource_class: large
+
 install-rust: &install-rust
   run:
     name: Install Rust
     command: |
       curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+install-rust-windows: &install-rust-windows
+  run:
+    name: Install Rust
+    shell: bash
+    command: |
+      curl https://sh.rustup.rs -sSf | sh -s -- -y \
+        --default-toolchain nightly-2019-11-19 \
+        --default-host x86_64-pc-windows-msvc
+      # see https://github.com/rust-lang/cargo/issues/2078
+      printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
 
 install-vector: &install-vector
   run:
@@ -37,10 +54,7 @@ jobs:
   #
 
   check-code:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -51,10 +65,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-code
 
   check-fmt:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -65,10 +76,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-fmt
 
   check-generate:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -77,10 +85,7 @@ jobs:
             ./scripts/docker-run.sh checker make check-generate
 
   check-version:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -92,13 +97,7 @@ jobs:
     executor: win/vs2019
     steps:
       - checkout
-      - run:
-          name: Install Rust
-          shell: bash
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      - *install-rust-windows
       - run:
           name: Download Perl
           shell: bash
@@ -133,9 +132,50 @@ jobs:
           command: |
             RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
             rm rust-toolchain
-            cargo test --release --no-default-features --features "$FEATURES" -- --test-threads 1
+            cargo test --release --no-default-features --features default-msvc -- --test-threads 1
+
+  test-stable-kubernetes:
+    machine: true
+    resource_class: xlarge
+    environment:
+      K8S_VERSION: v1.10.0
+      KUBECONFIG: /home/circleci/.kube/config
+      MINIKUBE_VERSION: v0.30.0
+      MINIKUBE_WANTUPDATENOTIFICATION: false
+      MINIKUBE_WANTREPORTERRORPROMPT: false
+      MINIKUBE_HOME: /home/circleci
+      CHANGE_MINIKUBE_NONE_USER: true
+    steps:
+      - checkout
+      - run:
+          name: setup kubectl
+          command: |
+            curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+      - run:
+          name: Start Kubernetes
+          command: |
+            docker run -d --name kube --privileged -p 8443:8443 -p 10080:10080 bsycorp/kind:latest-1.12
+            until curl -s --fail http://127.0.0.1:10080/kubernetes-ready; do
+              sleep 1;
+            done
+            curl http://127.0.0.1:10080/config > ~/.kube/config
+            echo "Kubernetes ready - run tests!"
+      - run:
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+            source $HOME/.cargo/env
+            rustup install stable
+            rustup default stable
+
+      - run:
+          name: Run tests
+          command: |
+            export PATH=$PATH:$HOME/.cargo/bin
+            cargo test kubernetes --no-default-features --features kubernetes-integration-tests
+
 
   test-stable:
     resource_class: xlarge
@@ -150,7 +190,7 @@ jobs:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
           PORT_WEB_UI: 8888
-          SERVICES: kinesis,cloudwatch,elasticsearch
+          SERVICES: kinesis,cloudwatch,elasticsearch,firehose
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: "test-access-key"
@@ -183,6 +223,10 @@ jobs:
           - xpack.ssl.certificate=certs/localhost.crt
           - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
+      - image: timberiodev/mock-ec2-metadata:latest
+      - image: messagebird/gcloud-pubsub-emulator
+        environment:
+          - PUBSUB_PROJECT1=testproject,topic1:subscription1
     steps:
       - checkout
       - setup_remote_docker:
@@ -218,17 +262,11 @@ jobs:
           paths:
             - "*-x86_64-apple-darwin.tar.gz"
 
-  build-x86_64-pc-windows-msvc-archive:
+  build-x86_64-pc-windows-msvc-archive-and-msi-package:
     executor: win/vs2019
     steps:
       - checkout
-      - run:
-          name: Install Rust
-          shell: bash
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      - *install-rust-windows
       - run:
           name: Download Perl
           shell: bash
@@ -257,18 +295,22 @@ jobs:
             msiexec /quiet /i cmake-installer.msi
             del cmake-installer.msi
       - run:
+          name: Install WiX
+          shell: bash
+          command: |
+            mkdir -p /c/wix
+            cd /c/wix
+            curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+            unzip wix-binaries.zip
+            rm wix-binaries.zip
+      - run:
           name: Build archive
           shell: bash
           no_output_timeout: 30m
           command: |
             export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            function zip() {
-              powershell Compress-Archive $3 $2
-            }
-            export -f zip
-
             export RUSTFLAGS=-Ctarget-feature=+crt-static
-            export FEATURES="leveldb leveldb/leveldb-sys-3 rdkafka rdkafka/cmake_build openssl/vendored"
+            export FEATURES="default-msvc"
             export ARCHIVE_TYPE="zip"
             export STRIP="false"
             export RUST_LTO=""
@@ -276,16 +318,21 @@ jobs:
 
             ./scripts/build-archive.sh
             ls -lha target/artifacts
+      - run:
+          name: Build MSI package
+          shell: bash
+          no_output_timeout: 30m
+          command: |
+            export PATH="/c/wix:$PATH"
+            ./scripts/package-msi.sh
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-x86_64-pc-windows-msvc.zip"
+            - "vector-x64.msi"
 
   build-x86_64-unknown-linux-musl-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -293,7 +340,7 @@ jobs:
           no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
-            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
+            PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
@@ -303,10 +350,7 @@ jobs:
             - "*-amd64.deb"
 
   build-aarch64-unknown-linux-musl-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -314,7 +358,7 @@ jobs:
           no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
-            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
+            PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
@@ -324,10 +368,7 @@ jobs:
             - "*-arm64.deb"
 
   build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - run:
@@ -335,7 +376,7 @@ jobs:
           no_output_timeout: 30m
           environment:
             PASS_RUST_LTO: "lto"
-            PASS_FEATURES: "jemallocator rdkafka rdkafka/cmake_build leveldb leveldb/leveldb-sys-3 shiplift/unix-socket openssl/vendored"
+            PASS_FEATURES: "default-musl"
           command: |
             ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
       - persist_to_workspace:
@@ -370,11 +411,8 @@ jobs:
   #
   # This is how I'd like the .deb packager to work as well, and I have a
   # feeling if we ditched `cargo deb` we could achieve this.
-  package-rpm:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+  package-rpm-x86_64-unknown-linux-musl:
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -387,7 +425,40 @@ jobs:
       - persist_to_workspace:
           root: target/artifacts
           paths:
-            - "*.rpm"
+            - "*x86_64.rpm"
+
+  package-rpm-aarch64-unknown-linux-musl:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build aarch64-unknown-linux-musl .rpm package
+          command: |
+            ./scripts/docker-run.sh packager-rpm make package-rpm
+          environment:
+            PASS_TARGET: aarch64-unknown-linux-musl
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*aarch64.rpm"
+
+  package-rpm-armv7-unknown-linux-musleabihf:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build armv7-unknown-linux-musleabihf .rpm package
+          command: |
+            ./scripts/docker-run.sh packager-rpm make package-rpm
+          environment:
+            PASS_TARGET: armv7-unknown-linux-musleabihf
+            PASS_ARCH: armv7hl
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*armv7hl.rpm"
 
   #
   # Verifying
@@ -466,10 +537,7 @@ jobs:
           command: vector --version
 
   verify-zip-artifact-on-wine:
-    resource_class: large
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -477,15 +545,14 @@ jobs:
           name: Verify archive
           command: |
             ./scripts/docker-run.sh verifier-wine bash -x \<<EOF
-              unzip target/artifacts/*-x86_64-pc-windows-msvc.zip
-              wine *-x86_64-pc-windows-msvc/bin/vector.exe --version
+              mkdir -p dest
+              cd dest
+              unzip ../target/artifacts/*-x86_64-pc-windows-msvc.zip
+              wine ./bin/vector.exe --version
             EOF
 
   verify-docker:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
-    resource_class: large
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -676,17 +743,15 @@ jobs:
           no_output_timeout: 30m
 
   release-github:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Github
           command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-github
+            export PASS_VERSION=$(make version)
+            ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
     docker:
@@ -710,7 +775,6 @@ jobs:
       - run:
           name: Release S3
           command: |
-            export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-s3
 
@@ -746,11 +810,15 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-fmt
     - check-generate
     - test-stable
+    - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+    - package-rpm-x86_64-unknown-linux-musl
+    - package-rpm-aarch64-unknown-linux-musl
+    - package-rpm-armv7-unknown-linux-musleabihf
     - build-x86_64-apple-darwin-archive
-    - build-x86_64-pc-windows-msvc-archive
+    - build-x86_64-pc-windows-msvc-archive-and-msi-package
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
     - verify-deb-artifact-on-deb-10
@@ -780,6 +848,7 @@ workflows:
       - check-version:
           <<: *master-filters
       - test-stable
+      - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc
 
       # Build & verify
@@ -788,10 +857,16 @@ workflows:
       - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive
-      - package-rpm:
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package
+      - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
       # Verify
 
@@ -815,7 +890,7 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           requires:
-            - build-x86_64-pc-windows-msvc-archive
+            - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -823,13 +898,14 @@ workflows:
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
+
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -844,6 +920,8 @@ workflows:
           <<: *release-filters
       - test-stable:
           <<: *release-filters
+      - test-stable-kubernetes:
+          <<: *release-filters
 
       # Build & verify
 
@@ -855,12 +933,20 @@ workflows:
           <<: *release-filters
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
-      - build-x86_64-pc-windows-msvc-archive:
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package:
           <<: *release-filters
-      - package-rpm:
+      - package-rpm-x86_64-unknown-linux-musl:
           <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          <<: *release-filters
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          <<: *release-filters
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
       # Verify
 
@@ -891,7 +977,7 @@ workflows:
       - verify-zip-artifact-on-wine:
           <<: *release-filters
           requires:
-            - build-x86_64-pc-windows-msvc-archive
+            - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - verify-docker:
           <<: *release-filters
           requires:
@@ -901,15 +987,15 @@ workflows:
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-amazon-linux-2:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           <<: *release-filters
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           <<: *release-filters
           requires:
@@ -944,6 +1030,7 @@ workflows:
       - check-fmt
       - check-generate
       - test-stable
+      - test-stable-kubernetes
 
       # Build & verify
 
@@ -951,10 +1038,17 @@ workflows:
       - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive
-      - package-rpm:
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package
+      - package-rpm-x86_64-unknown-linux-musl:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-aarch64-unknown-linux-musl:
+          requires:
+            - build-aarch64-unknown-linux-musl-archive-and-deb-package
+      - package-rpm-armv7-unknown-linux-musleabihf:
+          requires:
+            - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
+
 
       # Verify
 
@@ -978,7 +1072,7 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - verify-zip-artifact-on-wine:
           requires:
-            - build-x86_64-pc-windows-msvc-archive
+            - build-x86_64-pc-windows-msvc-archive-and-msi-package
       - verify-docker:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -986,13 +1080,13 @@ workflows:
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-rpm-artifact-on-centos-7:
           requires:
-            - package-rpm
+            - package-rpm-x86_64-unknown-linux-musl
       - verify-systemd-on-debian:
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package

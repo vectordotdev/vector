@@ -1,25 +1,22 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::{self, Event, ValueKind},
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
+        http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
-use hyper::{Body, Client};
-use hyper_tls::HttpsConnector;
+use hyper::Body;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
-use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -38,16 +35,17 @@ pub struct HecSinkConfig {
     pub compression: Option<Compression>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_in_flight_limit: Some(10),
+        request_rate_limit_num: Some(10),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -69,10 +67,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        let sink = hec(self.clone(), acker)?;
-        let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
+        let healthcheck = healthcheck(&self, cx.resolver())?;
+        let sink = hec(self.clone(), cx)?;
 
         Ok((sink, healthcheck))
     }
@@ -86,7 +84,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -96,20 +94,8 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         Compression::Gzip => true,
     };
     let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
     let encoding = config.encoding.clone();
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
 
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
@@ -118,33 +104,26 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
 
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
-                let mut builder = Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |body: Vec<u8>| {
+            let mut builder = Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
 
-                builder.header("Content-Type", "application/json");
+            builder.header("Content-Type", "application/json");
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
-                }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
 
-                builder.header("Authorization", token.clone());
+            builder.header("Authorization", token.clone());
 
-                builder.body(body).unwrap()
-            });
+            builder.body(body).unwrap()
+        });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
@@ -159,18 +138,21 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub fn healthcheck(token: String, host: String) -> crate::Result<super::Healthcheck> {
-    let uri = format!("{}/services/collector/health/1.0", host)
+pub fn healthcheck(
+    config: &HecSinkConfig,
+    resolver: Resolver,
+) -> crate::Result<super::Healthcheck> {
+    let uri = format!("{}/services/collector/health/1.0", config.host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Splunk {}", token))
+        .header("Authorization", format!("Splunk {}", config.token))
         .body(Body::empty())
         .unwrap();
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let client = https_client(resolver, tls)?;
 
     let healthcheck = client
         .request(request)
@@ -279,14 +261,17 @@ mod tests {
 #[cfg(feature = "splunk-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string, runtime},
+        topology::config::SinkContext,
         Event,
     };
     use futures::Sink;
+    use http::StatusCode;
     use serde_json::Value as JsonValue;
+    use std::net::SocketAddr;
+    use warp::Filter;
 
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
@@ -294,8 +279,9 @@ mod integration_tests {
     #[test]
     fn splunk_insert_message() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text), cx).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -325,8 +311,9 @@ mod integration_tests {
     #[test]
     fn splunk_insert_many() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text), cx).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -357,8 +344,9 @@ mod integration_tests {
     #[test]
     fn splunk_custom_fields() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -390,8 +378,9 @@ mod integration_tests {
     #[test]
     fn splunk_hostname() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -428,13 +417,14 @@ mod integration_tests {
     #[test]
     fn splunk_configure_hostname() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
         let config = super::HecSinkConfig {
             host_field: "roast".into(),
             ..config(Encoding::Json)
         };
 
-        let sink = sinks::splunk_hec::hec(config, Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config, cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -474,20 +464,22 @@ mod integration_tests {
     #[test]
     fn splunk_healthcheck() {
         let mut rt = runtime();
+        let resolver = crate::dns::Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         // OK
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:8088".to_string())
-                    .unwrap();
+            let config = config(Encoding::Text);
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
             rt.block_on(healthcheck).unwrap();
         }
 
         // Server not listening at address
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:1111".to_string())
-                    .unwrap();
+            let config = HecSinkConfig {
+                host: "http://localhost:1111".to_string(),
+                ..config(Encoding::Text)
+            };
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
 
             rt.block_on(healthcheck).unwrap_err();
         }
@@ -507,9 +499,17 @@ mod integration_tests {
 
         // Unhealthy server
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://503.returnco.de".to_string())
-                    .unwrap();
+            let config = HecSinkConfig {
+                host: "http://localhost:5503".to_string(),
+                ..config(Encoding::Text)
+            };
+
+            let unhealthy = warp::any()
+                .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
+            let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
+            rt.spawn(server);
+
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver).unwrap();
             assert_downcast_matches!(
                 rt.block_on(healthcheck).unwrap_err(),
                 HealthcheckError,

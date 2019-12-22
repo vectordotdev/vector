@@ -41,6 +41,7 @@ class Metadata
     :releases,
     :sinks,
     :sources,
+    :team,
     :transforms
 
   def initialize(hash, docs_root, pages_root)
@@ -62,15 +63,19 @@ class Metadata
     @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
     @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
+    # posts
+
+    @posts ||=
+      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+        Post.new(path)
+      end.sort
+
     # releases
 
     release_versions =
       hash.fetch("releases").collect do |version_string, _release_hash|
         Version.new(version_string)
       end
-
-    # Seed the list of releases with the first version
-    release_versions << Version.new("0.3.0")
 
     hash.fetch("releases").collect do |version_string, release_hash|
       version = Version.new(version_string)
@@ -81,8 +86,10 @@ class Metadata
           sort.
           last
 
+      last_date = last_version && hash.fetch("releases").fetch(last_version.to_s).fetch("date").to_date
+
       release_hash["version"] = version_string
-      release = Release.new(release_hash, last_version)
+      release = Release.new(release_hash, last_version, last_date, @posts)
       @releases.send("#{version_string}=", release)
     end
 
@@ -90,6 +97,7 @@ class Metadata
 
     hash["sources"].collect do |source_name, source_hash|
       source_hash["name"] = source_name
+      source_hash["posts"] = posts.select { |post| post.source?(source_name) }
       source = Source.new(source_hash)
       @sources.send("#{source_name}=", source)
     end
@@ -98,6 +106,7 @@ class Metadata
 
     hash["transforms"].collect do |transform_name, transform_hash|
       transform_hash["name"] = transform_name
+      transform_hash["posts"] = posts.select { |post| post.transform?(transform_name) }
       transform = Transform.new(transform_hash)
       @transforms.send("#{transform_name}=", transform)
     end
@@ -106,6 +115,7 @@ class Metadata
 
     hash["sinks"].collect do |sink_name, sink_hash|
       sink_hash["name"] = sink_name
+      sink_hash["posts"] = posts.select { |post| post.sink?(sink_name) }
 
       sink =
         case sink_hash.fetch("egress_method")
@@ -124,13 +134,6 @@ class Metadata
 
     @links = Links.new(hash.fetch("links"), docs_root, pages_root)
 
-    # posts
-
-    @posts ||=
-      Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-        Post.new(path)
-      end.sort
-
     # env vars
 
     @env_vars = Option.build_struct(hash["env_vars"] || {})
@@ -140,6 +143,13 @@ class Metadata
         @env_vars.send("#{key}=", val)
       end
     end
+
+    # team
+
+    @team =
+      hash.fetch("team").collect do |member|
+        OpenStruct.new(member)
+      end
   end
 
   def components
@@ -189,6 +199,46 @@ class Metadata
     end
   end
 
+  def new_post
+    return @new_post if defined?(@new_post)
+
+    @new_post ||=
+      begin
+        last_post = posts.last
+        
+        if (Date.today - last_post.date) <= 30
+          last_post
+        else
+          nil
+        end
+      end
+  end
+
+  def new_release
+    return @new_post if defined?(@new_post)
+
+    @new_post ||=
+      begin
+        last_release = releases.releases_list.last
+        
+        if (Date.today - last_release.date) <= 30
+          last_release
+        else
+          nil
+        end
+      end
+  end
+
+  def post_tags
+    @post_tags ||= posts.collect(&:tags).flatten.uniq
+  end
+
+  def platforms
+    @platforms ||= installation.containers +
+      installation.operating_systems +
+      installation.package_managers
+  end
+
   def previous_minor_releases(release)
     releases_list.select do |other_release|
       other_release.version < release.version &&
@@ -219,7 +269,10 @@ class Metadata
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,
       posts: posts.deep_to_h,
+      post_tags: post_tags,
+      releases: releases.deep_to_h,
       sources: sources.deep_to_h,
+      team: team.deep_to_h,
       transforms: transforms.deep_to_h,
       sinks: sinks.deep_to_h
     }

@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use regex::RegexSet; // TODO: use regex::bytes
@@ -12,6 +13,7 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
+    #[serde(default)]
     pub pass_list: Vec<String>,
 }
 
@@ -21,7 +23,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
             .context(super::InvalidRegex)?)

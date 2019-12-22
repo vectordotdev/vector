@@ -44,6 +44,9 @@ class Option
     @enum = hash["enum"]
     @examples = hash["examples"] || []
     @name = hash.fetch("name")
+    if !hash.key?("null")
+      raise hash.inspect
+    end
     @null = hash.fetch("null")
     @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true
@@ -69,10 +72,13 @@ class Option
     if @examples.empty?
       if !@enum.nil?
         @examples = @enum.keys
-      elsif @type == "bool"
-        @examples = [true, false]
       elsif !@default.nil?
         @examples = [@default]
+        if @type == "bool"
+          @examples.push(!@default)
+        end
+      elsif @type == "bool"
+        @examples = [true, false]
       end
     end
 

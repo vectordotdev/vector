@@ -242,4 +242,4 @@ ensure that Uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
 
 
-[docs.reference.tests]: /docs/reference/tests
+[docs.reference.tests]: /docs/reference/tests/

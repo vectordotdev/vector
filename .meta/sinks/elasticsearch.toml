@@ -1,4 +1,5 @@
 [sinks.elasticsearch]
+title = "Elasticsearch"
 batch_size = 10490000
 batch_timeout = 1
 beta = true
@@ -51,13 +52,13 @@ description = "Options for basic authentication."
 
 [sinks.elasticsearch.options.basic_auth.options.password]
 type = "string"
-examples = ["password", "${PASSWORD_ENV_VAR}"]
+examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
 description = "The basic authentication password."
 
 [sinks.elasticsearch.options.basic_auth.options.user]
 type = "string"
-examples = ["username"]
+examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
 description = "The basic authentication user name."
 
@@ -109,9 +110,8 @@ description = "When using the AWS provider, the [AWS region][urls.aws_elasticsea
 
 [[sinks.elasticsearch.output.examples]]
 label = "Generic"
-type = "http"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST <host>/_bulk HTTP/1.1
 Host: <host>
 Content-Type: application/x-ndjson
@@ -122,5 +122,6 @@ Content-Length: <byte_size>
 { "index" : { "_index" : "<index>" } }
 <json_encoded_log>
 { "index" : { "_index" : "<index>" } }
-<json_encoded_log>\
+<json_encoded_log>
+```\
 """

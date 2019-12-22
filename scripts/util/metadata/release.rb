@@ -4,11 +4,29 @@ require_relative "../../util/version"
 class Release
   include Comparable
 
-  attr_reader :commits, :date, :last_version, :version
+  attr_reader :commits,
+    :date,
+    :last_date,
+    :last_version,
+    :posts,
+    :upgrade_guides,
+    :version
 
-  def initialize(release_hash, last_version)
+  def initialize(release_hash, last_version, last_date, all_posts)
+    @last_date = last_date
     @last_version = last_version
     @date = release_hash.fetch("date").to_date
+
+    @posts =
+      all_posts.select do |p|
+        last_date && p.date > last_date && p.date <= @date && p.type?("announcement")
+      end
+
+    @upgrade_guides =
+      (release_hash["upgrade_guides"] || []).collect do |guide_hash|
+        OpenStruct.new(guide_hash)
+      end
+
     @version = Version.new(release_hash.fetch("version"))
 
     @commits =
@@ -39,6 +57,10 @@ class Release
 
   def compare_short_link
     @compare_short_link ||= "urls.compare_v#{last_version}...v#{version}"
+  end
+
+  def compare_url
+    @compare_url ||= "https://github.com/timberio/vector/compare/v#{last_version}...v#{version}"
   end
 
   def deletions_count
@@ -99,14 +121,42 @@ class Release
 
   def to_h
     {
+      commits: commits.deep_to_h,
+      compare_url: compare_url,
+      deletions_count: deletions_count,
       date: date,
+      insertions_count: insertions_count,
       last_version: last_version,
+      posts: posts.deep_to_h,
+      type: type,
+      type_url: type_url,
+      upgrade_guides: upgrade_guides.deep_to_h,
       version: version,
     }
   end
 
   def type
-    @type ||= last_version.bump_type(version)
+    @type ||= 
+      if version.major == 0
+        "initial dev"
+      else
+        last_version.bump_type(version)
+      end
+  end
+
+  def type_url
+    case type
+    when "initial dev"
+      "https://semver.org/#spec-item-4"
+    when "patch"
+      "https://semver.org/#spec-item-6"
+    when "minor"
+      "https://semver.org/#spec-item-7"
+    when "major"
+      "https://semver.org/#spec-item-8"
+    else
+      raise "Unknown release type #{type.inspect}!"
+    end
   end
 
   private

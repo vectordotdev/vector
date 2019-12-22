@@ -1,4 +1,5 @@
 [sinks.clickhouse]
+title = "Clickhouse"
 batch_size = 1049000
 batch_timeout = 1
 beta = true
@@ -48,12 +49,12 @@ description = "Options for basic authentication."
 
 [sinks.clickhouse.options.basic_auth.options.password]
 type = "string"
-examples = ["password", "${PASSWORD_ENV_VAR}"]
+examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
 description = "The basic authentication password."
 
 [sinks.clickhouse.options.basic_auth.options.user]
 type = "string"
-examples = ["username"]
+examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
 description = "The basic authentication user name."
