@@ -1,0 +1,23 @@
+[[redirects]]
+  from = "/docs/"
+  to = "/docs/about/what-is-vector/"
+  status = 302
+  force = false
+
+[[redirects]]
+  from = "/download/"
+  to = "/releases/latest/download/"
+  status = 302
+  force = false
+
+[[redirects]]
+  from = "/mailing_list"
+  to = "/community/"
+  status = 301
+  force = false
+
+  [[redirects]]
+  from = "/releases/"
+  to = "/releases/latest/download/"
+  status = 302
+  force = false

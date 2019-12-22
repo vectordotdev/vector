@@ -2,7 +2,6 @@
 title: About
 description: "About Vector, the log and metrics collector, forwarder, and router"
 sidebar_label: hidden
-description: About Vector
 hide_pagination: true
 ---
 
