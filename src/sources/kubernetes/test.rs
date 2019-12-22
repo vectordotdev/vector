@@ -182,82 +182,104 @@ impl Kube {
             .replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
-        api.create(&PostParams::default(), json).unwrap()
+        retry(|| {
+            api.create(&PostParams::default(), json.clone())
+                .map_err(|error| {
+                    error!(message = "Failed creating Kubernetes object", ?error);
+                })
+                .ok()
+        })
+        .unwrap()
     }
 
     fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
-        self.api(Api::v1Pod)
-            .list(&ListParams {
-                field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
-                ..ListParams::default()
-            })
-            .unwrap()
-            .items
-            .into_iter()
-            .filter(|item| {
-                item.metadata
-                    .name
-                    .as_str()
-                    .starts_with(object.metadata.name.as_str())
-            })
-            .collect()
+        retry(|| {
+            self.api(Api::v1Pod)
+                .list(&ListParams {
+                    field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
+                    ..ListParams::default()
+                })
+                .map_err(|error| {
+                    error!(message = "Failed listing Pods", ?error);
+                })
+                .ok()
+        })
+        .unwrap()
+        .items
+        .into_iter()
+        .filter(|item| {
+            item.metadata
+                .name
+                .as_str()
+                .starts_with(object.metadata.name.as_str())
+        })
+        .collect()
     }
 
     fn logs(&self, pod_name: &str) -> Vec<String> {
-        self.api(Api::v1Pod)
-            .log(pod_name, &LogParams::default())
-            .unwrap()
-            .lines()
-            .map(|s| s.to_owned())
-            .collect()
+        retry(|| {
+            self.api(Api::v1Pod)
+                .log(pod_name, &LogParams::default())
+                .map_err(|error| {
+                    error!(message = "Failed getting Pod logs", ?error);
+                })
+                .ok()
+        })
+        .unwrap()
+        .lines()
+        .map(|s| s.to_owned())
+        .collect()
     }
 
     fn wait_for_running(&self, mut object: KubeDaemon) -> Option<KubeDaemon> {
         let api = self.api(Api::v1DaemonSet);
-        for _ in 0..WAIT_LIMIT {
-            match object.status.clone() {
-                None => (),
-                Some(DaemonSetStatus {
+        retry(move || {
+            object = api
+                .get_status(object.meta().name.as_str())
+                .map_err(|error| {
+                    error!(message = "Failed getting object status", ?error);
+                })
+                .ok()?;
+            match object.status.clone()? {
+                DaemonSetStatus {
                     desired_number_scheduled,
                     number_available: Some(number_available),
                     ..
-                }) if number_available == desired_number_scheduled => {
-                    return Some(object);
-                }
-                Some(status) => {
+                } if number_available == desired_number_scheduled => Some(object.clone()),
+                status => {
                     debug!(message = "DaemonSet not yet ready", ?status);
+                    None
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            object = api.get_status(object.meta().name.as_str()).unwrap();
-        }
-        return None;
+        })
     }
 
     fn wait_for_success(&self, mut object: KubePod) -> Option<KubePod> {
         let api = self.api(Api::v1Pod);
         let legal = ["Pending", "Running", "Succeeded"];
         let goal = "Succeeded";
-        for _ in 0..WAIT_LIMIT {
-            match object.status.clone() {
-                None => (),
-                Some(PodStatus {
+        retry(move || {
+            object = api
+                .get_status(object.meta().name.as_str())
+                .map_err(|error| {
+                    error!(message = "Failed getting object status", ?error);
+                })
+                .ok()?;
+            match object.status.clone()? {
+                PodStatus {
                     phase: Some(ref phase),
                     ..
-                }) if phase.as_str() == goal => return Some(object),
-                Some(PodStatus {
+                } if phase.as_str() == goal => Some(object.clone()),
+                PodStatus {
                     phase: Some(ref phase),
                     ..
-                }) if legal.contains(&phase.as_str()) => (),
-                Some(PodStatus { phase, .. }) => {
+                } if legal.contains(&phase.as_str()) => None,
+                PodStatus { phase, .. } => {
                     error!(message = "Illegal pod phase", ?phase);
-                    return None;
+                    None
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            object = api.get_status(object.meta().name.as_str()).unwrap();
-        }
-        return None;
+        })
     }
 
     fn cleanup(&self) {
@@ -275,6 +297,19 @@ impl Drop for Kube {
     fn drop(&mut self) {
         self.cleanup();
     }
+}
+
+/// If F returns None, retries it after some time, for some count,
+/// returning None if all trys fail.
+fn retry<F: FnMut() -> Option<R>, R>(mut f: F) -> Option<R> {
+    for _ in 0..WAIT_LIMIT {
+        if let Some(data) = f() {
+            return Some(data);
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        debug!("Retrying");
+    }
+    None
 }
 
 fn user_namespace(namespace: &str) -> String {
