@@ -14,6 +14,17 @@ install-rust: &install-rust
     command: |
       curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
+install-rust-windows: &install-rust-windows
+  run:
+    name: Install Rust
+    shell: bash
+    command: |
+      curl https://sh.rustup.rs -sSf | sh -s -- -y \
+        --default-toolchain nightly-2019-11-19 \
+        --default-host x86_64-pc-windows-msvc
+      # see https://github.com/rust-lang/cargo/issues/2078
+      printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+
 install-vector: &install-vector
   run:
     name: Execute install.sh
@@ -86,13 +97,7 @@ jobs:
     executor: win/vs2019
     steps:
       - checkout
-      - run:
-          name: Install Rust
-          shell: bash
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      - *install-rust-windows
       - run:
           name: Download Perl
           shell: bash
@@ -261,13 +266,7 @@ jobs:
     executor: win/vs2019
     steps:
       - checkout
-      - run:
-          name: Install Rust
-          shell: bash
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      - *install-rust-windows
       - run:
           name: Download Perl
           shell: bash
