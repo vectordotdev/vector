@@ -2,7 +2,6 @@
 title: Environment Variables
 description: "A full list of Vector's supported environment variables."
 sidebar_label: Env Vars
-description: Vector's environment variables
 ---
 
 You can control Vector's behavior through select environment variables:
