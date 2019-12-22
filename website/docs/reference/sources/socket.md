@@ -99,7 +99,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets. 
+The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
 
 
 </Field>
@@ -122,7 +122,7 @@ The address to listen for connections on, or "systemd#N" to use the Nth socket p
 
 ### host_key
 
-The key name added to each event representing the current host. Valid for "tcp" and "udp" sockets.  See [Context](#context) for more info.
+The key name added to each event representing the current host. Valid for "tcp" and "udp" sockets. See [Context](#context) for more info.
 
 
 </Field>
@@ -145,7 +145,7 @@ The key name added to each event representing the current host. Valid for "tcp" 
 
 ### max_length
 
-The maximum bytes size of incoming messages before they are discarded. Valid for "tcp" and "udp" sockets. 
+The maximum bytes size of incoming messages before they are discarded. Valid for "tcp" and "udp" sockets.
 
 
 </Field>
@@ -168,7 +168,7 @@ The maximum bytes size of incoming messages before they are discarded. Valid for
 
 ### mode
 
-Specifies what type of socket to use. Valid options are "tcp" and "udp". 
+Specifies what type of socket to use. Valid options are "tcp" and "udp".
 
 
 </Field>
@@ -191,7 +191,7 @@ Specifies what type of socket to use. Valid options are "tcp" and "udp".
 
 ### shutdown_timeout_secs
 
-The timeout before a connection is forcefully closed during shutdown. Valid only for "tcp" sockets. 
+The timeout before a connection is forcefully closed during shutdown. Valid only for "tcp" sockets.
 
 
 </Field>

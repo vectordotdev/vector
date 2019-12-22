@@ -378,8 +378,7 @@ dns_servers = ["0.0.0.0:53"]
   type = "socket"
 
   # The address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation. Valid for "tcp" and "udp"
-  # sockets.
+  # socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
   # 
   # * required
   # * type: string
