@@ -112,7 +112,8 @@ Given the following input:
 
 ```text
 # TYPE promhttp_metric_handler_requests_total counter
-promhttp_metric_handler_requests_total{code="200"} 100```
+promhttp_metric_handler_requests_total{code="200"} 100
+```
 
 A metric event will be output with the following structure:
 
@@ -128,7 +129,8 @@ A metric event will be output with the following structure:
     "type": "counter",
     "value": 100.0
   }
-}```
+}
+```
 
 </TabItem>
 
@@ -137,7 +139,8 @@ A metric event will be output with the following structure:
 Given the following input:
 
 ```text
-prometheus_remote_storage_samples_in_total 57011636```
+prometheus_remote_storage_samples_in_total 57011636
+```
 
 A metric event will be output with the following structure:
 
@@ -151,7 +154,8 @@ A metric event will be output with the following structure:
     "type": "gauge",
     "value": 57011636.0
   }
-}```
+}
+```
 
 </TabItem>
 </Tabs>

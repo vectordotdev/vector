@@ -3817,13 +3817,21 @@ end
   # * type: string
   namespace = "service"
 
-  # Default buckets to use for histogram metrics.
-  #
+  # Default buckets to use for aggregating distribution metrics into histograms.
+  # 
   # * optional
   # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
   # * type: [float]
   # * unit: seconds
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+
+  # Time interval between set values are reset.
+  # 
+  # * optional
+  # * default: 60
+  # * type: int
+  # * unit: seconds
+  flush_period_secs = 60
 
   # Enables/disables the sink healthcheck upon start.
   #

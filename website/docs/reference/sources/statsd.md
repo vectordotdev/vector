@@ -87,7 +87,8 @@ import TabItem from '@theme/TabItem';
 Given the following input:
 
 ```text
-login.invocations:1|c```
+login.invocations:1|c
+```
 
 A metric event will be output with the following structure:
 
@@ -100,7 +101,8 @@ A metric event will be output with the following structure:
     "type": "counter",
     "value": 1.0
   }
-}```
+}
+```
 
 </TabItem>
 
@@ -109,7 +111,8 @@ A metric event will be output with the following structure:
 Given the following input:
 
 ```text
-gas_tank:0.50|g```
+gas_tank:0.50|g
+```
 
 A metric event will be output with the following structure:
 
@@ -122,7 +125,8 @@ A metric event will be output with the following structure:
     "type": "gauge",
     "value": 0.5
   }
-}```
+}
+```
 
 </TabItem>
 
@@ -131,7 +135,8 @@ A metric event will be output with the following structure:
 Given the following input:
 
 ```text
-unique_users:foo|s```
+unique_users:foo|s
+```
 
 A metric event will be output with the following structure:
 
@@ -144,7 +149,8 @@ A metric event will be output with the following structure:
     "type": "set",
     "values": ["foo"]
   }
-}```
+}
+```
 
 </TabItem>
 
@@ -153,7 +159,8 @@ A metric event will be output with the following structure:
 Given the following input:
 
 ```text
-login.time:22|ms|@0.1```
+login.time:22|ms|@0.1
+```
 
 A metric event will be output with the following structure:
 
@@ -167,7 +174,8 @@ A metric event will be output with the following structure:
     "values": [0.022], // ms become seconds
     "sample_rates": [10]
   }
-}```
+}
+```
 
 </TabItem>
 </Tabs>

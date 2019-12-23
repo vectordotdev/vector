@@ -21,11 +21,11 @@ use std::{
 use stream_cancel::{Trigger, Tripwire};
 use tracing::field;
 
-const MIN_FLUSH_PERIOD_SEC: u64 = 1;
+const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Flush period for sets must be greater or equal to {} sec", min))]
+    #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
     FlushPeriodTooShort { min: u64 },
 }
 
@@ -37,8 +37,8 @@ pub struct PrometheusSinkConfig {
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
     pub buckets: Vec<f64>,
-    #[serde(default = "default_flush_period_sec")]
-    pub flush_period_sec: u64,
+    #[serde(default = "default_flush_period_secs")]
+    pub flush_period_secs: u64,
 }
 
 pub fn default_histogram_buckets() -> Vec<f64> {
@@ -53,7 +53,7 @@ pub fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-pub fn default_flush_period_sec() -> u64 {
+pub fn default_flush_period_secs() -> u64 {
     60
 }
 
@@ -64,9 +64,9 @@ inventory::submit! {
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        if self.flush_period_sec < MIN_FLUSH_PERIOD_SEC {
+        if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
-                min: MIN_FLUSH_PERIOD_SEC,
+                min: MIN_FLUSH_PERIOD_SECS,
             }));
         }
 
@@ -329,20 +329,20 @@ impl PrometheusSink {
         let namespace = self.config.namespace.clone();
         let buckets = self.config.buckets.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
-        let flush_period_sec = self.config.flush_period_sec.clone();
+        let flush_period_secs = self.config.flush_period_secs.clone();
 
         let new_service = move || {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
-            let flush_period_sec = flush_period_sec.clone();
+            let flush_period_secs = flush_period_secs.clone();
 
             service_fn(move |req| {
                 let metrics = metrics.read().unwrap();
                 let last_flush_timestamp = last_flush_timestamp.read().unwrap();
                 let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
-                let expired = interval > flush_period_sec;
+                let expired = interval > flush_period_secs;
                 info_span!(
                     "prometheus_server",
                     method = field::debug(req.method()),
@@ -386,7 +386,7 @@ impl Sink for PrometheusSink {
                         // because otherwise they could grow infinitelly
                         let now = Utc::now().timestamp();
                         let interval = now - *self.last_flush_timestamp.read().unwrap();
-                        if interval > self.config.flush_period_sec as i64 {
+                        if interval > self.config.flush_period_secs as i64 {
                             *self.last_flush_timestamp.write().unwrap() = now;
                             existing.reset();
                         }
