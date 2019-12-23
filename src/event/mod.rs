@@ -102,21 +102,29 @@ impl LogEvent {
         self.fields.remove(key).map(|v| v.value)
     }
 
-    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
+    pub fn insert_explicit<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<ValueKind>,
+    {
         self.fields.insert(
-            key,
+            key.into(),
             Value {
-                value,
+                value: value.into(),
                 explicit: true,
             },
         );
     }
 
-    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
+    pub fn insert_implicit<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<ValueKind>,
+    {
         self.fields.insert(
-            key,
+            key.into(),
             Value {
-                value,
+                value: value.into(),
                 explicit: false,
             },
         );
