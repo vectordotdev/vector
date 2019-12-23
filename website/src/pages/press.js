@@ -19,7 +19,7 @@ function Contact() {
     <Layout title="Press" description="Offical Vector resources for digital and printed materials">
       <header className="hero">
         <div className="container container--fluid">
-          <h1>Logos & Press Hit</h1>
+          <h1>Logos & Press Kit</h1>
           <div className="hero__subtitle">
             Offical Vector resources for digital and printed materials.
           </div>
