@@ -1,5 +1,5 @@
-[sinks.tcp]
-title = "TCP"
+[sinks.socket]
+title = "Socket"
 buffer = true
 common = false
 delivery_guarantee = "best_effort"
@@ -8,10 +8,17 @@ encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-write_to_description = "a TCP connection"
+write_to_description = "a socket, such as a TCP or Unix socket"
 tls_options = ["+enabled"]
 
-[sinks.tcp.options.address]
+[sinks.socket.options.mode]
+type = "string"
+common = true
+examples = ["tcp"]
+null = false
+description = """What type of socket to use.  Currently only "tcp" is valid."""
+
+[sinks.socket.options.address]
 type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
