@@ -126,7 +126,7 @@ mod test {
                     rpc_duration_seconds{code="200",quantile="0.99"} 76656
                     rpc_duration_seconds_sum{code="200"} 1.7560473e+07
                     rpc_duration_seconds_count{code="200"} 2693
-                    "##
+                    "##,
                 ))
             })
         });
