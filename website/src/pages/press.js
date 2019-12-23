@@ -88,6 +88,35 @@ function Contact() {
               </div>
             </div>
 
+            <AnchoredH3 id="connect">Icon</AnchoredH3>
+
+            <div className="row margin-bottom--lg">
+              <div className="col text--center">
+                <div style={{background: 'white'}} className="margin-bottom--sm">
+                  <a href="/press/vector-icon.svg">
+                    <img src="/press/vector-icon.svg" width="100px" height="auto" />
+                  </a>
+                </div>
+                <div>
+                  <a href="/press/vector-icon.svg"><i className="feather icon-download"></i> SVG</a>
+                  &nbsp;&nbsp;
+                  <a href="/press/vector-icon.png"><i className="feather icon-download"></i> PNG</a>
+                </div>
+              </div>
+              <div className="col text--center">
+                <div style={{background: 'black'}} className="margin-bottom--sm">
+                  <a href="/press/vector-icon.svg">
+                    <img src="/press/vector-icon.svg" width="100px" height="auto" />
+                  </a>
+                </div>
+                <div>
+                  <a href="/press/vector-icon.svg"><i className="feather icon-download"></i> SVG</a>
+                  &nbsp;&nbsp;
+                  <a href="/press/vector-icon.png"><i className="feather icon-download"></i> PNG</a>
+                </div>
+              </div>
+            </div>
+
           </div>
         </section>
         <section>
