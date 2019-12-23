@@ -19,7 +19,7 @@ function Community() {
       <header className="hero">
         <div className="container container--fluid">
           <h1>Vector Community</h1>
-          <MailingListForm buttonClass="highlight" size="lg" />
+          <MailingListForm buttonClass="highlight" center={true} size="lg" />
         </div>
       </header>
       <main>

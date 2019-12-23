@@ -1,11 +1,19 @@
 .mailing-list .mailing-list--description {
   margin-bottom: var(--ifm-spacing-vertical);
 }
-.mailing-list form input[type="email"] {
-  margin-right: 1em;
-  max-width: 250px;
-  width: 100%;
+.mailing-list--form {
+  display: flex;
+  max-width: 400px;
 }
+.mailing-list--form input[type="email"] {
+  flex: 1 1;
+  margin-right: 1em;
+}
+
+/*
+ * block
+ */
+
 .mailing-list.mailing-list--block input[type="email"] {
   display: block;
   max-width: none;
@@ -18,25 +26,26 @@
   width: 100%;
 }
 
+/*
+ * center
+ */
+
+.mailing-list.mailing-list--center .mailing-list--form {
+  margin: 0 auto;
+}
+
+/*
+ * lg
+ */
+.mailing-list.mailing-list--lg .mailing-list--form {
+  max-width: 600px;
+}
+
+/*
+ * hero
+ */
+
 .hero .mailing-list .mailing-list--description {
   font-size: 1.1rem;
   color: var(--ifm-color-emphasis-600);
-}
-.hero .mailing-list form input[type="email"] {
-  margin-right: 1em;
-  max-width: 425px;
-  width: 100%;
-}
-
-@media (max-width: 996px) {
-  .mailing-list form input[type="email"] {
-    display: block;
-    max-width: none;
-  }
-
-  .mailing-list form .button {
-    display: block;
-    margin: var(--ifm-spacing-vertical) 0 0 0;
-    width: 100%;
-  }
 }

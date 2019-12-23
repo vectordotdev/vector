@@ -944,6 +944,16 @@ input[type="text"]:focus {
 }
 
 /**
+ * press--color
+ */
+
+.press--color {
+  background: #10E7FF;
+  color: black;
+  padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
+}
+
+/**
  * react-select-container
  */
 
@@ -1009,6 +1019,8 @@ section .sub-title {
 }
 section.shade {
   background: var(--ifm-panel-background);
+  padding-left: var(--ifm-spacing-horizontal);
+  padding-right: var(--ifm-spacing-horizontal);
 }
 section:last-child {
   border-bottom: 0px none;
