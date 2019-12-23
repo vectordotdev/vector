@@ -108,13 +108,50 @@ import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 
+Given the following input:
 
+```text
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 100```
+
+A metric event will be output with the following structure:
+
+```json
+{
+  "name": "promhttp_metric_handler_requests_total",
+  "kind": "absolute",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "tags": {
+    "code": "200"
+  },
+  "value": {
+    "type": "counter",
+    "value": 100.0
+  }
+}```
 
 </TabItem>
 
 <TabItem value="gauge">
 
+Given the following input:
 
+```text
+prometheus_remote_storage_samples_in_total 57011636```
+
+A metric event will be output with the following structure:
+
+```json
+{
+  "name": "prometheus_remote_storage_samples_in_total",
+  "kind": "absolute",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "tags": null,
+  "value": {
+    "type": "gauge",
+    "value": 57011636.0
+  }
+}```
 
 </TabItem>
 </Tabs>

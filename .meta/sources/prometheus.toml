@@ -25,11 +25,17 @@ description = "The interval between scrapes in seconds."
 
 [[sources.prometheus.output.metric.examples]]
 label = "Counter"
-input = """\
-# TYPE promhttp_metric_handler_requests_total counter\
+body = """\
+Given the following input:
+
+```text
+# TYPE promhttp_metric_handler_requests_total counter
 promhttp_metric_handler_requests_total{code="200"} 100\
-"""
-output = """\
+```
+
+A metric event will be output with the following structure:
+
+```json
 {
   "name": "promhttp_metric_handler_requests_total",
   "kind": "absolute",
@@ -42,14 +48,21 @@ output = """\
     "value": 100.0
   }
 }\
+```\
 """
 
 [[sources.prometheus.output.metric.examples]]
 label = "Gauge"
-input = """\
+body = """\
+Given the following input:
+
+```text
 prometheus_remote_storage_samples_in_total 57011636\
-"""
-output = """\
+```
+
+A metric event will be output with the following structure:
+
+```json
 {
   "name": "prometheus_remote_storage_samples_in_total",
   "kind": "absolute",
@@ -60,4 +73,5 @@ output = """\
     "value": 57011636.0
   }
 }\
+```\
 """

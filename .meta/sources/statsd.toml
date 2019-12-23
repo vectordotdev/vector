@@ -18,10 +18,16 @@ description = "UDP socket address to bind to."
 
 [[sources.statsd.output.metric.examples]]
 label = "Counter"
-input = """\
+body = """\
+Given the following input:
+
+```text
 login.invocations:1|c\
-"""
-output = """\
+```
+
+A metric event will be output with the following structure:
+
+```json
 {
   "name": "login.invocations",
   "kind": "incremental",
@@ -31,14 +37,21 @@ output = """\
     "value": 1.0
   }
 }\
+```\
 """
 
 [[sources.statsd.output.metric.examples]]
 label = "Gauge"
-input = """\
+body = """\
+Given the following input:
+
+```text
 gas_tank:0.50|g\
-"""
-output = """\
+```
+
+A metric event will be output with the following structure:
+
+```json
 {
   "name": "gas_tank",
   "kind": "absolute",
@@ -48,14 +61,21 @@ output = """\
     "value": 0.5
   }
 }\
+```\
 """
 
 [[sources.statsd.output.metric.examples]]
 label = "Set"
-input = """\
+body = """\
+Given the following input:
+
+```text
 unique_users:foo|s\
-"""
-output = """\
+```
+
+A metric event will be output with the following structure:
+
+```json
 {
   "name": "unique_users",
   "kind": "incremental",
@@ -65,14 +85,21 @@ output = """\
     "values": ["foo"]
   }
 }\
+```\
 """
 
 [[sources.statsd.output.metric.examples]]
-label = "Timer/Histogram"
-input = """\
-login.time:22|ms\
-"""
-output = """\
+label = "Timer"
+body = """\
+Given the following input:
+
+```text
+login.time:22|ms|@0.1\
+```
+
+A metric event will be output with the following structure:
+
+```json
 {
   "name": "login.time",
   "kind": "incremental",
@@ -80,7 +107,8 @@ output = """\
   "value": {
     "type": "distribution",
     "values": [0.022], // ms become seconds
-    "sample_rates": [1.0]
+    "sample_rates": [10]
   }
 }\
+```\
 """
