@@ -32,9 +32,12 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 ### Parsing
 
-Vector will _only_ parse messages in the [Syslog 5424][urls.syslog_5424] format.
-Vector makes a best effort to parse this format. If parsing fails, the message
-will be dropped and `warning` log line will be emitted. If this is the case, we
-recommend using the [`tcp` source][docs.sources.tcp] combined with the
-[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
-ingestion and parsing scheme.
+Vector will _only_ parse messages in the [Syslog 5424 format][urls.syslog_5424],
+Vector will _not_ parse the [Syslog 3164 format][urls.syslog_3164] since 3164
+is not an exact specification, but an observation of behavior.
+
+Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
+fails, the event will be dropped and `warning` log line will be emitted. If
+this is the case, we recommend using the [`tcp` source][docs.sources.tcp]
+combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
+implement your own ingestion and parsing scheme.
