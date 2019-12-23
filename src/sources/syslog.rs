@@ -1,24 +1,26 @@
 use super::util::{SocketListenAddr, TcpSource};
+#[cfg(unix)]
+use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
+#[cfg(unix)]
+use std::path::PathBuf;
 use syslog_rfc5424::{self, message::ProcId::*, SyslogMessage};
 use tokio::{
     self,
-    codec::{BytesCodec, FramedRead, LinesCodec},
+    codec::{BytesCodec, LinesCodec},
     net::{UdpFramed, UdpSocket},
 };
-#[cfg(unix)]
-use tokio_uds::UnixListener;
 use tracing::field;
-use tracing_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -85,7 +87,13 @@ impl SourceConfig for SyslogConfig {
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
+            Mode::Unix { path } => Ok(build_unix_source(
+                path,
+                self.max_length,
+                host_key,
+                out,
+                event_from_str,
+            )),
         }
     }
 
@@ -112,7 +120,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
-        event_from_str(&self.host_key, host, frame).map(|event| {
+        event_from_str(&self.host_key, host, &frame).map(|event| {
             trace!(
                 message = "Received one event.",
                 event = field::debug(&event)
@@ -162,67 +170,16 @@ pub fn udp(
     )
 }
 
-#[cfg(unix)]
-pub fn unix(
-    path: PathBuf,
-    max_length: usize,
-    host_key: String,
-    out: mpsc::Sender<Event>,
-) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
-
-    Box::new(future::lazy(move || {
-        let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
-
-        info!(message = "listening.", ?path, r#type = "unix");
-
-        listener
-            .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
-            .for_each(move |socket| {
-                let out = out.clone();
-                let peer_addr = socket.peer_addr().ok();
-                let host_key = host_key.clone();
-
-                let span = info_span!("connection");
-                let path = if let Some(addr) = peer_addr {
-                    if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
-                        span.record("peer_path", &field::debug(&path));
-                        Some(path)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-                let received_from: Option<Bytes> =
-                    path.map(|p| p.to_string_lossy().into_owned().into());
-                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(move |event| {
-                        event_from_str(&host_key.clone(), received_from.clone(), event)
-                    })
-                    .map_err(|e| error!("error reading line: {:?}", e));
-
-                let handler = lines_in.forward(out).map(|_| info!("finished sending"));
-
-                tokio::spawn(handler.instrument(span))
-            })
-    }))
-}
-
+/**
+* Function to pass to build_unix_source, specific to the Unix mode of the syslog source.
+* Handles the logic of parsing and decoding the syslog message format.
+**/
 // TODO: many more cases to handle:
 // handle parse errors instead of discarding
 // non-strict rfc5424 parsing (see ignored tests)
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
-
-fn event_from_str(
-    host_key: &str,
-    default_host: Option<Bytes>,
-    raw: impl AsRef<str>,
-) -> Option<Event> {
-    let line = raw.as_ref();
+fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
     trace!(
         message = "Received line.",
         bytes = &field::display(line.len())
@@ -372,7 +329,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
+            event_from_str(&"host".to_string(), None, &raw).unwrap(),
             expected
         );
     }
@@ -384,7 +341,7 @@ mod test {
             r#"[incorrect x]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg);
+        let event = event_from_str(&"host".to_string(), None, &msg);
         assert_eq!(event, None);
 
         let msg = format!(
@@ -392,7 +349,7 @@ mod test {
             r#"[incorrect x=]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg);
+        let event = event_from_str(&"host".to_string(), None, &msg);
         assert_eq!(event, None);
     }
 
@@ -411,7 +368,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -419,7 +376,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -427,7 +384,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -435,7 +392,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(!there_is_map_called_empty(event));
     }
 
