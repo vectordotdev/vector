@@ -50,7 +50,7 @@ POST / HTTP/1.1
 Host: kinesis.<region>.<domain>
 Content-Length: <byte_size>
 Content-Type: application/x-amz-json-1.1
-Connection: Keep-Alive 
+Connection: Keep-Alive
 X-Amz-Target: Kinesis_20131202.PutRecords
 {
     "Records": [
