@@ -12,7 +12,7 @@ pub fn flatten(event: &mut LogEvent, map: Map<String, Value>) {
 pub fn insert(event: &mut LogEvent, name: String, value: Value) {
     match value {
         Value::String(string) => {
-            event.insert_explicit(name.into(), string.into());
+            event.insert_explicit(name, string);
         }
         Value::Number(number) => {
             let val: ValueKind = if let Some(val) = number.as_i64() {
@@ -23,13 +23,13 @@ pub fn insert(event: &mut LogEvent, name: String, value: Value) {
                 number.to_string().into()
             };
 
-            event.insert_explicit(name.into(), val);
+            event.insert_explicit(name, val);
         }
         Value::Bool(b) => {
-            event.insert_explicit(name.into(), b.into());
+            event.insert_explicit(name, b);
         }
         Value::Null => {
-            event.insert_explicit(name.into(), "".into());
+            event.insert_explicit(name, "");
         }
         Value::Array(array) => {
             for (i, element) in array.into_iter().enumerate() {

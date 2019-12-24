@@ -73,7 +73,7 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
 
                     event
                         .as_mut_log()
-                        .insert_implicit(host_key.clone(), addr.to_string().into());
+                        .insert_implicit(host_key.clone(), addr.to_string());
 
                     trace!(message = "Received one event.", ?event);
                     event

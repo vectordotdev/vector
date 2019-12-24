@@ -102,21 +102,29 @@ impl LogEvent {
         self.fields.remove(key).map(|v| v.value)
     }
 
-    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
+    pub fn insert_explicit<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<ValueKind>,
+    {
         self.fields.insert(
-            key,
+            key.into(),
             Value {
-                value,
+                value: value.into(),
                 explicit: true,
             },
         );
     }
 
-    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
+    pub fn insert_implicit<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<ValueKind>,
+    {
         self.fields.insert(
-            key,
+            key.into(),
             Value {
-                value,
+                value: value.into(),
                 explicit: false,
             },
         );
@@ -541,12 +549,10 @@ impl From<Bytes> for Event {
             fields: HashMap::new(),
         });
 
+        event.as_mut_log().insert_implicit(MESSAGE.clone(), message);
         event
             .as_mut_log()
-            .insert_implicit(MESSAGE.clone(), message.into());
-        event
-            .as_mut_log()
-            .insert_implicit(TIMESTAMP.clone(), Utc::now().into());
+            .insert_implicit(TIMESTAMP.clone(), Utc::now());
 
         event
     }
@@ -619,12 +625,8 @@ mod test {
     #[test]
     fn serialization() {
         let mut event = Event::from("raw log line");
-        event
-            .as_mut_log()
-            .insert_explicit("foo".into(), "bar".into());
-        event
-            .as_mut_log()
-            .insert_explicit("bar".into(), "baz".into());
+        event.as_mut_log().insert_explicit("foo", "bar");
+        event.as_mut_log().insert_explicit("bar", "baz");
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
@@ -653,16 +655,12 @@ mod test {
         use serde_json::json;
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert_explicit("int".into(), 4.into());
+        event.as_mut_log().insert_explicit("int", 4);
+        event.as_mut_log().insert_explicit("float", 5.5);
+        event.as_mut_log().insert_explicit("bool", true);
         event
             .as_mut_log()
-            .insert_explicit("float".into(), 5.5.into());
-        event
-            .as_mut_log()
-            .insert_explicit("bool".into(), true.into());
-        event
-            .as_mut_log()
-            .insert_explicit("string".into(), "thisisastring".into());
+            .insert_explicit("string", "thisisastring");
 
         let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(map["float"], json!(5.5));
@@ -677,11 +675,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
-        event.as_mut_log().insert_implicit(
-            "Pitbull".into(),
-            "The bigger they are, the harder they fall".into(),
-        );
+            .insert_explicit("Ke$ha", "It's going down, I'm yelling timber");
+        event
+            .as_mut_log()
+            .insert_implicit("Pitbull", "The bigger they are, the harder they fall");
 
         let all = event
             .as_log()

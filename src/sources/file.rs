@@ -332,15 +332,13 @@ fn create_event(
     let mut event = Event::from(line);
 
     if let Some(file_key) = &file_key {
-        event
-            .as_mut_log()
-            .insert_implicit(file_key.clone().into(), file.into());
+        event.as_mut_log().insert_implicit(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
         event
             .as_mut_log()
-            .insert_implicit(host_key.into(), hostname.clone().into());
+            .insert_implicit(host_key, hostname.clone());
     }
 
     event
