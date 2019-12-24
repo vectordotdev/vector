@@ -2,11 +2,9 @@ use crate::event::metric::{Metric, MetricKind, MetricValue};
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use regex::Regex;
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::{
-    error, fmt,
-    num::{ParseFloatError, ParseIntError},
-};
+use std::num::ParseFloatError;
 
 lazy_static! {
     static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
@@ -56,7 +54,9 @@ fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
     let tokens: Vec<_> = input.split_ascii_whitespace().collect();
 
     if tokens.len() != 4 {
-        return Err(ParserError::Malformed("expected 4 tokens in TYPE string"));
+        return Err(ParserError::Malformed {
+            s: "expected 4 tokens in TYPE string",
+        });
     }
 
     let name = tokens[2];
@@ -67,7 +67,9 @@ fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
         "histogram" => ParserType::Histogram,
         "summary" => ParserType::Summary,
         other => {
-            return Err(ParserError::UnknownMetricType(other.to_string()));
+            return Err(ParserError::UnknownMetricType {
+                s: other.to_string(),
+            });
         }
     };
 
@@ -83,7 +85,7 @@ fn parse_value(input: &str) -> Result<f64, ParserError> {
         "Nan" => std::f64::NAN,
         "+Inf" => std::f64::INFINITY,
         "-Inf" => std::f64::NEG_INFINITY,
-        s => s.parse()?,
+        s => s.parse().with_context(|| InvalidFloat { s: input })?,
     };
 
     Ok(value)
@@ -105,7 +107,9 @@ fn parse_tags(input: &str) -> Result<HashMap<String, String>, ParserError> {
         let pair = pair.trim();
         let parts = pair.split('=').collect::<Vec<_>>();
         if parts.len() != 2 {
-            return Err(ParserError::Malformed("expected 2 values separated by '='"));
+            return Err(ParserError::Malformed {
+                s: "expected 2 values separated by '='",
+            });
         }
         let key = parts[0].trim().to_string();
         let mut value = parts[1].trim();
@@ -133,9 +137,9 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         let (first, second) = input.split_at(pos);
         let parts = first.split('{').collect::<Vec<_>>();
         if parts.len() < 2 {
-            return Err(ParserError::Malformed(
-                "expected at least 2 tokens in data line",
-            ));
+            return Err(ParserError::Malformed {
+                s: "expected at least 2 tokens in data line",
+            });
         };
 
         let name = parts[0].trim();
@@ -154,9 +158,9 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         // example: http_requests_total 1027 1395066363000
         let parts = input.split(' ').collect::<Vec<_>>();
         if parts.len() < 2 {
-            return Err(ParserError::Malformed(
-                "expected at least 2 tokens in data line",
-            ));
+            return Err(ParserError::Malformed {
+                s: "expected at least 2 tokens in data line",
+            });
         };
         let name = parts[0];
         let value = parse_value(parts[1])?;
@@ -326,7 +330,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     let v: Vec<_> = metric.name.rsplitn(2, '_').collect();
                     if v.len() < 2 {
-                        return Err(ParserError::Malformed("expected histogram name suffix"));
+                        return Err(ParserError::Malformed {
+                            s: "expected histogram name suffix",
+                        });
                     }
                     let (name, suffix) = (v[1], v[0]);
 
@@ -352,9 +358,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                                     aggregate.values.push(metric.value);
                                 }
                             } else {
-                                return Err(ParserError::Malformed(
-                                    "expected \"le\" tag in histogram bucket",
-                                ));
+                                return Err(ParserError::Malformed {
+                                    s: "expected \"le\" tag in histogram bucket",
+                                });
                             }
                         }
                         "sum" => {
@@ -364,7 +370,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             aggregate.count = metric.value as u32;
                         }
                         _ => {
-                            return Err(ParserError::Malformed("unknown histogram name suffix"));
+                            return Err(ParserError::Malformed {
+                                s: "unknown histogram name suffix",
+                            });
                         }
                     }
                 }
@@ -427,9 +435,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                                 aggregate.bounds.push(parse_value(&b)?);
                                 aggregate.values.push(metric.value);
                             } else {
-                                return Err(ParserError::Malformed(
-                                    "expected \"quantile\" tag in summary bucket",
-                                ));
+                                return Err(ParserError::Malformed {
+                                    s: "expected \"quantile\" tag in summary bucket",
+                                });
                             }
                         }
                         "sum" => {
@@ -439,7 +447,9 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             aggregate.count = metric.value as u32;
                         }
                         _ => {
-                            return Err(ParserError::Malformed("unknown summary name suffix"));
+                            return Err(ParserError::Malformed {
+                                s: "unknown summary name suffix",
+                            });
                         }
                     }
                 }
@@ -473,34 +483,19 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
     Ok(result)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Snafu)]
 pub enum ParserError {
-    Malformed(&'static str),
-    UnknownMetricType(String),
-    InvalidInteger(ParseIntError),
-    InvalidFloat(ParseFloatError),
-}
-
-impl fmt::Display for ParserError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            anything => write!(f, "Prometheus parse error: {:?}", anything),
-        }
-    }
-}
-
-impl error::Error for ParserError {}
-
-impl From<ParseIntError> for ParserError {
-    fn from(e: ParseIntError) -> ParserError {
-        ParserError::InvalidInteger(e)
-    }
-}
-
-impl From<ParseFloatError> for ParserError {
-    fn from(e: ParseFloatError) -> ParserError {
-        ParserError::InvalidFloat(e)
-    }
+    Malformed {
+        s: &'static str,
+    },
+    UnknownMetricType {
+        s: String,
+    },
+    #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
+    InvalidFloat {
+        s: String,
+        source: ParseFloatError,
+    },
 }
 
 #[cfg(test)]

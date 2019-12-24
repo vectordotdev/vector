@@ -4,6 +4,7 @@ use http::Uri;
 use hyper;
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
 
@@ -28,7 +29,10 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        Ok(prometheus(self.clone(), out))
+        let base_uri = self.host.parse::<Uri>().context(super::UriParseError)?;
+        let uri = format!("{}metrics", base_uri);
+        let interval = self.scrape_interval_secs;
+        Ok(prometheus(uri, interval, out))
     }
 
     fn output_type(&self) -> crate::topology::config::DataType {
@@ -40,39 +44,37 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
     }
 }
 
-fn prometheus(config: PrometheusConfig, out: mpsc::Sender<Event>) -> super::Source {
+fn prometheus(uri: String, interval: u64, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
-    let task = Interval::new(
-        Instant::now(),
-        Duration::from_secs(config.scrape_interval_secs),
-    )
-    .map_err(|e| error!("timer error: {:?}", e))
-    .map(move |_| {
-        let uri = format!("{}/metrics", config.host).parse::<Uri>().unwrap();
-        let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let task = Interval::new(Instant::now(), Duration::from_secs(interval))
+        .map_err(|e| error!("timer error: {:?}", e))
+        .map(move |_| {
+            let request = hyper::Request::get(&uri)
+                .body(hyper::Body::empty())
+                .unwrap();
 
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client = hyper::Client::builder().build(https);
+            let https = HttpsConnector::new(4).expect("TLS initialization failed");
+            let client = hyper::Client::builder().build(https);
 
-        client
-            .request(request)
-            .and_then(|response| response.into_body().concat2())
-            .map(|body| {
-                let packet = String::from_utf8_lossy(&body);
-                let metrics = parser::parse(&packet)
-                    .map_err(|e| error!("parsing error: {:?}", e))
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(Event::Metric);
-                futures::stream::iter_ok(metrics)
-            })
-            .flatten_stream()
-            .map_err(|e| error!("http request processing error: {:?}", e))
-    })
-    .flatten()
-    .forward(out)
-    .map(|_| info!("finished sending"));
+            client
+                .request(request)
+                .and_then(|response| response.into_body().concat2())
+                .map(|body| {
+                    let packet = String::from_utf8_lossy(&body);
+                    let metrics = parser::parse(&packet)
+                        .map_err(|e| error!("parsing error: {:?}", e))
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(Event::Metric);
+                    futures::stream::iter_ok(metrics)
+                })
+                .flatten_stream()
+                .map_err(|e| error!("http request processing error: {:?}", e))
+        })
+        .flatten()
+        .forward(out)
+        .map(|_| info!("finished sending"));
 
     Box::new(task)
 }
