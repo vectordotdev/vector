@@ -49,7 +49,7 @@ impl Transform for Coercer {
         for (field, conv) in &self.types {
             if let Some(value) = log.remove(field) {
                 match conv.convert(value) {
-                    Ok(converted) => log.insert_explicit(field.into(), converted),
+                    Ok(converted) => log.insert_explicit(field, converted),
                     Err(error) => {
                         warn!(
                             message = "Could not convert types.",
@@ -81,7 +81,7 @@ mod tests {
             ("other", "no"),
             ("float", "broken"),
         ] {
-            event.as_mut_log().insert_explicit(key.into(), value.into());
+            event.as_mut_log().insert_explicit(key, value);
         }
 
         let mut coercer = toml::from_str::<CoercerConfig>(

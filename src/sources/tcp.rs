@@ -89,9 +89,7 @@ impl TcpSource for RawTcpSource {
         };
 
         if let Some(host) = host {
-            event
-                .as_mut_log()
-                .insert_implicit(host_key.clone(), host.into());
+            event.as_mut_log().insert_implicit(host_key.clone(), host);
         }
 
         trace!(
