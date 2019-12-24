@@ -3674,7 +3674,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Streams `log` events to a socket, such as a TCP or Unix socket.
+# Streams `log` events to a socket, such as a TCP, UDP, or Unix socket.
 [sinks.socket]
   #
   # General
@@ -3694,16 +3694,17 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The TCP address.
+  # The address to bind to.
   # 
   # * required
   # * type: string
   address = "92.12.333.224:5000"
 
-  # What type of socket to use.  Currently only "tcp" is valid.
+  # The type of socket to use. Currently only `tcp` is valid.
   # 
   # * required
   # * type: string
+  # * must be: "tcp"
   mode = "tcp"
 
   # Enables/disables the sink healthcheck upon start.
