@@ -46,7 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   type = "socket" # example, must be: "socket"
   address = "0.0.0.0:9000" # example
-  mode = "tcp" # example
+  mode = "tcp" # example, enum
 ```
 
 </TabItem>
@@ -59,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "socket" # example, must be: "socket"
   address = "0.0.0.0:9000" # example
-  mode = "tcp" # example
+  mode = "tcp" # example, enum
   
   # OPTIONAL - General
   max_length = 102400 # default, bytes
@@ -154,7 +154,7 @@ The maximum bytes size of incoming messages before they are discarded. Valid for
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
+  enumValues={{"tcp":"The TCP protocol.","udp":"The UDP protocol."}}
   examples={["tcp","udp"]}
   name={"mode"}
   nullable={false}
@@ -168,7 +168,7 @@ The maximum bytes size of incoming messages before they are discarded. Valid for
 
 ### mode
 
-Specifies what type of socket to use. Valid options are "tcp" and "udp".
+The type of socket to use.
 
 
 </Field>

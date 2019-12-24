@@ -11,11 +11,12 @@ through_description = "a socket, such as a TCP, UDP, or Unix socket"
 [sources.socket.options.mode]
 type = "string"
 common = true
-examples = ["tcp", "udp"]
 null = false
-description = """Specifies what type of socket to use. \
-Valid options are "tcp" and "udp".\
-"""
+description = "The type of socket to use."
+
+[sources.socket.options.mode.enum]
+tcp = "The TCP protocol."
+udp = "The UDP protocol."
 
 [sources.socket.options.address]
 type = "string"
