@@ -9,12 +9,12 @@ output_types = ["metric"]
 resources = []
 through_description = "the Prometheus text exposition format"
 
-[sources.prometheus.options.host]
-type = "string"
+[sources.prometheus.options.hosts]
+type = "[string]"
 common = true
 null = false
-examples = ["http://localhost:9090"]
-description = "Host address to scrape metrics from."
+examples = [["http://localhost:9090"]]
+description = "Host addresses to scrape metrics from."
 
 [sources.prometheus.options.scrape_interval_secs]
 type = "int"

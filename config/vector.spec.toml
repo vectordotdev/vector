@@ -433,11 +433,11 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "prometheus"
   type = "prometheus"
 
-  # Host address to scrape metrics from.
+  # Host addresses to scrape metrics from.
   # 
   # * required
-  # * type: string
-  host = "http://localhost:9090"
+  # * type: [string]
+  hosts = ["http://localhost:9090"]
 
   # The interval between scrapes in seconds.
   # 

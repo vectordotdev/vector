@@ -12,7 +12,7 @@ pub mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusConfig {
-    host: String,
+    hosts: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -29,10 +29,12 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let base_uri = self.host.parse::<Uri>().context(super::UriParseError)?;
-        let uri = format!("{}metrics", base_uri);
-        let interval = self.scrape_interval_secs;
-        Ok(prometheus(uri, interval, out))
+        let mut urls = Vec::new();
+        for host in self.hosts.iter() {
+            let base_uri = host.parse::<Uri>().context(super::UriParseError)?;
+            urls.push(format!("{}metrics", base_uri));
+        }
+        Ok(prometheus(urls, self.scrape_interval_secs, out))
     }
 
     fn output_type(&self) -> crate::topology::config::DataType {
@@ -44,18 +46,20 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
     }
 }
 
-fn prometheus(uri: String, interval: u64, out: mpsc::Sender<Event>) -> super::Source {
+fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
     let task = Interval::new(Instant::now(), Duration::from_secs(interval))
         .map_err(|e| error!("timer error: {:?}", e))
-        .map(move |_| {
-            let request = hyper::Request::get(&uri)
-                .body(hyper::Body::empty())
-                .unwrap();
-
+        .map(move |_| futures::stream::iter_ok(urls.clone()))
+        .flatten()
+        .map(move |url| {
             let https = HttpsConnector::new(4).expect("TLS initialization failed");
             let client = hyper::Client::builder().build(https);
+
+            let request = hyper::Request::get(&url)
+                .body(hyper::Body::empty())
+                .unwrap();
 
             client
                 .request(request)
@@ -142,7 +146,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusConfig {
-                host: format!("http://{}", in_addr),
+                hosts: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
             },
         );

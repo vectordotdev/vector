@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   type = "prometheus" # example, must be: "prometheus"
-  host = "http://localhost:9090" # example
+  hosts = ["http://localhost:9090"] # example
   scrape_interval_secs = 1 # example
 ```
 
@@ -47,20 +47,20 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["http://localhost:9090"]}
-  name={"host"}
+  examples={[["http://localhost:9090"]]}
+  name={"hosts"}
   nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"string"}
+  type={"[string]"}
   unit={null}
   >
 
-### host
+### hosts
 
-Host address to scrape metrics from.
+Host addresses to scrape metrics from.
 
 
 </Field>
