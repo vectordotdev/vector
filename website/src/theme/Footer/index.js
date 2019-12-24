@@ -75,6 +75,8 @@ function Footer() {
                 <a href="https://chat.vector.dev" target="_blank"><i className="feather icon-message-circle" alt="Vector's Chat"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
                 <a href="https://github.com/timberio/vector" target="_blank"><i className="feather icon-github" alt="Vector's Github Repo"></i></a>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="https://vector.dev/blog/atom.xml" target="_blank"><i className="feather icon-rss" alt="Vector's RSS feed"></i></a>
               </div>
             </div>
             {links.map((linkItem, i) => (
