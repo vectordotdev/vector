@@ -571,7 +571,7 @@ jobs:
       - run:
           name: Test on NixOS
           command: |
-            ./scripts/docker-run.sh verifier-nixos ./scripts/verify-nixos.sh
+            ./scripts/docker-run.sh verifier-nixos ./scripts/verify-nix.sh
 
   test-install-script-on-amazon-linux-1:
     docker:
