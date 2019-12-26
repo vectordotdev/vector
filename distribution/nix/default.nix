@@ -12,7 +12,10 @@
 
 rustPlatform.buildRustPackage rec {
   pname = "vector";
-  version = "0.6.0"; # TODO: use a template
+  version = "<%=
+    require 'toml-rb'
+    TomlRB.load_file('Cargo.toml')['package']['version']
+  %>";
 
   src = <%= Dir.getwd %>; # TODO: allow using GitHub as well
   # src = fetchFromGitHub {
