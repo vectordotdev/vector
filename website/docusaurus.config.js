@@ -11,6 +11,7 @@ module.exports = {
   },
   themeConfig: {
     navbar: {
+      hideOnScroll: true,
       logo: {
         alt: 'Vector',
         src: 'img/logo-light.svg',
