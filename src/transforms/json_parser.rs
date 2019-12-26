@@ -196,10 +196,9 @@ mod test {
         // Field present
 
         let mut event = Event::from("message");
-        event.as_mut_log().insert_explicit(
-            "data".into(),
-            r#"{"greeting": "hello", "name": "bob"}"#.into(),
-        );
+        event
+            .as_mut_log()
+            .insert_explicit("data", r#"{"greeting": "hello", "name": "bob"}"#);
 
         let event = parser.transform(event).unwrap();
 
@@ -272,9 +271,7 @@ mod test {
         });
 
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("data".into(), invalid.into());
+        event.as_mut_log().insert_explicit("data", invalid);
 
         let event = parser.transform(event).unwrap();
 
@@ -311,21 +308,15 @@ mod test {
         });
 
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("data".into(), valid.into());
+        event.as_mut_log().insert_explicit("data", valid);
         assert!(parser.transform(event).is_some());
 
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("data".into(), invalid.into());
+        event.as_mut_log().insert_explicit("data", invalid);
         assert!(parser.transform(event).is_none());
 
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("data".into(), not_object.into());
+        event.as_mut_log().insert_explicit("data", not_object);
         assert!(parser.transform(event).is_none());
 
         // Missing field

@@ -358,7 +358,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert_explicit(event::MESSAGE.clone(), string.into())
+                    log.insert_explicit(event::MESSAGE.clone(), string)
                 }
                 Value::Object(object) => {
                     if object.is_empty() {
@@ -373,7 +373,7 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process channel field
         if let Some(Value::String(guid)) = json.get_mut("channel").map(Value::take) {
-            log.insert_explicit(CHANNEL.clone(), guid.into());
+            log.insert_explicit(CHANNEL.clone(), guid);
         } else if let Some(guid) = self.channel.as_ref() {
             log.insert_explicit(CHANNEL.clone(), guid.clone());
         }
@@ -496,11 +496,11 @@ fn raw_event(
     log.insert_explicit(event::MESSAGE.clone(), message);
 
     // Add channel
-    log.insert_explicit(CHANNEL.clone(), channel.as_bytes().into());
+    log.insert_explicit(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert_explicit(event::HOST.clone(), host.as_bytes().into());
+        log.insert_explicit(event::HOST.clone(), host.as_bytes());
     }
 
     Ok(event)
@@ -801,12 +801,8 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("greeting".into(), "hello".into());
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "bob".into());
+        event.as_mut_log().insert_explicit("greeting", "hello");
+        event.as_mut_log().insert_explicit("name", "bob");
 
         let pump = sink.send(event);
         let _ = rt.block_on(pump).unwrap();

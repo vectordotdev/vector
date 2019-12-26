@@ -14,6 +14,10 @@
  * block
  */
 
+.mailing-list.mailing-list--block .mailing-list--form {
+  display: block;
+}
+
 .mailing-list.mailing-list--block input[type="email"] {
   display: block;
   max-width: none;

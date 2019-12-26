@@ -68,7 +68,7 @@ impl Transform for Sampler {
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
             event
                 .as_mut_log()
-                .insert_implicit(Atom::from("sample_rate"), self.rate.to_string().into());
+                .insert_implicit(Atom::from("sample_rate"), self.rate.to_string());
 
             Some(event)
         } else {

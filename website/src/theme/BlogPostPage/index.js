@@ -54,7 +54,7 @@ function BlogPostPage(props) {
             <p>
               One email on the 1st of the month. No spam, ever.
             </p>
-            <MailingListForm description={false} size="lg" />
+            <MailingListForm center={true} description={false} size="lg" />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
             <div className="bleed margin-vert--xl">
