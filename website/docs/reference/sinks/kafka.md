@@ -50,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
 ```
@@ -68,20 +68,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
-  
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default

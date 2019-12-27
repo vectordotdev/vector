@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "syslog" # example, must be: "syslog"
   mode = "tcp" # example, enum
-  
+
   # OPTIONAL
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
@@ -63,12 +63,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "syslog" # example, must be: "syslog"
   mode = "tcp" # example, enum
-  
+
   # OPTIONAL - General
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
   max_length = 102400 # default, bytes
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
-  
+
   # OPTIONAL - Context
   host_key = "host" # default
 ```
@@ -103,7 +103,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. 
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 
 </Field>

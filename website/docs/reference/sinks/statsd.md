@@ -48,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "statsd" # example, must be: "statsd"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
-  
+
   # OPTIONAL
   address = "127.0.0.1:8125" # default
 ```
@@ -64,7 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "statsd" # example, must be: "statsd"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
-  
+
   # OPTIONAL
   address = "127.0.0.1:8125" # default
   healthcheck = true # default

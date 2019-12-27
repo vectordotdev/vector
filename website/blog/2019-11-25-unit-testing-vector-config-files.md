@@ -17,7 +17,7 @@ mission-critical production pipelines that are collaborated on.
 
 ## Example
 
-Let's look at a basic example that uses the [`regex_parser` 
+Let's look at a basic example that uses the [`regex_parser`
 transform][docs.transforms.regex_parser] to parse log lines:
 
 import CodeHeader from '@site/src/components/CodeHeader';
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 And you can run the tests via the new `test` subcommand:
 
 ```sh
-$ vector test ./vector.toml 
+$ vector test ./vector.toml
 Running ./vector.toml tests
 Test ./vector.toml: verify_regex ... passed
 ```

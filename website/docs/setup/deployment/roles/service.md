@@ -53,7 +53,7 @@ data_dir = "/var/lib/vector"
 [sinks.backups]
     type = "s3"
     # ...
-    
+
     [sinks.backups.buffer]
         type = "disk"
         max_size = 5000000000 # 5gb

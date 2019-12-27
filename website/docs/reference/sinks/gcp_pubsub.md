@@ -62,16 +62,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
-  
+
   # OPTIONAL - General
   api_key = nil # example, no default
   credentials_path = nil # example, no default
   healthcheck = true # default
-  
+
   # OPTIONAL - Batching
   batch_size = 10485760 # default, bytes
   batch_timeout = 1 # default, seconds
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -79,14 +79,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 9223372036854775807 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 60 # default, seconds
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
-  
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default

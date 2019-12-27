@@ -320,7 +320,7 @@ table.comparison tr td.result.failed {
 }
 table.comparison tr td.result.lost {
   background: var(--ifm-color-emphasis-1000);
-  color: var(--ifm-background-color);  
+  color: var(--ifm-background-color);
 }
 table.comparison tr td.result.not-applicable {
   background: var(--ifm-color-emphasis-1000);
@@ -334,7 +334,7 @@ table.comparison tr td.result.warning {
 }
 table.comparison tr td.result.passed.vector {
   background: var(--ifm-color-primary);
-  color: var(--ifm-background-color);  
+  color: var(--ifm-background-color);
 }
 table.comparison tr:hover td.result.passed.vector {
   background: rgba( var(--ifm-color-primary-rgb), 0.8 );
@@ -605,7 +605,7 @@ header.hero h1 {
   flex-direction: column;
   justify-content: center;
   min-height: calc( 100vh - var(--ifm-navbar-height) );
-}   
+}
 @media (max-width: 996px) {
   .hero {
     min-height: 100px;
@@ -1064,7 +1064,7 @@ header + section.shade {
 .section-list > .section > .badges .badge:first-child {
   margin-left: 0;
 }
-.section-list > .section > h3, 
+.section-list > .section > h3,
 .section-list > .section > h4,
 .section-list > .section > h5,
 .section-list > .section > h6 {

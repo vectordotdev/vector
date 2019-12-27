@@ -61,7 +61,7 @@ default = true
 null = true
 description = """\
 Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not already exist. This will ignore \
-`create_missing_stream` directly after creating the group and will create the first stream. \
+`create_missing_stream` directly after creating the group and will create the first stream.\
 """
 
 [sinks.aws_cloudwatch_logs.options.create_missing_stream]

@@ -29,7 +29,7 @@ function Contact() {
         <section>
           <div className="container container--narrow">
             <AnchoredH2 id="connect">Logo</AnchoredH2>
-            
+
             <AnchoredH3 id="connect">Vertical</AnchoredH3>
 
             <div className="row margin-bottom--lg">
@@ -122,7 +122,7 @@ function Contact() {
         <section>
           <div className="container container--narrow">
             <AnchoredH2 id="connect">Diagrams</AnchoredH2>
-            
+
             <AnchoredH3 id="connect">Components</AnchoredH3>
 
             <div className="text--center margin-bottom--sm">
@@ -143,7 +143,7 @@ function Contact() {
         <section>
           <div className="container container--narrow">
             <AnchoredH2 id="connect">Vector Blue</AnchoredH2>
-            
+
             <div className="press--color">
               <div>Hex: #10E7FF</div>
               <div>RGB: 16, 231, 255</div>

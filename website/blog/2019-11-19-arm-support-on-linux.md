@@ -40,7 +40,7 @@ cases:
 
 ### AWS performance improvements and cost savings
 
-An interesting usecase for ARM support are the [new AWS `M6g`, `C6g`, and `R6g` 
+An interesting usecase for ARM support are the [new AWS `M6g`, `C6g`, and `R6g`
 instances][urls.aws_arm_g2_announcement]. These instances are based on Amazon's
 ARM-based Graviton2 processors. Amazon claims they "deliver up to 40% improved
 price/performance over current generation `M5`, `C5`, and `R5` instances".

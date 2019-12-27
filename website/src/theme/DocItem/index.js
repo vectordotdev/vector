@@ -87,7 +87,7 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
             <i className="feather icon-shield"></i> at-least-once
           </Link>
         </div>}
-      {operatingSystemsEls.length > 0 && 
+      {operatingSystemsEls.length > 0 &&
         <div>
           <Link to="/docs/setup/installation/operating-systems/" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
             <i className="feather icon-cpu"></i> {operatingSystemsEls}
@@ -172,7 +172,7 @@ function DocItem(props) {
                       <h1 className={styles.docTitle}>{metadata.title}</h1>
                     </header>
                   )}
-                  
+
                   <div className="markdown">
                     <DocContent />
                   </div>

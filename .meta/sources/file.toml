@@ -33,7 +33,7 @@ type = "[string]"
 examples = [["/var/log/nginx/*.[0-9]*.log"]]
 null = true
 description = """\
-Array of file patterns to exclude. [Globbing](#globbing) is supported. \
+Array of file patterns to exclude. [Globbing](#globbing) is supported.\
 *Takes precedence over the [`include` option](#include).*\
 """
 

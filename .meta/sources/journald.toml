@@ -33,7 +33,7 @@ null = true
 description = """\
 The directory used to persist the journal checkpoint position. By \
 default, the global `data_dir` is used. Please make sure the Vector \
-project has write permissions to this dir. \
+project has write permissions to this dir.\
 """
 
 [sources.journald.options.local_only]

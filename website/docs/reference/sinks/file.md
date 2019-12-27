@@ -48,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "file" # example, must be: "file"
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
-  
+
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
 ```
@@ -64,10 +64,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "file" # example, must be: "file"
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
-  
+
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
   idle_timeout_secs = "30" # default
