@@ -5,7 +5,7 @@ echo "Copying ZIP archive..."
 echo "Preparing LICENSE.rtf.."
 cat <<EOF > LICENSE.rtf
 {\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Lucida Console;}}
-\viewkind4\uc1 
+\viewkind4\uc1
 \pard\f0\fs14\lang1033\par
 EOF
 cat vector-x86_64-pc-windows-msvc/LICENSE.txt | sed 's/$/\\/' >> LICENSE.rtf

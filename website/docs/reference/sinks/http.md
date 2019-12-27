@@ -48,10 +48,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "http" # example, must be: "http"
   inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
-  
+
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
-  
+
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
     password = "${PASSWORD_ENV_VAR}" # example
@@ -69,18 +69,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "http" # example, must be: "http"
   inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
-  
+
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
-  
+
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 10 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -88,23 +88,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 10 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-  
+
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
     password = "${PASSWORD_ENV_VAR}" # example
     user = "${USERNAME_ENV_VAR}" # example
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
-  
+
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
     Authorization = "${TOKEN_ENV_VAR}"
-  
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default

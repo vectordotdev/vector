@@ -60,7 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "blackhole" # example, must be: "blackhole"
   inputs = ["my-source-id"] # example
   print_amount = 1000 # example
-  
+
   # OPTIONAL
   healthcheck = true # default
 ```

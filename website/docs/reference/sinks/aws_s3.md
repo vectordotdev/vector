@@ -50,10 +50,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
   region = "us-east-1" # example
-  
+
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
-  
+
   # OPTIONAL - Object Names
   key_prefix = "date=%F/" # default
 ```
@@ -71,23 +71,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
   region = "us-east-1" # example
-  
+
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
-  
+
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, seconds
-  
+
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -95,7 +95,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 5 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum

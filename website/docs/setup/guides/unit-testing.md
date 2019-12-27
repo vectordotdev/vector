@@ -141,7 +141,7 @@ vector test ./example.toml
 Doing this results in the following output:
 
 ```sh
-$ vector test ./example.toml 
+$ vector test ./example.toml
 Running ./example.toml tests
 Test ./example.toml: check_simple_log ... failed
 
@@ -192,7 +192,7 @@ clearer by breaking our condition down to one per predicate:
 Running the test again gives us this:
 
 ```sh
-$ vector test ./example.toml 
+$ vector test ./example.toml
 Running ./example.toml tests
 Test ./example.toml: check_simple_log ... failed
 
@@ -221,7 +221,7 @@ The fix is easy, we simply change the input of `baz` from `foo` to `bar`:
 --- a/example.toml
 +++ b/example.toml
 @@ -15,7 +15,7 @@
- 
+
  [transforms.baz]
    type = "remove_fields"
 -  inputs = ["foo"]
@@ -232,7 +232,7 @@ The fix is easy, we simply change the input of `baz` from `foo` to `bar`:
 And running our test again gives us an exit status 0:
 
 ```sh
-$ vector test ./example.toml 
+$ vector test ./example.toml
 Running ./example.toml tests
 Test ./example.toml: check_simple_log ... passed
 ```

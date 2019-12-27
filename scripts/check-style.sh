@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # check-style.sh
 #
@@ -23,14 +24,18 @@ function ised() {
 for i in $(git ls-files); do
   # ignore binary files
   case $i in
-    *png) break;;
-    *svg) break;;
+    *png) continue;;
+    *svg) continue;;
+    *ico) continue;;
+    test-data*) continue;;
+    tests/data*) continue;;
+    website/sidebars.js) continue;;
   esac
 
   # check that the file contains trailing newline
   if [ -n "$(tail -c1 $i | tr -d $'\n')" ]; then
     case $mode in
-      check) 
+      check)
         echo "File \"$i\" doesn't end with a newline"
         exit_code=1
         ;;

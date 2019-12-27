@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "grok_parser" # example, must be: "grok_parser"
   inputs = ["my-source-id"] # example
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # example
-  
+
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  
+
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
     status = "int"

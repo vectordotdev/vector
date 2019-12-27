@@ -16,7 +16,7 @@ null = true
 relevant_when = {mode = ["tcp", "udp"]}
 description = """\
 The TCP or UDP address to listen for connections on, or "systemd#N" to use \
-the Nth socket passed by systemd socket activation. \
+the Nth socket passed by systemd socket activation.\
 """
 
 [sources.syslog.options.host_key]

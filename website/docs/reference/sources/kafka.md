@@ -49,7 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
-  
+
   # OPTIONAL
   key_field = "user_id" # example, no default
 ```
@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
-  
+
   # OPTIONAL
   auto_offset_reset = "smallest" # default
   key_field = "user_id" # example, no default
