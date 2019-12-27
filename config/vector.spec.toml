@@ -105,7 +105,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   data_dir = "/var/lib/vector"
 
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # Array of file patterns to exclude. Globbing is supported.*Takes precedence
   # over the `include` option.*
   #
   # * optional

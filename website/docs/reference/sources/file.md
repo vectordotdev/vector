@@ -147,7 +147,7 @@ The directory used to persist file checkpoint positions. By default, the [global
 
 ### exclude
 
-Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the [`include` option](#include).*
+Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*
 
 
 </Field>

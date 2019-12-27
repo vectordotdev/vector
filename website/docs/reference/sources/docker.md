@@ -324,6 +324,7 @@ Vector will automatically attempt to connect to the docker daemon for you. In mo
 situations if your current user is able to run `docker ps` then Vector will be able to
 connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
 use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.

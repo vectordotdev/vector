@@ -36,7 +36,7 @@ null = true
 description = """\
 A list of container IDs _or_ names to match against. Prefix matches are \
 supported, meaning you can supply just the first few characters of the
-container ID or name. If not provided, all containers will be included. \
+container ID or name. If not provided, all containers will be included.\
 """
 
 [sources.docker.options.include_labels]

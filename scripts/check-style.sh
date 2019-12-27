@@ -29,6 +29,7 @@ for i in $(git ls-files); do
     *ico) continue;;
     test-data*) continue;;
     tests/data*) continue;;
+    website/sidebars.js) continue;;
   esac
 
   # check that the file contains trailing newline
