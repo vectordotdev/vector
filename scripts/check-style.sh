@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # check-style.sh
 #
@@ -23,8 +24,8 @@ function ised() {
 for i in $(git ls-files); do
   # ignore binary files
   case $i in
-    *png) break;;
-    *svg) break;;
+    *png) continue;;
+    *svg) continue;;
   esac
 
   # check that the file contains trailing newline
