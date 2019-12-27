@@ -12,7 +12,7 @@ function BlogPostTags({tags, valuesOnly}) {
   return (
     <div className={styles.tags}>
       {enrichedTags.map((tag, idx) => (
-        <Link to={tag.permalink + '/'} className={classnames('badge', 'badge--rounded', `badge--${tag.style}`)}>{valuesOnly ? tag.value : tag.label}</Link>
+        <Link key={idx} to={tag.permalink + '/'} className={classnames('badge', 'badge--rounded', `badge--${tag.style}`)}>{valuesOnly ? tag.value : tag.label}</Link>
       ))}
     </div>
   );

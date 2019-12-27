@@ -40,9 +40,7 @@ import Tabs from '@theme/Tabs';
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     ```
 
-2. Install C++ toolchain
-
-    Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
+2.  Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
     on your system.
 
 3.  Create the `vector` directory

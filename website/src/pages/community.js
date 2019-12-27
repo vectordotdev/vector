@@ -40,11 +40,10 @@ function Community() {
               <div className="col">
                 <a href="https://twitter.com/timberdotio" target="_blank" className="panel panel--link text--center">
                   <div className="panel--icon">
-                    <i className="feather icon-twitter"></i>
+                    <i className="feather icon-twitter" title="Twitter"></i>
                   </div>
-                  <div className="panel--title">Twitter @timberdotio</div>
-                  <div className="panel--description">
-                    Stay up-to-date with <code>#vector</code></div>
+                  <div className="panel--title">@timberdotio via <code>#vectordev</code></div>
+                  <div className="panel--description">Follow us in real-time</div>
                 </a>
               </div>
               <div className="col">
