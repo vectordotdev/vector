@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "ansi_stripper" # example, must be: "ansi_stripper"
   inputs = ["my-source-id"] # example
-  
+
   # OPTIONAL
   field = "message" # default
 ```

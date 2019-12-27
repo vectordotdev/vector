@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "add_fields" # example, must be: "add_fields"
   inputs = ["my-source-id"] # example
-  
+
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
     my_string_field = "string value"
@@ -154,7 +154,7 @@ same type. You cannot mix types:
 ```toml
 [transforms.<transform-id>]
   # ...
-  
+
   [transforms.<transform-id>.fields]
     my_array = ["first", "second", "third"]
 ```
@@ -199,7 +199,7 @@ verbose for this usecase:
 ```
 [transforms.<transform-id>]
   # ...
-  
+
   [transforms.<transform-id>.fields]
     parent.child.grandchild = "my_value"
 ```

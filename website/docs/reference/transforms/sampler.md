@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "sampler" # example, must be: "sampler"
   inputs = ["my-source-id"] # example
   rate = 10 # example
-  
+
   # OPTIONAL
   pass_list = ["[error]", "field2"] # example, no default
 ```

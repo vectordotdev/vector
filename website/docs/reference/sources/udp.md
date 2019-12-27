@@ -58,10 +58,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "udp" # example, must be: "udp"
   address = "0.0.0.0:9000" # example
-  
+
   # OPTIONAL - General
   max_length = 102400 # default, bytes
-  
+
   # OPTIONAL - Context
   host_key = "host" # default
 ```

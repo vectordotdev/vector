@@ -205,7 +205,7 @@ class Metadata
     @new_post ||=
       begin
         last_post = posts.last
-        
+
         if (Date.today - last_post.date) <= 30
           last_post
         else
@@ -220,7 +220,7 @@ class Metadata
     @new_post ||=
       begin
         last_release = releases.releases_list.last
-        
+
         if (Date.today - last_release.date) <= 30
           last_release
         else

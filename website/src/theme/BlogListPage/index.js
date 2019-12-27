@@ -47,7 +47,7 @@ function BlogListPage(props) {
           </ul>
 
           <h3>Domains</h3>
-          
+
           <ul className="filters unstyled">
             {domainTags.map((tag, idx) => (
               <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--blue">{tag.value}</Link></li>

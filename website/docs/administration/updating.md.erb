@@ -3,7 +3,7 @@ title: Updating
 description: How to update Vector to a newer version.
 ---
 
-Updating Vector depends largely on your [installation][docs.installation] 
+Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides it's own "Updating" section:
 
 ---

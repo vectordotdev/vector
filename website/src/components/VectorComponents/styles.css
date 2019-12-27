@@ -14,7 +14,7 @@
 }
 
 .vector-components--results {
-  padding-top: calc( var(--ifm-spacing-vertical) * 1 );  
+  padding-top: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
 .vector-components--grid {
@@ -98,7 +98,7 @@
     margin-bottom: var(--ifm-spacing-vertical);
     text-align: left;
     text-transform: uppercase;
-  } 
+  }
 
   .vector-components--cols .filter--choices label {
     display: block;

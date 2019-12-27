@@ -34,7 +34,7 @@ class Links
 
   attr_reader :values
 
-  def initialize(links, docs_root, pages_root)    
+  def initialize(links, docs_root, pages_root)
     @links = links
     @values = {}
 
@@ -44,7 +44,7 @@ class Links
       reject { |p| File.directory?(p) }.
       collect { |f| f.gsub(docs_root, "").split(".").first }
 
-    @pages = 
+    @pages =
       Dir.glob("#{pages_root}/**/*.js").
       to_a.
       reject { |p| File.directory?(p) }.
@@ -113,7 +113,7 @@ class Links
       if @links[namespace] && @links[namespace][name]
         return @links[namespace][name]
       end
-      
+
       normalized_name = name.downcase.gsub(".", "/").gsub("-", "_").split("#", 2).first
 
       found_items =

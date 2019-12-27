@@ -46,7 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED
   type = "journald" # example, must be: "journald"
-  
+
   # OPTIONAL
   current_boot_only = true # default
   units = ["ntpd", "sysinit.target"] # default
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED
   type = "journald" # example, must be: "journald"
-  
+
   # OPTIONAL
   batch_size = 16 # default
   current_boot_only = true # default

@@ -50,7 +50,7 @@ module PostProcessors
       <<~EOF
       #{content}
 
-      
+
       #{footer_links.sort.join("\n")}
       EOF
     end

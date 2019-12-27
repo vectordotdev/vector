@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "elasticsearch" # example, must be: "elasticsearch"
   inputs = ["my-source-id"] # example
-  
+
   # OPTIONAL
   host = "http://10.24.32.122:9000" # example, no default
   index = "vector-%Y-%m-%d" # default
@@ -63,7 +63,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "elasticsearch" # example, must be: "elasticsearch"
   inputs = ["my-source-id"] # example
-  
+
   # OPTIONAL - General
   doc_type = "_doc" # default
   healthcheck = true # default
@@ -71,11 +71,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   index = "vector-%Y-%m-%d" # default
   provider = "default" # default, enum
   region = "us-east-1" # example, no default
-  
+
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -83,27 +83,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 5 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 60 # default, seconds
-  
+
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
     password = "${PASSWORD_ENV_VAR}" # example
     user = "${USERNAME_ENV_VAR}" # example
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
-  
+
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
     Authorization = "${TOKEN_ENV_VAR}"
-  
+
   # OPTIONAL - Query
   [sinks.my_sink_id.query]
     X-Powered-By = "Vector"
-  
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default

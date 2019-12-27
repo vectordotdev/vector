@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "vector" # example, must be: "vector"
   address = "0.0.0.0:9000" # example
-  
+
   # OPTIONAL
   shutdown_timeout_secs = 30 # default, seconds
 ```

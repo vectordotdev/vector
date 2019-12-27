@@ -29,14 +29,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "log_to_metric" # example, must be: "log_to_metric"
   inputs = ["my-source-id"] # example
-  
+
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
     # REQUIRED
     type = "counter" # example, enum
     field = "duration" # example
     name = "duration_total" # example
-    
+
     # OPTIONAL
     [transforms.my_transform_id.metrics.tags]
       host = "${HOSTNAME}"
@@ -258,7 +258,7 @@ You can convert the `time` field into a `distribution` metric:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "histogram"
     field = "time"
@@ -310,7 +310,7 @@ You can count the number of responses by status code:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "counter"
     field = "status"
@@ -363,7 +363,7 @@ field's value:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "counter"
     field = "total"
@@ -417,7 +417,7 @@ You can reduce this logs into multiple `gauge` metrics:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "1m_load_avg"
@@ -502,7 +502,7 @@ You can count the number of unique `remote_addr` values by using a set:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "set"
     field = "remote_addr"
