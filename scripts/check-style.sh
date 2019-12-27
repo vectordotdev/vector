@@ -27,6 +27,7 @@ for i in $(git ls-files); do
     *png) continue;;
     *svg) continue;;
     *ico) continue;;
+    test-data*) continue;;
   esac
 
   # check that the file contains trailing newline
