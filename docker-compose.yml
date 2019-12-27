@@ -76,8 +76,8 @@ services:
       ports:
         - "8123:8123"
     ec2_metadata:
-      image: timberiodev/mock-ec2-metadata:latest 
-      ports: 
+      image: timberiodev/mock-ec2-metadata:latest
+      ports:
         - "8111:8111"
     gcloud-pubsub:
       image: messagebird/gcloud-pubsub-emulator

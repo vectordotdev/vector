@@ -9,7 +9,7 @@ class String
   # Downcases the first letter, even if it has markdown syntax
   def continuize
     i = 0
-    
+
     loop do
       if i > self.length
         break

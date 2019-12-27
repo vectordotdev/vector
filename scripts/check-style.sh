@@ -34,7 +34,7 @@ for i in $(git ls-files); do
   # check that the file contains trailing newline
   if [ -n "$(tail -c1 $i | tr -d $'\n')" ]; then
     case $mode in
-      check) 
+      check)
         echo "File \"$i\" doesn't end with a newline"
         exit_code=1
         ;;

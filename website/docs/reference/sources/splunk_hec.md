@@ -31,7 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED
   type = "splunk_hec" # example, must be: "splunk_hec"
-  
+
   # OPTIONAL
   address = "0.0.0.0:8088" # default
   token = "A94A8FE5CCB19BA61C4C08" # example, no default

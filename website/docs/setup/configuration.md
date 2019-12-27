@@ -162,7 +162,7 @@ with the following syntax:
 ```toml
 [transforms.add_host]
   type = "add_fields"
-    
+
   [transforms.add_host.fields]
     host = "${HOSTNAME}"
     environment = "${ENV:-development}" # default value when not present

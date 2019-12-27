@@ -49,7 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
 ```
@@ -66,17 +66,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
-  
+
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -84,7 +84,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 5 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum

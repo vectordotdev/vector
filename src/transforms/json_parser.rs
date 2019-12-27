@@ -395,7 +395,7 @@ mod test {
         let event = Event::from(
             r#"{
                 "key": "data",
-                "message": "inner" 
+                "message": "inner"
             }"#,
         );
 

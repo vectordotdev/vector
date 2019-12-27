@@ -52,28 +52,28 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
-  
+
   # REQUIRED - Outputs
   [[tests.outputs]]
     # REQUIRED - General
     extract_from = "foo" # example
-    
+
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
       # REQUIRED
       type = "check_fields" # example
-      
+
       # OPTIONAL
       "message.eq" = "this is the content to match against" # example
       "host.exists" = true # example
       "method.neq" = "POST" # example
-  
+
   # REQUIRED - Input
   [tests.input]
     # REQUIRED
     type = "raw" # example, enum
     insert_at = "foo" # example
-    
+
     # OPTIONAL
     value = "some message contents" # example, no default, relevant when type = "raw"
 ```
@@ -91,35 +91,35 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
-  
+
   # REQUIRED - Outputs
   [[tests.outputs]]
     # REQUIRED - General
     extract_from = "foo" # example
-    
+
     # REQUIRED - Conditions
     [[tests.outputs.conditions]]
       # REQUIRED
       type = "check_fields" # example
-      
+
       # OPTIONAL
       "message.eq" = "this is the content to match against" # example
       "host.exists" = true # example
       "method.neq" = "POST" # example
-  
+
   # REQUIRED - Input
   [tests.input]
     # REQUIRED - General
     type = "raw" # example, enum
     insert_at = "foo" # example
-    
+
     # OPTIONAL - General
     value = "some message contents" # example, no default, relevant when type = "raw"
-    
+
     # OPTIONAL - Log fields
     [tests.input.log_fields]
       message = "some message contents"
-    
+
     # OPTIONAL - Metric
     [tests.input.metric]
       # REQUIRED - General
@@ -127,11 +127,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
       name = "duration_total" # example
       timestamp = "2019-11-01T21:15:47.443232Z" # example
       val = 10.2 # example
-      
+
       # OPTIONAL - General
       direction = "plus" # example, no default, enum
       sample_rate = 1 # example, no default
-      
+
       # OPTIONAL - Tags
       [tests.input.metric.tags]
         host = "foohost"

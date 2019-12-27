@@ -56,10 +56,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED - General
   type = "stdin" # example, must be: "stdin"
-  
+
   # OPTIONAL - General
   max_length = 102400 # default, bytes
-  
+
   # OPTIONAL - Context
   host_key = "host" # default
 ```
