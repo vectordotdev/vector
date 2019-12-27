@@ -604,15 +604,15 @@ X-Amz-Target: Logs_20140328.PutLogEvents
   "logStreamName": "<stream_name>",
   "logEvents": [
     {
-      "timestamp": <log_timestamp>, 
+      "timestamp": <log_timestamp>,
       "message": "<json_encoded_log>"
-    }, 
+    },
     {
-      "timestamp": <log_timestamp>, 
+      "timestamp": <log_timestamp>,
       "message": "<json_encoded_log>"
-    }, 
+    },
     {
-      "timestamp": <log_timestamp>, 
+      "timestamp": <log_timestamp>,
       "message": "<json_encoded_log>"
     }
   ]

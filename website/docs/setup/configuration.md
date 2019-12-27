@@ -66,6 +66,7 @@ data_dir = "/var/lib/vector"
   batch_size   = 10000000                      # 10mb uncompressed
   compression  = "gzip"                        # compress final objects
   encoding     = "ndjson"                      # new line delimited JSON
+
 ```
 
 ## Quick Start

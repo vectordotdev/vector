@@ -202,7 +202,7 @@ class Templates
   end
 
   def full_config_spec
-    render("#{partials_path}/_full_config_spec.toml", binding).strip
+    render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
   def manual_installation_next_steps(type)
