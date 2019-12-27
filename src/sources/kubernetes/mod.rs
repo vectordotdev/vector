@@ -93,12 +93,12 @@ impl TimeFilter {
     fn filter(&self, event: Event) -> Option<Event> {
         // Only logs created at, or after now are logged.
         if let Some(ValueKind::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
-            if ts >= &self.start {
-                return Some(event);
+            if ts < &self.start {
+                trace!(message = "Recieved older log.", from = %ts.to_rfc3339());
+                return None;
             }
-            trace!(message = "Recieved older log.", from = %ts.to_rfc3339());
         }
-        None
+        Some(event)
     }
 }
 
@@ -190,17 +190,22 @@ impl Transform for DockerMessageTransformer {
                     event::TIMESTAMP.clone(),
                     timestamp.with_timezone(&Utc).into(),
                 ),
-                Err(error) => warn!(message = "Non rfc3339 timestamp.", %error),
+                Err(error) => {
+                    debug!(message = "Non rfc3339 timestamp.", %error, rate_limit_secs = 10);
+                    return None;
+                }
             }
         } else {
-            warn!(message = "Missing field.", field = %self.atom_time);
+            debug!(message = "Missing field.", field = %self.atom_time, rate_limit_secs = 10);
+            return None;
         }
 
         // log -> message
         if let Some(message) = log.remove(&self.atom_log) {
             log.insert_explicit(event::MESSAGE.clone(), message);
         } else {
-            warn!(message = "Missing field.", field = %self.atom_log);
+            debug!(message = "Missing field.", field = %self.atom_log, rate_limit_secs = 10);
+            return None;
         }
 
         Some(event)
@@ -346,11 +351,12 @@ impl Transform for ApplicableTransform {
                     Some(event)
                 } else {
                     *self = Self::Transform(None);
+                    warn!("No applicable transform.");
                     None
                 }
             }
             Self::Transform(Some(transform)) => transform.transform(event),
-            Self::Transform(None) => None,
+            Self::Transform(None) => Some(event),
         }
     }
 }
