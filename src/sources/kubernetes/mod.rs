@@ -200,7 +200,7 @@ impl Transform for DockerMessageTransformer {
         if let Some(message) = log.remove(&self.atom_log) {
             log.insert_explicit(event::MESSAGE.clone(), message);
         } else {
-            warn!(message = "Missing field", field = %self.atom_log);
+            warn!(message = "Missing field.", field = %self.atom_log);
         }
 
         Some(event)
