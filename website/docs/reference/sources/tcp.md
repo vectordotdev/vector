@@ -58,11 +58,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "tcp" # example, must be: "tcp"
   address = "0.0.0.0:9000" # example
-
+  
   # OPTIONAL - General
   max_length = 102400 # default, bytes
   shutdown_timeout_secs = 30 # default, seconds
-
+  
   # OPTIONAL - Context
   host_key = "host" # default
 ```

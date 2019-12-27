@@ -50,10 +50,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
-
+  
   # REQUIRED - requests
   encoding = "json" # example, enum
-
+  
   # OPTIONAL - General
   create_missing_group = true # default
   create_missing_stream = true # default
@@ -72,19 +72,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
-
+  
   # REQUIRED - requests
   encoding = "json" # example, enum
-
+  
   # OPTIONAL - General
   create_missing_group = true # default
   create_missing_stream = true # default
   healthcheck = true # default
-
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
-
+  
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -92,7 +92,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 5 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-
+  
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
