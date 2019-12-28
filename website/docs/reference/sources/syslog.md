@@ -66,6 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
+  drop_invalid = true # default
   max_length = 102400 # default, bytes
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
@@ -104,6 +105,29 @@ import Field from '@site/src/components/Field';
 ### address
 
 The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  name={"drop_invalid"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### drop_invalid
+
+If true, the message is dropped if it cannot be parsed in 3164 format. See [Parsing](#parsing) for more info.
 
 
 </Field>
@@ -294,7 +318,7 @@ The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostn
 ### message
 
 The raw message, unaltered.
-
+ See [Parsing](#parsing) for more info.
 
 
 </Field>
@@ -421,9 +445,10 @@ Vector will _not_ parse the [Syslog 3164 format][urls.syslog_3164] since 3164
 is not an exact specification, but an observation of behavior.
 
 Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
-fails, the event will be dropped and `warning` log line will be emitted. If
-this is the case, we recommend using the [`tcp` source][docs.sources.tcp]
-combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
+fails, and the [`drop_invalid`](#drop_invalid) option is true the event will be dropped and `warning` log line 
+will be emitted. If [`drop_invalid`](#drop_invalid) is false the event will not be dropped but only the [`message`](#message) field
+is populated. The timestamp is taken as the current time. If this is the case, we recommend using 
+the [`tcp` source][docs.sources.tcp] combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
 implement your own ingestion and parsing scheme.
 
 

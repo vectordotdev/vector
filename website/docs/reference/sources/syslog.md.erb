@@ -37,7 +37,9 @@ Vector will _not_ parse the [Syslog 3164 format][urls.syslog_3164] since 3164
 is not an exact specification, but an observation of behavior.
 
 Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
-fails, the event will be dropped and `warning` log line will be emitted. If
-this is the case, we recommend using the [`tcp` source][docs.sources.tcp]
-combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
+fails, and the `drop_invalid` option is true the event will be dropped and `warning` log line 
+will be emitted. If `drop_invalid` is false the event will not be dropped but only the `message` field
+is populated. The timestamp is taken as the current time. If this is the case, we recommend using 
+the [`tcp` source][docs.sources.tcp] combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
 implement your own ingestion and parsing scheme.
+

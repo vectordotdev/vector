@@ -60,6 +60,14 @@ description = """\
 The unix socket path. *This should be absolute path.*
 """
 
+[sources.syslog.options.drop_invalid]
+type = "bool"
+null = true
+default = true
+description = """\
+If true, the message is dropped if it cannot be parsed in 3164 format.\
+"""
+
 [sources.syslog.output.log.fields.appname]
 type = "string"
 examples = ["app-name"]

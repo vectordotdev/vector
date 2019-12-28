@@ -473,6 +473,14 @@ dns_servers = ["0.0.0.0:53"]
   address = "systemd"
   address = "systemd#2"
 
+  # If true, the message is dropped if it cannot be parsed in 3164 format.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  drop_invalid = true
+  drop_invalid = false
+
   # The maximum bytes size of incoming messages before they are discarded.
   #
   # * optional
