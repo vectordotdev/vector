@@ -16,6 +16,7 @@
 
 .mailing-list.mailing-list--block .mailing-list--form {
   display: block;
+  max-width: none;
 }
 
 .mailing-list.mailing-list--block input[type="email"] {
@@ -52,4 +53,27 @@
 .hero .mailing-list .mailing-list--description {
   font-size: 1.1rem;
   color: var(--ifm-color-emphasis-600);
+}
+
+/*
+ * responsive
+ */
+
+@media (max-width: 480px) {
+  .mailing-list .mailing-list--form {
+    display: block;
+    max-width: none;
+  }
+
+  .mailing-list input[type="email"] {
+    display: block;
+    max-width: none;
+    width: 100%;
+  }
+  .mailing-list .button {
+    display: block;
+    margin-top: var(--ifm-spacing-vertical);
+    max-width: none;
+    width: 100%;
+  }
 }

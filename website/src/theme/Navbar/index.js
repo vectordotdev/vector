@@ -62,7 +62,7 @@ function navLinkAttributes(label) {
   };
 }
 
-function NavLink({href, hideIcon, hideText, label, to}) {
+function NavLink({href, hideIcon, hideText, label, onClick, to}) {
   let attributes = navLinkAttributes(label) || {};
   const toUrl = useBaseUrl(to);
 
@@ -70,6 +70,7 @@ function NavLink({href, hideIcon, hideText, label, to}) {
     <Link
       className="navbar__item navbar__link"
       title={hideText ? label : null}
+      onClick={onClick}
       {...(href
         ? {
             target: '_blank',
@@ -193,7 +194,7 @@ function Navbar() {
         <div className="navbar-sidebar__brand">
           <Link className="navbar__brand" onClick={hideSidebar} to={baseUrl}>
             {logo != null && (
-              <img className="navbar__logo" src={logoUrl} alt={logo.alt} />
+              <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
             )}
             {title != null && <strong>{title}</strong>}
           </Link>
