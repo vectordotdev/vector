@@ -29,6 +29,7 @@ pub struct SyslogConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
+    pub drop_invalid: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -56,6 +57,7 @@ impl SyslogConfig {
             mode,
             host_key: None,
             max_length: default_max_length(),
+            drop_invalid: true,
         }
     }
 }
@@ -79,13 +81,26 @@ impl SourceConfig for SyslogConfig {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
                     host_key,
+                    drop_invalid: self.drop_invalid,
                 };
                 let shutdown_secs = 30;
                 source.run(address, shutdown_secs, out)
             }
-            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            Mode::Udp { address } => Ok(udp(
+                address,
+                self.max_length,
+                host_key,
+                self.drop_invalid,
+                out,
+            )),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
+            Mode::Unix { path } => Ok(unix(
+                path,
+                self.max_length,
+                host_key,
+                self.drop_invalid,
+                out,
+            )),
         }
     }
 
@@ -102,6 +117,7 @@ impl SourceConfig for SyslogConfig {
 struct SyslogTcpSource {
     max_length: usize,
     host_key: String,
+    drop_invalid: bool,
 }
 
 impl TcpSource for SyslogTcpSource {
@@ -112,7 +128,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
-        event_from_str(&self.host_key, host, frame).map(|event| {
+        event_from_str(&self.host_key, host, frame, self.drop_invalid).map(|event| {
             trace!(
                 message = "Received one event.",
                 event = field::debug(&event)
@@ -127,6 +143,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
+    drop_invalid: bool,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
@@ -151,9 +168,9 @@ pub fn udp(
                     let host_key = host_key.clone();
                     let received_from = received_from.to_string().into();
 
-                    std::str::from_utf8(&bytes)
-                        .ok()
-                        .and_then(|s| event_from_str(&host_key, Some(received_from), s))
+                    std::str::from_utf8(&bytes).ok().and_then(|s| {
+                        event_from_str(&host_key, Some(received_from), s, drop_invalid)
+                    })
                 })
                 .map_err(|e| error!("error reading line: {:?}", e));
 
@@ -167,6 +184,7 @@ pub fn unix(
     path: PathBuf,
     max_length: usize,
     host_key: String,
+    drop_invalid: bool,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
@@ -200,7 +218,12 @@ pub fn unix(
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(move |event| {
-                        event_from_str(&host_key.clone(), received_from.clone(), event)
+                        event_from_str(
+                            &host_key.clone(),
+                            received_from.clone(),
+                            event,
+                            drop_invalid,
+                        )
                     })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
@@ -221,6 +244,7 @@ fn event_from_str(
     host_key: &str,
     default_host: Option<Bytes>,
     raw: impl AsRef<str>,
+    drop_invalid: bool,
 ) -> Option<Event> {
     let line = raw.as_ref();
     trace!(
@@ -230,6 +254,9 @@ fn event_from_str(
 
     let line = line.trim();
     syslog_rfc5424::parse_message(line)
+        .map_err(|error|
+            warn!(message = "Problem parsing incoming message, check syslog format", %error, rate_limit_secs = 10))
+        .ok()
         .map(|parsed| {
             let mut event = Event::from(&parsed.msg[..]);
 
@@ -237,10 +264,10 @@ fn event_from_str(
                 event
                     .as_mut_log()
                     .insert_implicit(host_key.into(), host.clone().into());
-            } else if let Some(default_host) = default_host {
+            } else if let Some(default_host) = &default_host {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.into(), default_host.into());
+                    .insert_implicit(host_key.into(), default_host.clone().into());
             }
 
             let timestamp = parsed
@@ -260,8 +287,26 @@ fn event_from_str(
 
             event
         })
-        .map_err(|error| warn!(message = "Problem parsing incoming message, check syslog format", %error, rate_limit_secs = 10))
-        .ok()
+        .or_else(|| {
+            if drop_invalid {
+                None
+            } else {
+                let mut event = Event::from(line);
+
+                if let Some(default_host) = default_host {
+                    event
+                        .as_mut_log()
+                        .insert_implicit(host_key.into(), default_host.into());
+                }
+
+                trace!(
+                    message = "processing one event.",
+                    event = &field::debug(&event)
+                );
+
+                Some(event)
+            }
+        })
 }
 
 fn insert_fields_from_rfc5424(event: &mut Event, parsed: SyslogMessage) {
@@ -372,7 +417,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
+            event_from_str(&"host".to_string(), None, raw, true).unwrap(),
             expected
         );
     }
@@ -384,7 +429,7 @@ mod test {
             r#"[incorrect x]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg);
+        let event = event_from_str(&"host".to_string(), None, msg, true);
         assert_eq!(event, None);
 
         let msg = format!(
@@ -392,8 +437,43 @@ mod test {
             r#"[incorrect x=]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg);
+        let event = event_from_str(&"host".to_string(), None, msg, true);
         assert_eq!(event, None);
+    }
+
+    #[test]
+    fn handles_incorrect_sd_element_without_dropping() {
+        let msg = format!(
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r#"[incorrect x]"#
+        );
+
+        let event = event_from_str(&"host".to_string(), None, msg.clone(), false);
+        assert_eq!(
+            event
+                .unwrap()
+                .as_log()
+                .get(&event::MESSAGE)
+                .unwrap()
+                .clone(),
+            msg.into()
+        );
+
+        let msg = format!(
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r#"[incorrect x=]"#
+        );
+
+        let event = event_from_str(&"host".to_string(), None, msg.clone(), false);
+        assert_eq!(
+            event
+                .unwrap()
+                .as_log()
+                .get(&event::MESSAGE)
+                .unwrap()
+                .clone(),
+            msg.into()
+        );
     }
 
     #[test]
@@ -411,7 +491,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, msg, true).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -419,7 +499,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, msg, true).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -427,7 +507,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, msg, true).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -435,7 +515,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, msg, true).unwrap();
         assert!(!there_is_map_called_empty(event));
     }
 
@@ -448,8 +528,8 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
-            event_from_str(&"host".to_string(), None, cleaned).unwrap()
+            event_from_str(&"host".to_string(), None, raw, true).unwrap(),
+            event_from_str(&"host".to_string(), None, cleaned, true).unwrap()
         );
     }
 
@@ -468,7 +548,7 @@ mod test {
             .insert_implicit("host".into(), "74794bfb6795".into());
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
+            event_from_str(&"host".to_string(), None, raw, true).unwrap(),
             expected
         );
     }
@@ -488,7 +568,7 @@ mod test {
             .insert_implicit("host".into(), "74794bfb6795".into());
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
+            event_from_str(&"host".to_string(), None, raw, true).unwrap(),
             expected
         );
     }
@@ -508,7 +588,7 @@ mod test {
             .insert_implicit("host".into(), "74794bfb6795".into());
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
+            event_from_str(&"host".to_string(), None, raw, true).unwrap(),
             expected
         );
     }
