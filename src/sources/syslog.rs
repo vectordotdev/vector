@@ -29,6 +29,7 @@ pub struct SyslogConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
+    #[serde(default = "default_drop_invalid")]
     pub drop_invalid: bool,
 }
 
@@ -49,6 +50,10 @@ pub enum Mode {
 
 fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
+}
+
+fn default_drop_invalid() -> bool {
+    true
 }
 
 impl SyslogConfig {

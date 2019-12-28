@@ -116,7 +116,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
   enumValues={null}
   examples={[true,false]}
   name={"drop_invalid"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
