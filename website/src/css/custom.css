@@ -1054,7 +1054,6 @@ header + section.shade {
 .section-list > .section > .badges {
   float: right;
   margin-top: -0.25em;
-  margin-bottom: 0.5em;
   text-align: right;
 }
 .section-list > .section > .badges .badge {
