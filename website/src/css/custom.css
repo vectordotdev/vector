@@ -373,6 +373,11 @@ table.comparison tr td.bar.vector .bar {
  * container
  */
 
+.container--flush {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .container--narrow {
   box-sizing: border-box;
   max-width: 760px;
