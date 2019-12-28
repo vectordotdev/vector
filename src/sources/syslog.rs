@@ -301,7 +301,7 @@ fn event_from_str(
                 if let Some(default_host) = default_host {
                     event
                         .as_mut_log()
-                        .insert_implicit(host_key.into(), default_host.into());
+                        .insert_implicit(host_key, default_host);
                 }
 
                 trace!(
