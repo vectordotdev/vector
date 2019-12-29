@@ -365,9 +365,17 @@ impl<R: Read> Stream for EventStream<R> {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
 
-                    // Add 'line' Value under 'event::MESSAGE'
+                    // Add 'line' value as 'event::MESSAGE'
                     if let Some(line) = object.remove("line") {
-                        event::flatten::insert(log, event::MESSAGE.clone(), line);
+                        match line {
+                            // This don't quite fit the meaning of a event::MESSAGE
+                            Value::Array(_) | Value::Object(_) => {
+                                event::flatten::insert(log, "line", line)
+                            }
+                            _ => {
+                                event::flatten::insert(log, event::MESSAGE.clone(), line);
+                            }
+                        }
                     }
 
                     flatten(log, object);
