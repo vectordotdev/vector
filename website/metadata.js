@@ -227,7 +227,7 @@ module.exports = {
     ]
   },
   "latest_post": {
-    "author_id": "ashley",
+    "author_github": "https://github.com/Jeffail",
     "date": "2019-11-25",
     "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
     "id": "unit-testing-vector-config-files",
@@ -5169,7 +5169,7 @@ module.exports = {
     "last_version": "0.5.0",
     "posts": [
       {
-        "author_id": "ben",
+        "author_github": "https://github.com/binarylogic",
         "date": "2019-11-19",
         "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
         "id": "arm-support-on-linux",
@@ -5183,7 +5183,7 @@ module.exports = {
         "title": "ARMv7 & ARM64 Support on Linux"
       },
       {
-        "author_id": "ben",
+        "author_github": "https://github.com/binarylogic",
         "date": "2019-11-21",
         "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
         "id": "windows-support",
@@ -5197,7 +5197,7 @@ module.exports = {
         "title": "Windows Support Is Here!"
       },
       {
-        "author_id": "ashley",
+        "author_github": "https://github.com/Jeffail",
         "date": "2019-11-25",
         "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
         "id": "unit-testing-vector-config-files",
@@ -5241,7 +5241,7 @@ module.exports = {
   ],
   "posts": [
     {
-      "author_id": "luke",
+      "author_github": "https://github.com/lukesteensen",
       "date": "2019-06-28",
       "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
       "id": "introducing-vector",
@@ -5253,7 +5253,7 @@ module.exports = {
       "title": "Introducing Vector"
     },
     {
-      "author_id": "ben",
+      "author_github": "https://github.com/binarylogic",
       "date": "2019-11-19",
       "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
       "id": "arm-support-on-linux",
@@ -5267,7 +5267,7 @@ module.exports = {
       "title": "ARMv7 & ARM64 Support on Linux"
     },
     {
-      "author_id": "ben",
+      "author_github": "https://github.com/binarylogic",
       "date": "2019-11-21",
       "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
       "id": "windows-support",
@@ -5281,7 +5281,7 @@ module.exports = {
       "title": "Windows Support Is Here!"
     },
     {
-      "author_id": "ashley",
+      "author_github": "https://github.com/Jeffail",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -17681,7 +17681,7 @@ module.exports = {
       "last_version": "0.5.0",
       "posts": [
         {
-          "author_id": "ben",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
           "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
           "id": "arm-support-on-linux",
@@ -17695,7 +17695,7 @@ module.exports = {
           "title": "ARMv7 & ARM64 Support on Linux"
         },
         {
-          "author_id": "ben",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
           "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
           "id": "windows-support",
@@ -17709,7 +17709,7 @@ module.exports = {
           "title": "Windows Support Is Here!"
         },
         {
-          "author_id": "ashley",
+          "author_github": "https://github.com/Jeffail",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",

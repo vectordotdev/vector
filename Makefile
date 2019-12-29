@@ -44,6 +44,10 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/check-version.rb
 
+check-blog: ## Checks that all blog articles are signed by their authors
+	@bundle install --gemfile=scripts/Gemfile --quiet
+	@scripts/check-blog-signatures.rb
+
 CHECK_URLS=false
 export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta

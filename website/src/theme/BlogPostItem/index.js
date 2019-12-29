@@ -22,7 +22,7 @@ function BlogPostItem(props) {
     isBlogPostPage = false,
   } = props;
   const {date: dateString, description, permalink, tags} = metadata;
-  const {author_id, title} = frontMatter;
+  const {author_github, title} = frontMatter;
   const readingStats = readingTime(children.toString());
   const date = new Date(Date.parse(dateString));
   const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
@@ -33,7 +33,7 @@ function BlogPostItem(props) {
       <article>
         <h2>{title}</h2>
         <div className="blog-post-item--subtitle">{description}</div>
-        <Avatar id={author_id} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
+        <Avatar id={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
         <BlogPostTags tags={tags} />
       </article>
     </Link>
