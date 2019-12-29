@@ -36,6 +36,7 @@ metadata.posts.each do |post|
     end
   end
 
+  # verify the signature for the post
   res = system("gpg", "--verify", "#{ROOT_DIR}/#{post.path}.sig")
   if not res
     error!("Cannot verify GPG signature for #{post.path}")
