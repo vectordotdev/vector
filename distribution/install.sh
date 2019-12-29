@@ -18,7 +18,7 @@ _indent="   "
 
 header() {
     cat 1>&2 <<EOF
-                                   __   __  __  
+                                   __   __  __
                                    \ \ / / / /
                                     \ V / / /
                                      \_/  \/
@@ -526,7 +526,7 @@ ensure_with_sudo() {
         ensure $@
     else
         ensure sudo $@
-    fi 
+    fi
 }
 
 # This is just for indicating that commands' results are being

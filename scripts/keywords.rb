@@ -89,6 +89,12 @@ end
 sinks.each do |sink|
   puts "send logs to #{sink}"
   puts "send metrics to #{sink}"
+  puts "#{sink} alternative"
+
+  sinks.each do |sink2|
+    next if sink == sink2
+    puts "#{sink} vs #{sink}"
+  end
 end
 
 sources.each do |source|

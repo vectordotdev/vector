@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "add_tags" # example, must be: "add_tags"
   inputs = ["my-source-id"] # example
-  
+
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
     my_tag = "my value"

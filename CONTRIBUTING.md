@@ -336,7 +336,7 @@ patent licenses as well. These rights are granted to everyone.
 
 Nope! The DCO confirms that you are entitled to submit the code, which assumes
 that you are authorized to do so.  It treats you like an adult and relies on
-your accurate statement about your rights to submit a contribution.  
+your accurate statement about your rights to submit a contribution.
 
 ### What if I forgot to sign my commits?
 

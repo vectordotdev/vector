@@ -48,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "tcp" # example, must be: "tcp"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
 ```
@@ -64,20 +64,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "tcp" # example, must be: "tcp"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
-  
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default

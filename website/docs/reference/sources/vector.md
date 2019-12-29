@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "vector" # example, must be: "vector"
   address = "0.0.0.0:9000" # example
-  
+
   # OPTIONAL
   shutdown_timeout_secs = 30 # default, seconds
 ```
@@ -93,7 +93,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The TCP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. 
+The TCP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 
 </Field>

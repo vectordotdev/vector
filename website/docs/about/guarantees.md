@@ -75,7 +75,7 @@ import Jump from '@site/src/components/Jump';
 ### Best-Effort
 
 A `best-effort` delivery guarantee means that Vector will make a best effort to
-deliver each event, but cannot _guarantee_ delivery. This is usually due to 
+deliver each event, but cannot _guarantee_ delivery. This is usually due to
 limitations of the underlying protocol; outside the scope of Vector. It's
 important to note that while data loss is possible, it is usually rare and
 Vector does everything within it's control to ensure data is not lost. For more

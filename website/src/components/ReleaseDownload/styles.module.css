@@ -178,7 +178,7 @@
   .downloadFiles > li {
     margin-bottom: var(--ifm-spacing-vertical);
   }
-  
+
   .downloadFiles > li:last-child {
     padding-left: 0;
   }

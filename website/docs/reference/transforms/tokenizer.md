@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "tokenizer" # example, must be: "tokenizer"
   inputs = ["my-source-id"] # example
   field_names = ["timestamp", "level", "message"] # example
-  
+
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  
+
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
     status = "int"

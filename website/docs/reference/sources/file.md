@@ -47,11 +47,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "file" # example, must be: "file"
   include = ["/var/log/nginx/*.log"] # example
-  
+
   # OPTIONAL - General
   ignore_older = 86400 # example, no default, seconds
   start_at_beginning = false # default
-  
+
   # OPTIONAL - Priority
   oldest_first = false # default
 ```
@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "file" # example, must be: "file"
   include = ["/var/log/nginx/*.log"] # example
-  
+
   # OPTIONAL - General
   data_dir = "/var/lib/vector" # example, no default
   exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
@@ -74,19 +74,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
   ignore_older = 86400 # example, no default, seconds
   max_line_bytes = 102400 # default, bytes
   start_at_beginning = false # default
-  
+
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
-  
+
   # OPTIONAL - Multi-line
   message_start_indicator = "^(INFO|ERROR)" # example, no default
   multi_line_timeout = 1000 # default, milliseconds
-  
+
   # OPTIONAL - Priority
   max_read_bytes = 2048 # default, bytes
   oldest_first = false # default
-  
+
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
     strategy = "checksum" # default, enum
@@ -147,7 +147,7 @@ The directory used to persist file checkpoint positions. By default, the [global
 
 ### exclude
 
-Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the [`include` option](#include).*
+Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*
 
 
 </Field>

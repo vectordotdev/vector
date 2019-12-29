@@ -40,7 +40,7 @@ if event["host"] == nil then
   event["host"] = hostname
 end
 """
-  
+
   # OPTIONAL
   search_dirs = ["/etc/vector/lua"] # example, no default
 ```

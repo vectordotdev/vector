@@ -1,6 +1,6 @@
 use crate::{
     conditions::Condition,
-    event::Event,
+    event::{Event, ValueKind},
     runtime::Runtime,
     topology::config::{TestCondition, TestDefinition, TestInputValue},
     transforms::Transform,
@@ -169,15 +169,13 @@ fn build_unit_test(
             if let Some(log_fields) = &definition.input.log_fields {
                 let mut event = Event::from("");
                 for (path, value) in log_fields {
-                    event.as_mut_log().insert_explicit(
-                        path.to_owned().into(),
-                        match value {
-                            TestInputValue::String(s) => s.as_bytes().into(),
-                            TestInputValue::Boolean(b) => (*b).into(),
-                            TestInputValue::Integer(i) => (*i).into(),
-                            TestInputValue::Float(f) => (*f).into(),
-                        },
-                    );
+                    let value: ValueKind = match value {
+                        TestInputValue::String(s) => s.as_bytes().into(),
+                        TestInputValue::Boolean(b) => (*b).into(),
+                        TestInputValue::Integer(i) => (*i).into(),
+                        TestInputValue::Float(f) => (*f).into(),
+                    };
+                    event.as_mut_log().insert_explicit(path.to_owned(), value);
                 }
                 event
             } else {
@@ -270,33 +268,38 @@ fn build_unit_test(
     });
 
     // Build all output conditions.
-    let checks = definition.outputs.iter().map(|o| {
-        let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
-        for (index, cond_conf) in o.conditions.iter().enumerate() {
-            match cond_conf {
-                TestCondition::Embedded(b) => {
-                    match b.build() {
+    let checks = definition
+        .outputs
+        .iter()
+        .map(|o| {
+            let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
+            for (index, cond_conf) in o.conditions.iter().enumerate() {
+                match cond_conf {
+                    TestCondition::Embedded(b) => match b.build() {
                         Ok(c) => {
                             conditions.push(c);
-                        },
+                        }
                         Err(e) => {
                             errors.push(format!(
                                 "failed to create test condition '{}': {}",
                                 index, e,
                             ));
-                        },
+                        }
+                    },
+                    TestCondition::String(_s) => {
+                        errors.push(format!(
+              "failed to create test condition '{}': condition references are not yet supported",
+              index
+            ));
                     }
-                },
-                TestCondition::String(_s) => {
-                    errors.push(format!("failed to create test condition '{}': condition references are not yet supported", index));
-                },
+                }
             }
-        }
-        UnitTestCheck{
-            extract_from: o.extract_from.clone(),
-            conditions,
-        }
-    }).collect();
+            UnitTestCheck {
+                extract_from: o.extract_from.clone(),
+                conditions,
+            }
+        })
+        .collect();
 
     if !errors.is_empty() {
         Err(errors)

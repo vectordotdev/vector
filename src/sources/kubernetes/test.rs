@@ -62,12 +62,12 @@ data:
     [sinks.out]
       type = "console"
       inputs = ["kubernetes_logs"]
-      target = "stdout" 
+      target = "stdout"
 
-    encoding = "text" 
+    encoding = "text"
     healthcheck = true
 
-  # This line is not in VECTOR.TOML  
+  # This line is not in VECTOR.TOML
 "#;
 
 // TODO: use localy builded image of vector
@@ -113,12 +113,12 @@ spec:
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
-          readOnly: true        
+          readOnly: true
         - name: var-lib
           mountPath: /var/lib
         - name: config-dir
           mountPath: /etc/vector
-          readOnly: true 
+          readOnly: true
         - name: tmp
           mountPath: /tmp/vector/
 "#;

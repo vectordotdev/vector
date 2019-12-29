@@ -239,9 +239,7 @@ mod tests {
     fn firehose_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("key".into(), "value".into());
+        event.as_mut_log().insert_explicit("key", "value");
         let event = encode_event(event, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();

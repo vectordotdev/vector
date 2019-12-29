@@ -98,7 +98,7 @@ test
 | **Required** |  |  |
 | `-c, --config <path>` | Path the Vector [configuration file][docs.configuration]. |
 | **Optional** |  |  |
-| `-d, --dry-run` | Vector will [validate configuration][docs.validating] and exit. | 
+| `-d, --dry-run` | Vector will [validate configuration][docs.validating] and exit. |
 | `-q, --quiet` | Raises the log level to `warn`. |
 | `-qq` | Raises the log level to `error`, the highest level possible. |
 | `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks. |

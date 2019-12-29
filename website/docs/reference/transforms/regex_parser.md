@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "regex_parser" # example, must be: "regex_parser"
   inputs = ["my-source-id"] # example
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
-  
+
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  
+
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
     status = "int"
