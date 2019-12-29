@@ -174,12 +174,12 @@ pub struct WaitFor<T, F> {
 
 impl WaitFor<(), ()> {
     pub fn is(mut predicate: impl FnMut() -> bool) -> WaitFor<(), impl FnMut() -> Option<()>> {
-        WaitFor::it(move || if predicate() { Some(()) } else { None })
+        WaitFor::some(move || if predicate() { Some(()) } else { None })
     }
 }
 
 impl<T, F: FnMut() -> Option<T>> WaitFor<T, F> {
-    pub fn it(f: F) -> Self {
+    pub fn some(f: F) -> Self {
         WaitFor {
             f,
             limit: std::time::Duration::from_secs(5),

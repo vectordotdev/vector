@@ -182,7 +182,7 @@ impl Kube {
             .replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
-        WaitFor::it(|| {
+        WaitFor::some(|| {
             api.create(&PostParams::default(), json.clone())
                 .map_err(|error| {
                     error!(message = "Failed creating Kubernetes object", ?error);
@@ -194,7 +194,7 @@ impl Kube {
     }
 
     fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
-        WaitFor::it(|| {
+        WaitFor::some(|| {
             self.api(Api::v1Pod)
                 .list(&ListParams {
                     field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
@@ -219,7 +219,7 @@ impl Kube {
     }
 
     fn logs(&self, pod_name: &str) -> Vec<String> {
-        WaitFor::it(|| {
+        WaitFor::some(|| {
             self.api(Api::v1Pod)
                 .log(pod_name, &LogParams::default())
                 .map_err(|error| {
@@ -236,7 +236,7 @@ impl Kube {
 
     fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
-        WaitFor::it(move || {
+        WaitFor::some(move || {
             object = api
                 .get_status(object.meta().name.as_str())
                 .map_err(|error| {
@@ -263,7 +263,7 @@ impl Kube {
         let api = self.api(Api::v1Pod);
         let legal = ["Pending", "Running", "Succeeded"];
         let goal = "Succeeded";
-        WaitFor::it(move || {
+        WaitFor::some(move || {
             object = api
                 .get_status(object.meta().name.as_str())
                 .map_err(|error| {
