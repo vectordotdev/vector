@@ -419,10 +419,8 @@ mod tests {
     fn pod_uid_transform_namespace_name_uid() {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert_explicit(
-            "pod_uid".into(),
-            "kube-system_kube-apiserver-minikube_8f6b5d95bfe4bcf4cc9c4d8435f0668b"
-                .to_owned()
-                .into(),
+            "pod_uid",
+            "kube-system_kube-apiserver-minikube_8f6b5d95bfe4bcf4cc9c4d8435f0668b".to_owned(),
         );
 
         let mut transform = transform_pod_uid().unwrap();
@@ -437,10 +435,9 @@ mod tests {
     #[test]
     fn pod_uid_transform_uid() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
-            "pod_uid".into(),
-            "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned().into(),
-        );
+        event
+            .as_mut_log()
+            .insert_explicit("pod_uid", "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned());
 
         let mut transform = transform_pod_uid().unwrap();
 
