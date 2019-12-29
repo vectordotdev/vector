@@ -1,6 +1,6 @@
 ---
 title: Validating
-description: Validate Vector's configuration
+description: How to validation Vector's configuration to ensure it is error free before applying it.
 ---
 
 Vector provides a subcommand `validate` which checks the validity of any number
@@ -102,7 +102,7 @@ flag to also run health checks for all defined sinks.
 8. All [sinks][docs.sinks] are able to connect to their targets.
 
 
-[docs.configuration#value-types]: /docs/setup/configuration#value-types
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.transforms]: /docs/reference/transforms
+[docs.configuration#value-types]: /docs/setup/configuration/#value-types
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.transforms]: /docs/reference/transforms/

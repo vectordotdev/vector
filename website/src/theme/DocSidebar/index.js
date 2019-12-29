@@ -11,7 +11,7 @@ import classnames from 'classnames';
 import Link from '@docusaurus/Link';
 
 import styles from './styles.module.css';
-   
+
 const MOBILE_TOGGLE_SIZE = 24;
 
 function DocSidebarItem({item, level, onItemClick, collapsible}) {
@@ -53,11 +53,7 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
           </li>
         );
       } else {
-        let categoryHref = '#!';
-
-        if(items[0].label == 'hidden') {
-          categoryHref = items[0].href;
-        }
+        let categoryHref = items[0].href;
 
         return (
           <li
@@ -70,7 +66,7 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
               className={classnames('menu__link', {
                 'menu__link--sublist': collapsible,
               })}
-              to={categoryHref}
+              to={categoryHref + "/"}
               onClick={
                 collapsible && categoryHref == '#!' ? () => setCollapsed(!collapsed) : undefined
               }>
@@ -109,7 +105,7 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
           <Link
             activeClassName="menu__link--active"
             className="menu__link"
-            to={href}
+            to={href + "/"}
             onClick={onItemClick}>
             {processedLabel}
             {eventTypes.length > 0 &&

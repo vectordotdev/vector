@@ -1,4 +1,5 @@
 [sinks.datadog_metrics]
+title = "Datadog Metrics"
 batch_size = 20
 batch_timeout = 1
 beta = true
@@ -16,7 +17,7 @@ request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 60
 service_provider = "Datadog"
-write_to_description = "[Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)"
+write_to_description = "[Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)"
 
 [sinks.datadog_metrics.options.api_key]
 type = "string"

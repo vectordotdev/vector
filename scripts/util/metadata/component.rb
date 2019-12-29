@@ -17,7 +17,9 @@ class Component
     :name,
     :operating_systems,
     :options,
+    :posts,
     :resources,
+    :title,
     :type,
     :unsupported_operating_systems
 
@@ -27,6 +29,8 @@ class Component
     @env_vars = Option.build_struct(hash["env_vars"] || {})
     @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
+    @posts = hash.fetch("posts")
+    @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = Option.build_struct(hash["options"] || {})

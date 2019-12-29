@@ -15,8 +15,8 @@ use tracing_core::{
 };
 use tracing_subscriber::layer::{Context, Layer};
 
-const RATE_LIMIT_FIELD: &'static str = "rate_limit_secs";
-const MESSAGE_FIELD: &'static str = "message";
+const RATE_LIMIT_FIELD: &str = "rate_limit_secs";
+const MESSAGE_FIELD: &str = "message";
 const DEFAULT_LIMIT: u64 = 5;
 
 #[derive(Debug, Default)]
@@ -112,7 +112,7 @@ where
                 // check if the event exists within the map, if it does
                 // that means we are currently rate limiting it.
                 if let Some(state) = events.get(&id) {
-                    let start = state.start.unwrap_or_else(|| Instant::now());
+                    let start = state.start.unwrap_or_else(Instant::now);
 
                     if start.elapsed().as_secs() < state.limit {
                         if state.count.load(Ordering::Acquire) == 1 {

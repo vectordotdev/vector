@@ -11,21 +11,21 @@ module.exports = {
   },
   themeConfig: {
     navbar: {
+      hideOnScroll: true,
       logo: {
         alt: 'Vector',
         src: 'img/logo-light.svg',
-        darkSrc: 'img/logo-dark.svg'
       },
       links: [
-        {to: 'components', label: 'Components', position: 'left'},
-        {to: 'docs', label: 'Docs', position: 'left'},
-        {to: 'blog', label: 'Blog', position: 'left'},
-        {to: 'community', label: 'Community', position: 'left'},
-        {to: '/releases', label: 'Download', position: 'right'},
+        {to: 'components/', label: 'Components', position: 'left'},
+        {to: 'docs/', label: 'Docs', position: 'left'},
+        {to: 'blog/', label: 'Blog', position: 'left'},
+        {to: 'community/', label: 'Community', position: 'left'},
+        {to: 'releases/', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
     },
-    image: 'img/open-source.png',
+    image: 'img/open-graph.png',
     prism: {
       theme: require('prism-react-renderer/themes/github'),
       darkTheme: require('prism-react-renderer/themes/dracula'),
@@ -37,19 +37,19 @@ module.exports = {
           items: [
             {
               label: 'What is Vector?',
-              to: 'docs/about/what-is-vector',
+              to: 'docs/about/what-is-vector/',
             },
             {
-              label: 'Concepts',
-              to: 'docs/about/concepts',
+              label: 'The Team',
+              to: 'community/#team',
             },
             {
-              label: 'Data Model',
-              to: 'docs/about/data-model',
+              label: 'Contact Us',
+              to: 'contact/',
             },
             {
-              label: 'Guarantees',
-              to: 'docs/about/guarantees',
+              label: 'Press',
+              to: 'press/',
             },
           ],
         },
@@ -58,15 +58,15 @@ module.exports = {
           items: [
             {
               label: 'Sources',
-              to: 'docs/reference/sources',
+              to: 'docs/reference/sources/',
             },
             {
               label: 'Transforms',
-              to: 'docs/reference/transforms',
+              to: 'docs/reference/transforms/',
             },
             {
               label: 'Sinks',
-              to: 'docs/reference/sinks',
+              to: 'docs/reference/sinks/',
             },
           ],
         },
@@ -75,19 +75,19 @@ module.exports = {
           items: [
             {
               label: 'Install',
-              to: 'docs/setup/installation',
+              to: 'docs/setup/installation/',
             },
             {
               label: 'Deployment',
-              to: 'docs/setup/deployment',
+              to: 'docs/setup/deployment/',
             },
             {
               label: 'Configuration',
-              to: 'docs/setup/configuration',
+              to: 'docs/setup/configuration/',
             },
             {
               label: 'Administration',
-              to: 'docs/administration',
+              to: 'docs/administration/',
             },
           ],
         },
@@ -108,11 +108,11 @@ module.exports = {
             },
             {
               label: 'Mailing List',
-              to: 'mailing_list',
+              to: 'mailing_list/',
             },
             {
               label: 'Blog',
-              to: '/blog',
+              to: 'blog/',
             },
           ],
         },

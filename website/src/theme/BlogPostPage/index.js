@@ -36,7 +36,7 @@ function BlogPostPage(props) {
       <article className={styles.blogPost}>
         <header className={classnames('hero', 'domain-bg', `domain-bg--${domain}`, styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
-            <Avatar id={author_id} size="lg" nameSuffix={<> / <time pubdate datetime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
+            <Avatar id={author_id} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
             <h1>{title}</h1>
             <div className={styles.headerTags}>
               <BlogPostTags tags={tags} />
@@ -49,12 +49,12 @@ function BlogPostPage(props) {
           </section>
           <section className={classnames('panel', 'bleed', styles.mailingList)} style={{textAlign: 'center'}}>
             <div className={styles.mailingListTitle}>
-              Vector In Your Inbox
+              <i className="feather icon-mail"></i> Vector In Your Inbox!
             </div>
             <p>
               One email on the 1st of the month. No spam, ever.
             </p>
-            <MailingListForm description={false} size="lg" />
+            <MailingListForm center={true} description={false} size="lg" />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
             <div className="bleed margin-vert--xl">

@@ -1,6 +1,7 @@
 #encoding: utf-8
 
 require_relative "component"
+require_relative "output"
 
 class Sink < Component
   EGRESS_METHODS = ["batching", "exposing", "streaming"].freeze
@@ -27,7 +28,6 @@ class Sink < Component
     encodings = hash["encodings"]
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
-    @output = OpenStruct.new
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
     tls_options = hash["tls_options"]
@@ -47,12 +47,8 @@ class Sink < Component
 
     # output
 
-    output = hash["output"] || {}
-    @output.examples = (output["examples"] || []).collect do |e|
-      s = OpenStruct.new(e)
-      s.input = OpenStruct.new(s.input) if s.input
-      s.output = OpenStruct.new(s.output) if s.output
-      s
+    if hash["output"]
+      @output = Output.new(hash["output"])
     end
 
     # Healthcheck option

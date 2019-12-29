@@ -123,7 +123,7 @@ impl Batch for MetricBuffer {
                     // and emit the difference between previous and current as a Counter
                     let delta = MetricEntry(Metric {
                         name: item.name.to_string(),
-                        timestamp: item.timestamp.clone(),
+                        timestamp: item.timestamp,
                         tags: item.tags.clone(),
                         kind: MetricKind::Incremental,
                         value: MetricValue::Counter {
@@ -158,7 +158,7 @@ impl Batch for MetricBuffer {
                         // Otherwise we start from zero value
                         Metric {
                             name: item.name.to_string(),
-                            timestamp: item.timestamp.clone(),
+                            timestamp: item.timestamp,
                             tags: item.tags.clone(),
                             kind: MetricKind::Absolute,
                             value: MetricValue::Gauge { value: 0.0 },

@@ -8,14 +8,14 @@
 data_dir = "/var/lib/vector"
 
 # Ingest data by tailing one or more files
-# Docs: https://docs.vector.dev/usage/configuration/sources/file
+# Docs: https://vector.dev/docs/reference/sources/file
 [sources.apache_logs]
   type         = "file"
   include      = ["/var/log/*.log"]
   ignore_older = 86400 # 1 day
 
 # Optionally parse, structure and transform data here.
-# Docs: https://docs.vector.dev/usage/configuration/transforms
+# Docs: https://vector.dev/docs/reference/transforms
 
 # Send structured data to Elasticsearch for searching of recent data
 [sinks.es_cluster]

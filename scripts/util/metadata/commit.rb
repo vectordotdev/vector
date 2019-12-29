@@ -66,7 +66,7 @@ class Commit
     @component_name =
       if new_feature?
         match =  description.match(/`?(?<name>[a-zA-Z_]*)`? (source|transform|sink)/)
-        
+
         if !match.nil? && !match[:name].nil?
           match[:name].downcase
         else
@@ -158,7 +158,7 @@ class Commit
       if match.nil?
         raise <<~EOF
         Commit message does not conform to the conventional commit format.
-        
+
         Unable to parse at all!
 
           #{message}
@@ -191,7 +191,7 @@ class Commit
         The type must be one of #{TYPES.inspect}.
 
           #{type.inspect}
-        
+
         Please correct in the release /.meta file and retry.
         EOF
       end

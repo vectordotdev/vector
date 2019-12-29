@@ -56,7 +56,7 @@ impl SourceConfig for SplunkConfig {
 
         let event_service = SplunkSource::event_service(source.clone());
         let raw_service = SplunkSource::raw_service(source.clone());
-        let health_service = SplunkSource::health_service(source.clone());
+        let health_service = SplunkSource::health_service(source);
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector")
@@ -343,7 +343,7 @@ impl<R: Read> Stream for EventStream<R> {
             }
             Err(error) => {
                 error!(message = "Malformed request body",%error);
-                Err(ApiError::InvalidDataFormat { event: self.events })?
+                return Err(ApiError::InvalidDataFormat { event: self.events }.into());
             }
         };
 
@@ -356,24 +356,24 @@ impl<R: Read> Stream for EventStream<R> {
             Some(event) => match event.take() {
                 Value::String(string) => {
                     if string.is_empty() {
-                        Err(ApiError::EmptyEventField { event: self.events })?;
+                        return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert_explicit(event::MESSAGE.clone(), string.into())
+                    log.insert_explicit(event::MESSAGE.clone(), string)
                 }
                 Value::Object(object) => {
                     if object.is_empty() {
-                        Err(ApiError::EmptyEventField { event: self.events })?;
+                        return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
                     flatten(log, object);
                 }
-                _ => Err(ApiError::InvalidDataFormat { event: self.events })?,
+                _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
             },
-            None => Err(ApiError::MissingEventField { event: self.events })?,
+            None => return Err(ApiError::MissingEventField { event: self.events }.into()),
         }
 
         // Process channel field
         if let Some(Value::String(guid)) = json.get_mut("channel").map(Value::take) {
-            log.insert_explicit(CHANNEL.clone(), guid.into());
+            log.insert_explicit(CHANNEL.clone(), guid);
         } else if let Some(guid) = self.channel.as_ref() {
             log.insert_explicit(CHANNEL.clone(), guid.clone());
         }
@@ -403,10 +403,10 @@ impl<R: Read> Stream for EventStream<R> {
                         .into(),
                     );
                 } else {
-                    Err(ApiError::InvalidDataFormat { event: self.events })?;
+                    return Err(ApiError::InvalidDataFormat { event: self.events }.into());
                 }
             }
-            Some(None) => Err(ApiError::InvalidDataFormat { event: self.events })?,
+            Some(None) => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
         }
 
         // Add time field
@@ -477,11 +477,11 @@ fn raw_event(
     let message: ValueKind = if gzip {
         let mut data = Vec::new();
         match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
-            Ok(0) => Err(ApiError::NoData)?,
+            Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => data.into(),
             Err(error) => {
                 error!(message = "Malformed request body",%error);
-                Err(ApiError::InvalidDataFormat { event: 0 })?
+                return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
     } else {
@@ -496,11 +496,11 @@ fn raw_event(
     log.insert_explicit(event::MESSAGE.clone(), message);
 
     // Add channel
-    log.insert_explicit(CHANNEL.clone(), channel.as_bytes().into());
+    log.insert_explicit(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert_explicit(event::HOST.clone(), host.as_bytes().into());
+        log.insert_explicit(event::HOST.clone(), host.as_bytes());
     }
 
     Ok(event)
@@ -801,12 +801,8 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("greeting".into(), "hello".into());
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "bob".into());
+        event.as_mut_log().insert_explicit("greeting", "hello");
+        event.as_mut_log().insert_explicit("name", "bob");
 
         let pump = sink.send(event);
         let _ = rt.block_on(pump).unwrap();

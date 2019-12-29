@@ -15,11 +15,11 @@ function Community() {
   const {metadata: {team}} = siteConfig.customFields;
 
   return (
-    <Layout title="Community">
+    <Layout title="Community" description="Join the Vector community. Connect with the core Vector team and other Vector users.">
       <header className="hero">
         <div className="container container--fluid">
           <h1>Vector Community</h1>
-          <MailingListForm buttonClass="highlight" size="lg" />
+          <MailingListForm buttonClass="highlight" center={true} size="lg" />
         </div>
       </header>
       <main>
@@ -40,11 +40,10 @@ function Community() {
               <div className="col">
                 <a href="https://twitter.com/timberdotio" target="_blank" className="panel panel--link text--center">
                   <div className="panel--icon">
-                    <i className="feather icon-twitter"></i>
+                    <i className="feather icon-twitter" title="Twitter"></i>
                   </div>
-                  <div className="panel--title">Twitter @timberdotio</div>
-                  <div className="panel--description">
-                    Stay up-to-date with <code>#vector</code></div>
+                  <div className="panel--title">@timberdotio via <code>#vectordev</code></div>
+                  <div className="panel--description">Follow us in real-time</div>
                 </a>
               </div>
               <div className="col">

@@ -46,7 +46,7 @@ expanding into more specifics.
 
 ## Assumptions
 
-1. **You are familiar with the [docs](https://docs.vector.dev).**
+1. **You are familiar with the [docs](https://vector.dev/docs/).**
 2. **You know about the [Vector community](https://vector.dev/community/),
    use this for help.**
 
@@ -147,7 +147,7 @@ updated versions of Vector through various channels.
 * [`/benches`](/benches) - Internal benchmarks.
 * [`/config`](/config) - Public facing Vector config, included in releases.
 * [`/distribution`](/distribution) - Distribution artifacts for various targets.
-* [`/docs`](/docs) - https://docs.vector.dev source.
+* [`/docs`](/docs) - https://vector.dev/docs/ source.
 * [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 * [`/proto`](/proto) - Protobuf definitions.
 * [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
@@ -336,7 +336,7 @@ patent licenses as well. These rights are granted to everyone.
 
 Nope! The DCO confirms that you are entitled to submit the code, which assumes
 that you are authorized to do so.  It treats you like an adult and relies on
-your accurate statement about your rights to submit a contribution.  
+your accurate statement about your rights to submit a contribution.
 
 ### What if I forgot to sign my commits?
 

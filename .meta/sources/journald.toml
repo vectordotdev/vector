@@ -1,4 +1,5 @@
 [sources.journald]
+title = "Journald"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
@@ -32,7 +33,7 @@ null = true
 description = """\
 The directory used to persist the journal checkpoint position. By \
 default, the global `data_dir` is used. Please make sure the Vector \
-project has write permissions to this dir. \
+project has write permissions to this dir.\
 """
 
 [sources.journald.options.local_only]
@@ -55,7 +56,10 @@ Unit names lacking a `"."` will have `".service"` appended to make them a valid 
 
 [[sources.journald.output.log.examples]]
 label = "Generic"
-input = """\
+body = """\
+Given the following input:
+
+```text
 __REALTIME_TIMESTAMP=1564173027000443
 __MONOTONIC_TIMESTAMP=98694000446
 _BOOT_ID=124c781146e841ae8d9b4590df8b9231
@@ -78,8 +82,11 @@ _SYSTEMD_UNIT=ntpd.service
 _SYSTEMD_SLICE=system.slice
 _SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
 MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
-"""
-output = """\
+```
+
+A log event will be output with the following structure:
+
+```json
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>,
   "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
@@ -105,6 +112,7 @@ output = """\
   "_SYSTEMD_SLICE": "system.slice",
   "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
 }
+```\
 """
 
 [sources.journald.output.log.fields."`[record-key]`"]

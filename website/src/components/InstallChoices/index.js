@@ -29,27 +29,27 @@ function ArchChoices({arch, docker, os, packageManager}) {
 
   return (
     <div>
-      {packageManagerSupported && <Jump to={`/docs/setup/installation/package-managers/${packageManager.toLowerCase()}?arch=${arch}`}>
+      {packageManagerSupported && <Jump to={`/docs/setup/installation/package-managers/${packageManager.toLowerCase()}/?arch=${arch}`}>
         <i className="feather icon-package"></i> {packageManager} ({arch}) <span className="badge badge--primary">recommended</span>
       </Jump>}
-      {!packageManagerSupported && dockerSupported && <Jump to="/docs/setup/installation/containers/docker">
+      {!packageManagerSupported && dockerSupported && <Jump to="/docs/setup/installation/containers/docker/">
         <i className="feather icon-terminal"></i> Docker ({arch}) <span className="badge badge--primary">recommended</span>
       </Jump>}
-      {!packageManagerSupported && !dockerSupported && <Jump to={`/docs/setup/installation/manual/from-archives?file_name=${archiveDownload.file_name}`}>
+      {!packageManagerSupported && !dockerSupported && <Jump to={`/docs/setup/installation/manual/from-archives/?file_name=${archiveDownload.file_name}`}>
         <i className="feather icon-terminal"></i> From an Archive ({arch})  <span className="badge badge--primary">recommended</span>
       </Jump>}
 
       <p>Alternatively, you can use your preferred method:</p>
 
-      {(packageManagerSupported && dockerSupported) && <Jump to="/docs/setup/installation/containers/docker" size="sm">
+      {(packageManagerSupported && dockerSupported) && <Jump to="/docs/setup/installation/containers/docker/" size="sm">
         <i className="feather icon-package"></i> Docker ({arch})
       </Jump>}
 
-      {(packageManagerSupported || dockerSupported) && <Jump to={`/docs/setup/installation/manual/from-archives?file_name=${archiveDownload.file_name}`} size="sm">
+      {(packageManagerSupported || dockerSupported) && <Jump to={`/docs/setup/installation/manual/from-archives/?file_name=${archiveDownload.file_name}`} size="sm">
         <i className="feather icon-terminal"></i> From an Archive ({arch})
       </Jump>}
 
-      <Jump to="/docs/setup/installation/manual/from-source" size="sm">
+      <Jump to="/docs/setup/installation/manual/from-source/" size="sm">
         <i className="feather icon-terminal"></i> From Source
       </Jump>
     </div>

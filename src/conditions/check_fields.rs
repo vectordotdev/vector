@@ -313,14 +313,10 @@ mod test {
         let mut event = Event::from("foo");
         assert_eq!(cond.check(&event), false);
 
-        event
-            .as_mut_log()
-            .insert_implicit("other_thing".into(), "bar".into());
+        event.as_mut_log().insert_implicit("other_thing", "bar");
         assert_eq!(cond.check(&event), true);
 
-        event
-            .as_mut_log()
-            .insert_implicit("message".into(), "not foo".into());
+        event.as_mut_log().insert_implicit("message", "not foo");
         assert_eq!(cond.check(&event), false);
     }
 
@@ -341,19 +337,13 @@ mod test {
         let mut event = Event::from("not foo");
         assert_eq!(cond.check(&event), false);
 
-        event
-            .as_mut_log()
-            .insert_implicit("other_thing".into(), "not bar".into());
+        event.as_mut_log().insert_implicit("other_thing", "not bar");
         assert_eq!(cond.check(&event), true);
 
-        event
-            .as_mut_log()
-            .insert_implicit("other_thing".into(), "bar".into());
+        event.as_mut_log().insert_implicit("other_thing", "bar");
         assert_eq!(cond.check(&event), false);
 
-        event
-            .as_mut_log()
-            .insert_implicit("message".into(), "foo".into());
+        event.as_mut_log().insert_implicit("message", "foo");
         assert_eq!(cond.check(&event), false);
     }
 
@@ -368,14 +358,12 @@ mod test {
         let mut event = Event::from("ignored field");
         assert_eq!(cond.check(&event), false);
 
-        event
-            .as_mut_log()
-            .insert_implicit("foo".into(), "not ignored".into());
+        event.as_mut_log().insert_implicit("foo", "not ignored");
         assert_eq!(cond.check(&event), true);
 
         event
             .as_mut_log()
-            .insert_implicit("bar".into(), "also not ignored".into());
+            .insert_implicit("bar", "also not ignored");
         assert_eq!(cond.check(&event), false);
     }
 }

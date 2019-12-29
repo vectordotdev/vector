@@ -1,4 +1,5 @@
 [sinks.tcp]
+title = "TCP"
 buffer = true
 common = false
 delivery_guarantee = "best_effort"

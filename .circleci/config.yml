@@ -14,6 +14,17 @@ install-rust: &install-rust
     command: |
       curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
+install-rust-windows: &install-rust-windows
+  run:
+    name: Install Rust
+    shell: bash
+    command: |
+      curl https://sh.rustup.rs -sSf | sh -s -- -y \
+        --default-toolchain nightly-2019-11-19 \
+        --default-host x86_64-pc-windows-msvc
+      # see https://github.com/rust-lang/cargo/issues/2078
+      printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+
 install-vector: &install-vector
   run:
     name: Execute install.sh
@@ -86,13 +97,7 @@ jobs:
     executor: win/vs2019
     steps:
       - checkout
-      - run:
-          name: Install Rust
-          shell: bash
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      - *install-rust-windows
       - run:
           name: Download Perl
           shell: bash
@@ -185,7 +190,7 @@ jobs:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
           PORT_WEB_UI: 8888
-          SERVICES: kinesis,cloudwatch,elasticsearch
+          SERVICES: kinesis,cloudwatch,elasticsearch,firehose
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: "test-access-key"
@@ -218,6 +223,10 @@ jobs:
           - xpack.ssl.certificate=certs/localhost.crt
           - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
+      - image: timberiodev/mock-ec2-metadata:latest
+      - image: messagebird/gcloud-pubsub-emulator
+        environment:
+          - PUBSUB_PROJECT1=testproject,topic1:subscription1
     steps:
       - checkout
       - setup_remote_docker:
@@ -257,13 +266,7 @@ jobs:
     executor: win/vs2019
     steps:
       - checkout
-      - run:
-          name: Install Rust
-          shell: bash
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2019-11-19
-            # see https://github.com/rust-lang/cargo/issues/2078
-            printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
+      - *install-rust-windows
       - run:
           name: Download Perl
           shell: bash
@@ -772,7 +775,6 @@ jobs:
       - run:
           name: Release S3
           command: |
-            export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-s3
 

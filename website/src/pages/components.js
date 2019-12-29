@@ -21,14 +21,14 @@ function Components(props) {
   }, []);
 
   return (
-    <Layout title="Vector Components">
+    <Layout title="Components - Sources, Transforms, & Sinks" description="Browse and search all of Vector's components: sources, transforms, and sinks. Filter by event type, guarantee, function, operating system, and provider.">
       <header className={classnames('hero', styles.componentsHero)}>
         <div className="container container--fluid">
           <canvas width="2000" height="300"></canvas>
           <div className={styles.componentsHeroOverlay}>
             <h1>Vector Components</h1>
             <div className="hero__subtitle">
-              Components allow you to collect, transform, and route data with ease. <Link to="/docs/about/concepts">Learn more</Link>.
+              Components allow you to collect, transform, and route data with ease. <Link to="/docs/about/concepts/">Learn more</Link>.
             </div>
           </div>
         </div>

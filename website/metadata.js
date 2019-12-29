@@ -5214,7 +5214,7 @@ module.exports = {
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
       {
-        "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+        "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
         "commits": [
 
         ],
@@ -5222,7 +5222,7 @@ module.exports = {
         "title": "The `file` and `console` sinks now require `encoding`"
       },
       {
-        "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+        "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
         "commits": [
 
         ],
@@ -17726,7 +17726,7 @@ module.exports = {
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
         {
-          "body": "The `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n\n```diff\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n```\n",
+          "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
           "commits": [
 
           ],
@@ -17734,7 +17734,7 @@ module.exports = {
           "title": "The `file` and `console` sinks now require `encoding`"
         },
         {
-          "body": "The `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n\n```diff\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n```\n",
+          "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
           "commits": [
 
           ],
@@ -17749,7 +17749,7 @@ module.exports = {
     "aws_cloudwatch_logs": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
+      "description": "Batches log events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
       "event_types": [
         "log"
       ],
@@ -17761,7 +17761,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17771,7 +17771,7 @@ module.exports = {
     "aws_cloudwatch_metrics": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Streams metric events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
+      "description": "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
       "event_types": [
         "metric"
       ],
@@ -17783,7 +17783,29 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "aws_kinesis_firehose": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "aws_kinesis_firehose_sink",
+      "name": "aws_kinesis_firehose",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17793,7 +17815,7 @@ module.exports = {
     "aws_kinesis_streams": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
+      "description": "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
       "event_types": [
         "log"
       ],
@@ -17805,7 +17827,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17815,7 +17837,7 @@ module.exports = {
     "aws_s3": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
+      "description": "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
       "event_types": [
         "log"
       ],
@@ -17827,7 +17849,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "AWS",
+      "service_provider": "Amazon",
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17905,7 +17927,7 @@ module.exports = {
     "datadog_metrics": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Batches metric events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
+      "description": "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
       "event_types": [
         "metric"
       ],
@@ -17968,6 +17990,28 @@ module.exports = {
 
       ]
     },
+    "gcp_pubsub": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "gcp_pubsub_sink",
+      "name": "gcp_pubsub",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": "Google",
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -18015,7 +18059,7 @@ module.exports = {
     "new_relic_logs": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to [New Relic][urls.new_relic] via their [log API][urls.new_relic_log_api].",
+      "description": "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api].",
       "event_types": [
         "log"
       ],
@@ -18059,7 +18103,7 @@ module.exports = {
     "splunk_hec": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
-      "description": "Batches log events to a [Splunk HTTP Event Collector][urls.splunk_hec].",
+      "description": "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec].",
       "event_types": [
         "log"
       ],
@@ -18500,6 +18544,26 @@ module.exports = {
 
       ]
     },
+    "aws_ec2_metadata": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "enrich",
+      "id": "aws_ec2_metadata_transform",
+      "name": "aws_ec2_metadata",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "coercer": {
       "beta": false,
       "delivery_guarantee": null,
@@ -18515,6 +18579,28 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "concat": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to concat (substrings) of other fields to a new one.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": [
+        "filter"
+      ],
+      "id": "concat_transform",
+      "name": "concat",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 

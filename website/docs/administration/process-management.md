@@ -1,5 +1,6 @@
 ---
 title: Process Management
+description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---
 
 This document covers how to manage the Vector process using various process
@@ -97,7 +98,7 @@ test
 | **Required** |  |  |
 | `-c, --config <path>` | Path the Vector [configuration file][docs.configuration]. |
 | **Optional** |  |  |
-| `-d, --dry-run` | Vector will [validate configuration][docs.validating] and exit. | 
+| `-d, --dry-run` | Vector will [validate configuration][docs.validating] and exit. |
 | `-q, --quiet` | Raises the log level to `warn`. |
 | `-qq` | Raises the log level to `error`, the highest level possible. |
 | `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks. |
@@ -261,11 +262,11 @@ which sinks and sources should be started and shutdown and ensures the
 transition from the old to new pipeline is graceful.
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.roles.agent#limiting-resources]: /docs/setup/deployment/roles/agent#limiting-resources
-[docs.roles.agent]: /docs/setup/deployment/roles/agent
-[docs.sources]: /docs/reference/sources
-[docs.validating]: /docs/administration/validating
+[docs.configuration]: /docs/setup/configuration/
+[docs.roles.agent#limiting-resources]: /docs/setup/deployment/roles/agent/#limiting-resources
+[docs.roles.agent]: /docs/setup/deployment/roles/agent/
+[docs.sources]: /docs/reference/sources/
+[docs.validating]: /docs/administration/validating/
 [urls.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service

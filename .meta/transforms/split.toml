@@ -1,4 +1,5 @@
 [transforms.split]
+title = "Split"
 allow_you_to_description = """\
 split a field's value on a given separator \
 and zip the tokens into ordered field names\

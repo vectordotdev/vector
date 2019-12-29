@@ -1,6 +1,7 @@
 #encoding: utf-8
 
 require_relative "component"
+require_relative "output"
 
 class Transform < Component
   attr_reader :allow_you_to_description,
@@ -37,23 +38,15 @@ class Transform < Component
 
     output = hash["output"] || {}
 
-    # output.log
-
     if output["log"]
-      log = output["log"]
-      @output.log = OpenStruct.new
-      @output.log.fields = Field.build_struct(log["fields"] || {})
-      @output.log.examples = (log["examples"] || []).collect { |e| OpenStruct.new(e) }
+      @output.log = Output.new(output["log"])
     end
-
-    # output.metric
 
     if output["metric"]
-      metric = output["metric"]
-      @output.metric = OpenStruct.new
-      @output.metric.fields = Field.build_struct(metric["fields"] || {})
-      @output.metric.examples = (metric["examples"] || []).collect { |e| OpenStruct.new(e) }
+      @output.metric = Output.new(output["metric"])
     end
+
+    # types
 
     if types_coercion
       wildcard_option =

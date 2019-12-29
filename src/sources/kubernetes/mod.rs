@@ -26,7 +26,7 @@ use string_cache::DefaultAtom as Atom;
 // LogPath = `containerName/Instance#.log`
 
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
-const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
+const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -378,7 +378,7 @@ mod tests {
     #[test]
     fn file_path_transform() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("file".into(),"/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned().into());
+        event.as_mut_log().insert_explicit("file","/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned());
 
         let mut transform = transform_file().unwrap();
 
@@ -396,10 +396,8 @@ mod tests {
     fn cri_message_transform() {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert_explicit(
-            "message".into(),
-            "2019-10-02T13:21:36.927620189+02:00 stdout F 12"
-                .to_owned()
-                .into(),
+            "message",
+            "2019-10-02T13:21:36.927620189+02:00 stdout F 12".to_owned(),
         );
 
         let mut transform = transform_cri_message().unwrap();

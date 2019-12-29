@@ -6,9 +6,9 @@ import BlogPostTags from '@site/src/components/BlogPostTags';
 import Changelog from '@site/src/components/Changelog';
 import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
+import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import MailingListForm from '@site/src/components/MailingListForm';
-import MDX from '@mdx-js/runtime';
 import MDXComponents from '@theme/MDXComponents';
 
 import classnames from 'classnames';
@@ -70,7 +70,7 @@ function UpgradeGuide({upgradeGuide, key}) {
   return (
     <div className="section">
       <AnchoredH3 id={upgradeGuide.id}>{upgradeGuide.title}</AnchoredH3>
-      <MDX components={MDXComponents} scope={{}}>{upgradeGuide.body}</MDX>
+      <div dangerouslySetInnerHTML={{__html: upgradeGuide.body}} />
     </div>
   );
 }
@@ -132,11 +132,11 @@ function Notes({release, latest}) {
         </div>
       </header>
       <section className="shade" style={{textAlign: 'center'}}>
-        <MailingListForm />
+        <MailingListForm center={true} />
       </section>
       <section className="markdown">
         <p>
-          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community">let us know what you think</Link>!
+          We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community/">let us know what you think</Link>!
         </p>
 
         {posts.length > 0 && (
@@ -258,11 +258,15 @@ function ReleaseNotes({version}) {
   }
 
   return (
-    <div className={styles.containers}>
-      <Sidebar releases={releasesList} release={release} />
-      <Notes release={release} latest={latest} />
-      <TableOfContents release={release} />
-    </div>
+    <Layout title={`v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
+      <main>
+        <div className={styles.containers}>
+          <Sidebar releases={releasesList} release={release} />
+          <Notes release={release} latest={latest} />
+          <TableOfContents release={release} />
+        </div>
+      </main>
+    </Layout>
   );
 }
 

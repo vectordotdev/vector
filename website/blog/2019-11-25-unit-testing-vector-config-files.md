@@ -17,7 +17,7 @@ mission-critical production pipelines that are collaborated on.
 
 ## Example
 
-Let's look at a basic example that uses the [`regex_parser` 
+Let's look at a basic example that uses the [`regex_parser`
 transform][docs.transforms.regex_parser] to parse log lines:
 
 import CodeHeader from '@site/src/components/CodeHeader';
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 And you can run the tests via the new `test` subcommand:
 
 ```sh
-$ vector test ./vector.toml 
+$ vector test ./vector.toml
 Running ./vector.toml tests
 Test ./vector.toml: verify_regex ... passed
 ```
@@ -94,9 +94,9 @@ works well for everyone. Please let us know what you think either in our
 [raising an issue](https://github.com/timberio/vector/issues/new).
 
 
-[docs.guides.unit_testing]: /docs/setup/guides/unit-testing
-[docs.reference.tests]: /docs/reference/tests
-[docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs
-[docs.sources.file]: /docs/reference/sources/file
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
-[docs.transforms]: /docs/reference/transforms
+[docs.guides.unit_testing]: /docs/setup/guides/unit-testing/
+[docs.reference.tests]: /docs/reference/tests/
+[docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms]: /docs/reference/transforms/
