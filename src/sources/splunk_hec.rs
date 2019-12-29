@@ -360,10 +360,16 @@ impl<R: Read> Stream for EventStream<R> {
                     }
                     log.insert_explicit(event::MESSAGE.clone(), string)
                 }
-                Value::Object(object) => {
+                Value::Object(mut object) => {
                     if object.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
+
+                    // Add 'line' Value under 'event::MESSAGE'
+                    if let Some(line) = object.remove("line") {
+                        event::flatten::insert(log, event::MESSAGE.clone(), line);
+                    }
+
                     flatten(log, object);
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
