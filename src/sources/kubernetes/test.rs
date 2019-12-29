@@ -65,7 +65,7 @@ data:
       inputs = ["kubernetes_logs"]
       target = "stdout"
 
-      encoding = "text"
+      encoding = "json"
       healthcheck = true
 
   # This line is not in VECTOR.TOML
