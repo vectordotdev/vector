@@ -186,10 +186,9 @@ impl Transform for DockerMessageTransformer {
             match DateTime::parse_from_rfc3339(
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
-                Ok(timestamp) => log.insert_explicit(
-                    event::TIMESTAMP.clone(),
-                    timestamp.with_timezone(&Utc).into(),
-                ),
+                Ok(timestamp) => {
+                    log.insert_explicit(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
+                }
                 Err(error) => {
                     debug!(message = "Non rfc3339 timestamp.", %error, rate_limit_secs = 10);
                     return None;
