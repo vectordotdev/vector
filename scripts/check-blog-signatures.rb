@@ -1,5 +1,12 @@
 #!/usr/bin/env ruby
 
+# check-blog-signatures.rb
+#
+# SUMMARY
+#
+#   Checks that all blog articles are cryptographically
+#   signed by their respective authors
+
 require "json"
 require "open3"
 require "net/http"
