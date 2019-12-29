@@ -819,6 +819,20 @@ mod tests {
     }
 
     #[test]
+    fn line_to_message() {
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit("line", "hello");
+
+        let pump = sink.send(event);
+        let _ = rt.block_on(pump).unwrap();
+        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
+
+        assert_eq!(event.as_log()[&event::MESSAGE], "hello".into());
+    }
+
+    #[test]
     fn raw() {
         let message = "raw";
         let mut rt = test_util::runtime();
