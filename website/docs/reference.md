@@ -1,5 +1,6 @@
 ---
 title: Reference
+description: "Vector technical reference, covering available options and settings."
 sidebar_label: hidden
 hide_pagination: true
 ---

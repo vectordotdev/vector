@@ -1,12 +1,14 @@
 ---
 title: Transforms
+description: "Transforms are responsible for parsing, enriching, or transforming your log and metric data in-flight. They can be chained together, forming a network of transforms within your topology."
 sidebar_label: hidden
 hide_pagination: true
 ---
 
-Transforms are in the middle of the [pipeline][docs.concepts#pipelines],
-sitting in-between [sources][docs.sources] and [sinks][docs.sinks]. They
-transform [events][docs.data-model#event] or the stream as a whole.
+Transforms are responsible for parsing, enriching, or transforming your
+[log][docs.data-model.log] and [metric][docs.data-model.metric] data
+in-flight. They can be chained together, forming a network of transforms within
+your topology, ultimately flowing into a [sink][docs.sinks].
 
 ---
 

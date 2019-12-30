@@ -1,6 +1,6 @@
 ---
 title: Tuning
-description: Tuning Vector
+description: How to tune Vector.
 ---
 
 This document will cover tuning Vector.

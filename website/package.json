@@ -10,14 +10,14 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.39",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.39",
+    "@docusaurus/core": "^2.0.0-alpha.40",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.40",
     "axios": "^0.18.1",
     "cash-dom": "^4.1.5",
     "classnames": "^2.2.6",
     "d3-timer": "^1.0.9",
     "dateformat": "^3.0.3",
-    "docusaurus": "^2.0.0-alpha.39",
+    "docusaurus": "^2.0.0-alpha.40",
     "humanize-string": "^2.1.0",
     "pluralize": "^8.0.0",
     "prismjs": "^1.17.1",

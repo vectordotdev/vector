@@ -30,6 +30,7 @@ check-code: ## Checks code for compilation errors (only default features)
 	@cargo check --all --all-targets
 
 check-fmt: ## Checks code formatting correctness
+	@scripts/check-style.sh
 	@cargo fmt -- --check
 
 check-generate: ## Checks for pending `make generate` changes
@@ -50,6 +51,7 @@ generate: ## Generates files across the repo using the data in /.meta
 	@scripts/generate.rb
 
 fmt: ## Format code
+	@scripts/check-style.sh --fix
 	@cargo fmt
 
 release: ## Release a new Vector version

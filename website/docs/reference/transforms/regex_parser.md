@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "regex_parser" # example, must be: "regex_parser"
   inputs = ["my-source-id"] # example
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
-  
+
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  
+
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
     status = "int"
@@ -189,7 +189,7 @@ And the following configuration:
   regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 
 [transforms.<transform-id>.types]
-  bytes_int = "int"
+  bytes_in = "int"
   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
   status = "int"
   bytes_out = "int"
@@ -206,7 +206,7 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "timestamp": <19/06/2019:17:20:49 -0400>,
   "message": "GET /embrace/supply-chains/dynamic/vertical",
   "status": 201,
-  "bytes": 20574
+  "bytes_out": 20574
 }
 ```
 

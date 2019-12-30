@@ -102,8 +102,7 @@ fn test_max_size() {
         .take(num_lines / 2)
         .map(|line| {
             let mut e = Event::from(line);
-            e.as_mut_log()
-                .insert_implicit("host".into(), "127.0.0.1".into());
+            e.as_mut_log().insert_implicit("host", "127.0.0.1");
             event::proto::EventWrapper::from(e)
         })
         .map(|ew| ew.encoded_len())

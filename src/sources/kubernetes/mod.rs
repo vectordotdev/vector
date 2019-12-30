@@ -235,10 +235,9 @@ fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
             match DateTime::parse_from_rfc3339(
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
-                Ok(timestamp) => log.insert_explicit(
-                    event::TIMESTAMP.clone(),
-                    timestamp.with_timezone(&Utc).into(),
-                ),
+                Ok(timestamp) => {
+                    log.insert_explicit(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
+                }
                 Err(error) => warn!(message = "Non rfc3339 timestamp.", %error),
             }
         } else {
@@ -317,7 +316,7 @@ mod tests {
     #[test]
     fn file_path_transform() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("file".into(),"/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned().into());
+        event.as_mut_log().insert_explicit("file","/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned());
 
         let mut transform = transform_file().unwrap();
 
@@ -335,10 +334,8 @@ mod tests {
     fn cri_message_transform() {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert_explicit(
-            "message".into(),
-            "2019-10-02T13:21:36.927620189+02:00 stdout F 12"
-                .to_owned()
-                .into(),
+            "message",
+            "2019-10-02T13:21:36.927620189+02:00 stdout F 12".to_owned(),
         );
 
         let mut transform = transform_cri_message().unwrap();

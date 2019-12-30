@@ -6,8 +6,9 @@ services:
         - "4568:4568"
         - "4582:4582"
         - "4571:4571"
+        - "4573:4573"
       environment:
-        SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571
+        SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571,firehose:4573
     minio:
       image: minio/minio
       ports:
@@ -75,8 +76,8 @@ services:
       ports:
         - "8123:8123"
     ec2_metadata:
-      image: timberiodev/mock-ec2-metadata:latest 
-      ports: 
+      image: timberiodev/mock-ec2-metadata:latest
+      ports:
         - "8111:8111"
     gcloud-pubsub:
       image: messagebird/gcloud-pubsub-emulator

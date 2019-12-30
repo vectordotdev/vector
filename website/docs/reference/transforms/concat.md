@@ -59,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
-  
+
   # OPTIONAL
   joiner = " " # default
 ```

@@ -136,7 +136,7 @@ class Release
   end
 
   def type
-    @type ||= 
+    @type ||=
       if version.major == 0
         "initial dev"
       else

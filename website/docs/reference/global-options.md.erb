@@ -1,6 +1,6 @@
 ---
 title: Global Options
-description: Global configuration options
+description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
 
 In addition to [sources][docs.sources], [transforms][docs.transforms], and

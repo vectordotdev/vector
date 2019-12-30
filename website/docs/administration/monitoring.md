@@ -1,6 +1,6 @@
 ---
 title: Monitoring
-description: Monitoring Vector
+description: How to monitor and observe Vector with logs, metrics, and more.
 ---
 
 This document will cover monitoring Vector.

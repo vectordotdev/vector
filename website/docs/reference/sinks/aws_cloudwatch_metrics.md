@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example
-  
+
   # OPTIONAL
   healthcheck = true # default
 ```

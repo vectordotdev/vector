@@ -1,7 +1,8 @@
 use crate::{
+    dns::Resolver,
     event::{self, Event, ValueKind},
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -10,8 +11,7 @@ use crate::{
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
-use hyper::{Body, Client};
-use hyper_tls::HttpsConnector;
+use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -69,8 +69,8 @@ inventory::submit! {
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
+        let healthcheck = healthcheck(&self, cx.resolver())?;
         let sink = hec(self.clone(), cx)?;
-        let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
 
         Ok((sink, healthcheck))
     }
@@ -138,18 +138,21 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub fn healthcheck(token: String, host: String) -> crate::Result<super::Healthcheck> {
-    let uri = format!("{}/services/collector/health/1.0", host)
+pub fn healthcheck(
+    config: &HecSinkConfig,
+    resolver: Resolver,
+) -> crate::Result<super::Healthcheck> {
+    let uri = format!("{}/services/collector/health/1.0", config.host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Splunk {}", token))
+        .header("Authorization", format!("Splunk {}", config.token))
         .body(Body::empty())
         .unwrap();
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let client = https_client(resolver, tls)?;
 
     let healthcheck = client
         .request(request)
@@ -223,9 +226,7 @@ mod tests {
     fn splunk_encode_event_json() {
         let host = "host".into();
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_explicit("key".into(), "value".into());
+        event.as_mut_log().insert_explicit("key", "value");
 
         let bytes = encode_event(&host, event, &Encoding::Json).unwrap();
 
@@ -347,9 +348,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("asdf".into(), "hello".into());
+        event.as_mut_log().insert_explicit("asdf", "hello");
 
         let pump = sink.send(event);
 
@@ -381,12 +380,10 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
+        event.as_mut_log().insert_explicit("asdf", "hello");
         event
             .as_mut_log()
-            .insert_explicit("asdf".into(), "hello".into());
-        event
-            .as_mut_log()
-            .insert_implicit("host".into(), "example.com:1234".into());
+            .insert_implicit("host", "example.com:1234");
 
         let pump = sink.send(event);
 
@@ -425,15 +422,13 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
+        event.as_mut_log().insert_explicit("asdf", "hello");
         event
             .as_mut_log()
-            .insert_explicit("asdf".into(), "hello".into());
+            .insert_implicit("host", "example.com:1234");
         event
             .as_mut_log()
-            .insert_implicit("host".into(), "example.com:1234".into());
-        event
-            .as_mut_log()
-            .insert_explicit("roast".into(), "beef.example.com:1234".into());
+            .insert_explicit("roast", "beef.example.com:1234");
 
         let pump = sink.send(event);
 
@@ -461,20 +456,22 @@ mod integration_tests {
     #[test]
     fn splunk_healthcheck() {
         let mut rt = runtime();
+        let resolver = crate::dns::Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         // OK
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:8088".to_string())
-                    .unwrap();
+            let config = config(Encoding::Text);
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
             rt.block_on(healthcheck).unwrap();
         }
 
         // Server not listening at address
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:1111".to_string())
-                    .unwrap();
+            let config = HecSinkConfig {
+                host: "http://localhost:1111".to_string(),
+                ..config(Encoding::Text)
+            };
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
 
             rt.block_on(healthcheck).unwrap_err();
         }
@@ -494,14 +491,17 @@ mod integration_tests {
 
         // Unhealthy server
         {
+            let config = HecSinkConfig {
+                host: "http://localhost:5503".to_string(),
+                ..config(Encoding::Text)
+            };
+
             let unhealthy = warp::any()
                 .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
             let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
             rt.spawn(server);
 
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:5503".to_string())
-                    .unwrap();
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver).unwrap();
             assert_downcast_matches!(
                 rt.block_on(healthcheck).unwrap_err(),
                 HealthcheckError,

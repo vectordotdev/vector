@@ -75,7 +75,7 @@ def create_release_meta_file!(current_commits, new_version)
 
         Done? Ready to proceed?
         EOF
-      
+
       if get(words, ["y", "n"]) == "n"
         error!("Ok, re-run this command when you're ready.")
       end

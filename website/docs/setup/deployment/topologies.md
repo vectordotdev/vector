@@ -26,7 +26,7 @@ The simplest topology. This topology offers direct communication with your downs
 * **Simple.** Less moving parts.
 * **Elastic.** Easily scales with your app. Resources grow as you scale.
 
-#### Cons 
+#### Cons
 
 * **Less efficient.** Depending on the complexity of your pipelines, this will use more local resources, which could disrupt the performance of other applications on the same host.
 * **Less durable.** Because data is buffered on the host it is more likely you'll lose buffered data in the event of an unrecoverable crash. Often times this is the most important and useful data.

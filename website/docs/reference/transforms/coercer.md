@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "coercer" # example, must be: "coercer"
   inputs = ["my-source-id"] # example
-  
+
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
     status = "int"

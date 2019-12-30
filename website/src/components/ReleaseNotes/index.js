@@ -132,7 +132,7 @@ function Notes({release, latest}) {
         </div>
       </header>
       <section className="shade" style={{textAlign: 'center'}}>
-        <MailingListForm />
+        <MailingListForm center={true} />
       </section>
       <section className="markdown">
         <p>

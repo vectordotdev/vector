@@ -1,6 +1,6 @@
 ---
 title: Validating
-description: Validate Vector's configuration
+description: How to validation Vector's configuration to ensure it is error free before applying it.
 ---
 
 Vector provides a subcommand `validate` which checks the validity of any number

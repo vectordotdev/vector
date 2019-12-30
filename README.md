@@ -10,15 +10,6 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
----
-
-<p align="center">
-  <strong>
-    New post! <a href="https://vector.dev/blog/unit-testing-vector-config-files">Unit Testing Your Vector Config Files</a>
-  </strong>
-</p>
-
----
 
 Vector is a [high-performance][pages.index#performance] observability data router. It
 makes [collecting][docs.sources], [transforming][docs.transforms], and
@@ -62,7 +53,7 @@ simple and unified.
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [syslog][docs.sources.syslog], [tcp][docs.sources.tcp], and [5 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [12 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [http][docs.sinks.http], [kafka][docs.sinks.kafka], and [12 more...][docs.sinks]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [http][docs.sinks.http], [kafka][docs.sinks.kafka], and [13 more...][docs.sinks]
 
 #### Administration
 

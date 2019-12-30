@@ -112,9 +112,9 @@ fn kafka_source(
                                 Some(Err(e)) => {
                                     return Err(error!(message = "Cannot extract key", error = ?e))
                                 }
-                                Some(Ok(key)) => event
-                                    .as_mut_log()
-                                    .insert_implicit(key_field.clone().into(), key.into()),
+                                Some(Ok(key)) => {
+                                    event.as_mut_log().insert_implicit(key_field.clone(), key)
+                                }
                             }
                         }
                         consumer_ref.store_offset(&msg).map_err(

@@ -96,7 +96,7 @@ function Features({features}) {
   let i,j,temparray,chunk = 3;
   for (i=0,j=features.length; i<j; i+=chunk) {
     let featuresChunk = features.slice(i,i+chunk);
-    
+
     rows.push(
       <div key={`features${i}`} className="row">
         {featuresChunk.map((props, idx) => (
@@ -434,7 +434,7 @@ function Home() {
 
   return (
     <Layout description={siteConfig.description}>
-      <header className={classnames('hero', styles.indexHeroBanner)}>
+      <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (
             <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>

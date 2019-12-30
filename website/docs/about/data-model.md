@@ -1,7 +1,7 @@
 ---
 title: Data Model
 sidebar_label: hidden
-description: Explaining Vector's data model
+description: Vector's internal data model -- event. Covering both log and metrics events.
 ---
 
 import SVG from 'react-inlinesvg';

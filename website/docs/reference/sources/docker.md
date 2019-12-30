@@ -31,7 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED
   type = "docker" # example, must be: "docker"
-  
+
   # OPTIONAL
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
@@ -64,7 +64,7 @@ import Field from '@site/src/components/Field';
 ### include_containers
 
 A list of container IDs _or_ names to match against. Prefix matches are supported, meaning you can supply just the first few characters of the
-container ID or name. If not provided, all containers will be included. 
+container ID or name. If not provided, all containers will be included.
 
 
 </Field>
@@ -324,6 +324,7 @@ Vector will automatically attempt to connect to the docker daemon for you. In mo
 situations if your current user is able to run `docker ps` then Vector will be able to
 connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
 use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.

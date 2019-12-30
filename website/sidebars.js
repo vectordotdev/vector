@@ -68,7 +68,7 @@ module.exports = {
               items: [
                 "setup/installation/manual",
                 "setup/installation/manual/from-archives",
-                "setup/installation/manual/from-source",              
+                "setup/installation/manual/from-source",
               ],
             },
           ],
@@ -191,6 +191,8 @@ module.exports = {
               "reference/sinks/aws_cloudwatch_logs",
             
               "reference/sinks/aws_cloudwatch_metrics",
+            
+              "reference/sinks/aws_kinesis_firehose",
             
               "reference/sinks/aws_kinesis_streams",
             
