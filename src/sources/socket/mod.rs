@@ -28,7 +28,7 @@ pub enum Mode {
 impl SocketConfig {
     pub fn make_tcp_config(addr: SocketAddr) -> Self {
         Self {
-            mode: Mode::Tcp(tcp::TcpConfig::new(addr.into())),
+            mode: tcp::TcpConfig::new(addr.into()).into(),
         }
     }
 }
