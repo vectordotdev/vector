@@ -48,7 +48,7 @@ impl From<TcpSinkConfig> for SocketSinkConfig {
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        match self.mode.clone() {
+        match &self.mode {
             Mode::Tcp(config) => config.build(cx),
         }
     }
