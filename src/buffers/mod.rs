@@ -138,11 +138,14 @@ impl Acker {
     // This is primary used by the on-disk buffer to know which events are okay to
     // delete from disk.
     pub fn ack(&self, num: usize) {
-        match self {
-            Acker::Null => {}
-            Acker::Disk(counter, notifier) => {
-                counter.fetch_add(num, Ordering::Relaxed);
-                notifier.notify();
+        // Only ack items if the amount to ack is larger than zero.
+        if num > 0 {
+            match self {
+                Acker::Null => {}
+                Acker::Disk(counter, notifier) => {
+                    counter.fetch_add(num, Ordering::Relaxed);
+                    notifier.notify();
+                }
             }
         }
     }
