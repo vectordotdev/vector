@@ -24,18 +24,23 @@ inventory::submit! {
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(address: String, encoding: Encoding, tls: Option<TlsConfig>) -> Self {
-        Self {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address,
-                encoding,
-                tls,
-            }),
+        TcpSinkConfig {
+            address,
+            encoding,
+            tls,
         }
+        .into()
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
+        TcpSinkConfig::new(address).into()
+    }
+}
+
+impl From<TcpSinkConfig> for SocketSinkConfig {
+    fn from(config: TcpSinkConfig) -> Self {
         Self {
-            mode: Mode::Tcp(TcpSinkConfig::new(address)),
+            mode: Mode::Tcp(config),
         }
     }
 }
