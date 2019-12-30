@@ -427,20 +427,20 @@ dns_servers = ["0.0.0.0:53"]
 [sources.prometheus]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `prometheus`.
-  # 
+  #
   # * required
   # * type: string
   # * must be: "prometheus"
   type = "prometheus"
 
   # Host addresses to scrape metrics from.
-  # 
+  #
   # * required
   # * type: [string]
   hosts = ["http://localhost:9090"]
 
   # The interval between scrapes in seconds.
-  # 
+  #
   # * required
   # * type: int
   scrape_interval_secs = 1
@@ -3818,7 +3818,7 @@ end
   namespace = "service"
 
   # Default buckets to use for aggregating distribution metrics into histograms.
-  # 
+  #
   # * optional
   # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
   # * type: [float]
@@ -3826,7 +3826,7 @@ end
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
   # Time interval between set values are reset.
-  # 
+  #
   # * optional
   # * default: 60
   # * type: int
