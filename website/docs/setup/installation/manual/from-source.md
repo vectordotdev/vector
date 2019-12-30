@@ -15,7 +15,7 @@ import Alert from '@site/src/components/Alert';
 <Alert type="warning">
 
 We recommend installing Vector through a supported [container
-platform][docs.containers], [package manager][docs.package_managers], or 
+platform][docs.containers], [package manager][docs.package_managers], or
 pre-built [archive][docs.from_archives], if possible. These handle permissions,
 directory creation, and other intricacies covered in the [Next
 Steps](#next-steps) section.
@@ -40,9 +40,7 @@ import Tabs from '@theme/Tabs';
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     ```
 
-2. Install C++ toolchain
-
-    Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
+2.  Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
     on your system.
 
 3.  Create the `vector` directory
@@ -52,7 +50,7 @@ import Tabs from '@theme/Tabs';
     ```
 
 4.  Download Vector's Source
-  
+
     <Tabs
       className="mini"
       defaultValue="latest"
@@ -217,7 +215,7 @@ needed, as all of them would be automatically pulled by Docker.
 Building steps:
 
 1.  Download Vector's Source
-  
+
     <Tabs
       className="mini"
       defaultValue="latest"

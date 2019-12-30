@@ -1,6 +1,6 @@
 ---
 title: Metric Event
-description: A deep dive into Vector's metric event
+description: A detailed guide on Vector's internal metric data model.
 ---
 
 import SVG from 'react-inlinesvg';

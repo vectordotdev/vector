@@ -138,6 +138,7 @@ statsd_set = "https://github.com/statsd/statsd/blob/master/docs/metric_types.md#
 stderr = "https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)"
 stdout = "https://en.wikipedia.org/wiki/Standard_streams#Standard_output_(stdout)"
 strptime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
+syslog_3164 = "https://tools.ietf.org/html/rfc3164"
 syslog_5424 = "https://tools.ietf.org/html/rfc5424"
 systemd = "https://www.freedesktop.org/wiki/Software/systemd/"
 systemd_limit_resources = "https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html"

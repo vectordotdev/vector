@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, SinkExt, TowerRequestConfig,
     },
@@ -13,9 +13,8 @@ use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOEr
 use http::{Method, Uri};
 use hyper::{
     header::{HeaderValue, AUTHORIZATION},
-    Body, Client, Request,
+    Body, Request,
 };
-use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -74,7 +73,7 @@ impl SinkConfig for PubsubConfig {
         };
 
         let sink = self.service(&cx, &creds)?;
-        let healthcheck = self.healthcheck(&creds)?;
+        let healthcheck = self.healthcheck(&cx, &creds)?;
 
         Ok((sink, healthcheck))
     }
@@ -125,15 +124,19 @@ impl PubsubConfig {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(&self, creds: &Option<PubsubCreds>) -> crate::Result<super::Healthcheck> {
+    fn healthcheck(
+        &self,
+        cx: &SinkContext,
+        creds: &Option<PubsubCreds>,
+    ) -> crate::Result<super::Healthcheck> {
         let uri = self.uri("")?;
         let mut request = Request::get(uri).body(Body::empty()).unwrap();
         if let Some(creds) = creds.as_ref() {
             creds.apply(&mut request);
         }
 
-        let https = HttpsConnector::new(1).expect("TLS initialization failed");
-        let client = Client::builder().build(https);
+        let tls = TlsSettings::from_options(&self.tls)?;
+        let client = https_client(cx.resolver(), tls)?;
         let creds = creds.clone();
         let healthcheck = client
             .request(request)

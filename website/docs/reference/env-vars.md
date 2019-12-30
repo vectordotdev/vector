@@ -1,7 +1,7 @@
 ---
 title: Environment Variables
+description: "A full list of Vector's supported environment variables."
 sidebar_label: Env Vars
-description: Vector's environment variables
 ---
 
 You can control Vector's behavior through select environment variables:
@@ -10,7 +10,7 @@ You can control Vector's behavior through select environment variables:
 ENV_VAR1=val ENV_VAR2=val vector --config=/etc/vector/vector.toml
 ```
 
-In addition, we recommend that you look at the [global configuration 
+In addition, we recommend that you look at the [global configuration
 options][docs.global-options] as well.
 
 <!--

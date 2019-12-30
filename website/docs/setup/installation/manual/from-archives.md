@@ -43,7 +43,7 @@ import TabItem from '@theme/TabItem';
 
 
 1.  Download & unpack the archive
-    
+
     <Tabs
       className="mini"
       defaultValue="latest"
@@ -99,7 +99,7 @@ import TabItem from '@theme/TabItem';
 
 
 1.  Download & unpack the archive
-    
+
     <Tabs
       className="mini"
       defaultValue="latest"
@@ -155,7 +155,7 @@ import TabItem from '@theme/TabItem';
 
 
 1.  Download & unpack the archive
-    
+
     <Tabs
       className="mini"
       defaultValue="latest"
@@ -211,7 +211,7 @@ import TabItem from '@theme/TabItem';
 
 
 1.  Download & unpack the archive
-    
+
     <Tabs
       className="mini"
       defaultValue="latest"

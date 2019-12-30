@@ -11,7 +11,7 @@ import classnames from 'classnames';
 import Link from '@docusaurus/Link';
 
 import styles from './styles.module.css';
-   
+
 const MOBILE_TOGGLE_SIZE = 24;
 
 function DocSidebarItem({item, level, onItemClick, collapsible}) {

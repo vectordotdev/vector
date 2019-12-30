@@ -42,15 +42,15 @@ function BlogListPage(props) {
 
           <ul className="filters unstyled">
             {typeTags.map((tag, idx) => (
-              <li><Link to={tag.permalink + '/'} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
+              <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
             ))}
           </ul>
 
           <h3>Domains</h3>
-          
+
           <ul className="filters unstyled">
             {domainTags.map((tag, idx) => (
-              <li><Link to={tag.permalink + '/'} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
+              <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
             ))}
           </ul>
 

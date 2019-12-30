@@ -31,7 +31,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   database = "/path/to/GeoLite2-City.mmdb" # example
   source = "ip_address" # example
-  
+
   # OPTIONAL
   target = "geoip" # default
 ```

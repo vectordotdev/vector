@@ -60,10 +60,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "vector" # example, must be: "vector"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
-  
+
   # OPTIONAL - General
   healthcheck = true # default
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum

@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "new_relic_logs" # example, must be: "new_relic_logs"
   inputs = ["my-source-id"] # example
-  
+
   # OPTIONAL
   insert_key = "xxxx" # example, no default
   license_key = "xxxx" # example, no default
@@ -64,17 +64,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "new_relic_logs" # example, must be: "new_relic_logs"
   inputs = ["my-source-id"] # example
-  
+
   # OPTIONAL - General
   healthcheck = true # default
   insert_key = "xxxx" # example, no default
   license_key = "xxxx" # example, no default
   region = "us" # default, enum
-  
+
   # OPTIONAL - Batching
   batch_size = 524000 # default, bytes
   batch_timeout = 1 # default, seconds
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 100 # default
   request_rate_limit_duration_secs = 1 # default, seconds
@@ -82,7 +82,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_attempts = 10 # default
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
-  
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum

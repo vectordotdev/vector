@@ -11,10 +11,10 @@ module.exports = {
   },
   themeConfig: {
     navbar: {
+      hideOnScroll: true,
       logo: {
         alt: 'Vector',
         src: 'img/logo-light.svg',
-        darkSrc: 'img/logo-dark.svg'
       },
       links: [
         {to: 'components/', label: 'Components', position: 'left'},
@@ -40,16 +40,16 @@ module.exports = {
               to: 'docs/about/what-is-vector/',
             },
             {
-              label: 'Concepts',
-              to: 'docs/about/concepts/',
+              label: 'The Team',
+              to: 'community/#team',
             },
             {
-              label: 'Data Model',
-              to: 'docs/about/data-model/',
+              label: 'Contact Us',
+              to: 'contact/',
             },
             {
-              label: 'Guarantees',
-              to: 'docs/about/guarantees/',
+              label: 'Press',
+              to: 'press/',
             },
           ],
         },

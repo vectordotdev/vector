@@ -47,10 +47,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "console" # example, must be: "console"
   inputs = ["my-source-id"] # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
-  
+
   # OPTIONAL - General
   target = "stdout" # default, enum
 ```
@@ -65,10 +65,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "console" # example, must be: "console"
   inputs = ["my-source-id"] # example
-  
+
   # REQUIRED - requests
   encoding = "json" # example, enum
-  
+
   # OPTIONAL - General
   healthcheck = true # default
   target = "stdout" # default, enum

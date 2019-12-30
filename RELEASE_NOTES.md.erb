@@ -9,5 +9,5 @@
 ---
 
 <%- metadata.releases_list.reverse.each do |release| -%>
-* [**v<%= release.version %>**][urls.release_notes_v<%= release.version %>] - <%= release.date %> - <%= release_summary(release) %>
+* [**v<%= release.version %>**][urls.release_notes_<%= release.version %>] - <%= release.date %> - <%= release_summary(release) %>
 <%- end -%>

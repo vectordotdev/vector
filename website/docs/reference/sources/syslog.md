@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "syslog" # example, must be: "syslog"
   mode = "tcp" # example, enum
-  
+
   # OPTIONAL
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
@@ -63,12 +63,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "syslog" # example, must be: "syslog"
   mode = "tcp" # example, enum
-  
+
   # OPTIONAL - General
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
   max_length = 102400 # default, bytes
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
-  
+
   # OPTIONAL - Context
   host_key = "host" # default
 ```
@@ -103,7 +103,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. 
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 
 </Field>
@@ -416,16 +416,20 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 ### Parsing
 
-Vector will _only_ parse messages in the [Syslog 5424][urls.syslog_5424] format.
-Vector makes a best effort to parse this format. If parsing fails, the message
-will be dropped and `warning` log line will be emitted. If this is the case, we
-recommend using the [`tcp` source][docs.sources.tcp] combined with the
-[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
-ingestion and parsing scheme.
+Vector will _only_ parse messages in the [Syslog 5424 format][urls.syslog_5424],
+Vector will _not_ parse the [Syslog 3164 format][urls.syslog_3164] since 3164
+is not an exact specification, but an observation of behavior.
+
+Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
+fails, the event will be dropped and `warning` log line will be emitted. If
+this is the case, we recommend using the [`tcp` source][docs.sources.tcp]
+combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
+implement your own ingestion and parsing scheme.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.sources.tcp]: /docs/reference/sources/tcp/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

@@ -1,5 +1,6 @@
 ---
 title: Glossary
+description: "Vector documentation glossary of terms"
 ---
 
 The gloassary contains common terms and their definitions.
@@ -14,7 +15,7 @@ The gloassary contains common terms and their definitions.
 
 ## Binary
 
-"Binary" refers to the static binary that Vector compiles to. 
+"Binary" refers to the static binary that Vector compiles to.
 
 ## Buffer
 

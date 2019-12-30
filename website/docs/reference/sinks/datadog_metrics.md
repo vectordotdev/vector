@@ -49,7 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example
-  
+
   # OPTIONAL
   host = "https://api.datadoghq.com" # default
 ```
@@ -66,15 +66,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example
-  
+
   # OPTIONAL - General
   healthcheck = true # default
   host = "https://api.datadoghq.com" # default
-  
+
   # OPTIONAL - Batching
   batch_size = 20 # default, bytes
   batch_timeout = 1 # default, seconds
-  
+
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
   request_rate_limit_duration_secs = 1 # default, seconds

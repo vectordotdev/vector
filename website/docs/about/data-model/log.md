@@ -1,6 +1,6 @@
 ---
 title: Log Event
-description: A deep dive into Vector's log event
+description: A detailed guide on Vector's internal log data model.
 ---
 
 import SVG from 'react-inlinesvg';

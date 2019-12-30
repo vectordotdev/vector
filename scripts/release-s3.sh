@@ -27,7 +27,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   # Add nightly files with today's date for posterity
   today=$(date +"%F")
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$today"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive --sse --acl public-read 
+  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
   # Add "latest" nightly files
