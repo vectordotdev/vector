@@ -386,10 +386,11 @@ dns_servers = ["0.0.0.0:53"]
   address = "systemd"
   address = "systemd#3"
 
-  # Specifies what type of socket to use. Valid options are "tcp" and "udp".
+  # The type of socket to use.
   #
   # * required
   # * type: string
+  # * enum: "tcp" or "udp"
   mode = "tcp"
   mode = "udp"
 
