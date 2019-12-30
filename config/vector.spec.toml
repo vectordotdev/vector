@@ -371,7 +371,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `socket`.
-  # 
+  #
   # * required
   # * type: string
   # * must be: "socket"
@@ -379,7 +379,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The address to listen for connections on, or "systemd#N" to use the Nth
   # socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
-  # 
+  #
   # * required
   # * type: string
   address = "0.0.0.0:9000"
@@ -387,7 +387,7 @@ dns_servers = ["0.0.0.0:53"]
   address = "systemd#3"
 
   # Specifies what type of socket to use. Valid options are "tcp" and "udp".
-  # 
+  #
   # * required
   # * type: string
   mode = "tcp"
@@ -395,7 +395,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The maximum bytes size of incoming messages before they are discarded. Valid
   # for "tcp" and "udp" sockets.
-  # 
+  #
   # * optional
   # * default: 102400
   # * type: int
@@ -404,7 +404,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The timeout before a connection is forcefully closed during shutdown. Valid
   # only for "tcp" sockets.
-  # 
+  #
   # * optional
   # * default: 30
   # * type: int
@@ -417,7 +417,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The key name added to each event representing the current host. Valid for
   # "tcp" and "udp" sockets.
-  # 
+  #
   # * optional
   # * default: "host"
   # * type: string
