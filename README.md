@@ -10,15 +10,6 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
----
-
-<p align="center">
-  <strong>
-    New post! <a href="https://vector.dev/blog/unit-testing-vector-config-files">Unit Testing Your Vector Config Files</a>
-  </strong>
-</p>
-
----
 
 Vector is a [high-performance][pages.index#performance] observability data router. It
 makes [collecting][docs.sources], [transforming][docs.transforms], and
