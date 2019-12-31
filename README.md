@@ -39,7 +39,7 @@ data from A to B simple and unified.
 #### About
 
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
+* [**Data model (Event)**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
