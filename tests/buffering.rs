@@ -316,7 +316,7 @@ fn test_reclaim_disk_space() {
         .map(|m| m.len())
         .sum();
 
-    // Ensure that the disk after is _atleast_ more than half as small
-    // as it was before.
+    // Ensure that the disk space after is less than half of the size that it
+    // was before we reclaimed the space.
     assert!(after_disk_size < before_disk_size / 2);
 }
