@@ -175,7 +175,7 @@ fn test_max_size() {
 fn test_max_size_resume() {
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
-    let mut rt = runtime();
+    let rt = runtime();
 
     let num_lines: usize = 1000;
     let line_size = 1000;
