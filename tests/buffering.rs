@@ -10,7 +10,6 @@ use vector::test_util::{
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
-#[cfg(unix)]
 #[test]
 fn test_buffering() {
     let data_dir = tempdir().unwrap();
@@ -35,7 +34,7 @@ fn test_buffering() {
     };
     config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
@@ -48,6 +47,9 @@ fn test_buffering() {
 
     rt.shutdown_now().wait().unwrap();
     drop(topology);
+
+    let in_addr = next_addr();
+    let out_addr = next_addr();
 
     // Start sink server, then run vector again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
@@ -63,7 +65,7 @@ fn test_buffering() {
     };
     config.global.data_dir = Some(data_dir);
 
-    let mut rt = runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -173,6 +175,7 @@ fn test_max_size() {
 fn test_max_size_resume() {
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
+    let mut rt = runtime();
 
     let num_lines: usize = 1000;
     let line_size = 1000;
@@ -215,7 +218,7 @@ fn test_max_size_resume() {
 
     let output_lines = receive(&out_addr);
 
-    block_on(topology.stop()).unwrap();
+    rt.block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
@@ -270,6 +273,9 @@ fn test_reclaim_disk_space() {
         .filter(|metadata| metadata.is_file())
         .map(|m| m.len())
         .sum();
+
+    let in_addr = next_addr();
+    let out_addr = next_addr();
 
     // Start sink server, then run vector again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
