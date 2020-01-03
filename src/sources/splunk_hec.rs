@@ -284,8 +284,8 @@ struct EventStream<R: Read> {
     events: usize,
     /// Optinal channel from headers
     channel: Option<ValueKind>,
-    /// Default time, Ok(extracted), Err(now)
-    time: Result<DateTime<Utc>, DateTime<Utc>>,
+    /// Default time
+    time: Time,
     /// Remaining extracted default values
     extractors: [DefaultExtractor; 4],
 }
@@ -296,7 +296,7 @@ impl<R: Read> EventStream<R> {
             data,
             events: 0,
             channel: channel.map(|value| value.as_bytes().into()),
-            time: Err(Utc::now()),
+            time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
@@ -393,9 +393,9 @@ impl<R: Read> Stream for EventStream<R> {
             None => (),
             Some(Some(t)) => {
                 if let Some(t) = t.as_u64() {
-                    self.time = Ok(Utc.timestamp(t as i64, 0));
+                    self.time = Time::Provided(Utc.timestamp(t as i64, 0));
                 } else if let Some(t) = t.as_f64() {
-                    self.time = Ok(Utc.timestamp(
+                    self.time = Time::Provided(Utc.timestamp(
                         t.floor() as i64,
                         (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
                     ));
@@ -408,8 +408,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Ok(time) => log.insert_explicit(event::TIMESTAMP.clone(), time),
-            Err(time) => log.insert_implicit(event::TIMESTAMP.clone(), time),
+            Time::Provided(time) => log.insert_explicit(event::TIMESTAMP.clone(), time),
+            Time::Now(time) => log.insert_implicit(event::TIMESTAMP.clone(), time),
         }
 
         // Extract default extracted fields
@@ -462,6 +462,15 @@ impl DefaultExtractor {
             log.insert_explicit(self.to_field.clone(), index.clone());
         }
     }
+}
+
+/// For tracking origin of the timestamp
+#[derive(Clone, Debug)]
+enum Time {
+    /// Backup
+    Now(DateTime<Utc>),
+    /// Provided in the request
+    Provided(DateTime<Utc>),
 }
 
 /// Creates event from raw request
