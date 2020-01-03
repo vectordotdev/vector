@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
   title: 'Vector',
   tagline: 'A High-Performance, Logs, Metrics, & Events Router',
@@ -20,6 +22,7 @@ module.exports = {
         {to: 'components/', label: 'Components', position: 'left'},
         {to: 'docs/', label: 'Docs', position: 'left'},
         {to: 'blog/', label: 'Blog', position: 'left'},
+        {to: 'guides/', label: 'Guides', position: 'left'},
         {to: 'community/', label: 'Community', position: 'left'},
         {to: 'releases/', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
@@ -152,6 +155,9 @@ module.exports = {
         },
       },
     ],
+  ],
+  plugins: [
+    path.resolve(__dirname, './plugins/guides'),
   ],
   scripts: [],
   stylesheets: [

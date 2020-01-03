@@ -30,7 +30,7 @@ class Metadata
   end
 
   attr_reader :blog_posts,
-  :env_vars,
+    :env_vars,
     :installation,
     :links,
     :log_fields,
@@ -274,7 +274,7 @@ class Metadata
       sources: sources.deep_to_h,
       team: team.deep_to_h,
       transforms: transforms.deep_to_h,
-      sinks: sinks.deep_to_h
+      sinks: sinks.deep_to_h,
     }
   end
 
