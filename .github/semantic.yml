@@ -49,12 +49,11 @@ scopes:
   - file source
   - journald source
   - kafka source
+  - socket source
   - splunk_hec source
   - statsd source
   - stdin source
   - syslog source
-  - tcp source
-  - udp source
   - vector source
 
   # transforms

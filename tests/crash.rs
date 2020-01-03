@@ -57,7 +57,10 @@ fn test_sink_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_sink(
         "out",
         &["in"],
@@ -136,7 +139,10 @@ fn test_sink_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_sink(
         "out",
         &["in"],
@@ -200,7 +206,10 @@ fn test_source_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_source("error", ErrorSourceConfig);
     config.add_sink(
         "out",
@@ -266,7 +275,10 @@ fn test_source_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_source("panic", PanicSourceConfig);
     config.add_sink(
         "out",

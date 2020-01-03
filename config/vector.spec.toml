@@ -363,6 +363,67 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events.
+[sources.socket]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `socket`.
+  #
+  # * required
+  # * type: string
+  # * must be: "socket"
+  type = "socket"
+
+  # The address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
+  #
+  # * required
+  # * type: string
+  address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#3"
+
+  # The type of socket to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "tcp" or "udp"
+  mode = "tcp"
+  mode = "udp"
+
+  # The maximum bytes size of incoming messages before they are discarded. Valid
+  # for "tcp" and "udp" sockets.
+  #
+  # * optional
+  # * default: 102400
+  # * type: int
+  # * unit: bytes
+  max_length = 102400
+
+  # The timeout before a connection is forcefully closed during shutdown. Valid
+  # only for "tcp" sockets.
+  #
+  # * optional
+  # * default: 30
+  # * type: int
+  # * unit: seconds
+  shutdown_timeout_secs = 30
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host. Valid for
+  # "tcp" and "udp" sockets.
+  #
+  # * optional
+  # * default: "host"
+  # * type: string
+  host_key = "host"
+
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
   # The component type. This is a required field that tells Vector which
@@ -488,95 +549,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   # * relevant when mode = "unix"
   path = "/path/to/socket"
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  #
-  # * optional
-  # * default: "host"
-  # * type: string
-  host_key = "host"
-
-# Ingests data through the TCP protocol and outputs `log` events.
-[sources.tcp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `tcp`.
-  #
-  # * required
-  # * type: string
-  # * must be: "tcp"
-  type = "tcp"
-
-  # The address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation.
-  #
-  # * required
-  # * type: string
-  address = "0.0.0.0:9000"
-  address = "systemd"
-  address = "systemd#3"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  #
-  # * optional
-  # * default: 102400
-  # * type: int
-  # * unit: bytes
-  max_length = 102400
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  shutdown_timeout_secs = 30
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  #
-  # * optional
-  # * default: "host"
-  # * type: string
-  host_key = "host"
-
-# Ingests data through the UDP protocol and outputs `log` events.
-[sources.udp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `udp`.
-  #
-  # * required
-  # * type: string
-  # * must be: "udp"
-  type = "udp"
-
-  # The address to bind the socket to.
-  #
-  # * required
-  # * type: string
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  #
-  # * optional
-  # * default: 102400
-  # * type: int
-  # * unit: bytes
-  max_length = 102400
 
   #
   # Context
@@ -2093,7 +2065,7 @@ end
   # this to be the root S3 "folder".
   #
   # * optional
-  # * default: "date=%F"
+  # * default: "date=%F/"
   # * type: string
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"

@@ -122,6 +122,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/socket",
+            
               "reference/sources/splunk_hec",
             
               "reference/sources/statsd",
@@ -129,10 +131,6 @@ module.exports = {
               "reference/sources/stdin",
             
               "reference/sources/syslog",
-            
-              "reference/sources/tcp",
-            
-              "reference/sources/udp",
             
               "reference/sources/vector",
             
