@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "console" # example, must be: "console"
+  type = "console" # must be: "console"
   inputs = ["my-source-id"] # example
 
   # REQUIRED - requests
@@ -63,7 +63,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "console" # example, must be: "console"
+  type = "console" # must be: "console"
   inputs = ["my-source-id"] # example
 
   # REQUIRED - requests

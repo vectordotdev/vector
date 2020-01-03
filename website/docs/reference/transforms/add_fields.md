@@ -27,12 +27,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "add_fields" # example, must be: "add_fields"
+  type = "add_fields" # must be: "add_fields"
   inputs = ["my-source-id"] # example
 
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
-    my_string_field = "string value"
+    string_field = "string value" # example
+    env_var_field = "${ENV_VAR}" # example
+    int_field = 1 # example
+    float_field = 1.2 # example
+    bool_field = true # example
+    timestamp_field = 1979-05-27T00:32:00Z # example
+    parent = {child = "child_value"} # example
+    list_field = ["first", "second", "third"] # example
 ```
 
 ## Options
@@ -70,7 +77,7 @@ A table of key/value pairs representing the keys to be added to the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"my_string_field":"string value"},{"my_env_var_field":"${ENV_VAR}"},{"my_int_field":1},{"my_float_field":1.2},{"my_bool_field":true},{"my_timestamp_field":"1979-05-27 00:32:00 -0700"},{"my_nested_fields":{"key1":"value1","key2":"value2"}},{"my_list":["first","second","third"]}]}
+  examples={[{"string_field":"string value"},{"env_var_field":"${ENV_VAR}"},{"int_field":1},{"float_field":1.2},{"bool_field":true},{"timestamp_field":"1979-05-27 00:32:00 -0700"},{"parent":{"child":"child_value"}},{"list_field":["first","second","third"]}]}
   name={"`[field-name]`"}
   nullable={false}
   path={"fields"}

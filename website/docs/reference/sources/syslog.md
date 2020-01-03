@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "syslog" # example, must be: "syslog"
+  type = "syslog" # must be: "syslog"
   mode = "tcp" # example, enum
 
   # OPTIONAL
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "syslog" # example, must be: "syslog"
+  type = "syslog" # must be: "syslog"
   mode = "tcp" # example, enum
 
   # OPTIONAL - General

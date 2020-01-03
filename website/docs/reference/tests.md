@@ -64,9 +64,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
 
       # OPTIONAL
-      "message.eq" = "this is the content to match against" # example
-      "host.exists" = true # example
-      "method.neq" = "POST" # example
+      "message.eq" = "this is the content to match against"
+      "host.exists" = true
+      "method.neq" = "POST"
 
   # REQUIRED - Input
   [tests.input]
@@ -103,9 +103,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
 
       # OPTIONAL
-      "message.eq" = "this is the content to match against" # example
-      "host.exists" = true # example
-      "method.neq" = "POST" # example
+      "message.eq" = "this is the content to match against"
+      "host.exists" = true
+      "method.neq" = "POST"
 
   # REQUIRED - Input
   [tests.input]
@@ -118,7 +118,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # OPTIONAL - Log fields
     [tests.input.log_fields]
-      message = "some message contents"
+      message = "some message contents" # example
+      host = "myhost" # example
 
     # OPTIONAL - Metric
     [tests.input.metric]
@@ -134,7 +135,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
       # OPTIONAL - Tags
       [tests.input.metric.tags]
-        host = "foohost"
+        host = "foohost" # example
+        region = "us-east-1" # example
 ```
 
 </TabItem>

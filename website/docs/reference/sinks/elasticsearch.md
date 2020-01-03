@@ -45,12 +45,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "elasticsearch" # example, must be: "elasticsearch"
+  type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL
   host = "http://10.24.32.122:9000" # example, no default
-  index = "vector-%Y-%m-%d" # default
+  index = "vector-%F" # default
 ```
 
 </TabItem>
@@ -61,14 +61,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "elasticsearch" # example, must be: "elasticsearch"
+  type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL - General
   doc_type = "_doc" # default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
-  index = "vector-%Y-%m-%d" # default
+  index = "vector-%F" # default
   provider = "default" # default, enum
   region = "us-east-1" # example, no default
 
@@ -98,11 +98,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${TOKEN_ENV_VAR}" # example
+    X-Powered-By = "Vector" # example
 
   # OPTIONAL - Query
   [sinks.my_sink_id.query]
-    X-Powered-By = "Vector"
+    X-Powered-By = "Vector" # example
 
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -488,7 +489,7 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
   common={true}
   defaultValue={"vector-%F"}
   enumValues={null}
-  examples={["vector-%Y-%m-%d","application-{{ application_id }}-%Y-%m-%d"]}
+  examples={["application-{{ application_id }}-%Y-%m-%d","vector-%Y-%m-%d"]}
   name={"index"}
   nullable={false}
   path={null}
@@ -1025,8 +1026,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```toml
 [sinks.my_elasticsearch_sink_id]
   # ...
-  index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
+  index = "vector-%Y-%m-%d"
   # ...
 ```
 

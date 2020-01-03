@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "kafka" # example, must be: "kafka"
+  type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
@@ -62,15 +62,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "kafka" # example, must be: "kafka"
+  type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
 
   # OPTIONAL
-  auto_offset_reset = "smallest" # default
+  auto_offset_reset = "largest" # default
   key_field = "user_id" # example, no default
-  session_timeout_ms = 5000 # default, milliseconds
+  session_timeout_ms = 10000 # default, milliseconds
 ```
 
 </TabItem>

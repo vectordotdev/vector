@@ -38,8 +38,8 @@ type = "string"
 common = true
 default = "vector-%F"
 examples = [
+  "application-{{ application_id }}-%Y-%m-%d",
   "vector-%Y-%m-%d",
-  "application-{{ application_id }}-%Y-%m-%d"
 ]
 null = false
 templateable = true

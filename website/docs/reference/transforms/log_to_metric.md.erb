@@ -4,7 +4,22 @@
 
 ## Configuration
 
-<%= component_config_example(component) %>
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+
+  [[transforms.log_to_metric.metrics]]
+    type = "histogram"
+    field = "time"
+    name = "time_ms" # optional
+    tags.status = "{{status}}" # optional
+    tags.host = "{{host}}" # optional
+    tags.env = "${ENV}" # optional
+```
 
 ## Options
 

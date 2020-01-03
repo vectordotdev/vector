@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "grok_parser" # example, must be: "grok_parser"
+  type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"] # example
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # example
 
@@ -37,7 +37,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int"
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options

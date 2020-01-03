@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
@@ -67,7 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_cloudwatch_logs" # example, must be: "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example

@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_kinesis_firehose" # example, must be: "aws_kinesis_firehose"
+  type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_kinesis_firehose" # example, must be: "aws_kinesis_firehose"
+  type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example

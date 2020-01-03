@@ -229,6 +229,6 @@ class Option
   end
 
   def wildcard?
-    name.start_with?("`<")
+    name.start_with?("`[")
   end
 end

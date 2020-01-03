@@ -8,19 +8,17 @@
 <%= config_example(option.options_list, array: true, path: "#{path}.#{option.name}", common: common).indent(2) %>
     <%- elsif option.table? -%>
 <%= config_example(option.options_list, path: "#{path}.#{option.name}", common: common).indent(2) %>
-    <%- else -%>
-      <%- if option.wildcard? -%>
-        <%- option.examples.each do |e| -%>
+    <%- elsif option.wildcard? -%>
+      <%- option.examples.each do |e| -%>
   <%= e.to_toml %> # example
-        <%- end -%>
+      <%- end -%>
+    <%- else -%>
+      <%- value = option.default || option.examples.first -%>
+      <%- tags = option_tags(option, example: true, optionality: false, short: true, type: false) -%>
+      <%- if value.is_a?(Hash) -%>
+<%= value.to_toml.indent(2) %>
       <%- else -%>
-        <%- first_example = option.examples.first -%>
-        <%- tags = option_tags(option, example: true, optionality: false, short: true, type: false) -%>
-        <%- if first_example.is_a?(Hash) -%>
-<%= first_example.to_toml.indent(2) %>
-        <%- else -%>
-  <%= option.name %> = <%= first_example.to_toml %><% if tags.any? && !first_example.to_toml.include?("\n") %> # <%= tags.join(", ") %><% end %>
-        <%- end -%>
+  <%= option.name %> = <%= value.to_toml %><% if tags.any? && !value.to_toml.include?("\n") %> # <%= tags.join(", ") %><% end %>
       <%- end -%>
     <%- end -%>
   <%- end -%>

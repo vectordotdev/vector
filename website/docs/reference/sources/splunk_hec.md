@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "splunk_hec" # example, must be: "splunk_hec"
+  type = "splunk_hec" # must be: "splunk_hec"
 
   # OPTIONAL
   address = "0.0.0.0:8088" # default

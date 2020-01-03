@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_s3" # example, must be: "aws_s3"
+  type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding = "ndjson" # example, enum
 
   # OPTIONAL - Object Names
-  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F" # default
 ```
 
 </TabItem>
@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_s3" # example, must be: "aws_s3"
+  type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
@@ -86,7 +86,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_append_uuid = true # default
   filename_extension = "log" # default
   filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F" # default
 
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default

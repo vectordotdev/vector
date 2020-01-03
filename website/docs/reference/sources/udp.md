@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "udp" # example, must be: "udp"
+  type = "udp" # must be: "udp"
   address = "0.0.0.0:9000" # example
 ```
 
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "udp" # example, must be: "udp"
+  type = "udp" # must be: "udp"
   address = "0.0.0.0:9000" # example
 
   # OPTIONAL - General

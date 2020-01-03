@@ -27,12 +27,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "add_tags" # example, must be: "add_tags"
+  type = "add_tags" # must be: "add_tags"
   inputs = ["my-source-id"] # example
 
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
-    my_tag = "my value"
+    static_tag = "my value" # example
+    env_tag = "${ENV_VAR}" # example
 ```
 
 ## Options
@@ -70,7 +71,7 @@ A table of key/value pairs representing the tags to be added to the metric.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"my_tag":"my value"},{"my_env_tag":"${ENV_VAR}"}]}
+  examples={[{"static_tag":"my value"},{"env_tag":"${ENV_VAR}"}]}
   name={"`[tag-name]`"}
   nullable={false}
   path={"tags"}
