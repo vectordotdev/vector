@@ -9,7 +9,7 @@ class Hash
         v.flatten.map do |h_k, h_v|
           h["#{k}.#{h_k}"] = h_v
         end
-      else 
+      else
         h[k] = v
       end
     end
