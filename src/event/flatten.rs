@@ -1,6 +1,5 @@
 use crate::event::{Atom, LogEvent, ValueKind};
 use serde_json::{Map, Value};
-use std::convert::AsRef;
 
 /// Recursevly inserts json values to event
 pub fn flatten(event: &mut LogEvent, map: Map<String, Value>) {
