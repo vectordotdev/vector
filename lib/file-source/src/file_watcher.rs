@@ -25,8 +25,8 @@ pub struct FileWatcher {
     devno: u64,
     inode: u64,
     is_dead: bool,
-    last_read_attempt: Option<Instant>,
-    last_read_success: Option<Instant>,
+    last_read_attempt: Instant,
+    last_read_success: Instant,
 }
 
 impl FileWatcher {
@@ -83,8 +83,8 @@ impl FileWatcher {
             devno: metadata.portable_dev(),
             inode: metadata.portable_ino(),
             is_dead: false,
-            last_read_attempt: None,
-            last_read_success: None,
+            last_read_attempt: Instant::now(),
+            last_read_success: Instant::now(),
         })
     }
 
@@ -165,23 +165,16 @@ impl FileWatcher {
     }
 
     fn track_read_attempt(&mut self) {
-        self.last_read_attempt = Some(Instant::now());
+        self.last_read_attempt = Instant::now();
     }
 
     fn track_read_success(&mut self) {
-        self.last_read_success = Some(Instant::now());
+        self.last_read_success = Instant::now();
     }
 
     pub fn should_read(&self) -> bool {
-        match (self.last_read_attempt, self.last_read_success) {
-            (None, None) => true,
-            (None, Some(_)) => panic!("success requires an attempt"),
-            (Some(attempt), None) => attempt.elapsed() > Duration::from_secs(10),
-            (Some(attempt), Some(success)) => {
-                success.elapsed() < Duration::from_secs(10)
-                    || attempt.elapsed() > Duration::from_secs(10)
-            }
-        }
+        self.last_read_success.elapsed() < Duration::from_secs(10)
+            || self.last_read_attempt.elapsed() > Duration::from_secs(10)
     }
 }
 
