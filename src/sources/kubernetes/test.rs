@@ -2,7 +2,7 @@
 //       that is to be tested is present.
 #![cfg(feature = "kubernetes-integration-tests")]
 
-use crate::test_util::{trace_init, WaitFor};
+use crate::test_util::trace_init;
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
@@ -22,7 +22,7 @@ static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
 static ARGS_MARKER: &'static str = "$(ARGS_MARKER)";
 static ECHO_NAME: &'static str = "$(ECHO_NAME)";
-static WAIT_LIMIT: Duration = Duration::from_secs(60);
+static WAIT_LIMIT: usize = 60; //s
 
 // ******************************* CONFIG ***********************************//
 // Replacing configurations need to have :
@@ -182,19 +182,17 @@ impl Kube {
             .replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
-        WaitFor::some(|| {
+        retry(|| {
             api.create(&PostParams::default(), json.clone())
                 .map_err(|error| {
                     error!(message = "Failed creating Kubernetes object", ?error);
                 })
                 .ok()
         })
-        .limit(WAIT_LIMIT)
-        .now()
     }
 
     fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
-        WaitFor::some(|| {
+        retry(|| {
             self.api(Api::v1Pod)
                 .list(&ListParams {
                     field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
@@ -205,8 +203,6 @@ impl Kube {
                 })
                 .ok()
         })
-        .limit(WAIT_LIMIT)
-        .now()
         .items
         .into_iter()
         .filter(|item| {
@@ -219,7 +215,7 @@ impl Kube {
     }
 
     fn logs(&self, pod_name: &str) -> Vec<String> {
-        WaitFor::some(|| {
+        retry(|| {
             self.api(Api::v1Pod)
                 .log(pod_name, &LogParams::default())
                 .map_err(|error| {
@@ -227,8 +223,6 @@ impl Kube {
                 })
                 .ok()
         })
-        .limit(WAIT_LIMIT)
-        .now()
         .lines()
         .map(|s| s.to_owned())
         .collect()
@@ -236,7 +230,7 @@ impl Kube {
 
     fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
-        WaitFor::some(move || {
+        retry(move || {
             object = api
                 .get_status(object.meta().name.as_str())
                 .map_err(|error| {
@@ -255,15 +249,13 @@ impl Kube {
                 }
             }
         })
-        .limit(WAIT_LIMIT)
-        .now()
     }
 
     fn wait_for_success(&self, mut object: KubePod) -> KubePod {
         let api = self.api(Api::v1Pod);
         let legal = ["Pending", "Running", "Succeeded"];
         let goal = "Succeeded";
-        WaitFor::some(move || {
+        retry(move || {
             object = api
                 .get_status(object.meta().name.as_str())
                 .map_err(|error| {
@@ -285,8 +277,6 @@ impl Kube {
                 }
             }
         })
-        .limit(WAIT_LIMIT)
-        .now()
     }
 
     fn cleanup(&self) {
@@ -304,6 +294,19 @@ impl Drop for Kube {
     fn drop(&mut self) {
         self.cleanup();
     }
+}
+
+/// If F returns None, retries it after some time, for some count.
+/// Panics if all trys fail.
+fn retry<F: FnMut() -> Option<R>, R>(mut f: F) -> R {
+    for _ in 0..WAIT_LIMIT {
+        if let Some(data) = f() {
+            return data;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        debug!("Retrying");
+    }
+    panic!("timed out while waiting");
 }
 
 fn user_namespace(namespace: &str) -> String {

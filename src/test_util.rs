@@ -13,7 +13,6 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
@@ -162,53 +161,14 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
 }
 
 pub fn wait_for(f: impl Fn() -> bool) {
-    WaitFor::is(f).now()
-}
-
-pub struct WaitFor<T, F> {
-    f: F,
-    limit: Duration,
-    wait: Duration,
-    _marker: std::marker::PhantomData<T>,
-}
-
-impl WaitFor<(), ()> {
-    pub fn is(mut predicate: impl FnMut() -> bool) -> WaitFor<(), impl FnMut() -> Option<()>> {
-        WaitFor::some(move || if predicate() { Some(()) } else { None })
-    }
-}
-
-impl<T, F: FnMut() -> Option<T>> WaitFor<T, F> {
-    pub fn some(f: F) -> Self {
-        WaitFor {
-            f,
-            limit: std::time::Duration::from_secs(5),
-            wait: std::time::Duration::from_millis(5),
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn limit(mut self, limit: Duration) -> Self {
-        self.limit = limit;
-        self
-    }
-
-    pub fn wait(mut self, wait: Duration) -> Self {
-        self.wait = wait;
-        self
-    }
-
-    pub fn now(mut self) -> T {
-        let mut attempts = 0;
-        loop {
-            if let Some(it) = (self.f)() {
-                return it;
-            }
-            std::thread::sleep(self.wait);
-            attempts += 1;
-            if attempts * self.wait > self.limit {
-                panic!("timed out while waiting");
-            }
+    let wait = std::time::Duration::from_millis(5);
+    let limit = std::time::Duration::from_secs(5);
+    let mut attempts = 0;
+    while !f() {
+        std::thread::sleep(wait);
+        attempts += 1;
+        if attempts * wait > limit {
+            panic!("timed out while waiting");
         }
     }
 }
