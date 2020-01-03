@@ -14,6 +14,7 @@ use kube::{
     config,
 };
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 use std::borrow::Borrow;
 use std::thread;
 use std::time::Duration;
@@ -64,8 +65,8 @@ data:
       inputs = ["kubernetes_logs"]
       target = "stdout"
 
-    encoding = "text"
-    healthcheck = true
+      encoding = "json"
+      healthcheck = true
 
   # This line is not in VECTOR.TOML
 "#;
@@ -108,7 +109,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector:latest
+        image: ktff/vector-improve:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
@@ -313,13 +314,17 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
     vector
 }
 
-fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<String> {
+fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
     // Wait for logs to propagate
     thread::sleep(Duration::from_secs(4));
     let mut logs = Vec::new();
     for daemon_instance in kube.list(&vector) {
         debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
-        logs.append(&mut kube.logs(daemon_instance.metadata.name.as_str()));
+        logs.extend(
+            kube.logs(daemon_instance.metadata.name.as_str())
+                .into_iter()
+                .filter_map(|s| serde_json::from_slice::<Value>(s.as_ref()).ok()),
+        );
     }
     logs
 }
@@ -342,7 +347,7 @@ fn kube_one_log() {
     // Verify logs
     // If any daemon logged message, done.
     for line in logs(&kube, &vector) {
-        if line == message {
+        if line["message"].as_str().unwrap() == message {
             // DONE
             return;
         } else {
@@ -375,9 +380,9 @@ fn kube_old_log() {
     // If any daemon logged message, done.
     let mut logged = false;
     for line in logs(&kube, &vector) {
-        if line == message_old {
+        if line["message"].as_str().unwrap() == message_old {
             panic!("Old message logged");
-        } else if line == message_new {
+        } else if line["message"].as_str().unwrap() == message_new {
             // OK
             logged = true;
         } else {
@@ -409,7 +414,7 @@ fn kube_multi_log() {
     // Verify logs
     // If any daemon logged message, done.
     for line in logs(&kube, &vector) {
-        if Some(&line.as_str()) == messages.first() {
+        if Some(&line["message"].as_str().unwrap()) == messages.first() {
             messages.remove(0);
         } else {
             debug!(namespace,log=%line);
@@ -420,4 +425,33 @@ fn kube_multi_log() {
     } else {
         panic!("Vector didn't log messages: {:?}", messages);
     }
+}
+
+#[test]
+fn kube_object_uid() {
+    let namespace = "vector-test-object-uid";
+    let message = "19";
+    let user_namespace = user_namespace(namespace);
+
+    let kube = Kube::new(namespace);
+    let user = Kube::new(user_namespace.clone());
+
+    // Start vector
+    let vector = start_vector(&kube, user_namespace.as_str());
+
+    // Start echo
+    let _echo = echo(&user, "echo", message);
+
+    // Verify logs
+    // If any daemon has object uid, done.
+    for line in logs(&kube, &vector) {
+        if line.get("object_uid").is_some() {
+            // DONE
+            return;
+        } else {
+            debug!(namespace,log=%line);
+        }
+    }
+
+    panic!("Vector didn't log message: {:?}", message);
 }
