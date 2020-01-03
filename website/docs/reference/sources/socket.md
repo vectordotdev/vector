@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "socket" # example, must be: "socket"
+  type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example
   mode = "tcp" # example, enum
 ```
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "socket" # example, must be: "socket"
+  type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example
   mode = "tcp" # example, enum
 

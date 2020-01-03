@@ -2065,7 +2065,7 @@ end
   # this to be the root S3 "folder".
   #
   # * optional
-  # * default: "date=%F"
+  # * default: "date=%F/"
   # * type: string
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"
