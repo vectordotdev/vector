@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "http" # example, must be: "http"
+  type = "http" # must be: "http"
   inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 
@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "http" # example, must be: "http"
+  type = "http" # must be: "http"
   inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 
@@ -103,7 +103,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${TOKEN_ENV_VAR}" # example
+    X-Powered-By = "Vector" # example
 
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]

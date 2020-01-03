@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "datadog_metrics" # example, must be: "datadog_metrics"
+  type = "datadog_metrics" # must be: "datadog_metrics"
   inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "datadog_metrics" # example, must be: "datadog_metrics"
+  type = "datadog_metrics" # must be: "datadog_metrics"
   inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example

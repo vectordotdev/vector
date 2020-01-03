@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "clickhouse" # example, must be: "clickhouse"
+  type = "clickhouse" # must be: "clickhouse"
   inputs = ["my-source-id"] # example
   host = "http://localhost:8123" # example
   table = "mytable" # example
@@ -67,7 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "clickhouse" # example, must be: "clickhouse"
+  type = "clickhouse" # must be: "clickhouse"
   inputs = ["my-source-id"] # example
   host = "http://localhost:8123" # example
   table = "mytable" # example

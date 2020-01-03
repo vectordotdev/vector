@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "file" # example, must be: "file"
+  type = "file" # must be: "file"
   include = ["/var/log/nginx/*.log"] # example
 
   # OPTIONAL - General
@@ -64,7 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "file" # example, must be: "file"
+  type = "file" # must be: "file"
   include = ["/var/log/nginx/*.log"] # example
 
   # OPTIONAL - General

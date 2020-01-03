@@ -41,7 +41,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "concat" # example, must be: "concat"
+  type = "concat" # must be: "concat"
   inputs = ["my-source-id"] # example
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "concat" # example, must be: "concat"
+  type = "concat" # must be: "concat"
   inputs = ["my-source-id"] # example
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example

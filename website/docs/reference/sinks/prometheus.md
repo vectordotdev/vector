@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "prometheus" # example, must be: "prometheus"
+  type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "prometheus" # example, must be: "prometheus"
+  type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example

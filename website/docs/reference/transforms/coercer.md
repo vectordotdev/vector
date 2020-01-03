@@ -27,12 +27,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "coercer" # example, must be: "coercer"
+  type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int"
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options

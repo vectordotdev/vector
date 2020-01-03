@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "sampler" # example, must be: "sampler"
+  type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"] # example
   rate = 10 # example
 

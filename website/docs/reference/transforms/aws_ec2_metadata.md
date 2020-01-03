@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "aws_ec2_metadata" # example, must be: "aws_ec2_metadata"
+  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL

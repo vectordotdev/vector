@@ -42,7 +42,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "json_parser" # example, must be: "json_parser"
+  type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"] # example
   drop_invalid = true # example
 
@@ -59,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "json_parser" # example, must be: "json_parser"
+  type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"] # example
   drop_invalid = true # example
 

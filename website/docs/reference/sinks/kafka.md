@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "kafka" # example, must be: "kafka"
+  type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
   bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
   key_field = "user_id" # example
@@ -63,7 +63,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "kafka" # example, must be: "kafka"
+  type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
   bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
   key_field = "user_id" # example

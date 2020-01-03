@@ -9,7 +9,7 @@ module.exports = {
         "about/concepts",
         {
           type: 'category',
-          label: 'Data Model',
+          label: 'Data Model (Event)',
           items: [
             "about/data-model",
             "about/data-model/log",

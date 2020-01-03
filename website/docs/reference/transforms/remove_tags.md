@@ -26,7 +26,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_tags" # example, must be: "remove_tags"
+  type = "remove_tags" # must be: "remove_tags"
   inputs = ["my-source-id"] # example
   tags = ["tag1", "tag2"] # example
 ```

@@ -138,11 +138,14 @@ impl Acker {
     // This is primary used by the on-disk buffer to know which events are okay to
     // delete from disk.
     pub fn ack(&self, num: usize) {
-        match self {
-            Acker::Null => {}
-            Acker::Disk(counter, notifier) => {
-                counter.fetch_add(num, Ordering::Relaxed);
-                notifier.notify();
+        // Only ack items if the amount to ack is larger than zero.
+        if num > 0 {
+            match self {
+                Acker::Null => {}
+                Acker::Disk(counter, notifier) => {
+                    counter.fetch_add(num, Ordering::Relaxed);
+                    notifier.notify();
+                }
             }
         }
     }
@@ -184,9 +187,11 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 
 #[cfg(test)]
 mod test {
-    use super::DropWhenFull;
+    use super::{Acker, DropWhenFull};
     use crate::test_util::block_on;
-    use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
+    use futures::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
+    use std::sync::{atomic::AtomicUsize, Arc};
+    use tokio01_test::task::MockTask;
 
     #[test]
     fn drop_when_full() {
@@ -208,5 +213,22 @@ mod test {
             future::ok(())
         }))
         .unwrap();
+    }
+
+    #[test]
+    fn ack_with_none() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let task = Arc::new(AtomicTask::new());
+        let acker = Acker::Disk(counter, task.clone());
+
+        let mut mock = MockTask::new();
+
+        mock.enter(|| task.register());
+
+        assert!(!mock.is_notified());
+        acker.ack(0);
+        assert!(!mock.is_notified());
+        acker.ack(1);
+        assert!(mock.is_notified());
     }
 }

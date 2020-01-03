@@ -27,18 +27,24 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "split" # example, must be: "split"
+  type = "split" # must be: "split"
   inputs = ["my-source-id"] # example
   field_names = ["timestamp", "level", "message"] # example
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  separator = "," # default
+  separator = "whitespace" # default
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int"
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options

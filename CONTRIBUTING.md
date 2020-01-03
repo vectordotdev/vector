@@ -273,7 +273,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 ### Benchmarking
 
-All benchmarks are placed in the [`/benchmarks`](/benchmarks) folder. Yuo can
+All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make benchmarks` command.
 
 ## FAQ

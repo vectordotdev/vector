@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "stdin" # example, must be: "stdin"
+  type = "stdin" # must be: "stdin"
 ```
 
 </TabItem>
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "stdin" # example, must be: "stdin"
+  type = "stdin" # must be: "stdin"
 
   # OPTIONAL - General
   max_length = 102400 # default, bytes
