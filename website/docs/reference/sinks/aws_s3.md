@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding = "ndjson" # example, enum
 
   # OPTIONAL - Object Names
-  key_prefix = "date=%F" # default
+  key_prefix = "date=%F/" # default
 ```
 
 </TabItem>
@@ -86,7 +86,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_append_uuid = true # default
   filename_extension = "log" # default
   filename_time_format = "%s" # default
-  key_prefix = "date=%F" # default
+  key_prefix = "date=%F/" # default
 
   # OPTIONAL - Requests
   request_in_flight_limit = 5 # default
@@ -445,7 +445,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 <Field
   common={true}
-  defaultValue={"date=%F"}
+  defaultValue={"date=%F/"}
   enumValues={null}
   examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
   name={"key_prefix"}

@@ -12,7 +12,8 @@ fn happy_path() {
     load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]
@@ -34,7 +35,7 @@ fn happy_path() {
     load(
         r#"
         [sources]
-        in = {type = "tcp", address = "127.0.0.1:1235"}
+        in = {type = "socket", mode = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
         sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
@@ -68,7 +69,26 @@ fn missing_key() {
     let err = load(
         r#"
         [sources.in]
+        type = "socket"
+
+        [sinks.out]
         type = "tcp"
+        inputs = ["in"]
+        address = "127.0.0.1:9999"
+      "#,
+    )
+    .unwrap_err();
+
+    assert_eq!(err, vec!["missing field `mode` for key `sources.in`"]);
+}
+
+#[test]
+fn missing_key2() {
+    let err = load(
+        r#"
+        [sources.in]
+        type = "socket"
+        mode = "tcp"
 
         [sinks.out]
         type = "socket"
@@ -87,7 +107,8 @@ fn bad_type() {
     let err = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1234"
 
         [sinks.out]
@@ -107,7 +128,8 @@ fn nonexistant_input() {
     let err = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]
@@ -140,7 +162,8 @@ fn bad_regex() {
     let err = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]
@@ -165,7 +188,8 @@ fn bad_regex() {
     let err = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.parser]
@@ -192,7 +216,8 @@ fn good_regex_parser() {
     let result = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.parser]
@@ -220,7 +245,8 @@ fn good_tokenizer() {
     let result = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.parser]
@@ -249,7 +275,8 @@ fn bad_s3_region() {
     let err = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [sinks.out1]
@@ -311,11 +338,13 @@ fn warnings() {
     let warnings = load(
         r#"
         [sources.in1]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [sources.in2]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1236"
 
         [transforms.sampler1]
@@ -354,7 +383,8 @@ fn cycle() {
     let errors = load(
         r#"
         [sources.in]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.one]
@@ -399,7 +429,8 @@ fn disabled_healthcheck() {
     load(
         r#"
       [sources.in]
-      type = "tcp"
+      type = "socket"
+      mode = "tcp"
       address = "127.0.0.1:1234"
 
       [sinks.out]

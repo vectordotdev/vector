@@ -1,4 +1,4 @@
-<%- component = metadata.sources.udp -%>
+<%- component = metadata.sources.socket -%>
 
 <%= component_header(component) %>
 
@@ -13,21 +13,13 @@
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= options(component.env_vars_list, heading_depth: 3) %>
+<%= fields(component.env_vars_list) %>
 
 <%- end -%>
-<%- if component.output.log -%>
 ## Output
 
 <%= component_output(component, component.output.log, heading_depth: 3) %>
 
-<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
-
-### Line Delimiters
-
-Each line is read until a new line delimiter (the `0xA` byte) is found.
-
-
