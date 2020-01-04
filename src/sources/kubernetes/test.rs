@@ -2,7 +2,7 @@
 //       that is to be tested is present.
 #![cfg(feature = "kubernetes-integration-tests")]
 
-use crate::test_util::trace_init;
+use crate::test_util::{trace_init, wait_for};
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
@@ -16,8 +16,6 @@ use kube::{
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::borrow::Borrow;
-use std::thread;
-use std::time::Duration;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
@@ -59,6 +57,7 @@ data:
     # Ingest logs from Kubernetes
     [sources.kubernetes_logs]
       type = "kubernetes"
+      include_namespaces = ["$(USER_TEST_NAMESPACE)"]
 
     [sinks.out]
       type = "console"
@@ -345,8 +344,6 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
 }
 
 fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
-    // Wait for logs to propagate
-    thread::sleep(Duration::from_secs(4));
     let mut logs = Vec::new();
     for daemon_instance in kube.list(&vector) {
         debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
@@ -376,15 +373,17 @@ fn kube_one_log() {
 
     // Verify logs
     // If any daemon logged message, done.
-    for line in logs(&kube, &vector) {
-        if line["message"].as_str().unwrap() == message {
-            // DONE
-            return;
-        } else {
-            debug!(namespace,log=%line);
+    wait_for(|| {
+        for line in logs(&kube, &vector) {
+            if line["message"].as_str().unwrap() == message {
+                // DONE
+                return true;
+            } else {
+                debug!(namespace,log=%line);
+            }
         }
-    }
-    panic!("Vector didn't log message: {:?}", message);
+        false
+    });
 }
 
 #[test]
@@ -407,23 +406,20 @@ fn kube_old_log() {
     let _echo_new = echo(&user, "echo-new", message_new);
 
     // Verify logs
-    // If any daemon logged message, done.
-    let mut logged = false;
-    for line in logs(&kube, &vector) {
-        if line["message"].as_str().unwrap() == message_old {
-            panic!("Old message logged");
-        } else if line["message"].as_str().unwrap() == message_new {
-            // OK
-            logged = true;
-        } else {
-            debug!(namespace,log=%line);
+    wait_for(|| {
+        let mut logged = false;
+        for line in logs(&kube, &vector) {
+            if line["message"].as_str().unwrap() == message_old {
+                panic!("Old message logged");
+            } else if line["message"].as_str().unwrap() == message_new {
+                // OK
+                logged = true;
+            } else {
+                debug!(namespace,log=%line);
+            }
         }
-    }
-    if logged {
-        // Done
-    } else {
-        panic!("Vector didn't log message: {:?}", message_new);
-    }
+        logged
+    });
 }
 
 #[test]
@@ -442,19 +438,16 @@ fn kube_multi_log() {
     let _echo = echo(&user, "echo", messages.join("\n").as_str());
 
     // Verify logs
-    // If any daemon logged message, done.
-    for line in logs(&kube, &vector) {
-        if Some(&line["message"].as_str().unwrap()) == messages.first() {
-            messages.remove(0);
-        } else {
-            debug!(namespace,log=%line);
+    wait_for(|| {
+        for line in logs(&kube, &vector) {
+            if Some(&line["message"].as_str().unwrap()) == messages.first() {
+                messages.remove(0);
+            } else {
+                debug!(namespace,log=%line);
+            }
         }
-    }
-    if messages.is_empty() {
-        //Done
-    } else {
-        panic!("Vector didn't log messages: {:?}", messages);
-    }
+        messages.is_empty()
+    });
 }
 
 #[test]
@@ -473,15 +466,16 @@ fn kube_object_uid() {
     let _echo = echo(&user, "echo", message);
 
     // Verify logs
-    // If any daemon has object uid, done.
-    for line in logs(&kube, &vector) {
-        if line.get("object_uid").is_some() {
-            // DONE
-            return;
-        } else {
-            debug!(namespace,log=%line);
+    wait_for(|| {
+        // If any daemon has object uid, done.
+        for line in logs(&kube, &vector) {
+            if line.get("object_uid").is_some() {
+                // DONE
+                return true;
+            } else {
+                debug!(namespace,log=%line);
+            }
         }
-    }
-
-    panic!("Vector didn't log message: {:?}", message);
+        false
+    });
 }

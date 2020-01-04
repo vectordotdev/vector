@@ -160,7 +160,7 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn wait_for(f: impl Fn() -> bool) {
+pub fn wait_for(mut f: impl FnMut() -> bool) {
     let wait = std::time::Duration::from_millis(5);
     let limit = std::time::Duration::from_secs(5);
     let mut attempts = 0;
