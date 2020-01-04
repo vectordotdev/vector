@@ -25,7 +25,7 @@ can have any number of sources, and as they ingest data they proceed to
 normalize it into [events](#events) \(see next section\). This sets the stage
 for easy and consistent processing of your data. Examples of sources include
 [`file`][docs.sources.file], [`syslog`][docs.sources.syslog],
-[`tcp`][docs.sources.tcp], and [`stdin`][docs.sources.stdin].
+[`socket`][docs.sources.socket], and [`stdin`][docs.sources.stdin].
 
 <Jump to="[[[docs.sources]]]">View all sources</Jump>
 
@@ -42,9 +42,9 @@ to you.
 
 A "sink" is a destination for [events][docs.data_model#event]. Each sink's
 design and transmission method is dictated by the downstream service it is
-interacting with. For example, the [`tcp` sink][docs.sinks.tcp] will stream
-individual events, while the [`aws_s3` sink][docs.sinks.aws_s3] will buffer and
-flush data.
+interacting with. For example, the [`socket` sink][docs.sinks.socket] will
+stream individual events, while the [`aws_s3` sink][docs.sinks.aws_s3] will
+buffer and flush data.
 
 <Jump to="[[[docs.sinks]]]">View all sinks</Jump>
 

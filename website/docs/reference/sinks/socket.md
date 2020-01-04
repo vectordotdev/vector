@@ -45,10 +45,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "socket" # example, must be: "socket"
+  type = "socket" # must be: "socket"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
-  mode = "tcp" # example, must be: "tcp"
+  mode = "tcp" # must be: "tcp"
 
   # REQUIRED - requests
   encoding = "json" # example, enum
@@ -62,10 +62,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "socket" # example, must be: "socket"
+  type = "socket" # must be: "socket"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
-  mode = "tcp" # example, must be: "tcp"
+  mode = "tcp" # must be: "tcp"
 
   # REQUIRED - requests
   encoding = "json" # example, enum

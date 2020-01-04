@@ -258,6 +258,7 @@ function Integrations() {
     'lua_transform': 'medium',
     'prometheus_sink': 'large',
     'regex_parser': 'medium',
+    'socket_sink': 'medium',
     'syslog_source': 'medium',
   }
 
