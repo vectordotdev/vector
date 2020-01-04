@@ -75,6 +75,13 @@ impl FileWatcher {
             (Box::new(reader), pos)
         };
 
+        let ts = metadata
+            .modified()
+            .ok()
+            .and_then(|mtime| mtime.elapsed().ok())
+            .and_then(|diff| Instant::now().checked_sub(diff))
+            .unwrap_or_else(Instant::now);
+
         Ok(FileWatcher {
             path,
             findable: true,
@@ -83,8 +90,8 @@ impl FileWatcher {
             devno: metadata.portable_dev(),
             inode: metadata.portable_ino(),
             is_dead: false,
-            last_read_attempt: Instant::now(),
-            last_read_success: Instant::now(),
+            last_read_attempt: ts.clone(),
+            last_read_success: ts,
         })
     }
 
