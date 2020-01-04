@@ -183,82 +183,101 @@ impl Kube {
             .replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
-        api.create(&PostParams::default(), json).unwrap()
+        retry(|| {
+            api.create(&PostParams::default(), json.clone())
+                .map_err(|error| {
+                    error!(message = "Failed creating Kubernetes object", ?error);
+                })
+                .ok()
+        })
     }
 
     fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
-        self.api(Api::v1Pod)
-            .list(&ListParams {
-                field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
-                ..ListParams::default()
-            })
-            .unwrap()
-            .items
-            .into_iter()
-            .filter(|item| {
-                item.metadata
-                    .name
-                    .as_str()
-                    .starts_with(object.metadata.name.as_str())
-            })
-            .collect()
+        retry(|| {
+            self.api(Api::v1Pod)
+                .list(&ListParams {
+                    field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
+                    ..ListParams::default()
+                })
+                .map_err(|error| {
+                    error!(message = "Failed listing Pods", ?error);
+                })
+                .ok()
+        })
+        .items
+        .into_iter()
+        .filter(|item| {
+            item.metadata
+                .name
+                .as_str()
+                .starts_with(object.metadata.name.as_str())
+        })
+        .collect()
     }
 
     fn logs(&self, pod_name: &str) -> Vec<String> {
-        self.api(Api::v1Pod)
-            .log(pod_name, &LogParams::default())
-            .unwrap()
-            .lines()
-            .map(|s| s.to_owned())
-            .collect()
+        retry(|| {
+            self.api(Api::v1Pod)
+                .log(pod_name, &LogParams::default())
+                .map_err(|error| {
+                    error!(message = "Failed getting Pod logs", ?error);
+                })
+                .ok()
+        })
+        .lines()
+        .map(|s| s.to_owned())
+        .collect()
     }
 
-    fn wait_for_running(&self, mut object: KubeDaemon) -> Option<KubeDaemon> {
+    fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
-        for _ in 0..WAIT_LIMIT {
-            match object.status.clone() {
-                None => (),
-                Some(DaemonSetStatus {
+        retry(move || {
+            object = api
+                .get_status(object.meta().name.as_str())
+                .map_err(|error| {
+                    error!(message = "Failed getting object status", ?error);
+                })
+                .ok()?;
+            match object.status.clone()? {
+                DaemonSetStatus {
                     desired_number_scheduled,
                     number_available: Some(number_available),
                     ..
-                }) if number_available == desired_number_scheduled => {
-                    return Some(object);
-                }
-                Some(status) => {
+                } if number_available == desired_number_scheduled => Some(object.clone()),
+                status => {
                     debug!(message = "DaemonSet not yet ready", ?status);
+                    None
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            object = api.get_status(object.meta().name.as_str()).unwrap();
-        }
-        return None;
+        })
     }
 
-    fn wait_for_success(&self, mut object: KubePod) -> Option<KubePod> {
+    fn wait_for_success(&self, mut object: KubePod) -> KubePod {
         let api = self.api(Api::v1Pod);
         let legal = ["Pending", "Running", "Succeeded"];
         let goal = "Succeeded";
-        for _ in 0..WAIT_LIMIT {
-            match object.status.clone() {
-                None => (),
-                Some(PodStatus {
+        retry(move || {
+            object = api
+                .get_status(object.meta().name.as_str())
+                .map_err(|error| {
+                    error!(message = "Failed getting object status", ?error);
+                })
+                .ok()?;
+            match object.status.clone()? {
+                PodStatus {
                     phase: Some(ref phase),
                     ..
-                }) if phase.as_str() == goal => return Some(object),
-                Some(PodStatus {
+                } if phase.as_str() == goal => Some(object.clone()),
+                PodStatus {
                     phase: Some(ref phase),
                     ..
-                }) if legal.contains(&phase.as_str()) => (),
-                Some(PodStatus { phase, .. }) => {
+                } if legal.contains(&phase.as_str()) => None,
+                PodStatus { phase, .. } => {
                     error!(message = "Illegal pod phase", ?phase);
-                    return None;
+                    None
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            object = api.get_status(object.meta().name.as_str()).unwrap();
-        }
-        return None;
+        })
     }
 
     fn cleanup(&self) {
@@ -278,6 +297,19 @@ impl Drop for Kube {
     }
 }
 
+/// If F returns None, retries it after some time, for some count.
+/// Panics if all trys fail.
+fn retry<F: FnMut() -> Option<R>, R>(mut f: F) -> R {
+    for _ in 0..WAIT_LIMIT {
+        if let Some(data) = f() {
+            return data;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        debug!("Retrying");
+    }
+    panic!("timed out while waiting");
+}
+
 fn user_namespace(namespace: &str) -> String {
     "user-".to_owned() + namespace
 }
@@ -293,8 +325,7 @@ fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
     );
 
     // Wait for success state
-    kube.wait_for_success(echo.clone())
-        .expect("Running echo failed");
+    kube.wait_for_success(echo.clone());
 
     echo
 }
@@ -308,8 +339,7 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
     let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
 
     // Wait for running state
-    kube.wait_for_running(vector.clone())
-        .expect("Running Vector failed");
+    kube.wait_for_running(vector.clone());
 
     vector
 }
