@@ -4,6 +4,7 @@ pub mod http;
 pub mod retries;
 pub mod rusoto;
 pub mod service;
+pub mod tcp;
 pub mod tls;
 
 use crate::buffers::Acker;

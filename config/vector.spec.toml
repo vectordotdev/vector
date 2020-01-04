@@ -3840,6 +3840,167 @@ end
   healthcheck = true
   healthcheck = false
 
+# Streams `log` events to a socket, such as a TCP, UDP, or Unix socket.
+[sinks.socket]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `socket`.
+  #
+  # * required
+  # * type: string
+  # * must be: "socket"
+  type = "socket"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The address to bind to.
+  #
+  # * required
+  # * type: string
+  address = "92.12.333.224:5000"
+
+  # The type of socket to use. Currently only `tcp` is valid.
+  #
+  # * required
+  # * type: string
+  # * must be: "tcp"
+  mode = "tcp"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
+
+  #
+  # Buffer
+  #
+
+  [sinks.socket.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    num_items = 500
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Tls
+  #
+
+  [sinks.socket.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to a Splunk's HTTP Event Collector.
 [sinks.splunk_hec]
   #
@@ -4102,160 +4263,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-# Streams `log` events to a TCP connection.
-[sinks.tcp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `tcp`.
-  #
-  # * required
-  # * type: string
-  # * must be: "tcp"
-  type = "tcp"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # The TCP address.
-  #
-  # * required
-  # * type: string
-  address = "92.12.333.224:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
-  # Buffer
-  #
-
-  [sinks.tcp.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * optional
-    # * no default
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
-    # The behavior when the buffer becomes full.
-    #
-    # * optional
-    # * default: "block"
-    # * type: string
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-  #
-  # Tls
-  #
-
-  [sinks.tcp.tls]
-    # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
-
-    # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    crt_path = "/path/to/host_certificate.crt"
-
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
-    # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
-
-    # If `true` (the default), Vector will validate the TLS certificate of the
-    # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_certificate = true
-    verify_certificate = false
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
 
 # Streams `log` events to another downstream `vector` source.
 [sinks.vector]

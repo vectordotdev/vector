@@ -22,7 +22,8 @@ fn happy_path() {
         pass_list = ["error"]
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["sampler"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -39,7 +40,7 @@ fn happy_path() {
         sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
 
         [sinks]
-        out = {type = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
+        out = {type = "socket", mode = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
       "#,
     )
     .unwrap();
@@ -70,7 +71,8 @@ fn missing_key() {
         type = "tcp"
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "out"
         inputs = ["in"]
         address = "127.0.0.1:9999"
       "#,
@@ -115,7 +117,8 @@ fn nonexistant_input() {
         pass_list = ["error"]
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["asdf"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -147,7 +150,8 @@ fn bad_regex() {
         pass_list = ["(["]
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["sampler"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -170,7 +174,8 @@ fn bad_regex() {
         regex = "(["
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["parser"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -199,7 +204,8 @@ fn good_regex_parser() {
         out = "integer"
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["parser"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -227,7 +233,8 @@ fn good_tokenizer() {
         two = "boolean"
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["parser"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -324,7 +331,8 @@ fn warnings() {
         pass_list = ["error"]
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["sampler1"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -374,7 +382,8 @@ fn cycle() {
         pass_list = []
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
+        mode = "tcp"
         inputs = ["four"]
         encoding = "text"
         address = "127.0.0.1:9999"
@@ -394,7 +403,8 @@ fn disabled_healthcheck() {
       address = "127.0.0.1:1234"
 
       [sinks.out]
-      type = "tcp"
+      type = "socket"
+      mode = "tcp"
       inputs = ["in"]
       address = "0.0.0.0:0"
       encoding = "text"

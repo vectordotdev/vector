@@ -18100,6 +18100,28 @@ module.exports = {
 
       ]
     },
+    "socket": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to a socket, such as a TCP, UDP, or Unix socket.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "socket_sink",
+      "name": "socket",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "splunk_hec": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -18139,28 +18161,6 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "beta",
-      "type": "sink",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "tcp": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Streams log events to a TCP connection.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "transmit",
-      "id": "tcp_sink",
-      "name": "tcp",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
 

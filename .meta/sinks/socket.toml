@@ -1,0 +1,28 @@
+[sinks.socket]
+title = "Socket"
+buffer = true
+common = true
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+encodings = ["json", "text"]
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+write_to_description = "a socket, such as a TCP, UDP, or Unix socket"
+tls_options = ["+enabled"]
+
+[sinks.socket.options.mode]
+type = "string"
+common = true
+null = false
+description = "The type of socket to use. Currently only `tcp` is valid."
+
+[sinks.socket.options.mode.enum]
+tcp = "Use the TCP protocol."
+
+[sinks.socket.options.address]
+type = "string"
+common = true
+examples = ["92.12.333.224:5000"]
+null = false
+description = "The address to bind to."

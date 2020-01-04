@@ -220,11 +220,11 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
+              "reference/sinks/socket",
+            
               "reference/sinks/splunk_hec",
             
               "reference/sinks/statsd",
-            
-              "reference/sinks/tcp",
             
               "reference/sinks/vector",
             
