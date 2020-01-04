@@ -17,7 +17,9 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use string_cache::DefaultAtom as Atom;
+
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
 // Intermediate version: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution
@@ -27,6 +29,14 @@ use string_cache::DefaultAtom as Atom;
 
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &str = r"/var/log/pods/";
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("To large UID: {:?}", uid))]
+    UidToLarge { uid: String },
+    #[snafu(display("UID contains illegal characters: {:?}", uid))]
+    IllegalCharacterInUid { uid: String },
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -113,57 +123,8 @@ fn file_source(
 ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
     let mut file_config = FileConfig::default();
 
-    fn flatten<'a>(o: &'a Option<Vec<String>>, default: &'a [String]) -> &'a [String] {
-        o.as_ref()
-            .map(|vec| vec.as_slice())
-            .filter(|slice| !slice.is_empty())
-            .unwrap_or(default)
-    }
-
-    // Cross product of includes
-    let any = ["*".to_string()];
-    let empty = ["".to_string()];
-    for object_uid in flatten(&config.include_pod_uids, &empty) {
-        for container_name in flatten(&config.include_container_names, &empty) {
-            // Will include logs of Kubernetes < v1.14.
-            file_config.include.push(
-                (LOG_DIRECTORY.to_owned()
-                    + format!("{}*/{}*/*.log", object_uid, container_name).as_str())
-                .into(),
-            );
-
-            for namespace in flatten(&config.include_namespaces, &any) {
-                // Will include logs of Kubernetes >= v1.14.
-                file_config.include.push(
-                    (LOG_DIRECTORY.to_owned()
-                        + format!("{}_*_{}*/{}*/*.log", namespace, object_uid, container_name)
-                            .as_str())
-                    .into(),
-                );
-            }
-        }
-    }
-
-    let no_include = flatten(&config.include_container_names, &[]).is_empty()
-        && flatten(&config.include_namespaces, &[]).is_empty()
-        && flatten(&config.include_pod_uids, &[]).is_empty();
-
-    // Default excludes
-    if no_include {
-        // Since there is no user intention in including specific namespace/pod/container,
-        // exclude kuberenetes and vector logs.
-
-        // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
-        // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
-        file_config
-            .exclude
-            .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
-
-        // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
-        file_config
-            .exclude
-            .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
-    }
+    file_source_include(config, &mut file_config)?;
+    file_source_exclude(config, &mut file_config);
 
     file_config.start_at_beginning = true;
 
@@ -185,6 +146,132 @@ fn file_source(
         .map_err(|e| format!("Failed in creating file source with error: {:?}", e))?;
 
     Ok((file_recv, file_source))
+}
+
+fn file_source_include(
+    config: &KubernetesConfig,
+    file_config: &mut FileConfig,
+) -> crate::Result<()> {
+    // Default includes
+    let empty = ["".to_string()];
+    let any = ["*".to_string()];
+    let uid_glob = to_uid_forms("");
+
+    // Cross product of includes
+    for object_uid in flatten_include(
+        &Some(prepare_pod_uids(&config.include_pod_uids)?),
+        uid_glob.as_slice(),
+    ) {
+        for container_name in flatten_include(&config.include_container_names, &empty) {
+            // Will include logs of Kubernetes < v1.14.
+            file_config.include.push(
+                (LOG_DIRECTORY.to_owned()
+                    + format!("{}/{}*/*.log", object_uid, container_name).as_str())
+                .into(),
+            );
+
+            for namespace in flatten_include(&config.include_namespaces, &any) {
+                // Will include logs of Kubernetes >= v1.14.
+                file_config.include.push(
+                    (LOG_DIRECTORY.to_owned()
+                        + format!("{}_*_{}/{}*/*.log", namespace, object_uid, container_name)
+                            .as_str())
+                    .into(),
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// Parses partial UIDs and transforms them to two UID forms with glob [0-9A-Fa-f] filling
+// them up to 32 hexadecimal numbers.
+fn prepare_pod_uids(include: &Option<Vec<String>>) -> Result<Vec<String>, BuildError> {
+    let mut include_pod_uids = Vec::new();
+    for pod_uid in flatten_include(include, &[]) {
+        let mut pod_uid = pod_uid.clone();
+
+        if !pod_uid.chars().all(|c| {
+            c.is_numeric() || ('A'..='F').contains(&c) || ('a'..='f').contains(&c) || c == '-'
+        }) {
+            error!(message = "Configuration 'include_pod_uids' contains not UID", uid = ?pod_uid);
+            return Err(BuildError::IllegalCharacterInUid {
+                uid: pod_uid.clone(),
+            });
+        }
+
+        pod_uid.retain(|c| c != '-');
+
+        if pod_uid.chars().count() > 32 {
+            return Err(BuildError::UidToLarge {
+                uid: pod_uid.clone(),
+            });
+        }
+
+        include_pod_uids.append(&mut to_uid_forms(pod_uid.as_str()));
+    }
+
+    Ok(include_pod_uids)
+}
+
+fn file_source_exclude(config: &KubernetesConfig, file_config: &mut FileConfig) {
+    let no_include = flatten_include(&config.include_container_names, &[]).is_empty()
+        && flatten_include(&config.include_namespaces, &[]).is_empty()
+        && flatten_include(&config.include_pod_uids, &[]).is_empty();
+
+    // Default excludes
+    if no_include {
+        // Since there is no user intention in including specific namespace/pod/container,
+        // exclude kuberenetes and vector logs.
+
+        // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
+        // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
+        file_config
+            .exclude
+            .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
+
+        // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
+        file_config
+            .exclude
+            .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
+    }
+}
+
+fn flatten_include<'a>(o: &'a Option<Vec<String>>, default: &'a [String]) -> &'a [String] {
+    o.as_ref()
+        .map(|vec| vec.as_slice())
+        .filter(|slice| !slice.is_empty())
+        .unwrap_or(default)
+}
+
+// Transforms uid to two UID forms with glob [0-9A-Fa-f] filling
+// them up to 32 hexadecimal numbers.
+fn to_uid_forms(uid: &str) -> Vec<String> {
+    fn char_or_hexadecimal(it: &mut impl Iterator<Item = char>, n: usize) -> String {
+        let mut tmp = String::new();
+        for _ in 0..n {
+            if let Some(item) = it.next() {
+                tmp.push(item);
+            } else {
+                tmp.push_str("[0-9A-Fa-f]")
+            }
+        }
+        tmp
+    }
+
+    let mut it = uid.chars();
+    vec![
+        format!(
+            "{}-{}-{}-{}-{}",
+            char_or_hexadecimal(&mut it, 8),
+            char_or_hexadecimal(&mut it, 4),
+            char_or_hexadecimal(&mut it, 4),
+            char_or_hexadecimal(&mut it, 4),
+            char_or_hexadecimal(&mut it, 12)
+        ),
+        char_or_hexadecimal(&mut uid.chars(), 32),
+    ]
 }
 
 /// Determines format of message.
