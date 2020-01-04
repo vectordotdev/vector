@@ -30,7 +30,11 @@ const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct KubernetesConfig {}
+pub struct KubernetesConfig {
+    include_container_names: Option<Vec<String>>,
+    include_pod_uids: Option<Vec<String>>,
+    include_namespaces: Option<Vec<String>>,
+}
 
 #[typetag::serde(name = "kubernetes")]
 impl SourceConfig for KubernetesConfig {
@@ -49,7 +53,7 @@ impl SourceConfig for KubernetesConfig {
 
         let now = TimeFilter::new();
 
-        let (file_recv, file_source) = file_source(name, globals)?;
+        let (file_recv, file_source) = file_source(name, globals, self)?;
 
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;
@@ -105,42 +109,78 @@ impl TimeFilter {
 fn file_source(
     kube_name: &str,
     globals: &GlobalOptions,
+    config: &KubernetesConfig,
 ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
-    let mut config = FileConfig::default();
+    let mut file_config = FileConfig::default();
 
-    // TODO: Add exclude_namspace option, and with it, in config, exclude kube-system namespace.
-    // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
-    // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
-    config
-        .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
+    fn flatten<'a>(o: &'a Option<Vec<String>>, default: &'a [String]) -> &'a [String] {
+        o.as_ref()
+            .map(|vec| vec.as_slice())
+            .filter(|slice| !slice.is_empty())
+            .unwrap_or(default)
+    }
 
-    // TODO: Add exclude_namspace option, and with it, in config, exclude namespace used by vector.
-    // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
-    config
-        .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
+    // Cross product of includes
+    let any = ["*".to_string()];
+    let empty = ["".to_string()];
+    for object_uid in flatten(&config.include_pod_uids, &empty) {
+        for container_name in flatten(&config.include_container_names, &empty) {
+            // Will include logs of Kubernetes < v1.14.
+            file_config.include.push(
+                (LOG_DIRECTORY.to_owned()
+                    + format!("{}*/{}*/*.log", object_uid, container_name).as_str())
+                .into(),
+            );
 
-    config
-        .include
-        .push((LOG_DIRECTORY.to_owned() + r"*/*/*.log").into());
+            for namespace in flatten(&config.include_namespaces, &any) {
+                // Will include logs of Kubernetes >= v1.14.
+                file_config.include.push(
+                    (LOG_DIRECTORY.to_owned()
+                        + format!("{}_*_{}*/{}*/*.log", namespace, object_uid, container_name)
+                            .as_str())
+                    .into(),
+                );
+            }
+        }
+    }
 
-    config.start_at_beginning = true;
+    let no_include = flatten(&config.include_container_names, &[]).is_empty()
+        && flatten(&config.include_namespaces, &[]).is_empty()
+        && flatten(&config.include_pod_uids, &[]).is_empty();
+
+    // Default excludes
+    if no_include {
+        // Since there is no user intention in including specific namespace/pod/container,
+        // exclude kuberenetes and vector logs.
+
+        // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
+        // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
+        file_config
+            .exclude
+            .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
+
+        // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
+        file_config
+            .exclude
+            .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
+    }
+
+    file_config.start_at_beginning = true;
 
     // Filter out files that certainly don't have logs newer than now timestamp.
-    config.ignore_older = Some(10);
+    file_config.ignore_older = Some(10);
 
     // oldest_first false, having all pods equaly serviced is of greater importance
     //                     than having time order guarantee.
 
     // CRI standard ensures unique naming.
-    config.fingerprinting = FingerprintingConfig::DevInode;
+    file_config.fingerprinting = FingerprintingConfig::DevInode;
 
     // Have a subdirectory for this source to avoid collision of naming its file source.
-    config.data_dir = Some(globals.resolve_and_make_data_subdir(None, kube_name)?);
+    file_config.data_dir = Some(globals.resolve_and_make_data_subdir(None, kube_name)?);
 
     let (file_send, file_recv) = mpsc::channel(1000);
-    let file_source = config
+    let file_source = file_config
         .build("file_source", globals, file_send)
         .map_err(|e| format!("Failed in creating file source with error: {:?}", e))?;
 
@@ -283,6 +323,7 @@ fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
 
     let namespace_regex = r"(?P<pod_namespace>[0-9a-z.\-]*)";
     let name_regex = r"(?P<pod_name>[0-9a-z.\-]*)";
+    // TODO: rename to pod_uid?
     let uid_regex = r"(?P<object_uid>([0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}|[0-9A-Fa-f]{32}))";
 
     // Definition of pod_uid has been well defined since Kubernetes 1.14 with https://github.com/kubernetes/kubernetes/pull/74441
