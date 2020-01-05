@@ -18126,31 +18126,6 @@ module.exports = {
       "beta": false,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec].",
-    "prometheus": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "event_types": [
-        "metric"
-      ],
-      "function_category": "receive",
-      "id": "prometheus_source",
-      "name": "prometheus",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "beta",
-      "type": "source",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "statsd": {
-      "beta": true,
-      "delivery_guarantee": "best_effort",
-      "description": "Streams metric events to [StatsD][urls.statsd] metrics service.",
       "event_types": [
         "log"
       ],
@@ -18302,29 +18277,6 @@ module.exports = {
 
       ]
     },
-    "socket": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs log events.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "receive",
-      "id": "socket_source",
-      "name": "socket",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "source",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "splunk_hec": {
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -18342,6 +18294,28 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "socket": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
+      "description": "Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs log events.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "socket_source",
+      "name": "socket",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
 

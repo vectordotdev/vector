@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "prometheus" # example, must be: "prometheus"
+  type = "prometheus" # must be: "prometheus"
   hosts = ["http://localhost:9090"] # example
   scrape_interval_secs = 1 # example
 ```

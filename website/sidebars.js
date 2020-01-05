@@ -122,11 +122,9 @@ module.exports = {
             
               "reference/sources/kafka",
             
-              "reference/sources/socket",
-            
-              "reference/sources/splunk_hec",
-
               "reference/sources/prometheus",
+            
+              "reference/sources/socket",
             
               "reference/sources/splunk_hec",
             
