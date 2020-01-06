@@ -14,7 +14,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
-use std::sync::mpsc::RecvTimeoutError;
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError};
 use std::thread;
 use std::time;
 use string_cache::DefaultAtom as Atom;
@@ -107,9 +107,9 @@ fn journald_source<J>(
     batch_size: usize,
 ) -> super::Source
 where
-    J: Iterator<Item = Result<Record, io::Error>> + JournalCursor + Send + 'static,
+    J: JournalSource + Send + 'static,
 {
-    let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
+    let (shutdown_tx, shutdown_rx) = channel();
 
     let out = out
         .sink_map_err(|_| ())
@@ -163,12 +163,12 @@ fn create_event(record: Record) -> Event {
     log.into()
 }
 
-trait JournalCursor {
+trait JournalSource: Iterator<Item = Result<Record, io::Error>> {
     fn cursor(&self) -> Result<String, io::Error>;
     fn seek_cursor(&mut self, cursor: &str) -> Result<(), io::Error>;
 }
 
-impl JournalCursor for Journal {
+impl JournalSource for Journal {
     fn cursor(&self) -> Result<String, io::Error> {
         Journal::cursor(self)
     }
@@ -181,14 +181,14 @@ struct JournaldServer<J, T> {
     journal: J,
     units: HashSet<String>,
     channel: T,
-    shutdown: std::sync::mpsc::Receiver<()>,
+    shutdown: Receiver<()>,
     checkpointer: Checkpointer,
     batch_size: usize,
 }
 
 impl<J, T> JournaldServer<J, T>
 where
-    J: Iterator<Item = Result<Record, io::Error>> + JournalCursor,
+    J: JournalSource,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
@@ -412,7 +412,7 @@ mod tests {
         }
     }
 
-    impl JournalCursor for FakeJournal {
+    impl JournalSource for FakeJournal {
         // The fake journal cursor is just a line number
         fn cursor(&self) -> Result<String, io::Error> {
             Ok(format!("{}", self.cursor))
