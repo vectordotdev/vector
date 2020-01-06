@@ -3,6 +3,7 @@
 { stdenv, lib, fetchFromGitHub, rustPlatform
 , openssl, pkgconfig, protobuf
 , Security, libiconv, rdkafka, cmake
+, tzdata
 
 , features ?
     (if stdenv.isAarch64
@@ -54,7 +55,7 @@ rustPlatform.buildRustPackage rec {
   PROTOC_INCLUDE="${protobuf}/include";
 
   cargoBuildFlags = [ "--no-default-features" "--features" "${lib.concatStringsSep "," features}" ];
-  checkPhase = ":"; # skip tests, too -- they don't respect the rdkafka flag...
+  checkPhase = "TZDIR=${tzdata}/share/zoneinfo cargo test --no-default-features --features ${lib.concatStringsSep "," features}";
 
   meta = with stdenv.lib; {
     description = "A high-performance logs, metrics, and events router";
