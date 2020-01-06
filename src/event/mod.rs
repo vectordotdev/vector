@@ -1,4 +1,4 @@
-use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
+use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
@@ -384,7 +384,7 @@ impl From<proto::EventWrapper> for Event {
                     None
                 };
 
-                let value = match proto.metric.unwrap() {
+                let value = match proto.value.unwrap() {
                     MetricProto::Counter(counter) => MetricValue::Counter {
                         value: counter.value,
                     },
@@ -522,7 +522,7 @@ impl From<Event> for proto::EventWrapper {
                     timestamp,
                     tags,
                     kind,
-                    metric: Some(metric),
+                    value: Some(metric),
                 });
 
                 proto::EventWrapper { event: Some(event) }
