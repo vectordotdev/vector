@@ -32,7 +32,7 @@ fn batching(
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_events * event_len) as u32))
+    .throughput(Throughput::Bytes((num_events * event_len) as u64))
 }
 
 fn partitioned_batching(
@@ -70,7 +70,7 @@ fn partitioned_batching(
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_events * event_len) as u32))
+    .throughput(Throughput::Bytes((num_events * event_len) as u64))
 }
 
 fn benchmark_batching(c: &mut Criterion) {
