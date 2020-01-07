@@ -80,10 +80,10 @@ common = true
 description = "The metric type."
 
 [testing.tests.options.input.options.metric.options.type.enum]
-counter = "A [counter metric type][docs.data-model#counters]."
-gauge = "A [gauge metric type][docs.data-model#gauges]."
-histogram = "A [histogram metric type][docs.data-model#histograms]."
-set = "A [set metric type][docs.data-model#sets]."
+counter = "A [counter metric type][docs.data-model.metric#counter]."
+gauge = "A [gauge metric type][docs.data-model.metric#gauge]."
+histogram = "A [distribution metric type][docs.data-model.metric#distribution]."
+set = "A [set metric type][docs.data-model.metric#set]."
 
 [testing.tests.options.input.options.metric.options.name]
 type = "string"
@@ -99,7 +99,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 type = "table"
 null = true
 common = true
-description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
+description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
 [testing.tests.options.input.options.metric.options.tags.options."`[tag-name]`"]
 type = "string"
@@ -110,7 +110,7 @@ examples = [
 null = false
 common = true
 description = """\
-Key/value pairs representing [metric tags][docs.data-model#tags].\
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].\
 """
 
 [testing.tests.options.input.options.metric.options.val]

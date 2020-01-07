@@ -18277,6 +18277,28 @@ module.exports = {
 
       ]
     },
+    "prometheus": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "receive",
+      "id": "prometheus_source",
+      "name": "prometheus",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "socket": {
       "beta": false,
       "delivery_guarantee": "best_effort",

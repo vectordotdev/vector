@@ -33,7 +33,16 @@ default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 null = false
 unit = "seconds"
 description = """\
-Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics.\
+Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms.\
+"""
+
+[sinks.prometheus.options.flush_period_secs]
+type = "int"
+default = 60
+null = false
+unit = "seconds"
+description = """\
+Time interval between [set][docs.data-model.metric#set] values are reset.\
 """
 
 [[sinks.prometheus.output.examples]]

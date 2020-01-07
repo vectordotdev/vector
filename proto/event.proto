@@ -35,7 +35,7 @@ message Metric {
     Absolute = 1;
   }
   Kind kind = 4;
-  oneof metric {
+  oneof value {
     Counter counter = 5;
     Gauge gauge = 6;
     Set set = 7;

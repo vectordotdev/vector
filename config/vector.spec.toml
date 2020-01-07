@@ -363,6 +363,28 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through the Prometheus text exposition format and outputs `metric` events.
+[sources.prometheus]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `prometheus`.
+  #
+  # * required
+  # * type: string
+  # * must be: "prometheus"
+  type = "prometheus"
+
+  # Host addresses to scrape metrics from.
+  #
+  # * required
+  # * type: [string]
+  hosts = ["http://localhost:9090"]
+
+  # The interval between scrapes in seconds.
+  #
+  # * required
+  # * type: int
+  scrape_interval_secs = 1
+
 # Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events.
 [sources.socket]
   #
@@ -3796,13 +3818,21 @@ end
   # * type: string
   namespace = "service"
 
-  # Default buckets to use for histogram metrics.
+  # Default buckets to use for aggregating distribution metrics into histograms.
   #
   # * optional
   # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
   # * type: [float]
   # * unit: seconds
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+
+  # Time interval between set values are reset.
+  #
+  # * optional
+  # * default: 60
+  # * type: int
+  # * unit: seconds
+  flush_period_secs = 60
 
   # Enables/disables the sink healthcheck upon start.
   #

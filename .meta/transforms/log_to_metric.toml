@@ -24,10 +24,10 @@ common = true
 description = "The metric type."
 
 [transforms.log_to_metric.options.metrics.options.type.enum]
-counter = "A [counter metric type][docs.data-model#counters]."
-gauge = "A [gauge metric type][docs.data-model#gauges]."
-histogram = "A [histogram metric type][docs.data-model#histograms]."
-set = "A [set metric type][docs.data-model#sets]."
+counter = "A [counter metric type][docs.data-model.metric#counter]."
+gauge = "A [gauge metric type][docs.data-model.metric#gauge]."
+histogram = "A [distribution metric type][docs.data-model.metric#distribution]."
+set = "A [set metric type][docs.data-model.metric#set]."
 
 [transforms.log_to_metric.options.metrics.options.field]
 type = "string"
@@ -61,7 +61,7 @@ type = "table"
 display = "inline"
 null = true
 common = true
-description = "Key/value pairs representing [metric tags][docs.data-model#tags]."
+description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
 [transforms.log_to_metric.options.metrics.options.tags.options."`[tag-name]`"]
 type = "string"
@@ -73,6 +73,6 @@ examples = [
 null = false
 common = true
 description = """\
-Key/value pairs representing [metric tags][docs.data-model#tags]. Environment \
+Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environment \
 variables and field interpolation is allowed.\
 """

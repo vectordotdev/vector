@@ -357,7 +357,7 @@ The bucket/distribution the metric is a part of.
 
 ##### tags
 
-Key/value pairs representing [metric tags][docs.data-model#tags].
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 <Fields filters={false}>
 
@@ -379,7 +379,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
 
 ###### `[tag-name]`
 
-Key/value pairs representing [metric tags][docs.data-model#tags].
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 </Field>
@@ -416,7 +416,7 @@ Time metric was created/ingested.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
+  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
   examples={["counter"]}
   name={"type"}
   nullable={false}
@@ -710,9 +710,9 @@ The name of a transform, at the end of the test events extracted from this trans
 </Fields>
 
 
-[docs.data-model#counters]: /docs/about/data-model/#counters
-[docs.data-model#gauges]: /docs/about/data-model/#gauges
-[docs.data-model#histograms]: /docs/about/data-model/#histograms
-[docs.data-model#sets]: /docs/about/data-model/#sets
-[docs.data-model#tags]: /docs/about/data-model/#tags
+[docs.data-model.metric#counter]: /docs/about/data-model/metric/#counter
+[docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution
+[docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
+[docs.data-model.metric#set]: /docs/about/data-model/metric/#set
+[docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing/

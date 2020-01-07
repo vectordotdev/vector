@@ -65,6 +65,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
+  flush_period_secs = 60 # default, seconds
   healthcheck = true # default
 ```
 
@@ -121,7 +122,30 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
 
 ### buckets
 
-Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
+Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms. See [Histogram Buckets](#histogram-buckets) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={60}
+  enumValues={null}
+  examples={[60]}
+  name={"flush_period_secs"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+### flush_period_secs
+
+Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 </Field>
@@ -428,9 +452,10 @@ discussion with your use case if you find this to be a problem.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric#counters]: /docs/about/data-model/metric/#counters
+[docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution
 [docs.data-model.metric#gauges]: /docs/about/data-model/metric/#gauges
-[docs.data-model.metric#histogram]: /docs/about/data-model/metric/#histogram
 [docs.data-model.metric#histograms]: /docs/about/data-model/metric/#histograms
+[docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#sets]: /docs/about/data-model/metric/#sets
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
