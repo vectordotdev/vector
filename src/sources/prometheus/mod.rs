@@ -59,7 +59,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
 
             let request = hyper::Request::get(&url)
                 .body(hyper::Body::empty())
-                .unwrap();
+                .expect("error creating request");
 
             client
                 .request(request)
