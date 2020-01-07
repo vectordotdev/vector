@@ -1,14 +1,12 @@
 ---
 title: About
-description: "About Vector, the log and metrics collector, forwarder, and router"
+description: "About Vector, the monitoring and observability data router"
 sidebar_label: hidden
 hide_pagination: true
 ---
 
 This section will cover the basic concepts of Vector and provide a foundation
 for the rest of the documentation.
-
----
 
 import Jump from '@site/src/components/Jump';
 

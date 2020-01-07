@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "file" # example, must be: "file"
+  type = "file" # must be: "file"
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "file" # example, must be: "file"
+  type = "file" # must be: "file"
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 

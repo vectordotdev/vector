@@ -5,7 +5,8 @@ use crate::{
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         SinkExt,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    sinks::{BuildError, DNSError, Healthcheck, RouterSink},
+    topology::config::SinkContext,
 };
 use bytes::Bytes;
 use futures::{
@@ -25,7 +26,7 @@ use tokio_tls::{Connect as TlsConnect, TlsConnector, TlsStream};
 use tracing::field;
 
 #[derive(Debug, Snafu)]
-enum BuildError {
+enum TcpBuildError {
     #[snafu(display("Must specify both TLS key_file and crt_file"))]
     MissingCrtKeyFile,
     #[snafu(display("Could not build TLS connector: {}", source))]
@@ -40,7 +41,7 @@ enum BuildError {
     MissingPort,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
@@ -71,30 +72,23 @@ impl TcpSinkConfig {
             tls: None,
         }
     }
-}
 
-inventory::submit! {
-    SinkDescription::new_without_default::<TcpSinkConfig>("tcp")
-}
-
-#[typetag::serde(name = "tcp")]
-impl SinkConfig for TcpSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let ip_addr = cx
             .resolver()
-            .lookup_ip(uri.host().ok_or(BuildError::MissingHost)?)
+            .lookup_ip(uri.host().ok_or(TcpBuildError::MissingHost)?)
             // This is fine to do here because this is just receiving on a channel
             // and does not require access to the reactor/timer.
             .wait()
-            .context(super::DNSError)?
+            .context(DNSError)?
             .next()
-            .ok_or(Box::new(super::BuildError::DNSFailure {
+            .ok_or(Box::new(BuildError::DNSFailure {
                 address: self.address.clone(),
             }))?;
 
-        let port = uri.port_part().ok_or(BuildError::MissingPort)?.as_u16();
+        let port = uri.port_part().ok_or(TcpBuildError::MissingPort)?.as_u16();
         let addr = SocketAddr::new(ip_addr, port);
 
         let tls = match self.tls {
@@ -118,14 +112,6 @@ impl SinkConfig for TcpSinkConfig {
         let healthcheck = tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "tcp"
     }
 }
 
@@ -308,7 +294,7 @@ pub fn raw_tcp(
     acker: Acker,
     encoding: Encoding,
     tls: Option<TlsSettings>,
-) -> super::RouterSink {
+) -> RouterSink {
     Box::new(
         TcpSink::new(hostname, addr, tls)
             .stream_ack(acker)
@@ -322,7 +308,7 @@ enum HealthcheckError {
     ConnectError { source: std::io::Error },
 }
 
-pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
+pub fn tcp_healthcheck(addr: SocketAddr) -> Healthcheck {
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         TcpStream::connect(&addr)

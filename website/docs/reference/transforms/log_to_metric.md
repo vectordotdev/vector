@@ -22,24 +22,19 @@ The Vector `log_to_metric` transform accepts [`log`][docs.data-model.log] events
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.my_transform_id]
-  # REQUIRED - General
-  type = "log_to_metric" # example, must be: "log_to_metric"
-  inputs = ["my-source-id"] # example
+[transforms.log_to_metric]
+  type = "log_to_metric"
 
-  # REQUIRED - Metrics
-  [[transforms.my_transform_id.metrics]]
-    # REQUIRED
-    type = "counter" # example, enum
-    field = "duration" # example
-    name = "duration_total" # example
-
-    # OPTIONAL
-    [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}"
+  [[transforms.log_to_metric.metrics]]
+    type = "histogram"
+    field = "time"
+    name = "time_ms" # optional
+    tags.status = "{{status}}" # optional
+    tags.host = "{{host}}" # optional
+    tags.env = "${ENV}" # optional
 ```
 
 ## Options

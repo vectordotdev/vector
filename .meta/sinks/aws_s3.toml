@@ -64,12 +64,12 @@ description = "The format of the resulting object file name. [`strftime` specifi
 type = "string"
 category = "Object Names"
 common = true
-default = "date=%F"
+default = "date=%F/"
 examples = [
   "date=%F/",
   "date=%F/hour=%H/",
   "year=%Y/month=%m/day=%d/",
-  "application_id={{ application_id }}/date=%F/"
+  "application_id={{ application_id }}/date=%F/",
 ]
 null = true
 partition_key = true

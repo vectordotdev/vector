@@ -3,7 +3,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
@@ -284,8 +284,8 @@ struct EventStream<R: Read> {
     events: usize,
     /// Optinal channel from headers
     channel: Option<ValueKind>,
-    /// Extracted default time
-    time: Option<ValueKind>,
+    /// Default time
+    time: Time,
     /// Remaining extracted default values
     extractors: [DefaultExtractor; 4],
 }
@@ -296,7 +296,7 @@ impl<R: Read> EventStream<R> {
             data,
             events: 0,
             channel: channel.map(|value| value.as_bytes().into()),
-            time: None,
+            time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
@@ -393,15 +393,12 @@ impl<R: Read> Stream for EventStream<R> {
             None => (),
             Some(Some(t)) => {
                 if let Some(t) = t.as_u64() {
-                    self.time = Some(Utc.timestamp(t as i64, 0).into());
+                    self.time = Time::Provided(Utc.timestamp(t as i64, 0));
                 } else if let Some(t) = t.as_f64() {
-                    self.time = Some(
-                        Utc.timestamp(
-                            t.floor() as i64,
-                            (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
-                        )
-                        .into(),
-                    );
+                    self.time = Time::Provided(Utc.timestamp(
+                        t.floor() as i64,
+                        (t.fract() * 1000.0 * 1000.0 * 1000.0) as u32,
+                    ));
                 } else {
                     return Err(ApiError::InvalidDataFormat { event: self.events }.into());
                 }
@@ -410,8 +407,9 @@ impl<R: Read> Stream for EventStream<R> {
         }
 
         // Add time field
-        if let Some(time) = self.time.as_ref() {
-            log.insert_explicit(event::TIMESTAMP.clone(), time.clone());
+        match self.time.clone() {
+            Time::Provided(time) => log.insert_explicit(event::TIMESTAMP.clone(), time),
+            Time::Now(time) => log.insert_implicit(event::TIMESTAMP.clone(), time),
         }
 
         // Extract default extracted fields
@@ -466,6 +464,15 @@ impl DefaultExtractor {
     }
 }
 
+/// For tracking origin of the timestamp
+#[derive(Clone, Debug)]
+enum Time {
+    /// Backup
+    Now(DateTime<Utc>),
+    /// Provided in the request
+    Provided(DateTime<Utc>),
+}
+
 /// Creates event from raw request
 fn raw_event(
     bytes: FullBody,
@@ -502,6 +509,9 @@ fn raw_event(
     if let Some(host) = host {
         log.insert_explicit(event::HOST.clone(), host.as_bytes());
     }
+
+    // Add timestamp
+    log.insert_implicit(event::TIMESTAMP.clone(), Utc::now());
 
     Ok(event)
 }
@@ -742,6 +752,7 @@ mod tests {
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
         assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
     }
 
     #[test]
@@ -752,6 +763,7 @@ mod tests {
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
         assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
     }
 
     #[test]
@@ -767,6 +779,7 @@ mod tests {
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
             assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
+            assert!(event.as_log().get(&event::TIMESTAMP).is_some());
         }
     }
 
@@ -778,6 +791,7 @@ mod tests {
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
         assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
     }
 
     #[test]
@@ -793,6 +807,7 @@ mod tests {
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
             assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
+            assert!(event.as_log().get(&event::TIMESTAMP).is_some());
         }
     }
 
@@ -810,6 +825,7 @@ mod tests {
 
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
+        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
     }
 
     #[test]
@@ -823,6 +839,7 @@ mod tests {
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
         assert_eq!(event.as_log()[&event::MESSAGE], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
     }
 
     #[test]
@@ -860,6 +877,7 @@ mod tests {
 
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
         assert_eq!(event.as_log()[&event::MESSAGE], "first".into());
+        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
     }
 
     #[test]

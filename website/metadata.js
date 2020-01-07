@@ -18100,6 +18100,28 @@ module.exports = {
 
       ]
     },
+    "socket": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to a socket, such as a TCP, UDP, or Unix socket.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "socket_sink",
+      "name": "socket",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "splunk_hec": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -18139,28 +18161,6 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "beta",
-      "type": "sink",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "tcp": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Streams log events to a TCP connection.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "transmit",
-      "id": "tcp_sink",
-      "name": "tcp",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -18277,6 +18277,28 @@ module.exports = {
 
       ]
     },
+    "socket": {
+      "beta": false,
+      "delivery_guarantee": "best_effort",
+      "description": "Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs log events.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "socket_source",
+      "name": "socket",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "splunk_hec": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
@@ -18353,50 +18375,6 @@ module.exports = {
       "function_category": "receive",
       "id": "syslog_source",
       "name": "syslog",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "source",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "tcp": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the TCP protocol and outputs log events.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "receive",
-      "id": "tcp_source",
-      "name": "tcp",
-      "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "service_provider": null,
-      "status": "prod-ready",
-      "type": "source",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "udp": {
-      "beta": false,
-      "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the UDP protocol and outputs log events.",
-      "event_types": [
-        "log"
-      ],
-      "function_category": "receive",
-      "id": "udp_source",
-      "name": "udp",
       "operating_systems": [
         "linux",
         "macos",

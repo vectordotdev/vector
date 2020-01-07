@@ -11,19 +11,19 @@
 </p>
 
 
-Vector is a [high-performance][pages.index#performance] observability data router. It
-makes [collecting][docs.sources], [transforming][docs.transforms], and
-[sending][docs.sinks] logs, metrics, and events easy. It decouples data
-collection & routing from your services, giving you control and data ownership,
-among many other benefits.
+Vector is a [high-performance][pages.index#performance] monitoring and
+observability data router. It makes [collecting][docs.sources],
+[transforming][docs.transforms], and [sending][docs.sinks] logs, metrics, and
+events easy. It decouples data collection & routing from your services, giving
+you control and data ownership, among many other benefits.
 
 Built in [Rust][urls.rust], Vector places high-value on
-[performance][pages.index#performance], [correctness][pages.index#correctness], and [operator
-friendliness][docs.administration]. It compiles to a single static binary and is
-designed to be [deployed][docs.deployment] across your entire infrastructure,
-serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
-[service][docs.roles.service], making the process of getting data from A to B
-simple and unified.
+[performance][pages.index#performance], [correctness][pages.index#correctness],
+and [operator friendliness][docs.administration]. It compiles to a single static
+binary and is designed to be [deployed][docs.deployment] across your entire
+infrastructure, serving both as a light-weight [agent][docs.roles.agent] and a
+highly efficient [service][docs.roles.service], making the process of getting
+data from A to B simple and unified.
 
 
 <!--
@@ -39,7 +39,7 @@ simple and unified.
 #### About
 
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
+* [**Data model (Event)**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
@@ -51,7 +51,7 @@ simple and unified.
 
 #### Reference
 
-* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [syslog][docs.sources.syslog], [tcp][docs.sources.tcp], and [5 more...][docs.sources]
+* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [4 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [12 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [http][docs.sinks.http], [kafka][docs.sinks.kafka], and [13 more...][docs.sinks]
 
@@ -171,8 +171,8 @@ Or use your own [preferred method][docs.installation].
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file/
 [docs.sources.journald]: https://vector.dev/docs/reference/sources/journald/
 [docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka/
+[docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
 [docs.sources.syslog]: https://vector.dev/docs/reference/sources/syslog/
-[docs.sources.tcp]: https://vector.dev/docs/reference/sources/tcp/
 [docs.sources]: https://vector.dev/docs/reference/sources/
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/

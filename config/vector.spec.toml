@@ -363,6 +363,67 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events.
+[sources.socket]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `socket`.
+  #
+  # * required
+  # * type: string
+  # * must be: "socket"
+  type = "socket"
+
+  # The address to listen for connections on, or "systemd#N" to use the Nth
+  # socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
+  #
+  # * required
+  # * type: string
+  address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#3"
+
+  # The type of socket to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "tcp" or "udp"
+  mode = "tcp"
+  mode = "udp"
+
+  # The maximum bytes size of incoming messages before they are discarded. Valid
+  # for "tcp" and "udp" sockets.
+  #
+  # * optional
+  # * default: 102400
+  # * type: int
+  # * unit: bytes
+  max_length = 102400
+
+  # The timeout before a connection is forcefully closed during shutdown. Valid
+  # only for "tcp" sockets.
+  #
+  # * optional
+  # * default: 30
+  # * type: int
+  # * unit: seconds
+  shutdown_timeout_secs = 30
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host. Valid for
+  # "tcp" and "udp" sockets.
+  #
+  # * optional
+  # * default: "host"
+  # * type: string
+  host_key = "host"
+
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
   # The component type. This is a required field that tells Vector which
@@ -508,95 +569,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
-# Ingests data through the TCP protocol and outputs `log` events.
-[sources.tcp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `tcp`.
-  #
-  # * required
-  # * type: string
-  # * must be: "tcp"
-  type = "tcp"
-
-  # The address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation.
-  #
-  # * required
-  # * type: string
-  address = "0.0.0.0:9000"
-  address = "systemd"
-  address = "systemd#3"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  #
-  # * optional
-  # * default: 102400
-  # * type: int
-  # * unit: bytes
-  max_length = 102400
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  shutdown_timeout_secs = 30
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  #
-  # * optional
-  # * default: "host"
-  # * type: string
-  host_key = "host"
-
-# Ingests data through the UDP protocol and outputs `log` events.
-[sources.udp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `udp`.
-  #
-  # * required
-  # * type: string
-  # * must be: "udp"
-  type = "udp"
-
-  # The address to bind the socket to.
-  #
-  # * required
-  # * type: string
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  #
-  # * optional
-  # * default: 102400
-  # * type: int
-  # * unit: bytes
-  max_length = 102400
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  #
-  # * optional
-  # * default: "host"
-  # * type: string
-  host_key = "host"
-
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
   # The component type. This is a required field that tells Vector which
@@ -660,15 +632,14 @@ dns_servers = ["0.0.0.0:53"]
     #
     # * required
     # * type: *
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00Z
-    my_nested_fields = key1 = "value1"
-    key2 = "value2"
-    my_list = ["first", "second", "third"]
+    string_field = "string value"
+    env_var_field = "${ENV_VAR}"
+    int_field = 1
+    float_field = 1.2
+    bool_field = true
+    timestamp_field = 1979-05-27T00:32:00Z
+    parent = {child = "child_value"}
+    list_field = ["first", "second", "third"]
 
 # Accepts `metric` events and allows you to add one or more metric tags.
 [transforms.add_tags]
@@ -700,8 +671,8 @@ dns_servers = ["0.0.0.0:53"]
     #
     # * required
     # * type: string
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
+    static_tag = "my value"
+    env_tag = "${ENV_VAR}"
 
 # Accepts `log` events and allows you to strips ANSI characters from the specified field.
 [transforms.ansi_stripper]
@@ -2102,7 +2073,7 @@ end
   # this to be the root S3 "folder".
   #
   # * optional
-  # * default: "date=%F"
+  # * default: "date=%F/"
   # * type: string
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"
@@ -2707,8 +2678,8 @@ end
   # * optional
   # * default: "vector-%F"
   # * type: string
-  index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
+  index = "vector-%Y-%m-%d"
 
   # The provider of the Elasticsearch service. This is used to properly
   # authenticate with the Elasticsearch cluster. For example, authentication for
@@ -3849,6 +3820,167 @@ end
   healthcheck = true
   healthcheck = false
 
+# Streams `log` events to a socket, such as a TCP, UDP, or Unix socket.
+[sinks.socket]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `socket`.
+  #
+  # * required
+  # * type: string
+  # * must be: "socket"
+  type = "socket"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The address to bind to.
+  #
+  # * required
+  # * type: string
+  address = "92.12.333.224:5000"
+
+  # The type of socket to use. Currently only `tcp` is valid.
+  #
+  # * required
+  # * type: string
+  # * must be: "tcp"
+  mode = "tcp"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
+
+  #
+  # Buffer
+  #
+
+  [sinks.socket.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    num_items = 500
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Tls
+  #
+
+  [sinks.socket.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to a Splunk's HTTP Event Collector.
 [sinks.splunk_hec]
   #
@@ -4111,160 +4243,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-# Streams `log` events to a TCP connection.
-[sinks.tcp]
-  #
-  # General
-  #
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `tcp`.
-  #
-  # * required
-  # * type: string
-  # * must be: "tcp"
-  type = "tcp"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # The TCP address.
-  #
-  # * required
-  # * type: string
-  address = "92.12.333.224:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
-  # Buffer
-  #
-
-  [sinks.tcp.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * optional
-    # * no default
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
-    # The behavior when the buffer becomes full.
-    #
-    # * optional
-    # * default: "block"
-    # * type: string
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-  #
-  # Tls
-  #
-
-  [sinks.tcp.tls]
-    # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
-    #
-    # * optional
-    # * no default
-    # * type: string
-    ca_path = "/path/to/certificate_authority.crt"
-
-    # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    crt_path = "/path/to/host_certificate.crt"
-
-    # Enable TLS during connections to the remote.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    enabled = false
-    enabled = true
-
-    # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_pass = "PassWord1"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    key_path = "/path/to/host_certificate.key"
-
-    # If `true` (the default), Vector will validate the TLS certificate of the
-    # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_certificate = true
-    verify_certificate = false
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
 
 # Streams `log` events to another downstream `vector` source.
 [sinks.vector]

@@ -18,9 +18,9 @@ pub mod http;
 pub mod kafka;
 pub mod new_relic_logs;
 pub mod prometheus;
+pub mod socket;
 pub mod splunk_hec;
 pub mod statsd;
-pub mod tcp;
 pub mod util;
 pub mod vector;
 

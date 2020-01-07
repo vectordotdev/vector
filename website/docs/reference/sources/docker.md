@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "docker" # example, must be: "docker"
+  type = "docker" # must be: "docker"
 
   # OPTIONAL
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default

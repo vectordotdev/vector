@@ -215,6 +215,10 @@ impl FileServer {
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                if !watcher.should_read() {
+                    continue;
+                }
+
                 let mut bytes_read: usize = 0;
                 while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
                     if sz > 0 {

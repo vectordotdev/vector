@@ -24,11 +24,16 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Memory {
                         num_items: 100,
@@ -59,11 +64,16 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
@@ -96,11 +106,16 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 10_000,

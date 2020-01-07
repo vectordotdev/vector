@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "geoip" # example, must be: "geoip"
+  type = "geoip" # must be: "geoip"
   inputs = ["my-source-id"] # example
   database = "/path/to/GeoLite2-City.mmdb" # example
   source = "ip_address" # example

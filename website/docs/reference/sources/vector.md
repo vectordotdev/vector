@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "vector" # example, must be: "vector"
+  type = "vector" # must be: "vector"
   address = "0.0.0.0:9000" # example
 ```
 
@@ -56,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "vector" # example, must be: "vector"
+  type = "vector" # must be: "vector"
   address = "0.0.0.0:9000" # example
 
   # OPTIONAL

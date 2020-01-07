@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::proto,
-    sinks::tcp::TcpSink,
+    sinks::util::tcp::TcpSink,
     sinks::util::SinkExt,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
@@ -59,7 +59,7 @@ impl SinkConfig for VectorSinkConfig {
         let addr = SocketAddr::new(ip_addr, port);
 
         let sink = vector(self.address.clone(), addr, cx.acker());
-        let healthcheck = super::tcp::tcp_healthcheck(addr);
+        let healthcheck = super::util::tcp::tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
     }

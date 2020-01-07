@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example
@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "aws_cloudwatch_metrics" # example, must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example

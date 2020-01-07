@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "new_relic_logs" # example, must be: "new_relic_logs"
+  type = "new_relic_logs" # must be: "new_relic_logs"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "new_relic_logs" # example, must be: "new_relic_logs"
+  type = "new_relic_logs" # must be: "new_relic_logs"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL - General

@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "syslog" # example, must be: "syslog"
+  type = "syslog" # must be: "syslog"
   mode = "tcp" # example, enum
 
   # OPTIONAL
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "syslog" # example, must be: "syslog"
+  type = "syslog" # must be: "syslog"
   mode = "tcp" # example, enum
 
   # OPTIONAL - General
@@ -448,13 +448,13 @@ Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
 fails, and the [`drop_invalid`](#drop_invalid) option is true the event will be dropped and `warning` log line
 will be emitted. If [`drop_invalid`](#drop_invalid) is false the event will not be dropped but only the [`message`](#message) field
 is populated. The timestamp is taken as the current time. If this is the case, we recommend using
-the [`tcp` source][docs.sources.tcp] combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
+the [`socket` source][docs.sources.socket] combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
 implement your own ingestion and parsing scheme.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.sources.tcp]: /docs/reference/sources/tcp/
+[docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

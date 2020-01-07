@@ -44,7 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "vector" # example, must be: "vector"
+  type = "vector" # must be: "vector"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
 ```
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "vector" # example, must be: "vector"
+  type = "vector" # must be: "vector"
   inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
 

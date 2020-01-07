@@ -241,7 +241,7 @@ class Templates
     end
 
     if example
-      if option.default.nil?
+      if option.default.nil? && (!option.enum || option.enum.keys.length > 1)
         tags << "example"
       end
     end

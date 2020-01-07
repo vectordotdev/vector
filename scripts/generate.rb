@@ -187,7 +187,6 @@ metadata.components.each do |component|
   if !File.exists?(template_path)
     contents = templates.component_default(component)
     File.open(template_path, 'w+') { |file| file.write(contents) }
-    templates = Templates.new(ROOT_DIR, metadata)
   end
 end
 
@@ -211,6 +210,8 @@ end
 # Render templates
 #
 
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+templates = Templates.new(ROOT_DIR, metadata)
 
 erb_paths.
   select { |path| !templates.partial?(path) }.

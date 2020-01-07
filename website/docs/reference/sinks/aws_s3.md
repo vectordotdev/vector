@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_s3" # example, must be: "aws_s3"
+  type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "aws_s3" # example, must be: "aws_s3"
+  type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
@@ -445,7 +445,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 <Field
   common={true}
-  defaultValue={"date=%F"}
+  defaultValue={"date=%F/"}
   enumValues={null}
   examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
   name={"key_prefix"}

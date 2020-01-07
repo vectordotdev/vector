@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "lua" # example, must be: "lua"
+  type = "lua" # must be: "lua"
   inputs = ["my-source-id"] # example
   source = """
 require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)

@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "statsd" # example, must be: "statsd"
+  type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
 
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "statsd" # example, must be: "statsd"
+  type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
 

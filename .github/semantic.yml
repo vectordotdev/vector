@@ -49,12 +49,11 @@ scopes:
   - file source
   - journald source
   - kafka source
+  - socket source
   - splunk_hec source
   - statsd source
   - stdin source
   - syslog source
-  - tcp source
-  - udp source
   - vector source
 
   # transforms
@@ -94,7 +93,7 @@ scopes:
   - kafka sink
   - new_relic_logs sink
   - prometheus sink
+  - socket sink
   - splunk_hec sink
   - statsd sink
-  - tcp sink
   - vector sink

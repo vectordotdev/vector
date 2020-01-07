@@ -15,7 +15,7 @@ import styles from './styles.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import {viewedNewRelease} from '@site/src/exports/newRelease';
 
-function Downloads({downloads, path}) {
+function Downloads({browsePath, downloads}) {
   const groupedDownloads = groupBy(downloads, ((download) => {
     return [download.os, download.package_manager];
   }));
@@ -28,7 +28,7 @@ function Downloads({downloads, path}) {
           <ul>
             {groupedDownloads[key].map((download, downloadIdx) => (
               <li key={downloadIdx}>
-                <a key={downloadIdx} title={download.file_name} href={`https://packages.timber.io/vector/${path}/${download.file_name}`}>
+                <a key={downloadIdx} title={download.file_name} href={`https://packages.timber.io/vector/${browsePath}/${download.file_name}`}>
                   <i className="feather icon-download"></i> {download.arch}
                 </a>
               </li>
@@ -37,13 +37,13 @@ function Downloads({downloads, path}) {
         </li>
       ))}
       <li>
-        <a href={`https://packages.timber.io/vector/${path}/`} target="_blank">browse all files&hellip;</a>
+        <a href={`https://packages.timber.io/vector/${browsePath}/`} target="_blank">browse all files&hellip;</a>
       </li>
     </ul>
   );
 }
 
-function DownloadTable({version, date, downloads, releaseNotesPath}) {
+function DownloadTable({browsePath, date, downloads, releaseNotesPath, version}) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
@@ -66,7 +66,7 @@ function DownloadTable({version, date, downloads, releaseNotesPath}) {
       <div>
         <div>Downloads</div>
         <div>
-          <Downloads downloads={downloads} path={version} />
+          <Downloads downloads={downloads} browsePath={browsePath} />
         </div>
       </div>
       <div>
@@ -196,16 +196,16 @@ function ReleaseDownload({version}) {
                 placeholder="Select a version..."
                 value={olderOptions.find(option => option.value == oldRelease.version)}
                 onChange={(selectedOption) => setVersion(selectedOption ? selectedOption.value : null)} />
-              <DownloadTable version={oldRelease.version} date={oldRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${oldRelease.version}/`} />
+              <DownloadTable browsePath={oldRelease.version} date={oldRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${oldRelease.version}/`} version={oldRelease.version} />
             </TabItem>
             <TabItem value="latest">
-              <DownloadTable version={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}/`} />
+              <DownloadTable browsePath={latestRelease.version} date={latestRelease.date} downloads={latestDownloads} releaseNotesPath={`/releases/${latestRelease.version}/`} version={latestRelease.version} />
             </TabItem>
             <TabItem value="nightly">
               <Alert fill={true} type="warning">
                 Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.
               </Alert>
-              <DownloadTable version="nightly" date={nightlyDate} downloads={nightlyDownloads} />
+              <DownloadTable browsePath="nightly/latest" date={nightlyDate} downloads={nightlyDownloads} version="nightly" />
             </TabItem>
             </Tabs>
           </div>
