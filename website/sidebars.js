@@ -162,6 +162,8 @@ module.exports = {
             
               "reference/transforms/grok_parser",
             
+              "reference/transforms/javascript",
+            
               "reference/transforms/json_parser",
             
               "reference/transforms/log_to_metric",

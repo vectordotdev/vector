@@ -20,7 +20,14 @@ There is a one-to-one correspondence between each Vector's data type and a JavaS
 
 ## Options
 
-<%= options_table(component.options.to_h.values.sort) %>
+<%= options(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
 
 ## Examples
 
@@ -121,11 +128,3 @@ If `handler` parameter is specified, the source should contain a definition of t
 function with the same name as the value of `handler`. In addition, the source can contain
 other top-level functions, variables, constants, or classes. The value of `handler`
 should consist of ASCII characters and be a valid JavaScript identifier.
-
-## Troubleshooting
-
-<%= component_troubleshooting(component) %>
-
-## Resources
-
-<%= component_resources(component) %>

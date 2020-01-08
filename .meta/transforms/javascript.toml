@@ -1,11 +1,15 @@
 [transforms.javascript]
+title = "JavaScript"
 allow_you_to_description = "transform events with a full embedded JavaScript engine"
 beta = true
-function_categories = ["program"]
+common = true
+function_category = "program"
 guides = []
 input_types = ["log"]
 output_types = ["log"]
-resources = []
+resources = [
+  {name = "ES 2019 Specification", short_link = "es2019_spec"}
+]
 
 [transforms.javascript.options.source]
 type = "string"
@@ -14,6 +18,7 @@ examples = [
 event => ({...event, field: 'value'})
 """
 ]
+common = true
 null = true
 description = "The inline JavaScript source with handler function."
 
@@ -26,6 +31,7 @@ description = "The path to JavaScript source file with handler function."
 [transforms.javascript.options.handler]
 type = "string"
 examples = ["handler"]
+common = true
 null = true
 description = "Name of the handler function."
 

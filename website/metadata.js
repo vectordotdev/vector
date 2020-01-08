@@ -18667,6 +18667,26 @@ module.exports = {
 
       ]
     },
+    "javascript": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to transform events with a full embedded JavaScript engine.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "program",
+      "id": "javascript_transform",
+      "name": "javascript",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "json_parser": {
       "beta": false,
       "delivery_guarantee": null,

@@ -966,42 +966,46 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts `log` events and allows you to transform events with a full embedded JavaScript engine.
 [transforms.javascript]
-  # The component type
-  # 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `javascript`.
+  #
   # * required
-  # * no default
+  # * type: string
   # * must be: "javascript"
   type = "javascript"
 
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
   # * required
-  # * no default
+  # * type: [string]
   inputs = ["my-source-id"]
 
   # Name of the handler function.
-  # 
+  #
   # * optional
   # * no default
+  # * type: string
   handler = "handler"
 
   # Maximum allowed RAM usage for JavaScript engine in bytes.
-  # 
+  #
   # * optional
   # * no default
+  # * type: int
   memory_limit = 10000000
 
   # The path to JavaScript source file with handler function.
-  # 
+  #
   # * optional
   # * no default
+  # * type: string
   path = "/etc/vector/transform.js"
 
   # The inline JavaScript source with handler function.
-  # 
+  #
   # * optional
   # * no default
+  # * type: string
   source = """
 event => ({...event, field: 'value'})
 
