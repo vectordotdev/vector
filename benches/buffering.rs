@@ -143,9 +143,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 

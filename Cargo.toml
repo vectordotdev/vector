@@ -151,7 +151,7 @@ built = "0.3"
 
 [dev-dependencies]
 approx = "0.3.0"
-criterion = "0.2.5"
+criterion = "0.3"
 reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"

@@ -84,7 +84,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("files", bench);
 }
