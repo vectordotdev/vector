@@ -1455,8 +1455,8 @@ dependencies = [
 
 [[package]]
 name = "libquickjs-sys"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.3.0"
+source = "git+https://github.com/theduke/quickjs-rs.git?rev=65cf630c1511aeefa72b1e90cad0103cc83a5917#65cf630c1511aeefa72b1e90cad0103cc83a5917"
 dependencies = [
  "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2217,11 +2217,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "quick-js"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.2.3"
+source = "git+https://github.com/theduke/quickjs-rs.git?rev=65cf630c1511aeefa72b1e90cad0103cc83a5917#65cf630c1511aeefa72b1e90cad0103cc83a5917"
 dependencies = [
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "libquickjs-sys 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libquickjs-sys 0.3.0 (git+https://github.com/theduke/quickjs-rs.git?rev=65cf630c1511aeefa72b1e90cad0103cc83a5917)",
  "num-bigint 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "once_cell 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4178,7 +4178,7 @@ dependencies = [
  "prost-build 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-types 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "quick-js 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quick-js 0.2.3 (git+https://github.com/theduke/quickjs-rs.git?rev=65cf630c1511aeefa72b1e90cad0103cc83a5917)",
  "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rdkafka 0.21.0 (git+https://github.com/timberio/rust-rdkafka)",
  "regex 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4579,7 +4579,7 @@ dependencies = [
 "checksum lexical-core 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2304bccb228c4b020f3a4835d247df0a02a7c4686098d4167762cfbbe4c5cb14"
 "checksum libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)" = "1a31a0627fdf1f6a39ec0dd577e101440b7db22672c0901fe00a9a6fbb5c24e8"
 "checksum libgit2-sys 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a30f8637eb59616ee3b8a00f6adff781ee4ddd8343a615b8238de756060cc1b3"
-"checksum libquickjs-sys 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "44b511fe25aec1f3a867d51eeca30d00fdf4e7dec98085ebd79de6607475d8b2"
+"checksum libquickjs-sys 0.3.0 (git+https://github.com/theduke/quickjs-rs.git?rev=65cf630c1511aeefa72b1e90cad0103cc83a5917)" = "<none>"
 "checksum libsqlite3-sys 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5e5b95e89c330291768dc840238db7f9e204fd208511ab6319b56193a7f2ae25"
 "checksum libz-sys 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)" = "2eb5e43362e38e2bca2fd5f5134c4d4564a23a5c28e9b95411652021a8675ebe"
 "checksum linked-hash-map 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ae91b68aebc4ddb91978b11a1b02ddd8602a05ec19002801c5666000e05e0f83"
@@ -4664,7 +4664,7 @@ dependencies = [
 "checksum publicsuffix 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9bf259a81de2b2eb9850ec990ec78e6a25319715584fd7652b9b26f96fcb1510"
 "checksum quanta 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "dd25291023477d6f6d60e7ec4bb0883ab20dd628edb95ad7dec25531ed590d23"
 "checksum quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9274b940887ce9addde99c4eee6b5c44cc494b182b97e73dc8ffdcb3397fd3f0"
-"checksum quick-js 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "44bfb2970e2d4bc587da58f43e1207e84db2eb4f63d6b4b67d400a033ae43de6"
+"checksum quick-js 0.2.3 (git+https://github.com/theduke/quickjs-rs.git?rev=65cf630c1511aeefa72b1e90cad0103cc83a5917)" = "<none>"
 "checksum quickcheck 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c01babc5ffd48a2a83744b3024814bb46dfd4f2a4705ccb44b1b60e644fdcab7"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)" = "6ce23b6b870e8f94f81fb0a363d65d86675884b34a09043c81e5562f11c1f8e1"
