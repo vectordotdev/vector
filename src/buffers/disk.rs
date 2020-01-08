@@ -18,6 +18,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::io;
+use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -47,7 +48,7 @@ struct Key(usize);
 
 impl db_key::Key for Key {
     fn from_u8(key: &[u8]) -> Self {
-        let bytes: [u8; 8] = key.try_into().expect("Key should be the right size");
+        let bytes: [u8; size_of::<usize>()] = key.try_into().expect("Key should be the right size");
 
         Self(usize::from_be_bytes(bytes))
     }

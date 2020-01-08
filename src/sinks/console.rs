@@ -1,8 +1,7 @@
 use super::util::SinkExt;
 use crate::{
-    buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
@@ -29,7 +28,7 @@ impl Default for Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    pub encoding: Option<Encoding>,
+    pub encoding: Encoding,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -39,9 +38,13 @@ pub enum Encoding {
     Json,
 }
 
+inventory::submit! {
+    SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
+}
+
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
@@ -50,7 +53,7 @@ impl SinkConfig for ConsoleSinkConfig {
         };
 
         let sink = FramedWrite::new(output, LinesCodec::new())
-            .stream_ack(acker)
+            .stream_ack(cx.acker())
             .sink_map_err(|_| ())
             .with(move |event| encode_event(event, &encoding));
 
@@ -60,72 +63,94 @@ impl SinkConfig for ConsoleSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Any
     }
+
+    fn sink_type(&self) -> &'static str {
+        "console"
+    }
 }
 
-fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<String, ()> {
+fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
     match event {
-        Event::Log(log) => {
-            if (log.is_structured() && encoding != &Some(Encoding::Text))
-                || encoding == &Some(Encoding::Json)
-            {
-                let bytes = serde_json::to_vec(&log.unflatten())
-                    .map_err(|e| panic!("Error encoding: {}", e))?;
-                String::from_utf8(bytes)
-                    .map_err(|e| panic!("Unable to convert json to utf8: {}", e))
-            } else {
+        Event::Log(log) => match encoding {
+            Encoding::Json => {
+                serde_json::to_string(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
+            }
+            Encoding::Text => {
                 let s = log
                     .get(&event::MESSAGE)
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)
             }
-        }
+        },
         Event::Metric(metric) => serde_json::to_string(&metric).map_err(|_| ()),
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::encode_event;
-    use crate::{event::Metric, Event};
+    use super::{encode_event, Encoding};
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::Event;
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
     fn encodes_raw_logs() {
         let event = Event::from("foo");
-        assert_eq!(Ok("foo".to_string()), encode_event(event, &None));
+        assert_eq!(Ok("foo".to_string()), encode_event(event, &Encoding::Text));
     }
 
     #[test]
     fn encodes_counter() {
-        let event = Event::Metric(Metric::Counter {
+        let event = Event::Metric(Metric {
             name: "foos".into(),
-            val: 100.0,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![("key".to_owned(), "value".to_owned())]
                     .into_iter()
                     .collect(),
             ),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            Ok(r#"{"type":"counter","name":"foos","val":100.0,"timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"}}"#.to_string()),
-            encode_event(event, &None)
+            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
+            encode_event(event, &Encoding::Text)
+        );
+    }
+
+    #[test]
+    fn encodes_set() {
+        let event = Event::Metric(Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        });
+        assert_eq!(
+            Ok(r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#.to_string()),
+            encode_event(event, &Encoding::Text)
         );
     }
 
     #[test]
     fn encodes_histogram_without_timestamp() {
-        let event = Event::Metric(Metric::Histogram {
+        let event = Event::Metric(Metric {
             name: "glork".into(),
-            val: 10.0,
-            sample_rate: 1,
             timestamp: None,
             tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![10.0],
+                sample_rates: vec![1],
+            },
         });
         assert_eq!(
-            Ok(r#"{"type":"histogram","name":"glork","val":10.0,"sample_rate":1,"timestamp":null,"tags":null}"#.to_string()),
-            encode_event(event, &None)
+            Ok(r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#.to_string()),
+            encode_event(event, &Encoding::Text)
         );
     }
 }

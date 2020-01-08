@@ -3,7 +3,10 @@ use crate::{
     Event,
 };
 use bytes::Bytes;
-use chrono::{format::strftime::StrftimeItems, Utc};
+use chrono::{
+    format::{strftime::StrftimeItems, Item},
+    Utc,
+};
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use serde::{
@@ -11,6 +14,7 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 use std::fmt;
+use std::path::PathBuf;
 use string_cache::DefaultAtom as Atom;
 
 lazy_static! {
@@ -30,9 +34,25 @@ impl From<&str> for Template {
         Template {
             src: src.into(),
             src_bytes: src.into(),
-            has_ts: StrftimeItems::new(src).count() > 0,
+            has_ts: StrftimeItems::new(src).filter(is_dynamic).count() > 0,
             has_fields: RE.is_match(src),
         }
+    }
+}
+
+impl From<PathBuf> for Template {
+    fn from(p: PathBuf) -> Self {
+        Template::from(&*p.to_string_lossy())
+    }
+}
+
+fn is_dynamic(item: &Item) -> bool {
+    match item {
+        Item::Error => true,
+        Item::Fixed(_) => true,
+        Item::Numeric(_, _) => true,
+        Item::Space(_) | Item::OwnedSpace(_) => false,
+        Item::Literal(_) | Item::OwnedLiteral(_) => false,
     }
 }
 
@@ -61,7 +81,7 @@ impl Template {
     }
 
     pub fn is_dynamic(&self) -> bool {
-        !(self.has_fields && self.has_ts)
+        self.has_fields || self.has_ts
     }
 
     pub fn get_ref(&self) -> &Bytes {
@@ -147,6 +167,14 @@ mod tests {
     use chrono::TimeZone;
 
     #[test]
+    fn is_dynamic() {
+        assert_eq!(true, Template::from("/kube-demo/%F").is_dynamic());
+        assert_eq!(false, Template::from("/kube-demo/echo").is_dynamic());
+        assert_eq!(true, Template::from("/kube-demo/{{ foo }}").is_dynamic());
+        assert_eq!(true, Template::from("/kube-demo/{{ foo }}/%F").is_dynamic());
+    }
+
+    #[test]
     fn render_static() {
         let event = Event::from("hello world");
         let template = Template::from("foo");
@@ -157,9 +185,7 @@ mod tests {
     #[test]
     fn render_dynamic() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("log_stream".into(), "stream".into());
+        event.as_mut_log().insert_implicit("log_stream", "stream");
         let template = Template::from("{{log_stream}}");
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
@@ -168,9 +194,7 @@ mod tests {
     #[test]
     fn render_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("log_stream".into(), "stream".into());
+        event.as_mut_log().insert_implicit("log_stream", "stream");
         let template = Template::from("abcd-{{log_stream}}");
 
         assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
@@ -179,9 +203,7 @@ mod tests {
     #[test]
     fn render_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("log_stream".into(), "stream".into());
+        event.as_mut_log().insert_implicit("log_stream", "stream");
         let template = Template::from("{{log_stream}}-abcd");
 
         assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
@@ -201,12 +223,8 @@ mod tests {
     #[test]
     fn render_dynamic_multiple_keys() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("foo".into(), "bar".into());
-        event
-            .as_mut_log()
-            .insert_implicit("baz".into(), "quux".into());
+        event.as_mut_log().insert_implicit("foo", "bar");
+        event.as_mut_log().insert_implicit("baz", "quux");
         let template = Template::from("stream-{{foo}}-{{baz}}.log");
 
         assert_eq!(
@@ -218,12 +236,8 @@ mod tests {
     #[test]
     fn render_dynamic_weird_junk() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("foo".into(), "bar".into());
-        event
-            .as_mut_log()
-            .insert_implicit("baz".into(), "quux".into());
+        event.as_mut_log().insert_implicit("foo", "bar");
+        event.as_mut_log().insert_implicit("baz", "quux");
         let template = Template::from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log");
 
         assert_eq!(
@@ -239,7 +253,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert_implicit(crate::event::TIMESTAMP.clone(), ts.into());
+            .insert_implicit(crate::event::TIMESTAMP.clone(), ts);
 
         let template = Template::from("abcd-%F");
 
@@ -253,7 +267,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert_implicit(crate::event::TIMESTAMP.clone(), ts.into());
+            .insert_implicit(crate::event::TIMESTAMP.clone(), ts);
 
         let template = Template::from("abcd-%F_%T");
 
@@ -268,12 +282,10 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
+        event.as_mut_log().insert_implicit("foo", "butts");
         event
             .as_mut_log()
-            .insert_implicit("foo".into(), "butts".into());
-        event
-            .as_mut_log()
-            .insert_implicit(crate::event::TIMESTAMP.clone(), ts.into());
+            .insert_implicit(crate::event::TIMESTAMP.clone(), ts);
 
         let template = Template::from("{{ foo }}-%F_%T");
 
@@ -288,12 +300,10 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
+        event.as_mut_log().insert_implicit("format", "%F");
         event
             .as_mut_log()
-            .insert_implicit("format".into(), "%F".into());
-        event
-            .as_mut_log()
-            .insert_implicit(crate::event::TIMESTAMP.clone(), ts.into());
+            .insert_implicit(crate::event::TIMESTAMP.clone(), ts);
 
         let template = Template::from("nested {{ format }} %T");
 
@@ -308,12 +318,10 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
+        event.as_mut_log().insert_implicit("%F", "foo");
         event
             .as_mut_log()
-            .insert_implicit("%F".into(), "foo".into());
-        event
-            .as_mut_log()
-            .insert_implicit(crate::event::TIMESTAMP.clone(), ts.into());
+            .insert_implicit(crate::event::TIMESTAMP.clone(), ts);
 
         let template = Template::from("nested {{ %F }} %T");
 

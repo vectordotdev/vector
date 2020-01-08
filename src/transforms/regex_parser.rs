@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
-    topology::config::{DataType, TransformConfig},
+    runtime::TaskExecutor,
+    topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex};
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
@@ -22,28 +23,26 @@ pub struct RegexParserConfig {
     pub types: HashMap<Atom, String>,
 }
 
+impl Default for RegexParserConfig {
+    fn default() -> Self {
+        RegexParserConfig {
+            regex: String::default(),
+            field: None,
+            drop_field: true,
+            drop_failed: false,
+            types: HashMap::default(),
+        }
+    }
+}
+
+inventory::submit! {
+    TransformDescription::new::<RegexParserConfig>("regex_parser")
+}
+
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
-
-        let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
-
-        let types = parse_check_conversion_map(
-            &self.types,
-            &regex
-                .capture_names()
-                .filter_map(|s| s.map(|s| s.into()))
-                .collect(),
-        )?;
-
-        Ok(Box::new(RegexParser::new(
-            regex,
-            field.clone(),
-            self.drop_field,
-            self.drop_failed,
-            types,
-        )))
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+        RegexParser::build(&self)
     }
 
     fn input_type(&self) -> DataType {
@@ -52,6 +51,10 @@ impl TransformConfig for RegexParserConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "regex"
     }
 }
 
@@ -65,6 +68,26 @@ pub struct RegexParser {
 }
 
 impl RegexParser {
+    pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
+        let field = config.field.as_ref().unwrap_or(&event::MESSAGE);
+
+        let regex = Regex::new(&config.regex).context(super::InvalidRegex)?;
+
+        let names = &regex
+            .capture_names()
+            .filter_map(|s| s.map(|s| s.into()))
+            .collect::<Vec<_>>();
+        let types = parse_check_conversion_map(&config.types, names)?;
+
+        Ok(Box::new(RegexParser::new(
+            regex,
+            field.clone(),
+            config.drop_field,
+            config.drop_failed,
+            types,
+        )))
+    }
+
     pub fn new(
         regex: Regex,
         field: Atom,
@@ -109,7 +132,11 @@ impl Transform for RegexParser {
         let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
-            if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
+            if self
+                .regex
+                .captures_read(&mut self.capture_locs, &value)
+                .is_some()
+            {
                 for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: ValueKind = value[start..end].into();
@@ -152,9 +179,15 @@ impl Transform for RegexParser {
     }
 }
 
-fn truncate_string_at<'a>(s: &'a str, maxlen: usize) -> Cow<'a, str> {
+const ELLIPSIS: &str = "[...]";
+
+fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
-        format!("{}[...]", &s[..maxlen - 5]).into()
+        let mut len = maxlen - ELLIPSIS.len();
+        while !s.is_char_boundary(len) {
+            len -= 1;
+        }
+        format!("{}{}", &s[..len], ELLIPSIS).into()
     } else {
         s.into()
     }
@@ -174,6 +207,7 @@ mod tests {
         drop_failed: bool,
         types: &[(&str, &str)],
     ) -> Option<LogEvent> {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(event);
         let mut parser = RegexParserConfig {
             regex: regex.into(),
@@ -182,7 +216,7 @@ mod tests {
             drop_failed,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build()
+        .build(rt.executor())
         .unwrap();
 
         parser.transform(event).map(|event| event.into_log())
@@ -307,5 +341,11 @@ mod tests {
         assert_eq!(log[&"check".into()], ValueKind::Boolean(false));
         assert_eq!(log[&"status".into()], ValueKind::Integer(1234));
         assert_eq!(log[&"time".into()], ValueKind::Float(6789.01));
+    }
+
+    #[test]
+    fn regex_parser_truncate_utf8() {
+        let message = "hello 😁 this is test";
+        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
     }
 }

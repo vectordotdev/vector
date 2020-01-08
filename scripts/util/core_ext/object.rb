@@ -1,4 +1,22 @@
 class Object
+  def deep_to_h
+    if is_a?(OpenStruct)
+      to_h.sort.to_h.deep_to_h
+    elsif is_a?(Hash)
+      new_h = {}
+      each do |k, v|
+        new_h[k] = v.deep_to_h
+      end
+      new_h
+    elsif is_a?(Array)
+      map(&:deep_to_h)
+    elsif respond_to?(:to_h)
+      to_h.sort.to_h
+    else
+      self
+    end
+  end
+
   def is_primitive_type?
     is_a?(String) ||
       is_a?(Integer) ||
@@ -8,12 +26,22 @@ class Object
       is_a?(Float)
   end
 
-  def to_toml
+  def to_toml(hash_style: :expanded)
     if is_a?(Hash)
-      values = select { |_k, v| !v.nil? }.collect { |k, v| "#{k} = #{v.to_toml}" }
-      "{" + values.join(", ") + "}"
+      values =
+        (hash_style == :flatten ? flatten : self).
+          select { |_k, v| !v.nil? }.
+          collect do |k, v|
+            "#{quote_toml_key(k)} = #{v.to_toml(hash_style: :inline)}"
+          end
+
+      if hash_style == :inline
+        "{#{values.join(", ")}}"
+      else
+        values.join("\n")
+      end
     elsif is_a?(Array)
-      values = select { |v| !v.nil? }.collect { |v| v.to_toml }
+      values = select { |v| !v.nil? }.collect { |v| v.to_toml(hash_style: :inline) }
       if any? { |v| v.is_a?(Hash) }
         "[\n" + values.join(",\n") + "\n]"
       else
@@ -38,4 +66,13 @@ class Object
       raise "Unknown value type: #{self.class}"
     end
   end
+
+  private
+    def quote_toml_key(key)
+      if key.include?(".")
+        "\"#{key}\""
+      else
+        "#{key}"
+      end
+    end
 end

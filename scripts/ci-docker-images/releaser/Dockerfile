@@ -1,14 +1,13 @@
-FROM ubuntu:18.04
+FROM ruby:2.6
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
-RUN apt-get update
-RUN apt-get install -y software-properties-common
+RUN apt-get update && \
+  apt-get install -y software-properties-common
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A1715D88E1DF1F24
 RUN add-apt-repository -y ppa:git-core/ppa
 
 RUN apt-get update && \
-  apt-get upgrade -y && \
-  apt-get update && \  
   apt-get install -y \
   build-essential \
   curl \
@@ -28,22 +27,18 @@ RUN pip3 install --upgrade awscli
 RUN wget https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
 RUN tar -xvf grease-1.0.1-linux-amd64.tar.gz
 ENV PATH="$PATH:/grease/bin"
-ENV LC_ALL en_US.UTF-8
+
+# Use UTF-8 since this is required to process release notes
+ENV LC_ALL C.UTF-8
 
 RUN gem install rake
 
 # Docker is used to upload Vector docker images
 RUN apt-get remove docker docker-engine docker.io
-RUN apt-get install -y docker.io
-
-ENV LANGUAGE en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
-RUN locale-gen "en_US.UTF-8"
-RUN dpkg-reconfigure locales
+RUN apt-get update && apt-get install -y docker.io
 
 # Install gems to reduce setup time
-RUN gem install bundler
+RUN gem install bundler -v '~> 2.0.0'
 COPY checker/Gemfile Gemfile
 RUN bundle install
 RUN rm Gemfile

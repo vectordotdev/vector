@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, TransformConfig},
+    runtime::TaskExecutor,
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
@@ -12,12 +13,17 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
+    #[serde(default)]
     pub pass_list: Vec<String>,
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<SamplerConfig>("sampler")
 }
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
             .context(super::InvalidRegex)?)
@@ -29,6 +35,10 @@ impl TransformConfig for SamplerConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "sampler"
     }
 }
 
@@ -58,7 +68,7 @@ impl Transform for Sampler {
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
             event
                 .as_mut_log()
-                .insert_implicit(Atom::from("sample_rate"), self.rate.to_string().into());
+                .insert_implicit(Atom::from("sample_rate"), self.rate.to_string());
 
             Some(event)
         } else {

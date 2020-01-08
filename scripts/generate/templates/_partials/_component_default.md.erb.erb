@@ -2,22 +2,35 @@
 
 <%%= component_header(component) %>
 
-## Config File
+## Configuration
 
 <%%= component_config_example(component) %>
 
 ## Options
 
-<%%= options_table(component.options.to_h.values.sort) %>
+<%%= options(component.specific_options_list, heading_depth: 3) %>
 
+<%%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%%= fields(component.env_vars_list) %>
+
+<%%- end -%>
+<%- if component.source? || component.transform? -%>
+## Output
+
+<%- if component.output.log -%>
+<%%= component_output(component, component.output.log, heading_depth: 3) %>
+<%- else -%>
+<%%= component_output(component, component.output.metric, heading_depth: 3) %>
+<%- end -%>
+
+<%- elsif component.sink? && component.output -%>
+## Output
+
+<%%= component_output(component, component.output) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%%= component_sections(component) %>
-
-## Troubleshooting
-
-<%%= component_troubleshooting(component) %>
-
-## Resources
-
-<%%= component_resources(component) %>

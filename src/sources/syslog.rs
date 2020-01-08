@@ -1,7 +1,7 @@
-use super::util::TcpSource;
+use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    event::{self, Event},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    event::{self, Event, ValueKind},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -15,6 +15,7 @@ use tokio::{
     codec::{BytesCodec, FramedRead, LinesCodec},
     net::{UdpFramed, UdpSocket},
 };
+#[cfg(unix)]
 use tokio_uds::UnixListener;
 use tracing::field;
 use tracing_futures::Instrument;
@@ -33,9 +34,16 @@ pub struct SyslogConfig {
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp { address: SocketAddr },
-    Udp { address: SocketAddr },
-    Unix { path: PathBuf },
+    Tcp {
+        address: SocketListenAddr,
+    },
+    Udp {
+        address: SocketAddr,
+    },
+    #[cfg(unix)]
+    Unix {
+        path: PathBuf,
+    },
 }
 
 fn default_max_length() -> usize {
@@ -50,6 +58,10 @@ impl SyslogConfig {
             max_length: default_max_length(),
         }
     }
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<SyslogConfig>("syslog")
 }
 
 #[typetag::serde(name = "syslog")]
@@ -72,12 +84,17 @@ impl SourceConfig for SyslogConfig {
                 source.run(address, shutdown_secs, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            #[cfg(unix)]
             Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
         }
     }
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "syslog"
     }
 }
 
@@ -145,6 +162,7 @@ pub fn udp(
     )
 }
 
+#[cfg(unix)]
 pub fn unix(
     path: PathBuf,
     max_length: usize,
@@ -167,10 +185,10 @@ pub fn unix(
                 let host_key = host_key.clone();
 
                 let span = info_span!("connection");
-                let path = if let Some(addr) = peer_addr.clone() {
+                let path = if let Some(addr) = peer_addr {
                     if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                         span.record("peer_path", &field::debug(&path));
-                        Some(path.clone())
+                        Some(path)
                     } else {
                         None
                     }
@@ -200,7 +218,7 @@ pub fn unix(
 // null byte delimiter in place of newline
 
 fn event_from_str(
-    host_key: &String,
+    host_key: &str,
     default_host: Option<Bytes>,
     raw: impl AsRef<str>,
 ) -> Option<Event> {
@@ -218,20 +236,20 @@ fn event_from_str(
             if let Some(host) = &parsed.hostname {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.clone().into(), host.clone().into());
+                    .insert_implicit(host_key, host.clone());
             } else if let Some(default_host) = default_host {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.clone().into(), default_host.into());
+                    .insert_implicit(host_key, default_host);
             }
 
             let timestamp = parsed
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                .unwrap_or(Utc::now());
+                .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
-                .insert_implicit(event::TIMESTAMP.clone(), timestamp.into());
+                .insert_implicit(event::TIMESTAMP.clone(), timestamp);
 
             insert_fields_from_rfc5424(&mut event, parsed);
 
@@ -249,28 +267,28 @@ fn event_from_str(
 fn insert_fields_from_rfc5424(event: &mut Event, parsed: SyslogMessage) {
     let log = event.as_mut_log();
 
-    log.insert_implicit("severity".into(), parsed.severity.as_str().into());
-    log.insert_implicit("facility".into(), parsed.facility.as_str().into());
-    log.insert_implicit("version".into(), parsed.version.into());
+    log.insert_implicit("severity", parsed.severity.as_str());
+    log.insert_implicit("facility", parsed.facility.as_str());
+    log.insert_implicit("version", parsed.version);
 
     if let Some(app_name) = parsed.appname {
-        log.insert_implicit("appname".into(), app_name.into());
+        log.insert_implicit("appname", app_name);
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert_implicit("msgid".into(), msg_id.into());
+        log.insert_implicit("msgid", msg_id);
     }
     if let Some(proc_id) = parsed.procid {
-        let value = match proc_id {
+        let value: ValueKind = match proc_id {
             PID(pid) => pid.into(),
             Name(name) => name.into(),
         };
-        log.insert_implicit("procid".into(), value);
+        log.insert_implicit("procid", value);
     }
 
     for (id, data) in parsed.sd.iter() {
         for (name, value) in data.iter() {
             let key = format!("{}.{}", id, name);
-            log.insert_explicit(key.into(), value.clone().into());
+            log.insert_explicit(key, value.clone());
         }
     }
 }
@@ -282,7 +300,7 @@ mod test {
     use chrono::TimeZone;
 
     #[test]
-    fn config() {
+    fn config_tcp() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "tcp"
@@ -291,7 +309,10 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_tcp());
+    }
 
+    #[test]
+    fn config_udp() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "udp"
@@ -301,7 +322,11 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_udp());
+    }
 
+    #[cfg(unix)]
+    #[test]
+    fn config_unix() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "unix"
@@ -329,21 +354,21 @@ mod test {
             let expected = expected.as_mut_log();
             expected.insert_implicit(
                 event::TIMESTAMP.clone(),
-                chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
+                chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert_implicit("host".into(), "74794bfb6795".into());
+            expected.insert_implicit("host", "74794bfb6795");
 
-            expected.insert_explicit("meta.sequenceId".into(), "1".into());
-            expected.insert_explicit("meta.sysUpTime".into(), "37".into());
-            expected.insert_explicit("meta.language".into(), "EN".into());
-            expected.insert_explicit("origin.software".into(), "test".into());
-            expected.insert_explicit("origin.ip".into(), "192.168.0.1".into());
+            expected.insert_explicit("meta.sequenceId", "1");
+            expected.insert_explicit("meta.sysUpTime", "37");
+            expected.insert_explicit("meta.language", "EN");
+            expected.insert_explicit("origin.software", "test");
+            expected.insert_explicit("origin.ip", "192.168.0.1");
 
-            expected.insert_implicit("severity".into(), "notice".into());
-            expected.insert_implicit("facility".into(), "user".into());
-            expected.insert_implicit("version".into(), 1.into());
-            expected.insert_implicit("appname".into(), "root".into());
-            expected.insert_implicit("procid".into(), 8449.into());
+            expected.insert_implicit("severity", "notice");
+            expected.insert_implicit("facility", "user");
+            expected.insert_implicit("version", 1);
+            expected.insert_implicit("appname", "root");
+            expected.insert_implicit("procid", 8449);
         }
 
         assert_eq!(
@@ -436,11 +461,11 @@ mod test {
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert_implicit(
             event::TIMESTAMP.clone(),
-            chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
         );
         expected
             .as_mut_log()
-            .insert_implicit("host".into(), "74794bfb6795".into());
+            .insert_implicit("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),
@@ -456,11 +481,11 @@ mod test {
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert_implicit(
             event::TIMESTAMP.clone(),
-            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
         );
         expected
             .as_mut_log()
-            .insert_implicit("host".into(), "74794bfb6795".into());
+            .insert_implicit("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),
@@ -476,11 +501,11 @@ mod test {
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert_implicit(
             event::TIMESTAMP.clone(),
-            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
         );
         expected
             .as_mut_log()
-            .insert_implicit("host".into(), "74794bfb6795".into());
+            .insert_implicit("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),

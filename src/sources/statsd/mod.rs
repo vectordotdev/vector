@@ -31,6 +31,10 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
     fn output_type(&self) -> crate::topology::config::DataType {
         crate::topology::config::DataType::Metric
     }
+
+    fn source_type(&self) -> &'static str {
+        "statsd"
+    }
 }
 
 fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
@@ -103,7 +107,7 @@ mod test {
                 address: out_addr,
                 namespace: "vector".into(),
                 buckets: vec![1.0, 2.0, 4.0],
-                flush_period: Duration::from_millis(100),
+                flush_period_secs: 1,
             },
         );
 
@@ -122,11 +126,11 @@ mod test {
                 )
                 .unwrap();
             // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(10));
         }
 
         // Give packets some time to flow through
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(100));
 
         let client = hyper::Client::new();
         let response =
@@ -172,7 +176,7 @@ mod test {
         // Flush test
         {
             // Wait for flush to happen
-            thread::sleep(Duration::from_millis(200));
+            thread::sleep(Duration::from_millis(2000));
 
             let response =
                 block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap()))
@@ -192,9 +196,9 @@ mod test {
 
             socket.send_to(b"set:0|s\nset:1|s\n", &in_addr).unwrap();
             // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(1));
-            // Give packets some time to flow through
             thread::sleep(Duration::from_millis(10));
+            // Give packets some time to flow through
+            thread::sleep(Duration::from_millis(100));
 
             let response =
                 block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap()))

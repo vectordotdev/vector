@@ -13,13 +13,7 @@ require_relative "setup"
 # Commit
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
-  end
-
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 release = metadata.latest_release
 version = release.version
 
@@ -51,7 +45,6 @@ commands =
   git tag -d v#{version}
   git push --delete origin v#{version}
   #{branch_commands}
-  git reset HEAD~
   EOF
 
 commands.chomp!

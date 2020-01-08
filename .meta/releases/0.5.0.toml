@@ -1,5 +1,5 @@
 [releases."0.5.0"]
-date = 2019-10-08
+date = 2019-10-09
 commits = [
 {sha = "89c303748f100c881e6e1cb921e3d64870d89ca3", message = "chore(operations): Update releaser Dockerfile to include Ruby and the necessary gems", author = "Ben Johnson", date = 2019-09-24T12:28:01Z, files_count = 1, insertions_count = 10, deletions_count = 2},
 {sha = "5f251260ede2331a19e20d1319e9484bebd6f890", message = "chore(operations): Add git to musl builder (#923)", author = "Lucio Franco", date = 2019-09-24T14:58:36Z, files_count = 1, insertions_count = 1, deletions_count = 1},
@@ -57,5 +57,11 @@ commits = [
 {sha = "74b654606b39a7554c53c07b585d0cd9be3b76f7", message = "enhancement(security): Unify the different TLS options (#972)", author = "Bruce Guenter", date = 2019-10-08T11:33:32Z, files_count = 25, insertions_count = 905, deletions_count = 540},
 {sha = "476fb7e436f1b285ccff3dc52e21a8b1f36ab458", message = "fix(config): Default data_dir to /var/lib/vector (#995)", author = "Luke Steensen", date = 2019-10-08T16:08:22Z, files_count = 1, insertions_count = 8, deletions_count = 1},
 {sha = "b541bb1a4097d22f3efa9d74ccaf28cabcbe6466", message = "feat(observability): Add rate limited debug messages (#971)", author = "Lucio Franco", date = 2019-10-08T18:21:36Z, files_count = 33, insertions_count = 422, deletions_count = 630},
-{sha = "389a65072cea2b7d3bafe70a52597d83925251e6", message = "chore(operations): Fix release script bug", author = "Ben Johnson", date = 2019-10-08T18:33:39Z, files_count = 1, insertions_count = 2, deletions_count = 2}
+{sha = "389a65072cea2b7d3bafe70a52597d83925251e6", message = "chore(operations): Fix release script bug", author = "Ben Johnson", date = 2019-10-08T18:33:39Z, files_count = 1, insertions_count = 2, deletions_count = 2},
+{sha = "3a86fdae3f5d72d001ba16b9683514e571a7c105", message = "chore: Prepare v0.5.0 release", author = "Ben Johnson", date = 2019-10-08T18:48:29Z, files_count = 10, insertions_count = 55, deletions_count = 204},
+{sha = "df6018be6c1c964692d3ea071f4d95fb21f1cb14", message = "chore: Add 0.5.0 release metadata", author = "Ben Johnson", date = 2019-10-08T19:06:31Z, files_count = 1, insertions_count = 61},
+{sha = "5a4d50b022db116a0155efafb6aaaa34e4882600", message = "chore: Remove unsupported bash flags", author = "Ben Johnson", date = 2019-10-08T20:27:20Z, files_count = 2, deletions_count = 6},
+{sha = "86d1d01bed23aa1496dcdab9c627d90c6c07e294", message = "chore(operations): Add sudo when installing via dpkg or rpm (#999)", author = "Binary Logic", date = 2019-10-09T11:36:55Z, files_count = 1, insertions_count = 10, deletions_count = 2},
+{sha = "a70603d11764ca49c4aa62bf3e50f7cf712c0018", message = "chore(operations): Add git to musl build image (#997)", author = "Binary Logic", date = 2019-10-09T11:38:01Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "2cb0e44c69c776679dc19d41af8aecee42169e75", message = "chore(operations): Fix centos verifier (#1001)", author = "Binary Logic", date = 2019-10-09T15:52:26Z, files_count = 15, insertions_count = 37, deletions_count = 107}
 ]

@@ -1,6 +1,9 @@
 [sources.file]
-beta = true
+title = "File"
+beta = false
+common = true
 delivery_guarantee = "best_effort"
+function_category = "collect"
 guides = []
 output_types = ["log"]
 resources = []
@@ -12,12 +15,13 @@ examples = ["/var/lib/vector"]
 null = true
 description = """\
 The directory used to persist file checkpoint positions. By default, the \
-global `data_dir` is used. Please make sure the Vector project has write \
-permissions to this dir.\
+[global `data_dir` option][docs.configuration#data_dir] is used. Please make \
+sure the Vector project has write permissions to this dir.\
 """
 
 [sources.file.options.include]
 type = "[string]"
+common = true
 examples = [["/var/log/nginx/*.log"]]
 null = false
 description = """\
@@ -26,11 +30,11 @@ Array of file patterns to include. [Globbing](#globbing) is supported.\
 
 [sources.file.options.exclude]
 type = "[string]"
-examples = [["/var/log/nginx/access.log"]]
+examples = [["/var/log/nginx/*.[0-9]*.log"]]
 null = true
 description = """\
-Array of file patterns to exclude. [Globbing](#globbing) is supported. \
-*Takes precedence over the `include` option.*\
+Array of file patterns to exclude. [Globbing](#globbing) is supported.\
+*Takes precedence over the [`include` option](#include).*\
 """
 
 [sources.file.options.file_key]
@@ -66,6 +70,7 @@ The key name added to each event representing the current host.\
 
 [sources.file.options.ignore_older]
 type = "int"
+common = true
 examples = [86400]
 null = true
 unit = "seconds"
@@ -86,6 +91,7 @@ files.\
 
 [sources.file.options.start_at_beginning]
 type = "bool"
+common = true
 null = false
 default = false
 description = """\
@@ -102,14 +108,16 @@ Configuration for how the file source should identify files.\
 
 [sources.file.options.fingerprinting.options.strategy]
 type = "string"
-enum = ["checksum", "device_and_inode"]
 default = "checksum"
 null = true
 description = """\
-Whether to use the content of a file to differentiate it (`checksum`) or the \
-storage device and inode (`device_and_inode`). Depending on your log rotation \
-strategy, one may be a better fit than the other.\
+The strategy used to uniquely identify files. This is important for \
+[checkpointing](#checkpointing) when file rotation is used.\
 """
+
+[sources.file.options.fingerprinting.options.strategy.enum]
+checksum = "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."
+device_and_inode = "Uses the [device and inode][urls.inode] to unique identify files."
 
 [sources.file.options.fingerprinting.options.fingerprint_bytes]
 type = "int"
@@ -135,6 +143,7 @@ fingerprint. This is helpful if all files share a common header.\
 
 [sources.file.options.message_start_indicator]
 type = "string"
+category = "Multi-line"
 null = true
 examples = ["^(INFO|ERROR)"]
 description = """\
@@ -146,6 +155,7 @@ a regular expression, so remember to anchor as appropriate.\
 
 [sources.file.options.multi_line_timeout]
 type = "int"
+category = "Multi-line"
 default = 1000
 null = true
 unit = "milliseconds"
@@ -157,6 +167,7 @@ or not it has seen a line indicating the start of a new message.\
 
 [sources.file.options.max_read_bytes]
 type = "int"
+category = "Priority"
 default = 2048
 null = true
 unit = "bytes"
@@ -167,9 +178,45 @@ time.\
 
 [sources.file.options.oldest_first]
 type = "bool"
+category = "Priority"
+common = true
 default = false
 null = true
 description = """\
 Instead of balancing read capacity fairly across all watched files, prioritize \
 draining the oldest files before moving on to read data from younger files.\
+"""
+
+[sources.file.output.log.fields.file]
+type = "string"
+examples = ["/var/log/nginx.log"]
+key_name_option = "file_key"
+optional = false
+description = """\
+The _full_ path of the file tha the log originated from.\
+"""
+
+[sources.file.output.log.fields.host]
+type = "string"
+examples = ["my.host.com"]
+key_name_option = "host_key"
+optional = false
+description = """\
+The current hostname, equivalent to the `gethostname` command.\
+"""
+
+[sources.file.output.log.fields.message]
+type = "string"
+examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+optional = false
+description = """\
+The raw log message, unaltered.\
+"""
+
+[sources.file.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+optional = false
+description = """\
+The exact time the event was ingested.\
 """

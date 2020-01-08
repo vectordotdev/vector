@@ -3,7 +3,23 @@
 class Option
   include Comparable
 
-  TYPES = ["*", "bool", "float", "[float]", "int", "string", "[string]", "table", "[table]"]
+  TYPES = ["*", "bool", "float", "[float]", "int", "string", "[string]", "table", "[table]"].freeze
+
+  class << self
+    def build_struct(hash)
+      options = OpenStruct.new()
+
+      hash.each do |option_name, option_hash|
+        option = new(
+          option_hash.merge({"name" => option_name}
+        ))
+
+        options.send("#{option_name}=", option)
+      end
+
+      options
+    end
+  end
 
   attr_reader :name,
     :category,
@@ -21,31 +37,25 @@ class Option
     :unit
 
   def initialize(hash)
-    # Options can have sub-options (tables)
-    options_hashes = hash["options"]
-
-    if !options_hashes.nil?
-      @options =
-        options_hashes.collect do |sub_name, sub_hash|
-          self.class.new(sub_hash.merge("name" => sub_name))
-        end
-    end
-
-    @name = hash.fetch("name")
+    @common = hash["common"] == true
     @default = hash["default"]
-    @display = hash["display"]
     @description = hash.fetch("description")
+    @display = hash["display"]
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @name = hash.fetch("name")
+    if !hash.key?("null")
+      raise hash.inspect
+    end
     @null = hash.fetch("null")
+    @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
-    @simple = hash["simple"] == true
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    @category = hash["category"] || ((@options.nil? || inline?) ? "General" : @name.humanize)
+    @category = hash["category"] || ((@options.to_h.values.empty? || inline?) ? "General" : @name.humanize)
 
     if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")
@@ -61,13 +71,18 @@ class Option
 
     if @examples.empty?
       if !@enum.nil?
-        @examples = @enum
+        @examples = @enum.keys
       elsif !@default.nil?
         @examples = [@default]
+        if @type == "bool"
+          @examples.push(!@default)
+        end
+      elsif @type == "bool"
+        @examples = [true, false]
       end
     end
 
-    if @examples.empty? && @options.nil? && !table?
+    if @examples.empty? && @options.empty? && !table?
       raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
     end
 
@@ -78,50 +93,31 @@ class Option
     end
   end
 
-  def <=>(other_option)
-    sort_token <=> other_option.sort_token
+  def <=>(other)
+    name <=> other.name
+  end
+
+  def advanced?
+    if options.any?
+      options.any?(&:advanced?)
+    else
+      !common?
+    end
   end
 
   def array?(inner_type)
     type == "[#{inner_type}]"
   end
 
-  def context?
-    category.downcase == "context"
+  def common?
+    @common == true || required?
   end
 
-  def get_relevant_sections(sections)
-    sections.select do |section|
-      section.referenced_options.include?(name) ||
-        section.referenced_options.any? { |o| o.end_with?(name) }
-    end
+  def common_options
+    @common_options ||= options.select(&:common?)
   end
 
-  def human_default
-    "#{default} #{unit}"
-  end
-
-  def inline?
-    display == "inline"
-  end
-
-  def optional?
-    !required?
-  end
-
-  def partition_key?
-    partition_key == true
-  end
-
-  def required?
-    default.nil? && null == false
-  end
-
-  def simple?
-    @simple == true || required?
-  end
-
-  def sort_token
+  def config_file_sort_token
     first =
       if table?
         2
@@ -145,13 +141,64 @@ class Option
       case name
       when "inputs"
         "AAB #{name}"
-      when "type"
+      when "strategy", "type"
         "AAA #{name}"
       else
         name
       end
 
     [first, second, third]
+  end
+
+  def context?
+    category.downcase == "context"
+  end
+
+  def eql?(other)
+    self.<=>(other) == 0
+  end
+
+  def get_relevant_sections(sections)
+    sections.select do |section|
+      section.referenced_options.include?(name) ||
+        section.referenced_options.any? { |o| o.end_with?(name) }
+    end
+  end
+
+  def human_default
+    "#{default} #{unit}"
+  end
+
+  def inline?
+    display == "inline"
+  end
+
+  def optional?
+    !required?
+  end
+
+  def options_list
+    @options_list ||= @options.to_h.values.sort
+  end
+
+  def partition_key?
+    partition_key == true
+  end
+
+  def relevant_when_kvs
+    relevant_when.collect do |k, v|
+      if v.is_a?(Array)
+        v.collect do |sub_v|
+          "#{k} = #{sub_v.to_toml}"
+        end
+      else
+        "#{k} = #{v.to_toml}"
+      end
+    end.flatten
+  end
+
+  def required?
+    default.nil? && null == false
   end
 
   def table?
@@ -162,7 +209,26 @@ class Option
     templateable == true
   end
 
+  def to_h
+    {
+      name: name,
+      category: category,
+      default: default,
+      description: description,
+      display: display,
+      enum: enum,
+      examples: examples,
+      null: null,
+      options: options,
+      partition_key: partition_key,
+      relevant_when: relevant_when,
+      templateable: templateable,
+      type: type,
+      unit: unit
+    }
+  end
+
   def wildcard?
-    name == "*"
+    name.start_with?("`[")
   end
 end

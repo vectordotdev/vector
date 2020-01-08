@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.4.0-dev"
+version = "0.7.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
@@ -20,12 +20,11 @@ assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
-  ["config/examples/complete/*", "/etc/vector/examples/complex/", "644"],
-  ["config/examples/sources/*", "/etc/vector/examples/sources/", "644"],
-  ["config/examples/transforms/*", "/etc/vector/examples/transforms/", "644"],
-  ["config/examples/sinks/*", "/etc/vector/examples/sinks/", "644"],
+  ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
+license-file = ["target/debian-license.txt"]
+extended-description-file = "target/debian-extended-description.txt"
 
 [workspace]
 members = [
@@ -47,6 +46,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
 futures = "0.1.25"
+futures03 = { package = "futures", version = "0.3", default-features = false, features = ["compat"] }
 tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
@@ -55,22 +55,22 @@ tokio-tls = "0.2.1"
 
 # Tracing
 tracing = "0.1.9"
-tracing-futures = "0.0.1-alpha.1"
+tracing-futures = { version = "0.2", features = ["futures-01"]}
 tracing-subscriber = "0.1.3"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing" }
-
 
 # Metrics
 hotmic = "0.8"
 
 # Aws
-rusoto_core = "0.37.0"
-rusoto_s3 = "0.37.0"
-rusoto_logs = "0.37.0"
-rusoto_cloudwatch = "0.37.0"
-rusoto_kinesis = "0.37.0"
-rusoto_credential = "0.16.0"
+rusoto_core = "0.41.0"
+rusoto_s3 = "0.41.0"
+rusoto_logs = "0.41.0"
+rusoto_cloudwatch = "0.41.0"
+rusoto_kinesis = "0.41.0"
+rusoto_credential = "0.41.1"
+rusoto_firehose = "0.41.0"
 
 # Tower
 tower = "0.1.1"
@@ -85,19 +85,22 @@ prost = "0.5"
 prost-derive = "0.5"
 prost-types = "0.5"
 
+# GCP
+goauth = "0.6.0"
+smpl_jwt = "0.4.0"
+
 # External libs
-atty = "0.2"
 derivative = "1.0"
 chrono = "0.4.7"
 rand = "0.5.5"
 regex = "1.0.5"
 bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
-prometheus = "0.4.2"
-hyper = "0.12.18"
-hyper-tls = "0.3.1"
+hyper = "0.12.35"
+hyper-openssl = "0.7"
+hyper-tls = "0.3.2"
 native-tls = "0.2.3"
-openssl = "0.10.25"
+openssl = "0.10.26"
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
@@ -109,27 +112,38 @@ toml = "0.4"
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
-leveldb = { version = "0.8.4", optional = true }
+leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.2.1"
-rdkafka = { version = "0.20.0", features = ["ssl"], optional = true }
+rdkafka = { git = "https://github.com/timberio/rust-rdkafka", features = ["ssl"], optional = true }
 hostname = "0.1.5"
 seahash = "3.0.6"
 jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
-rlua = "0.16.3"
-quick-js = { git = "https://github.com/theduke/quickjs-rs.git", rev = "65cf630c1511aeefa72b1e90cad0103cc83a5917", features = ["bigint", "chrono"] }
+rlua = { git = "https://github.com/timberio/rlua" }
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
-grok = "1.0.0"
+grok = "~1.0.1"
 nom = "5.0.0"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 exitcode = "1.1.2"
-snafu = "0.4.3"
+snafu = { version = "0.4.3", features = ["futures-01"] }
 url = "1.7"
 base64 = "0.10.1"
-shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
+shiplift = { version = "0.6", default-features = false, features = ["tls"] }
 owning_ref = "0.4.0"
+trust-dns-resolver = { version = "0.12", features = ["serde-config"]}
+trust-dns-proto = { version = "0.8" }
+listenfd = "0.3.3"
+inventory = "0.1"
+maxminddb = "0.13.0"
+strip-ansi-escapes = "0.1.0"
+colored = "1.9"
+warp = "0.1.20"
+evmap = { version = "7", features = ["bytes"] }
+
+[target.'cfg(unix)'.dependencies]
+atty = "0.2"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -141,37 +155,80 @@ criterion = "0.2.5"
 reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
+libz-sys = "1.0"
 walkdir = "2.2.7"
-elastic = { git = "https://github.com/elastic-rs/elastic" }
+elastic_responses = "0.20"
 matches = "0.1.8"
 mktemp = "0.4.0"
 pretty_assertions = "0.6.1"
 proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
+kube = { version = "0.16.1", features = ["openapi"] }
+k8s-openapi = { version = "0.5.1", default-features = false, features = ["v1_15"] }
+serde_yaml = "0.8.9"
+trust-dns-server = "0.17.0"
+trust-dns = "0.17.0"
+trust-dns-proto = "0.8.0"
 
 [features]
-default = ["rdkafka", "leveldb", "jemallocator"]
+# Default features for *-unknown-linux-gnu and *-apple-darwin
+default = ["vendored", "unix", "leveldb-plain", "rdkafka-plain"]
+# Default features for *-unknown-linux-musl
+default-musl = ["vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+# Default features for *-pc-windows-msvc
+default-msvc = ["vendored", "leveldb-cmake", "rdkafka-cmake"]
+
+# Enables features that work only on systems providing `cfg(unix)
+unix = ["jemallocator", "shiplift/unix-socket"]
+# Forces vendoring of OpenSSL and ZLib dependencies
+vendored = ["openssl/vendored", "libz-sys/static"]
+# This feature is less portable, but doesn't require `cmake` as build dependency
+rdkafka-plain = ["rdkafka"]
+# Enables `rdkafka` dependency.
+# This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
+# The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
+rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
+# This feature is less portable, but doesn't require `cmake` as build dependency
+leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
+# This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
+leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
+
+# Identifies that the build is a nightly build
+nightly = []
+
+# Testing-related features
 docker = [
+  "clickhouse-integration-tests",
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
-  "clickhouse-integration-tests",
+  "docker-integration-tests",
+  "ec2-metadata-integration-tests",
   "es-integration-tests",
+  "firehose-integration-tests",
+  "gcp-pubsub-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
   "splunk-integration-tests",
-  "docker-integration-tests"
+  "docker-integration-tests",
+  "ec2-metadata-integration-tests",
 ]
+clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
-clickhouse-integration-tests = []
+docker-integration-tests = []
+ec2-metadata-integration-tests = []
 es-integration-tests = []
+firehose-integration-tests = []
+gcp-pubsub-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
-docker-integration-tests = []
+
+kubernetes = ["kubernetes-integration-tests"]
+kubernetes-integration-tests = []
 
 [[bench]]
 name = "bench"

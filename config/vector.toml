@@ -1,4 +1,4 @@
-#                                    __   __  __  
+#                                    __   __  __
 #                                    \ \ / / / /
 #                                     \ V / / /
 #                                      \_/  \/
@@ -8,7 +8,7 @@
 #
 # ------------------------------------------------------------------------------
 # Website: https://vector.dev
-# Docs: https://docs.vector.dev/configuration
+# Docs: https://vector.dev/docs/
 # ------------------------------------------------------------------------------
 
 # Note: A full config spec is located at ./vector.spec.toml and examples
@@ -22,5 +22,6 @@ data_dir = "/var/lib/vector"
 
 # Output data
 [sinks.out]
-  inputs = ["in"]
-  type   = "console"
+  inputs   = ["in"]
+  type     = "console"
+  encoding = "text"

@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::event::Event;
-use crate::topology::config::DataType;
+use crate::runtime::TaskExecutor;
+use crate::topology::config::{DataType, TransformConfig, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,9 +15,13 @@ pub struct CoercerConfig {
     pub types: HashMap<Atom, String>,
 }
 
+inventory::submit! {
+    TransformDescription::new::<CoercerConfig>("coercer")
+}
+
 #[typetag::serde(name = "coercer")]
-impl crate::topology::config::TransformConfig for CoercerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+impl TransformConfig for CoercerConfig {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer { types }))
     }
@@ -27,6 +32,10 @@ impl crate::topology::config::TransformConfig for CoercerConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "coercer"
     }
 }
 
@@ -40,12 +49,13 @@ impl Transform for Coercer {
         for (field, conv) in &self.types {
             if let Some(value) = log.remove(field) {
                 match conv.convert(value) {
-                    Ok(converted) => log.insert_explicit(field.into(), converted),
+                    Ok(converted) => log.insert_explicit(field, converted),
                     Err(error) => {
-                        debug!(
+                        warn!(
                             message = "Could not convert types.",
                             field = &field[..],
                             %error,
+                            rate_limit_secs = 10,
                         );
                     }
                 }
@@ -63,6 +73,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn parse_it() -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let mut event = Event::from("dummy message");
         for &(key, value) in &[
             ("number", "1234"),
@@ -70,7 +81,7 @@ mod tests {
             ("other", "no"),
             ("float", "broken"),
         ] {
-            event.as_mut_log().insert_explicit(key.into(), value.into());
+            event.as_mut_log().insert_explicit(key, value);
         }
 
         let mut coercer = toml::from_str::<CoercerConfig>(
@@ -82,7 +93,7 @@ mod tests {
             "#,
         )
         .unwrap()
-        .build()
+        .build(rt.executor())
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }

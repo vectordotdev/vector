@@ -1,7 +1,7 @@
 class Templates
   class ConfigSchema
     TYPES = ["string", "int", "float", "bool", "timestamp"]
-    
+
     attr_reader :options
 
     def initialize(options)

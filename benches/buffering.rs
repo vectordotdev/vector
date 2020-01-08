@@ -5,7 +5,7 @@ use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, sinks, sources};
+use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -24,18 +24,23 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Memory {
                         num_items: 100,
                         when_full: Default::default(),
                     };
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -59,20 +64,25 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
                         when_full: Default::default(),
                     }
                     .into();
-                    config.data_dir = Some(data_dir.clone());
+                    config.global.data_dir = Some(data_dir.clone());
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -96,19 +106,24 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 10_000,
                         when_full: Default::default(),
                     };
-                    config.data_dir = Some(data_dir2.clone());
+                    config.global.data_dir = Some(data_dir2.clone());
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 

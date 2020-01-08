@@ -1,8 +1,10 @@
 pub mod batch;
 pub mod buffer;
 pub mod http;
-pub mod partition;
 pub mod retries;
+pub mod rusoto;
+pub mod service;
+pub mod tcp;
 pub mod tls;
 
 use crate::buffers::Acker;
@@ -11,12 +13,13 @@ use futures::{
 };
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::time::Duration;
 use tower::Service;
 
-pub use batch::{Batch, BatchSink};
+pub use batch::{Batch, BatchConfig, BatchSettings, BatchSink};
+pub use buffer::metrics::{MetricBuffer, MetricEntry};
+pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
-pub use partition::{Partition, PartitionedBatchSink};
+pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 
 pub trait SinkExt<T>
 where
@@ -33,24 +36,29 @@ where
         BatchSink::new(self, batch, limit)
     }
 
-    fn batched_with_min(self, batch: T, min: usize, delay: Duration) -> BatchSink<T, Self>
+    fn batched_with_min(self, batch: T, settings: &BatchSettings) -> BatchSink<T, Self>
     where
         T: Batch,
     {
-        BatchSink::new_min(self, batch, min, Some(delay))
+        BatchSink::new_min(self, batch, settings.size, Some(settings.timeout))
     }
 
     fn partitioned_batched_with_min<K>(
         self,
         batch: T,
-        min: usize,
-        delay: Duration,
+        settings: &BatchSettings,
     ) -> PartitionedBatchSink<T, Self, K>
     where
         T: Batch,
         K: Eq + Hash + Clone + Send + 'static,
     {
-        PartitionedBatchSink::with_linger(self, batch, min, min, delay)
+        PartitionedBatchSink::with_linger(
+            self,
+            batch,
+            settings.size,
+            settings.size,
+            settings.timeout,
+        )
     }
 }
 
@@ -133,12 +141,10 @@ where
     }
 }
 
-type Error = Box<dyn std::error::Error + 'static + Send + Sync>;
-
 impl<T, S, B> Sink for BatchServiceSink<T, S, B>
 where
     S: Service<T>,
-    S::Error: Into<Error>,
+    S::Error: Into<crate::Error>,
     S::Response: std::fmt::Debug,
     B: Batch<Output = T>,
 {
@@ -212,10 +218,10 @@ where
 mod test {
     use super::BatchServiceSink;
     use crate::buffers::Acker;
+    use crate::runtime::Runtime;
     use crate::test_util::wait_for;
     use futures::{stream, sync::oneshot, Future, Poll, Sink};
     use std::sync::{atomic::Ordering, Arc, Mutex};
-    use tokio::runtime::Runtime;
     use tower::Service;
 
     struct FakeService {

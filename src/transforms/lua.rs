@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
     event::Event,
-    topology::config::{DataType, TransformConfig},
+    runtime::TaskExecutor,
+    topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -20,9 +21,13 @@ pub struct LuaConfig {
     search_dirs: Vec<String>,
 }
 
+inventory::submit! {
+    TransformDescription::new_without_default::<LuaConfig>("lua")
+}
+
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -35,6 +40,10 @@ impl TransformConfig for LuaConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "lua"
     }
 }
 
@@ -103,8 +112,7 @@ impl rlua::UserData for Event {
             rlua::MetaMethod::NewIndex,
             |_ctx, this, (key, value): (String, Option<rlua::String<'lua>>)| {
                 if let Some(string) = value {
-                    this.as_mut_log()
-                        .insert_explicit(key.into(), string.as_bytes().into());
+                    this.as_mut_log().insert_explicit(key, string.as_bytes());
                 } else {
                     this.as_mut_log().remove(&key.into());
                 }
@@ -120,6 +128,28 @@ impl rlua::UserData for Event {
             } else {
                 Ok(None)
             }
+        });
+
+        methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: Event| {
+            let state = ctx.create_table()?;
+            {
+                let keys =
+                    ctx.create_table_from(event.as_log().keys().map(|k| (k.to_string(), true)))?;
+                state.set("event", event)?;
+                state.set("keys", keys)?;
+            }
+            let function =
+                ctx.create_function(|ctx, (state, prev): (rlua::Table, Option<String>)| {
+                    let event: Event = state.get("event")?;
+                    let keys: rlua::Table = state.get("keys")?;
+                    let next: rlua::Function = ctx.globals().get("next")?;
+                    let key: Option<String> = next.call((keys, prev))?;
+                    match key.clone().and_then(|k| event.as_log().get(&k.into())) {
+                        Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
+                        None => Ok((None, None)),
+                    }
+                })?;
+            Ok((function, state))
         });
     }
 }
@@ -182,9 +212,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "Bob".into());
+        event.as_mut_log().insert_explicit("name", "Bob");
         let event = transform.transform(event).unwrap();
 
         assert!(event.as_log().get(&"name".into()).is_none());
@@ -201,9 +229,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "Bob".into());
+        event.as_mut_log().insert_explicit("name", "Bob");
         let event = transform.transform(event);
 
         assert!(event.is_none());
@@ -352,5 +378,27 @@ mod tests {
         let event = transform.transform(event).unwrap();
 
         assert_eq!(event.as_log()[&"new field".into()], "new value".into());
+    }
+
+    #[test]
+    fn lua_pairs() {
+        let mut transform = Lua::new(
+            r#"
+              for k,v in pairs(event) do
+                event[k] = k .. v
+              end
+            "#,
+            vec![],
+        )
+        .unwrap();
+
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit("name", "Bob");
+        event.as_mut_log().insert_explicit("friend", "Alice");
+
+        let event = transform.transform(event).unwrap();
+
+        assert_eq!(event.as_log()[&"name".into()], "nameBob".into());
+        assert_eq!(event.as_log()[&"friend".into()], "friendAlice".into());
     }
 }

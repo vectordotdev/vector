@@ -12,6 +12,25 @@ require_relative "setup"
 # Functions
 #
 
+def bump_cargo_version(version)
+  # Cargo.toml
+  content = File.read("#{ROOT_DIR}/Cargo.toml")
+  new_content = bump_version(content, version)
+  File.write("#{ROOT_DIR}/Cargo.toml", new_content)
+
+  # Cargo.lock
+  content = File.read("#{ROOT_DIR}/Cargo.lock")
+  new_content = bump_version(content, version)
+  File.write("#{ROOT_DIR}/Cargo.lock", new_content)
+end
+
+def bump_version(content, version)
+  content.sub(
+    /name = "vector"\nversion = "([a-z0-9.-]*)"\n/,
+    "name = \"vector\"\nversion = \"#{version}\"\n"
+  )
+end
+
 def release_exists?(release)
   errors = `git rev-parse v#{release.version} 2>&1 >/dev/null`
   errors == ""
@@ -21,13 +40,7 @@ end
 # Commit
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
-  end
-
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 release = metadata.latest_release
 
 if release_exists?(release)
@@ -40,7 +53,11 @@ if release_exists?(release)
   )
 else
   title("Committing and tagging release")
-  
+
+  bump_cargo_version(release.version)
+
+  success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
+
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
   commands =

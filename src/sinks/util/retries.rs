@@ -1,4 +1,4 @@
-use super::Error;
+use crate::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::borrow::Cow;
 use std::time::{Duration, Instant};
@@ -17,7 +17,7 @@ pub trait RetryLogic: Clone {
 }
 
 #[derive(Debug, Clone)]
-pub struct FixedRetryPolicy<L: RetryLogic> {
+pub struct FixedRetryPolicy<L> {
     remaining_attempts: usize,
     backoff: Duration,
     logic: L,
@@ -40,7 +40,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
     fn build_retry(&self) -> RetryPolicyFuture<L> {
         let policy = FixedRetryPolicy::new(
             self.remaining_attempts - 1,
-            self.backoff.clone(),
+            self.backoff,
             self.logic.clone(),
         );
         let next = Instant::now() + self.backoff;
@@ -87,7 +87,7 @@ where
                         error!(message = "encountered non-retriable error.", %error);
                         None
                     }
-                } else if let Some(_) = error.downcast_ref::<Elapsed>() {
+                } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!("request timedout.");
                     Some(self.build_retry())
                 } else {

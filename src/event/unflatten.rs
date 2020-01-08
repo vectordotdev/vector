@@ -51,7 +51,7 @@ impl From<HashMap<Atom, Value>> for Unflatten {
 /// of this function will be merged into the overall tree.
 fn unflatten(k: Atom, v: MapValue) -> MapValue {
     // Maps are delimited via `.`.
-    let mut s = k.rsplit(".").peekable();
+    let mut s = k.rsplit('.').peekable();
     let mut map = HashMap::new();
 
     // Temp value variable that ends up representing the overall path of the tree.
@@ -91,7 +91,7 @@ fn unflatten(k: Atom, v: MapValue) -> MapValue {
         // otherwise, we create an intermediate map that gets set as the the temp value.
         //
         // Since the next item is `None` in the iterator this essentially breaks out of the loop.
-        if let None = s.peek() {
+        if s.peek().is_none() {
             map.insert(k.into(), temp_v.take().unwrap());
         } else {
             let mut m = HashMap::new();
@@ -109,10 +109,7 @@ fn unflatten(k: Atom, v: MapValue) -> MapValue {
 /// `i -1` with `MapValue::Null`, that will then get replaced.
 fn build_array(i: usize, value: MapValue) -> Vec<MapValue> {
     let mut array = if i > 0 {
-        (0..i)
-            .into_iter()
-            .map(|_| MapValue::Null)
-            .collect::<Vec<_>>()
+        (0..i).map(|_| MapValue::Null).collect::<Vec<_>>()
     } else {
         Vec::new()
     };
@@ -336,8 +333,8 @@ mod tests {
     #[test]
     fn nested() {
         let mut e = Event::new_empty_log().into_log();
-        e.insert_implicit("a.b.c".into(), "v1".into());
-        e.insert_implicit("a.b.d".into(), "v2".into());
+        e.insert_implicit("a.b.c", "v1");
+        e.insert_implicit("a.b.d", "v2");
 
         let json = serde_json::to_string(&e.unflatten()).unwrap();
         let expected = serde_json::from_str::<Expected>(&json).unwrap();
@@ -371,8 +368,8 @@ mod tests {
         // of hashmap iteration ordering.
         for _ in 0..100 {
             let mut e = Event::new_empty_log().into_log();
-            e.insert_implicit("a.b[0]".into(), "v1".into());
-            e.insert_implicit("a.b[1]".into(), "v2".into());
+            e.insert_implicit("a.b[0]", "v1");
+            e.insert_implicit("a.b[1]", "v2");
 
             #[derive(Deserialize, Debug)]
             #[serde(rename_all = "snake_case")]
@@ -398,7 +395,7 @@ mod tests {
         fn unflatten_abirtrary(json in prop::json()) {
             let s = serde_json::to_string(&json).unwrap();
             let mut event = Event::new_empty_log();
-            event.as_mut_log().insert_implicit(event::MESSAGE.clone().into(), s.into());
+            event.as_mut_log().insert_implicit(event::MESSAGE.clone(), s);
 
             let mut parser = JsonParser::from(JsonParserConfig::default());
             let event = parser.transform(event).unwrap().into_log();
