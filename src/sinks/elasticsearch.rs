@@ -60,13 +60,13 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
-    BasicAuth { user: String, password: String },
+    Basic { user: String, password: String },
     Aws,
 }
 
 impl ElasticSearchAuth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
-        if let Self::BasicAuth { user, password } = &self {
+        if let Self::Basic { user, password } = &self {
             use headers::HeaderMapExt;
             let auth = headers::Authorization::basic(&user, &password);
             req.headers_mut().typed_insert(auth);
@@ -122,7 +122,7 @@ enum ParseError {
 impl ElasticSearchCommon {
     pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
         let authorization = match &config.auth {
-            Some(ElasticSearchAuth::BasicAuth { user, password }) => {
+            Some(ElasticSearchAuth::Basic { user, password }) => {
                 let token = format!("{}:{}", user, password);
                 Some(format!("Basic {}", base64::encode(token.as_bytes())))
             }
@@ -138,7 +138,7 @@ impl ElasticSearchCommon {
         // let provider = config.provider.unwrap_or(Provider::Default);
 
         let base_url = match &config.auth {
-            Some(ElasticSearchAuth::BasicAuth { .. }) | None => match config.host {
+            Some(ElasticSearchAuth::Basic { .. }) | None => match config.host {
                 Some(ref host) => host.clone(),
                 None => return Err(ParseError::DefaultRequiresHost.into()),
             },
@@ -162,7 +162,7 @@ impl ElasticSearchCommon {
             .with_context(|| InvalidHost { host: &base_url })?;
 
         let credentials = match &config.auth {
-            Some(ElasticSearchAuth::BasicAuth { .. }) | None => None,
+            Some(ElasticSearchAuth::Basic { .. }) | None => None,
             Some(ElasticSearchAuth::Aws) => {
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;

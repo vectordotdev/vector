@@ -178,13 +178,13 @@ impl RetryLogic for HttpRetryLogic {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
-    BasicAuth { user: String, password: String },
+    Basic { user: String, password: String },
 }
 
 impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
         match &self {
-            Auth::BasicAuth { user, password } => {
+            Auth::Basic { user, password } => {
                 use headers::HeaderMapExt;
                 let auth = headers::Authorization::basic(&user, &password);
                 req.headers_mut().typed_insert(auth);

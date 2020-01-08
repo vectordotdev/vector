@@ -517,7 +517,7 @@ fn parses_sink_full_auth() {
         encoding = "json"
 
         [sinks.out.auth]
-        strategy = "basic_auth"
+        strategy = "basic"
         user = "user"
         password = "password"
         "#,
@@ -538,7 +538,7 @@ fn parses_sink_full_es_basic_auth() {
         host = "https://localhost"
 
         [sinks.out.auth]
-        strategy = "basic_auth"
+        strategy = "basic"
         user = "user"
         password = "password"
         "#,
