@@ -2,14 +2,13 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{https_client, BasicAuth, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
-use headers::HeaderMapExt;
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -40,8 +39,7 @@ pub struct HttpSinkConfig {
     pub uri: String,
     pub method: Option<HttpMethod>,
     pub healthcheck_uri: Option<String>,
-    #[serde(flatten)]
-    pub basic_auth: Option<BasicAuth>,
+    pub auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
@@ -80,13 +78,6 @@ pub enum Encoding {
     Json,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct BasicAuth {
-    user: String,
-    password: String,
-}
-
 inventory::submit! {
     SinkDescription::new::<HttpSinkConfig>("http")
 }
@@ -101,7 +92,7 @@ impl SinkConfig for HttpSinkConfig {
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
                 let healthcheck =
-                    healthcheck(healthcheck_uri, self.basic_auth.clone(), cx.resolver(), tls)?;
+                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)?;
                 Ok((sink, healthcheck))
             }
             None => Ok((sink, Box::new(future::ok(())))),
@@ -133,7 +124,7 @@ fn http(
 
     let encoding = config.encoding.clone();
     let headers = config.headers.clone();
-    let basic_auth = config.basic_auth.clone();
+    let basic_auth = config.auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
     let http_service = HttpService::builder(cx.resolver())
@@ -217,13 +208,6 @@ fn healthcheck(
         });
 
     Ok(Box::new(healthcheck))
-}
-
-impl BasicAuth {
-    fn apply(&self, header_map: &mut http::header::HeaderMap) {
-        let auth = headers::Authorization::basic(&self.user, &self.password);
-        header_map.typed_insert(auth)
-    }
 }
 
 fn validate_headers(headers: &Option<IndexMap<String, String>>) -> crate::Result<()> {

@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     region::{self, RegionOrEndpoint},
     sinks::util::{
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{https_client, BasicAuth, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -44,7 +44,7 @@ pub struct ElasticSearchConfig {
     pub region: RegionOrEndpoint,
     #[serde(flatten)]
     pub request: TowerRequestConfig,
-    pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
+    pub auth: Option<BasicAuth>,
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
@@ -56,13 +56,6 @@ lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         ..Default::default()
     };
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ElasticSearchBasicAuthConfig {
-    pub password: String,
-    pub user: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
@@ -119,7 +112,7 @@ enum ParseError {
 
 impl ElasticSearchCommon {
     pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        let authorization = config.basic_auth.as_ref().map(|auth| {
+        let authorization = config.auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))
         });

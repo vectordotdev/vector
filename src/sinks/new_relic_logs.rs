@@ -97,7 +97,7 @@ impl NewRelicLogsConfig {
             uri: uri.to_owned(),
             method: Some(HttpMethod::Post),
             healthcheck_uri: None,
-            basic_auth: None,
+            auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
             encoding: Encoding::Json,
@@ -158,7 +158,7 @@ mod tests {
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
-        assert!(http_config.basic_auth.is_none());
+        assert!(http_config.auth.is_none());
     }
 
     #[test]
@@ -186,7 +186,7 @@ mod tests {
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
-        assert!(http_config.basic_auth.is_none());
+        assert!(http_config.auth.is_none());
     }
 
     #[test]
@@ -216,7 +216,7 @@ mod tests {
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
-        assert!(http_config.basic_auth.is_none());
+        assert!(http_config.auth.is_none());
     }
 
     fn build_test_server(

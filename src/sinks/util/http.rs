@@ -8,6 +8,7 @@ use futures::{Future, Poll, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -171,6 +172,21 @@ impl RetryLogic for HttpRetryLogic {
             }
             _ => None,
         }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct BasicAuth {
+    pub user: String,
+    pub password: String,
+}
+
+impl BasicAuth {
+    pub fn apply(&self, header_map: &mut http::header::HeaderMap) {
+        use headers::HeaderMapExt;
+        let auth = headers::Authorization::basic(&self.user, &self.password);
+        header_map.typed_insert(auth)
     }
 }
 
