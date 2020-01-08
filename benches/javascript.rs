@@ -90,11 +90,12 @@ fn field_filter(c: &mut Criterion) {
         Benchmark::new("native", move |b| {
             b.iter_with_setup(
                 || {
+                    let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     let transform = transforms::field_filter::FieldFilterConfig {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
-                    .build()
+                    .build(rt.executor())
                     .unwrap();
 
                     let events: Vec<Event> = (0..num_events)
@@ -102,7 +103,7 @@ fn field_filter(c: &mut Criterion) {
                             let mut event = Event::new_empty_log();
                             event
                                 .as_mut_log()
-                                .insert_explicit("the_field".into(), (i % 10).to_string().into());
+                                .insert_explicit("the_field", (i % 10).to_string());
                             event
                         })
                         .collect();
@@ -130,7 +131,7 @@ fn field_filter(c: &mut Criterion) {
                             let mut event = Event::new_empty_log();
                             event
                                 .as_mut_log()
-                                .insert_explicit("the_field".into(), (i % 10).to_string().into());
+                                .insert_explicit("the_field", (i % 10).to_string());
                             event
                         })
                         .collect();

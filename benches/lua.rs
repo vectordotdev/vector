@@ -63,15 +63,14 @@ fn field_filter(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let rt = vector::runtime::Runtime::single_threaded().unwrap();
-                    transforms::field_filter::FieldFilterConfig {
+                    let transform = transforms::field_filter::FieldFilterConfig {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
                     .build(rt.executor())
-                    .unwrap()
-                },
-                |mut transform| {
-                    let num = (0..num_events)
+                    .unwrap();
+
+                    let events: Vec<Event> = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();
                             event
@@ -110,7 +109,6 @@ fn field_filter(c: &mut Criterion) {
                             event
                         })
                         .collect();
-
                     (transform, events)
                 },
                 |(mut transform, events)| {
