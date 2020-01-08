@@ -667,8 +667,8 @@ mod integration_tests {
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
             batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+                size: Some(1),
+                timeout_secs: None,
             },
             ..Default::default()
         }

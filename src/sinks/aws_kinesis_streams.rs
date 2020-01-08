@@ -345,8 +345,8 @@ mod integration_tests {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             batch: BatchConfig {
-                batch_size: Some(2),
-                batch_timeout: None,
+                size: Some(2),
+                timeout_secs: None,
             },
             ..Default::default()
         };

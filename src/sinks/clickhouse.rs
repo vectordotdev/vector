@@ -261,11 +261,11 @@ mod integration_tests {
             table: table.clone(),
             compression: Some(Compression::None),
             batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+                size: Some(1),
+                timeout_secs: None,
             },
             request: TowerRequestConfig {
-                request_retry_attempts: Some(1),
+                retry_attempts: Some(1),
                 ..Default::default()
             },
             ..Default::default()
@@ -304,8 +304,8 @@ mod integration_tests {
             table: table.clone(),
             compression: Some(Compression::None),
             batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+                size: Some(1),
+                timeout_secs: None,
             },
             ..Default::default()
         };

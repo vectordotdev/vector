@@ -665,8 +665,8 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             compression: Compression::None,
             batch: BatchConfig {
-                batch_size: Some(batch_size),
-                batch_timeout: Some(5),
+                size: Some(batch_size),
+                timeout_secs: Some(5),
             },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()

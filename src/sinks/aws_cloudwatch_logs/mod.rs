@@ -851,8 +851,8 @@ mod integration_tests {
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             batch: BatchConfig {
-                batch_timeout: None,
-                batch_size: Some(2),
+                timeout_secs: None,
+                size: Some(2),
             },
             ..Default::default()
         };
