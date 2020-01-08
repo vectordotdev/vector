@@ -67,20 +67,13 @@ impl TowerRequestConfig {
                 .in_flight_limit
                 .or(defaults.in_flight_limit)
                 .unwrap_or(5),
-            timeout: Duration::from_secs(
-                self.timeout_secs
-                    .or(defaults.timeout_secs)
-                    .unwrap_or(60),
-            ),
+            timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
                     .or(defaults.rate_limit_duration_secs)
                     .unwrap_or(1),
             ),
-            rate_limit_num: self
-                .rate_limit_num
-                .or(defaults.rate_limit_num)
-                .unwrap_or(5),
+            rate_limit_num: self.rate_limit_num.or(defaults.rate_limit_num).unwrap_or(5),
             retry_attempts: self
                 .retry_attempts
                 .or(defaults.retry_attempts)

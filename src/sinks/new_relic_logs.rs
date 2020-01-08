@@ -77,11 +77,7 @@ impl NewRelicLogsConfig {
         let batch = BatchConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            size: Some(
-                self.batch
-                    .size
-                    .unwrap_or(bytesize::mib(5u64) as usize),
-            ),
+            size: Some(self.batch.size.unwrap_or(bytesize::mib(5u64) as usize)),
             ..self.batch
         };
 
@@ -147,10 +143,7 @@ mod tests {
         assert_eq!(http_config.uri, "https://log-api.newrelic.com/log/v1");
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
-        assert_eq!(
-            http_config.batch.size,
-            Some(bytesize::mib(5u64) as usize)
-        );
+        assert_eq!(http_config.batch.size, Some(bytesize::mib(5u64) as usize));
         assert_eq!(http_config.request.in_flight_limit, Some(100));
         assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
@@ -175,10 +168,7 @@ mod tests {
         assert_eq!(http_config.uri, "https://log-api.eu.newrelic.com/log/v1");
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
-        assert_eq!(
-            http_config.batch.size,
-            Some(bytesize::mib(8u64) as usize)
-        );
+        assert_eq!(http_config.batch.size, Some(bytesize::mib(8u64) as usize));
         assert_eq!(http_config.request.in_flight_limit, Some(12));
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
@@ -205,10 +195,7 @@ mod tests {
         assert_eq!(http_config.uri, "https://log-api.eu.newrelic.com/log/v1");
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
-        assert_eq!(
-            http_config.batch.size,
-            Some(bytesize::mib(8u64) as usize)
-        );
+        assert_eq!(http_config.batch.size, Some(bytesize::mib(8u64) as usize));
         assert_eq!(http_config.request.in_flight_limit, Some(12));
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
