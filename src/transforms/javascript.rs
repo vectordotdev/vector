@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{Event, ValueKind},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig},
 };
 use lazy_static::lazy_static;
@@ -114,6 +115,11 @@ enum ProcessError {
         value
     ))]
     JavascriptBigintOverflowError { value: quick_js::BigInt },
+    #[snafu(display(
+        "Field \"{}\" in event returned from JavaScript has a type which cannot be serialized",
+        field
+    ))]
+    JavascriptUnserializableTypeError { field: String },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -133,7 +139,7 @@ pub struct JavaScriptConfig {
 
 #[typetag::serde(name = "javascript")]
 impl TransformConfig for JavaScriptConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         JavaScript::new(self.clone()).map(|js| -> Box<dyn Transform> { Box::new(js) })
     }
 
@@ -143,6 +149,10 @@ impl TransformConfig for JavaScriptConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "javascript"
     }
 }
 
@@ -389,8 +399,13 @@ fn object_to_event(object: HashMap<String, JsValue>) -> crate::Result<Event> {
                         value: v,
                     }))
                 }
+                _ => {
+                    return Err(Box::new(ProcessError::JavascriptUnserializableTypeError {
+                        field: k,
+                    }))
+                }
             };
-        log.insert_implicit(k.into(), v.into());
+        log.insert_implicit(k, v);
     }
     Ok(event)
 }
@@ -637,7 +652,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field".into(), "value".into());
+        expected_log.insert_implicit("field".to_string(), "value".as_bytes());
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -655,7 +670,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field".into(), 123.into());
+        expected_log.insert_implicit("field", 123);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -673,7 +688,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field".into(), 123.0.into());
+        expected_log.insert_implicit("field", 123.0);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -691,7 +706,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field".into(), 3.14159.into());
+        expected_log.insert_implicit("field", 3.14159);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -709,7 +724,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field".into(), true.into());
+        expected_log.insert_implicit("field", true);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -728,7 +743,7 @@ mod tests {
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
         let date = Utc.ymd(2020, 1, 1).and_hms_milli(0, 0, 0, 123);
-        expected_log.insert_implicit("field".into(), date.into());
+        expected_log.insert_implicit("field", date);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -773,7 +788,7 @@ mod tests {
 
         let mut source_event = make_event();
         let source_log = source_event.as_mut_log();
-        source_log.insert_implicit("field".into(), "value".into());
+        source_log.insert_implicit("field", "value");
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
@@ -793,7 +808,7 @@ mod tests {
 
         let mut source_event = make_event();
         let source_log = source_event.as_mut_log();
-        source_log.insert_implicit("field".into(), "value".into());
+        source_log.insert_implicit("field", "value");
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
@@ -813,7 +828,7 @@ mod tests {
 
         let mut source_event = make_event();
         let source_log = source_event.as_mut_log();
-        source_log.insert_implicit("field".into(), "value".into());
+        source_log.insert_implicit("field".to_string(), "value".as_bytes());
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
@@ -836,12 +851,12 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("a".into(), 3.into());
+        expected_log.insert_implicit("a", 3);
         expected_events.push(expected_event);
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("b".into(), 4.into());
+        expected_log.insert_implicit("b", 4);
         expected_events.push(expected_event);
 
         let mut transformed_events = vec![];
@@ -864,7 +879,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("count".into(), 1.into());
+        expected_log.insert_implicit("count", 1);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -874,7 +889,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("count".into(), 2.into());
+        expected_log.insert_implicit("count", 2);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
