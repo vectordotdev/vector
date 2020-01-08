@@ -34,14 +34,14 @@ pub struct CloudWatchMetricsSinkConfig {
     pub region: RegionOrEndpoint,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_timeout_secs: Some(30),
-        request_rate_limit_num: Some(150),
+        timeout_secs: Some(30),
+        rate_limit_num: Some(150),
         ..Default::default()
     };
 }

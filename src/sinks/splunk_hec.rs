@@ -35,15 +35,15 @@ pub struct HecSinkConfig {
     pub compression: Option<Compression>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_in_flight_limit: Some(10),
-        request_rate_limit_num: Some(10),
+        in_flight_limit: Some(10),
+        rate_limit_num: Some(10),
         ..Default::default()
     };
 }

@@ -45,13 +45,13 @@ pub struct DatadogConfig {
     pub api_key: String,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_retry_attempts: Some(5),
+        retry_attempts: Some(5),
         ..Default::default()
     };
 }

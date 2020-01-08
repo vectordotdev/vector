@@ -33,7 +33,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default, flatten)]
     pub batch: BatchConfig,
 
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
@@ -88,8 +88,8 @@ impl NewRelicLogsConfig {
         let request = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
-            request_in_flight_limit: Some(self.request.request_in_flight_limit.unwrap_or(100)),
-            request_rate_limit_num: Some(self.request.request_rate_limit_num.unwrap_or(100)),
+            in_flight_limit: Some(self.request.in_flight_limit.unwrap_or(100)),
+            rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
             ..self.request
         };
 
@@ -151,8 +151,8 @@ mod tests {
             http_config.batch.batch_size,
             Some(bytesize::mib(5u64) as usize)
         );
-        assert_eq!(http_config.request.request_in_flight_limit, Some(100));
-        assert_eq!(http_config.request.request_rate_limit_num, Some(100));
+        assert_eq!(http_config.request.in_flight_limit, Some(100));
+        assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
             http_config.headers.unwrap()["X-License-Key"],
             "foo".to_owned()
@@ -167,8 +167,8 @@ mod tests {
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
         nr_config.batch.batch_size = Some(bytesize::mib(8u64) as usize);
-        nr_config.request.request_in_flight_limit = Some(12);
-        nr_config.request.request_rate_limit_num = Some(24);
+        nr_config.request.in_flight_limit = Some(12);
+        nr_config.request.rate_limit_num = Some(24);
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -179,8 +179,8 @@ mod tests {
             http_config.batch.batch_size,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.request_in_flight_limit, Some(12));
-        assert_eq!(http_config.request.request_rate_limit_num, Some(24));
+        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
             "foo".to_owned()
@@ -209,8 +209,8 @@ mod tests {
             http_config.batch.batch_size,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.request_in_flight_limit, Some(12));
-        assert_eq!(http_config.request.request_rate_limit_num, Some(24));
+        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
             "foo".to_owned()

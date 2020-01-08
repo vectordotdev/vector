@@ -33,7 +33,7 @@ pub struct PubsubConfig {
 
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,

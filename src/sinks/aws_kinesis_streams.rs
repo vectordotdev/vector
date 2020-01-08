@@ -37,13 +37,13 @@ pub struct KinesisSinkConfig {
     pub encoding: Encoding,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_timeout_secs: Some(30),
+        timeout_secs: Some(30),
         ..Default::default()
     };
 }

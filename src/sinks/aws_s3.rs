@@ -44,14 +44,14 @@ pub struct S3SinkConfig {
     pub compression: Compression,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_in_flight_limit: Some(25),
-        request_rate_limit_num: Some(25),
+        in_flight_limit: Some(25),
+        rate_limit_num: Some(25),
         ..Default::default()
     };
 }
