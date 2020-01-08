@@ -176,17 +176,20 @@ impl RetryLogic for HttpRetryLogic {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct BasicAuth {
-    pub user: String,
-    pub password: String,
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+pub enum Auth {
+    BasicAuth { user: String, password: String },
 }
 
-impl BasicAuth {
-    pub fn apply(&self, header_map: &mut http::header::HeaderMap) {
-        use headers::HeaderMapExt;
-        let auth = headers::Authorization::basic(&self.user, &self.password);
-        header_map.typed_insert(auth)
+impl Auth {
+    pub fn apply<B>(&self, req: &mut Request<B>) {
+        match &self {
+            Auth::BasicAuth { user, password } => {
+                use headers::HeaderMapExt;
+                let auth = headers::Authorization::basic(&user, &password);
+                req.headers_mut().typed_insert(auth);
+            }
+        }
     }
 }
 

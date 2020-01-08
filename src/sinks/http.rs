@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        http::{https_client, BasicAuth, HttpRetryLogic, HttpService},
+        http::{https_client, Auth, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -39,7 +39,7 @@ pub struct HttpSinkConfig {
     pub uri: String,
     pub method: Option<HttpMethod>,
     pub healthcheck_uri: Option<String>,
-    pub auth: Option<BasicAuth>,
+    pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
@@ -165,7 +165,7 @@ fn http(
             let mut request = builder.body(body).unwrap();
 
             if let Some(auth) = &basic_auth {
-                auth.apply(request.headers_mut());
+                auth.apply(&mut request);
             }
 
             request
@@ -182,7 +182,7 @@ fn http(
 
 fn healthcheck(
     uri: String,
-    auth: Option<BasicAuth>,
+    auth: Option<Auth>,
     resolver: Resolver,
     tls_settings: TlsSettings,
 ) -> crate::Result<super::Healthcheck> {
@@ -190,7 +190,7 @@ fn healthcheck(
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
-        auth.apply(request.headers_mut());
+        auth.apply(&mut request);
     }
 
     let client = https_client(resolver, tls_settings)?;
