@@ -33,7 +33,7 @@ pub struct NewRelicLogsConfig {
     #[serde(default, flatten)]
     pub batch: BatchConfig,
 
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 

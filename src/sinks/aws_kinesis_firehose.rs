@@ -34,7 +34,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub encoding: Encoding,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 

@@ -45,7 +45,7 @@ pub struct DatadogConfig {
     pub api_key: String,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 

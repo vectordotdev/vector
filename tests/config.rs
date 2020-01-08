@@ -474,7 +474,9 @@ fn parses_sink_partial_request() {
         inputs = ["in"]
         uri = "https://localhost"
         encoding = "json"
-        request_in_flight_limit = 42
+
+        [sinks.out.request]
+        in_flight_limit = 42
         "#,
     )
     .unwrap();
@@ -492,12 +494,14 @@ fn parses_sink_full_request() {
         inputs = ["in"]
         uri = "https://localhost"
         encoding = "json"
-        request_in_flight_limit = 42
-        request_timeout_secs = 2
-        request_rate_limit_duration_secs = 3
-        request_rate_limit_num = 4
-        request_retry_attempts = 5
-        request_retry_backoff_secs = 6
+
+        [sinks.out.request]
+        in_flight_limit = 42
+        timeout_secs = 2
+        rate_limit_duration_secs = 3
+        rate_limit_num = 4
+        retry_attempts = 5
+        retry_backoff_secs = 6
         "#,
     )
     .unwrap();

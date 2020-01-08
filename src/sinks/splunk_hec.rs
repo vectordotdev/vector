@@ -35,7 +35,7 @@ pub struct HecSinkConfig {
     pub compression: Option<Compression>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }
