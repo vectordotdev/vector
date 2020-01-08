@@ -42,7 +42,7 @@ pub struct S3SinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     pub compression: Compression,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,

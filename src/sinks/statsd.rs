@@ -48,7 +48,7 @@ pub struct StatsdSinkConfig {
     pub namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
 }
 
@@ -317,8 +317,8 @@ mod test {
             namespace: "vector".into(),
             address: default_address(),
             batch: BatchConfig {
-                batch_size: Some(512),
-                batch_timeout: Some(1),
+                size: Some(512),
+                timeout_secs: Some(1),
             },
         };
 

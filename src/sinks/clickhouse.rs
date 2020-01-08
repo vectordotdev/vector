@@ -27,7 +27,7 @@ pub struct ClickhouseConfig {
     pub database: Option<String>,
     pub compression: Option<Compression>,
     pub basic_auth: Option<ClickHouseBasicAuthConfig>,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,

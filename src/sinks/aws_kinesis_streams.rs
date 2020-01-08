@@ -35,7 +35,7 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,

@@ -30,7 +30,7 @@ pub struct NewRelicLogsConfig {
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
 
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
 
     #[serde(default)]
@@ -77,9 +77,9 @@ impl NewRelicLogsConfig {
         let batch = BatchConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            batch_size: Some(
+            size: Some(
                 self.batch
-                    .batch_size
+                    .size
                     .unwrap_or(bytesize::mib(5u64) as usize),
             ),
             ..self.batch
@@ -148,7 +148,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
-            http_config.batch.batch_size,
+            http_config.batch.size,
             Some(bytesize::mib(5u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(100));
@@ -166,7 +166,7 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::default();
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.batch_size = Some(bytesize::mib(8u64) as usize);
+        nr_config.batch.size = Some(bytesize::mib(8u64) as usize);
         nr_config.request.in_flight_limit = Some(12);
         nr_config.request.rate_limit_num = Some(24);
 
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
-            http_config.batch.batch_size,
+            http_config.batch.size,
             Some(bytesize::mib(8u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(12));
@@ -206,7 +206,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
-            http_config.batch.batch_size,
+            http_config.batch.size,
             Some(bytesize::mib(8u64) as usize)
         );
         assert_eq!(http_config.request.in_flight_limit, Some(12));

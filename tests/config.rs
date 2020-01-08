@@ -282,7 +282,6 @@ fn bad_s3_region() {
         [sinks.out1]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -291,7 +290,6 @@ fn bad_s3_region() {
         [sinks.out2]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -301,7 +299,6 @@ fn bad_s3_region() {
         [sinks.out3]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -312,12 +309,14 @@ fn bad_s3_region() {
         [sinks.out4]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         endpoint = "this shoudlnt work"
+
+        [sinks.out4.batch]
+        size = 100000
       "#,
     )
     .unwrap_err();
@@ -502,6 +501,27 @@ fn parses_sink_full_request() {
         rate_limit_num = 4
         retry_attempts = 5
         retry_backoff_secs = 6
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_batch() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "http"
+        inputs = ["in"]
+        uri = "https://localhost"
+        encoding = "json"
+
+        [sinks.out.batch]
+        size = 100
+        timeout_secs = 10
         "#,
     )
     .unwrap();

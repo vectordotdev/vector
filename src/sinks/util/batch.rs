@@ -5,15 +5,15 @@ use tokio::timer::Delay;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct BatchConfig {
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    pub size: Option<usize>,
+    pub timeout_secs: Option<u64>,
 }
 
 impl BatchConfig {
     pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
         BatchSettings {
-            size: self.batch_size.unwrap_or(size as usize),
-            timeout: Duration::from_secs(self.batch_timeout.unwrap_or(timeout)),
+            size: self.size.unwrap_or(size as usize),
+            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
         }
     }
 }

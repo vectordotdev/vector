@@ -32,7 +32,7 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -285,12 +285,12 @@ mod integration_tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
             encoding: Encoding::Json, // required for ES destination w/ localstack
             batch: BatchConfig {
-                batch_size: Some(2),
-                batch_timeout: None,
+                size: Some(2),
+                timeout_secs: None,
             },
             request: TowerRequestConfig {
-                request_timeout_secs: Some(10),
-                request_retry_attempts: Some(0),
+                timeout_secs: Some(10),
+                retry_attempts: Some(0),
                 ..Default::default()
             },
         };

@@ -43,7 +43,7 @@ pub struct DatadogConfig {
     #[serde(default = "default_host")]
     pub host: String,
     pub api_key: String,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,

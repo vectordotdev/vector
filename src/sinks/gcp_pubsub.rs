@@ -31,7 +31,7 @@ pub struct PubsubConfig {
     pub api_key: Option<String>,
     pub credentials_path: Option<String>,
 
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,

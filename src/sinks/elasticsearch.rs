@@ -35,7 +35,7 @@ pub struct ElasticSearchConfig {
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     // TODO: This should be an Option, but when combined with flatten we never seem to get back
     // a None. For now, we get optionality by handling the error during parsing when nothing is

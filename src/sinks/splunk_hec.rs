@@ -33,7 +33,7 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
