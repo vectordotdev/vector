@@ -183,7 +183,7 @@ jobs:
       - checkout
       - run:
           name: Build tests
-          command: ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --all --no-default-features --features default-musl,docker --no-run
+          command: ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --all --no-default-features --features default-musl,docker --no-run --target x86_64-unknown-linux-musl
       - run:
           name: Test
           no_output_timeout: 30m
