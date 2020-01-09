@@ -141,7 +141,7 @@ strip-ansi-escapes = "0.1.0"
 colored = "1.9"
 warp = "0.1.20"
 evmap = { version = "7", features = ["bytes"] }
-quick-js = { version = "0.3", features = ["bigint", "chrono"] }
+quick-js = { version = "0.3", features = ["bigint", "chrono"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -174,9 +174,9 @@ trust-dns-proto = "0.8.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["vendored", "unix", "leveldb-plain", "rdkafka-plain"]
+default = ["vendored", "unix", "leveldb-plain", "rdkafka-plain", "quick-js"]
 # Default features for *-unknown-linux-musl
-default-musl = ["vendored", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default-musl = ["vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "quick-js"]
 # Default features for *-pc-windows-msvc
 default-msvc = ["vendored", "leveldb-cmake", "rdkafka-cmake"]
 

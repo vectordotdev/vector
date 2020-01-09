@@ -10,7 +10,7 @@ pub mod concat;
 pub mod field_filter;
 pub mod geoip;
 pub mod grok_parser;
-#[cfg(unix)]
+#[cfg(feature = "quick-js")]
 pub mod javascript;
 pub mod json_parser;
 pub mod log_to_metric;
