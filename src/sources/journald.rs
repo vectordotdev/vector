@@ -23,9 +23,11 @@ use tracing::{dispatcher, field};
 const DEFAULT_BATCH_SIZE: usize = 16;
 
 lazy_static! {
-    static ref MESSAGE: Atom = Atom::from("MESSAGE");
-    static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref CURSOR: Atom = Atom::from("__CURSOR");
     static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
+    static ref MESSAGE: Atom = Atom::from("MESSAGE");
+    static ref SYSTEMD_UNIT: Atom = Atom::from("_SYSTEMD_UNIT");
+    static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
 }
 
 #[derive(Debug, Snafu)]
@@ -176,7 +178,7 @@ fn create_event(record: Record) -> Event {
     log.into()
 }
 
-type Record = HashMap<String, String>;
+type Record = HashMap<Atom, String>;
 
 trait JournalSource: Iterator<Item = Result<Record, io::Error>> + Sized {
     fn new(local_only: bool, current_boot: bool, cursor: Option<String>) -> crate::Result<Self>;
@@ -248,7 +250,7 @@ impl Iterator for Journalctl {
                         }
                     };
                     // The journald format may contain non-string data elements
-                    if let Some(cursor) = record.remove("__CURSOR") {
+                    if let Some(cursor) = record.remove(&CURSOR) {
                         self.cursor = cursor;
                     }
                     Some(Ok(record))
@@ -299,7 +301,7 @@ where
                 saw_record = true;
                 if !self.units.is_empty() {
                     // Make sure the systemd unit is exactly one of the specified units
-                    if let Some(unit) = record.get("_SYSTEMD_UNIT") {
+                    if let Some(unit) = record.get(&SYSTEMD_UNIT) {
                         if !self.units.contains(unit) {
                             continue;
                         }
