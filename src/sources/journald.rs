@@ -5,15 +5,15 @@ use crate::{
 };
 use chrono::TimeZone;
 use futures::{future, sync::mpsc, Future, Sink};
-use journald::{Journal, Record};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
+use std::process::{Child, ChildStdout, Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError};
 use std::thread;
 use std::time;
@@ -30,8 +30,8 @@ lazy_static! {
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("journald error: {}", source))]
-    JournaldError { source: ::journald::Error },
+    #[snafu(display("journalctl failed to execute: {}", source))]
+    JournalctlSpawn { source: io::Error },
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -78,7 +78,7 @@ impl SourceConfig for JournaldConfig {
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
 
-        journald_source::<Journal>(
+        journald_source::<Journalctl>(
             local_only,
             current_boot,
             out,
@@ -176,40 +176,86 @@ fn create_event(record: Record) -> Event {
     log.into()
 }
 
+type Record = HashMap<String, String>;
+
 trait JournalSource: Iterator<Item = Result<Record, io::Error>> + Sized {
     fn new(local_only: bool, current_boot: bool, cursor: Option<String>) -> crate::Result<Self>;
     fn cursor(&self) -> Result<String, io::Error>;
 }
 
-impl JournalSource for Journal {
+struct Journalctl {
+    #[allow(dead_code)]
+    child: Child,
+    stdout: BufReader<ChildStdout>,
+    cursor: String,
+}
+
+impl JournalSource for Journalctl {
     fn new(local_only: bool, current_boot: bool, cursor: Option<String>) -> crate::Result<Self> {
-        let mut journal = Journal::open(local_only, false).context(JournaldError)?;
+        let mut command = Command::new("journalctl");
+        command.stdout(Stdio::piped());
+        command.arg("--follow");
+        command.arg("--all");
+        command.arg("--show-cursor");
+        command.arg("--output=json");
 
         if current_boot {
-            journal.setup_current_boot()?;
+            command.arg("--boot");
         }
 
         if let Some(cursor) = cursor {
-            if let Err(err) = journal.seek_cursor(&cursor) {
-                error!(
-                    message = "Could not seek journald to stored cursor",
-                    error = field::display(&err)
-                );
-            // The cursor now points to the last successfully read
-            // record, so skip past it to any newer records.
-            } else if let Some(Err(err)) = journal.next() {
-                error!(
-                    message = "Could not fetch next record after seeking to cursor",
-                    error = field::display(&err)
-                );
-            }
+            command.arg(format!("--after-cursor={}", cursor));
+        } else {
+            // journalctl --follow only outputs a few lines without a starting point
+            command.arg("--since=1970-01-01");
         }
 
-        Ok(journal)
+        let mut child = command.spawn().context(JournalctlSpawn)?;
+        let stdout = child.stdout.take().unwrap();
+        let stdout = BufReader::new(stdout);
+
+        Ok(Journalctl {
+            child,
+            stdout,
+            cursor: String::new(),
+        })
     }
 
     fn cursor(&self) -> Result<String, io::Error> {
-        Journal::cursor(self)
+        Ok(self.cursor.clone())
+    }
+}
+
+impl Iterator for Journalctl {
+    type Item = Result<Record, io::Error>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut line = Vec::<u8>::new();
+        loop {
+            break match self.stdout.read_until(b'\n', &mut line) {
+                Ok(0) => None,
+                Ok(_) => {
+                    let text = String::from_utf8_lossy(&line);
+                    let mut record = match serde_json::from_str::<Record>(&text) {
+                        Ok(record) => record,
+                        Err(error) => {
+                            // journalctl will output non-ASCII messages
+                            // using an array of integers. We don't
+                            // parse them into valid records yet but
+                            // instead just skip them.
+                            error!(message = "Invalid record from journalctl, discarding", %error, %text);
+                            line.clear();
+                            continue;
+                        }
+                    };
+                    // The journald format may contain non-string data elements
+                    if let Some(cursor) = record.remove("__CURSOR") {
+                        self.cursor = cursor;
+                    }
+                    Some(Ok(record))
+                }
+                Err(err) => Some(Err(err)),
+            };
+        }
     }
 }
 
