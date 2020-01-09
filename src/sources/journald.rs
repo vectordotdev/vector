@@ -99,6 +99,8 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
+type Record = HashMap<Atom, String>;
+
 fn journald_source<J>(
     local_only: bool,
     current_boot: bool,
@@ -178,18 +180,18 @@ fn create_event(record: Record) -> Event {
     log.into()
 }
 
-type Record = HashMap<Atom, String>;
-
-trait JournalSource: Iterator<Item = Result<Record, io::Error>> + Sized {
+/// A `JournalSource` is a data source that works as an `Iterator`
+/// producing lines that resemble journald JSON format records. These
+/// trait functions is an addition to the standard iteration methods for
+/// initializing the source.
+trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
     fn new(local_only: bool, current_boot: bool, cursor: Option<String>) -> crate::Result<Self>;
-    fn cursor(&self) -> String;
 }
 
 struct Journalctl {
     #[allow(dead_code)]
     child: Child,
     stdout: BufReader<ChildStdout>,
-    cursor: String,
 }
 
 impl JournalSource for Journalctl {
@@ -216,47 +218,18 @@ impl JournalSource for Journalctl {
         let stdout = child.stdout.take().unwrap();
         let stdout = BufReader::new(stdout);
 
-        Ok(Journalctl {
-            child,
-            stdout,
-            cursor: String::new(),
-        })
-    }
-
-    fn cursor(&self) -> String {
-        self.cursor.clone()
+        Ok(Journalctl { child, stdout })
     }
 }
 
 impl Iterator for Journalctl {
-    type Item = Result<Record, io::Error>;
+    type Item = Result<String, io::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         let mut line = Vec::<u8>::new();
-        loop {
-            break match self.stdout.read_until(b'\n', &mut line) {
-                Ok(0) => None,
-                Ok(_) => {
-                    let text = String::from_utf8_lossy(&line);
-                    let mut record = match serde_json::from_str::<Record>(&text) {
-                        Ok(record) => record,
-                        Err(error) => {
-                            // journalctl will output non-ASCII messages
-                            // using an array of integers. We don't
-                            // parse them into valid records yet but
-                            // instead just skip them.
-                            error!(message = "Invalid record from journalctl, discarding", %error, %text);
-                            line.clear();
-                            continue;
-                        }
-                    };
-                    // The journald format may contain non-string data elements
-                    if let Some(cursor) = record.remove(&CURSOR) {
-                        self.cursor = cursor;
-                    }
-                    Some(Ok(record))
-                }
-                Err(err) => Some(Err(err)),
-            };
+        match self.stdout.read_until(b'\n', &mut line) {
+            Ok(0) => None,
+            Ok(_) => Some(Ok(String::from_utf8_lossy(&line).into())),
+            Err(err) => Some(Err(err)),
         }
     }
 }
@@ -282,14 +255,15 @@ where
         loop {
             let mut saw_record = false;
             let mut at_end = false;
+            let mut cursor: Option<String> = None;
 
             for _ in 0..self.batch_size {
-                let record = match self.journal.next() {
+                let text = match self.journal.next() {
                     None => {
                         at_end = true;
                         break;
                     }
-                    Some(Ok(record)) => record,
+                    Some(Ok(text)) => text,
                     Some(Err(err)) => {
                         error!(
                             message = "Could not read from journald source",
@@ -298,6 +272,22 @@ where
                         break;
                     }
                 };
+
+                let mut record = match serde_json::from_str::<Record>(&text) {
+                    Ok(record) => record,
+                    Err(error) => {
+                        // journalctl will output non-ASCII messages
+                        // using an array of integers. We don't
+                        // parse them into valid records yet but
+                        // instead just skip them.
+                        error!(message = "Invalid record from journald, discarding", %error, %text);
+                        continue;
+                    }
+                };
+                if let Some(tmp) = record.remove(&CURSOR) {
+                    cursor = Some(tmp);
+                }
+
                 saw_record = true;
                 if !self.units.is_empty() {
                     // Make sure the systemd unit is exactly one of the specified units
@@ -316,12 +306,13 @@ where
             }
 
             if saw_record {
-                let cursor = self.journal.cursor();
-                if let Err(err) = self.checkpointer.set(&cursor) {
-                    error!(
-                        message = "Could not set journald checkpoint.",
-                        error = field::display(&err)
-                    );
+                if let Some(cursor) = cursor {
+                    if let Err(err) = self.checkpointer.set(&cursor) {
+                        error!(
+                            message = "Could not set journald checkpoint.",
+                            error = field::display(&err)
+                        );
+                    }
                 }
             }
 
@@ -424,61 +415,51 @@ mod tests {
     use super::*;
     use crate::test_util::{block_on, runtime, shutdown_on_idle};
     use futures::stream::Stream;
-    use std::io;
+    use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
     use tokio::util::FutureExt;
 
-    #[derive(Default)]
-    struct FakeJournal {
-        records: Vec<Record>,
-        cursor: usize,
-    }
+    const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
+{"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}
+"#;
 
-    impl FakeJournal {
-        fn push(&mut self, unit: &str, message: &str) {
-            let timestamp = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .expect("Calculating time stamp failed");
-            let mut record = Record::new();
-            record.insert("MESSAGE".into(), message.into());
-            record.insert("_SYSTEMD_UNIT".into(), unit.into());
-            record.insert(
-                "_SOURCE_REALTIME_TIMESTAMP".into(),
-                format!("{}", timestamp.as_micros()),
-            );
-            self.records.push(record);
-        }
+    struct FakeJournal {
+        reader: BufReader<Cursor<&'static str>>,
     }
 
     impl Iterator for FakeJournal {
-        type Item = Result<Record, io::Error>;
+        type Item = Result<String, io::Error>;
         fn next(&mut self) -> Option<Self::Item> {
-            self.cursor += 1;
-            self.records.pop().map(|item| Ok(item))
+            let mut line = String::new();
+            match self.reader.read_line(&mut line) {
+                Ok(0) => None,
+                Ok(_) => {
+                    line.pop();
+                    Some(Ok(line))
+                }
+                Err(err) => Some(Err(err)),
+            }
         }
     }
 
     impl JournalSource for FakeJournal {
-        fn new(_: bool, _: bool, cursor: Option<String>) -> crate::Result<Self> {
-            let mut journal = FakeJournal::default();
-            journal.push("unit.service", "unit message");
-            journal.push("sysinit.target", "System Initialization");
+        fn new(_: bool, _: bool, checkpoint: Option<String>) -> crate::Result<Self> {
+            let cursor = Cursor::new(FAKE_JOURNAL);
+            let reader = BufReader::new(cursor);
+            let mut journal = FakeJournal { reader };
 
-            if let Some(cursor) = cursor {
+            // The cursors are simply line numbers
+            if let Some(cursor) = checkpoint {
                 let cursor = cursor.parse::<usize>().expect("Invalid cursor");
                 for _ in 0..cursor {
-                    journal.records.pop();
+                    journal.next();
                 }
             }
 
             Ok(journal)
-        }
-        // The fake journal cursor is just a line number
-        fn cursor(&self) -> String {
-            format!("{}", self.cursor)
         }
     }
 
