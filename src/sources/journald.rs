@@ -182,7 +182,7 @@ type Record = HashMap<Atom, String>;
 
 trait JournalSource: Iterator<Item = Result<Record, io::Error>> + Sized {
     fn new(local_only: bool, current_boot: bool, cursor: Option<String>) -> crate::Result<Self>;
-    fn cursor(&self) -> Result<String, io::Error>;
+    fn cursor(&self) -> String;
 }
 
 struct Journalctl {
@@ -223,8 +223,8 @@ impl JournalSource for Journalctl {
         })
     }
 
-    fn cursor(&self) -> Result<String, io::Error> {
-        Ok(self.cursor.clone())
+    fn cursor(&self) -> String {
+        self.cursor.clone()
     }
 }
 
@@ -316,19 +316,12 @@ where
             }
 
             if saw_record {
-                match self.journal.cursor() {
-                    Ok(cursor) => {
-                        if let Err(err) = self.checkpointer.set(&cursor) {
-                            error!(
-                                message = "Could not set journald checkpoint.",
-                                error = field::display(&err)
-                            );
-                        }
-                    }
-                    Err(err) => error!(
-                        message = "Could not retrieve current journald checkpoint.",
+                let cursor = self.journal.cursor();
+                if let Err(err) = self.checkpointer.set(&cursor) {
+                    error!(
+                        message = "Could not set journald checkpoint.",
                         error = field::display(&err)
-                    ),
+                    );
                 }
             }
 
@@ -484,8 +477,8 @@ mod tests {
             Ok(journal)
         }
         // The fake journal cursor is just a line number
-        fn cursor(&self) -> Result<String, io::Error> {
-            Ok(format!("{}", self.cursor))
+        fn cursor(&self) -> String {
+            format!("{}", self.cursor)
         }
     }
 
