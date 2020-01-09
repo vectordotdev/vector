@@ -141,7 +141,7 @@ strip-ansi-escapes = "0.1.0"
 colored = "1.9"
 warp = "0.1.20"
 evmap = { version = "7", features = ["bytes"] }
-quick-js = { git = "https://github.com/theduke/quickjs-rs.git", rev = "65cf630c1511aeefa72b1e90cad0103cc83a5917", features = ["bigint", "chrono"] }
+quick-js = { version = "0.3", features = ["bigint", "chrono"] }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
