@@ -501,7 +501,6 @@ mod tests {
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
-
         rt.spawn(server);
 
         let _ = rt.block_on(pump).unwrap();

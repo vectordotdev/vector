@@ -6,6 +6,8 @@ pub mod rusoto;
 pub mod service;
 pub mod tcp;
 pub mod tls;
+#[cfg(unix)]
+pub mod unix;
 
 use crate::buffers::Acker;
 use futures::{

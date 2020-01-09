@@ -4108,7 +4108,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Streams `log` events to a socket, such as a TCP, UDP, or Unix socket.
+# Streams `log` events to a socket, such as a TCP or Unix Domain Socket.
 [sinks.socket]
   #
   # General
@@ -4132,14 +4132,23 @@ end
   #
   # * required
   # * type: string
+  # * relevant when mode = "tcp"
   address = "92.12.333.224:5000"
 
-  # The type of socket to use. Currently only `tcp` is valid.
+  # The type of socket to use.
   #
   # * required
   # * type: string
-  # * must be: "tcp"
+  # * enum: "tcp" or "unix"
   mode = "tcp"
+  mode = "unix"
+
+  # The unix socket path. *This should be absolute path*.
+  #
+  # * required
+  # * type: string
+  # * relevant when mode = "unix"
+  path = "/path/to/socket"
 
   # Enables/disables the sink healthcheck upon start.
   #

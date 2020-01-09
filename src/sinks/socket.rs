@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     sinks::util::tcp::{Encoding, TcpSinkConfig, TlsConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -16,6 +18,8 @@ pub struct SocketSinkConfig {
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp(TcpSinkConfig),
+    #[cfg(unix)]
+    Unix(UnixSinkConfig),
 }
 
 inventory::submit! {
@@ -50,6 +54,8 @@ impl SinkConfig for SocketSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         match &self.mode {
             Mode::Tcp(config) => config.build(cx),
+            #[cfg(unix)]
+            Mode::Unix(config) => config.build(cx),
         }
     }
 
