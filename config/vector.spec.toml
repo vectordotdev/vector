@@ -3507,7 +3507,7 @@ end
   #
   # * required
   # * type: string
-  bootstrap_servers = "10.14.22.123:9092, 10.14.23.332:9092"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value

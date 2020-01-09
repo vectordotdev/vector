@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
-  bootstrap_servers = "10.14.22.123:9092, 10.14.23.332:9092" # example
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
 
@@ -65,7 +65,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
-  bootstrap_servers = "10.14.22.123:9092, 10.14.23.332:9092" # example
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
 
@@ -108,7 +108,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["10.14.22.123:9092, 10.14.23.332:9092"]}
+  examples={["10.14.22.123:9092,10.14.23.332:9092"]}
   name={"bootstrap_servers"}
   nullable={false}
   path={null}
