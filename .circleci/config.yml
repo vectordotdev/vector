@@ -184,12 +184,15 @@ jobs:
       - run:
           name: Test
           no_output_timeout: 30m
+          environment:
+            PASS_RUST_BACKTRACE: full
+            PASS_AWS_ACCESS_KEY_ID: fake-aws-key
+            PASS_AWS_SECRET_ACCESS_KEY: fake-aws-key
           command: |
+            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --no-default-features --features default-musl,docker --no-run
             docker-compose up -d
-            export PASS_RUST_BACKTRACE=full
-            export PASS_AWS_ACCESS_KEY_ID=fake-aws-key
-            export PASS_AWS_SECRET_ACCESS_KEY=fake-aws-key
-            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --no-default-features --features default-musl,docker --jobs 4
+            export PASS_DOCKER_HOST="$DOCKER_HOST"
+            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --no-default-features --features default-musl,docker
       - store_test_results:
           path: ./test-results
 
