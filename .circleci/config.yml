@@ -235,7 +235,7 @@ jobs:
       - run:
           name: Test
           no_output_timeout: 30m
-          command: cargo test --all --features docker --jobs 4
+          command: cargo test --all --features docker --jobs 2
       - store_test_results:
           path: ./test-results
 
