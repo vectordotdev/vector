@@ -451,7 +451,14 @@ mod tests {
 
     #[test]
     fn host_is_required_for_default() {
-        let err = parse_config_err(r#"provider = "default""#);
+        let err = parse_config_err(
+            r#"
+        [auth]
+        strategy = "basic"
+        user = "user"
+        password = "password"
+        "#,
+        );
         assert_downcast_matches!(err, ParseError, ParseError::DefaultRequiresHost);
     }
 
@@ -459,8 +466,10 @@ mod tests {
     fn host_is_not_required_for_aws() {
         let result = parse_config(
             r#"
-                provider = "aws"
-                region = "us-east-1"
+            region = "us-east-1"
+
+            [auth]
+            strategy = "aws"
             "#,
         );
         // If not running in an AWS context, this will fail with a
@@ -482,7 +491,12 @@ mod tests {
 
     #[test]
     fn region_is_required_for_aws() {
-        let err = parse_config_err(r#"provider = "aws""#);
+        let err = parse_config_err(
+            r#"
+        [auth]
+        strategy = "aws"
+        "#,
+        );
         assert_downcast_matches!(err, ParseError, ParseError::AWSRequiresRegion { .. });
     }
 }

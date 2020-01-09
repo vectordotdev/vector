@@ -359,10 +359,13 @@ mod tests {
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        user = "waldo"
         compression = "gzip"
-        password = "hunter2"
         encoding = "ndjson"
+
+        [auth]
+        strategy = "basic"
+        user = "waldo"
+        password = "hunter2"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
@@ -419,10 +422,13 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         method = "put"
-        user = "waldo"
         compression = "gzip"
-        password = "hunter2"
         encoding = "ndjson"
+
+        [auth]
+        strategy = "basic"
+        user = "waldo"
+        password = "hunter2"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
