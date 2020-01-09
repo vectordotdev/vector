@@ -182,6 +182,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Build tests
+          command: ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --all --no-default-features --features default-musl,docker --no-run
+      - run:
           name: Test
           no_output_timeout: 30m
           environment:
@@ -189,7 +192,6 @@ jobs:
             AWS_ACCESS_KEY_ID: fake-aws-key
             AWS_SECRET_ACCESS_KEY: fake-aws-key
           command: |
-            ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl cargo test --all --no-default-features --features default-musl,docker --no-run
             docker-compose up -d
             find ./target -maxdepth 2 -type f -executable -name '*-*' | sh -e
       - store_test_results:
