@@ -184,9 +184,13 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
-        batch_size = 8388608
-        request_in_flight_limit = 12
-        request_rate_limit_num = 24
+
+        [batch]
+        size = 8388608
+
+        [request]
+        in_flight_limit = 12
+        rate_limit_num = 24
     "#;
         let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
 
