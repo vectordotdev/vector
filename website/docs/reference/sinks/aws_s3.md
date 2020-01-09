@@ -77,7 +77,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding = "ndjson" # example, enum
 
   # OPTIONAL - General
-  endpoint = "https://my-bucket.us-east-1.amazonaws.com" # example, no default
+  endpoint = "https://s3.us-east-1.amazonaws.com" # example, no default
   healthcheck = true # default
   region = "us-east-1" # example, no default
 
@@ -358,7 +358,7 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["https://my-bucket.us-east-1.amazonaws.com"]}
+  examples={["https://s3.us-east-1.amazonaws.com"]}
   name={"endpoint"}
   nullable={true}
   path={null}

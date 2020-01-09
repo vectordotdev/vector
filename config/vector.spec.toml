@@ -2014,7 +2014,7 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "https://my-bucket.us-east-1.amazonaws.com"
+  endpoint = "https://s3.us-east-1.amazonaws.com"
 
   # Enables/disables the sink healthcheck upon start.
   #
