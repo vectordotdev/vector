@@ -49,10 +49,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
-  region = "us-east-1" # example
 
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
+
+  # OPTIONAL - General
+  region = "us-east-1" # example, no default
 
   # OPTIONAL - Object Names
   key_prefix = "date=%F/" # default
@@ -70,13 +72,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
-  region = "us-east-1" # example
 
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
 
   # OPTIONAL - General
+  endpoint = "https://s3.us-east-1.amazonaws.com" # example, no default
   healthcheck = true # default
+  region = "us-east-1" # example, no default
 
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -353,6 +356,29 @@ The encoding format used to serialize the events before outputting.
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["https://s3.us-east-1.amazonaws.com"]}
+  name={"endpoint"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either "endpoint" or "region" must be specified.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -472,10 +498,10 @@ A prefix to apply to all object key names. This should be used to partition your
   enumValues={null}
   examples={["us-east-1"]}
   name={"region"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -483,7 +509,7 @@ A prefix to apply to all object key names. This should be used to partition your
 
 ### region
 
-The [AWS region][urls.aws_s3_regions] of the target S3 bucket.
+The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either "region" or "endpoint" must be specified.
 
 
 </Field>
@@ -788,6 +814,7 @@ You can read more about the complete syntax in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.guarantees]: /docs/about/guarantees/
 [urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.aws_s3_endpoints]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_endpoint
 [urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

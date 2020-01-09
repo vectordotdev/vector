@@ -2008,11 +2008,13 @@ end
   compression = "gzip"
   compression = "none"
 
-  # The AWS region of the target S3 bucket.
+  # The endpoint of the target S3 bucket. Either "endpoint" or "region" must be
+  # specified.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
-  region = "us-east-1"
+  endpoint = "https://s3.us-east-1.amazonaws.com"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2021,6 +2023,14 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # The AWS region of the target S3 bucket. Either "region" or "endpoint" must be
+  # specified.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "us-east-1"
 
   #
   # requests
