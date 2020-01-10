@@ -744,6 +744,10 @@ impl ContainerLogInfo {
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
+        } else {
+            // If message doesn't contain a newline at the end, consider it a partial message.
+            // TODO: make the key configurable per docker source instance.
+            log_event.insert_implicit(event::PARTIAL.clone(), true);
         }
 
         // Supply message
