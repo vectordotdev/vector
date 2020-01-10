@@ -10,10 +10,11 @@ pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, merge_fie
         };
         match current.get_mut(merge_field) {
             None => {
-                // TODO: here we do tricks just properly propagate the
+                // TODO: here we do tricks to properly propagate the
                 // explcitness status of the value. This should be simplified to
-                // just insrtion of the value once when we get rid of the
-                // `explicit` bool in the `Value`.
+                // just a plain `insert` of the value once when we get rid of
+                // the `explicit` bool in the `Value` and the legacy
+                // explicitness notion.
                 if is_explicit {
                     current.insert_explicit(merge_field, incoming_val)
                 } else {
