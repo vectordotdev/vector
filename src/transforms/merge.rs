@@ -74,11 +74,16 @@ impl From<MergeConfig> for Merge {
 
 impl Transform for Merge {
     fn transform(&mut self, event: Event) -> Option<Event> {
+        // TODO: `lua` transform doesn't support assigning non-string values.
+        // Normally we'd check for the field value to be `true`, and only then
+        // consider event partial, but, to simplify the integration, for now we
+        // only check for the field presence. We can switch this to check the
+        // value to be `true` when the `lua` supports setting boolean fields
+        // easily, as we expect users to rely on `lua` transform to implement
+        // custom partial markers.
+
         // Determine whether the current event is partial.
-        let is_partial = match event.as_log().get(&self.partial_event_indicator_field) {
-            Some(ValueKind::Boolean(ref val)) => *val,
-            _ => false,
-        };
+        let is_partial = event.as_log().contains(&self.partial_event_indicator_field);
 
         // If current event is partial, stash it.
         if is_partial {
