@@ -80,5 +80,12 @@ description = "A prefix to apply to all object key names. This should be used to
 type = "string"
 common = true
 examples = ["us-east-1"]
-null = false
-description = "The [AWS region][urls.aws_s3_regions] of the target S3 bucket."
+null = true
+description = "The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either \"region\" or \"endpoint\" must be specified."
+
+[sinks.aws_s3.options.endpoint]
+type = "string"
+common = false
+examples = ["https://s3.us-east-1.amazonaws.com"]
+null = true
+description = "The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either \"endpoint\" or \"region\" must be specified."

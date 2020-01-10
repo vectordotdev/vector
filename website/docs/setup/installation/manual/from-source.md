@@ -291,6 +291,62 @@ Building steps:
   this image, and then builds inside the Container. The target binary is located in
   `target/<target triple>/release/vector` like in the previous case.
 
+## Compiling on Windows
+
+The steps to compile Vector on Windows are different from the ones for other operating systems.
+
+1. Install Rust using [`rustup`][urls.rustup]. It would install toolchain for `nightly-x86_64-pc-windows-msvc` target on 64-bit machines by default. If you don't have VC++ build tools, the installer would prompt you to install them.
+
+2. Install [Perl for Windows][urls.perl_windows].
+
+3. In a Rust/MSVC environment (for example, using `x64 Native Tools Command Prompt`) add the binary directory of Perl installed on the previous step to `PATH`. For example, for default installation of  Strawberry Perl it is
+
+    ```
+    set PATH=%PATH%;C:\Strawberry\perl\bin
+    ```
+
+4. Get Vector's source using `git`:
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Master', value: 'master'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```
+    git clone https://github.com/timberio/vector
+    git checkout v0.6.0
+    cd vector
+    ```
+
+    </TabItem>
+    <TabItem value="master">
+
+    ```
+    git clone https://github.com/timberio/vector
+    cd vector
+    ```
+
+    </TabItem>
+    </Tabs>
+
+5. Build Vector in release mode:
+
+    ```
+    set RUSTFLAGS=-Ctarget-feature=+crt-static
+    cargo +nightly-x86_64-pc-windows-msvc build --no-default-features --features default-msvc --release
+    ```
+
+6. After these steps a binary `vector.exe` in `target\release` would be created. It can be started by running
+
+    ```
+    .\target\release\vector --config config\vector.toml
+    ```
+
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.containers]: /docs/setup/installation/containers/
@@ -305,4 +361,6 @@ Building steps:
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.openssl]: https://www.openssl.org/
+[urls.perl_windows]: https://www.perl.org/get.html#win32
+[urls.rustup]: https://rustup.rs
 [urls.zlib]: https://www.zlib.net
