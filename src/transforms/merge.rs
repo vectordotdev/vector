@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct MergeConfig {
     /// The field that indicates that the event is partial. A consequent stream
     /// of partial events along with the first non-partial event will be merged
