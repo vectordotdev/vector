@@ -113,18 +113,18 @@ impl Transform for Merge {
 
         // Merge all partial events into the merge event.
         for partial_event in drain {
-            merge(&mut merged_event, partial_event, merge_fields);
+            merge_event(&mut merged_event, partial_event, merge_fields);
         }
 
         // Merge the current event last.
-        merge(&mut merged_event, event, merge_fields);
+        merge_event(&mut merged_event, event, merge_fields);
 
         // Return the merged event.
         Some(merged_event)
     }
 }
 
-fn merge(into: &mut Event, from: Event, merge_fields: &[Atom]) {
+fn merge_event(into: &mut Event, from: Event, merge_fields: &[Atom]) {
     let mut incoming_log = from.into_log();
     for merge_field in merge_fields {
         let incoming_val = match incoming_log.remove(merge_field) {
