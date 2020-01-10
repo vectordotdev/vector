@@ -449,7 +449,7 @@ function Home() {
               {newPost.title}
             </Link>
           )}
-          <h1>Take Back Control Of Your Observability Data</h1>
+          <h1>Take Control Of Your Observability Data</h1>
           <p className="hero__subtitle">
             Vector is an <a href={repoUrl()}>open-source</a> utility for building observability pipelines. <a href="/components/">Collect, transform, and route</a> logs, metrics, and events with one tool.
           </p>
