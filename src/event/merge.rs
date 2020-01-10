@@ -26,6 +26,9 @@ pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, merge_fie
     }
 }
 
+/// Merges `incoming` value into `current` value.
+///
+/// Will concatenate `Bytes` and overwrite the rest value kinds.
 pub fn merge_value(current: &mut ValueKind, incoming: ValueKind) {
     match incoming {
         ValueKind::Bytes(incoming_bytes) => match current {
