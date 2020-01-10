@@ -1,4 +1,12 @@
-use crate::{event::Event, sinks, sources, transforms};
+use crate::{
+    buffers::Acker,
+    conditions,
+    dns::Resolver,
+    event::{Event, Metric},
+    runtime::TaskExecutor,
+    sinks, sources, transforms,
+};
+use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -6,30 +14,35 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
+pub mod component;
 mod validation;
 mod vars;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(flatten)]
+    pub global: GlobalOptions,
     #[serde(default)]
-    pub data_dir: Option<PathBuf>,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    #[serde(default)]
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
+    #[serde(default)]
+    pub tests: Vec<TestDefinition>,
 }
 
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct GlobalOptions {
+    #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub dns_servers: Vec<String>,
 }
 
-impl Default for GlobalOptions {
-    fn default() -> GlobalOptions {
-        GlobalOptions {
-            data_dir: Some(PathBuf::from("/var/lib/vector/")),
-        }
-    }
+pub fn default_data_dir() -> Option<PathBuf> {
+    Some(PathBuf::from("/var/lib/vector/"))
 }
 
 #[derive(Debug, Snafu)]
@@ -54,12 +67,6 @@ pub enum DataDirError {
 }
 
 impl GlobalOptions {
-    pub fn from(config: &Config) -> Self {
-        Self {
-            data_dir: config.data_dir.clone(),
-        }
-    }
-
     /// Resolve the `data_dir` option in either the global or local
     /// config, and validate that it exists and is writable.
     pub fn resolve_and_validate_data_dir(
@@ -69,7 +76,7 @@ impl GlobalOptions {
         let data_dir = local_data_dir
             .or(self.data_dir.as_ref())
             .ok_or_else(|| DataDirError::MissingDataDir)
-            .map_err(|err| Box::new(err))?
+            .map_err(Box::new)?
             .to_path_buf();
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
@@ -121,7 +128,13 @@ pub trait SourceConfig: core::fmt::Debug {
     ) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
+
+    fn source_type(&self) -> &'static str;
 }
+
+pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
+
+inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
@@ -136,13 +149,40 @@ pub struct SinkOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug {
-    fn build(
-        &self,
-        acker: crate::buffers::Acker,
-    ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
+    fn build(&self, cx: SinkContext) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
+
+    fn sink_type(&self) -> &'static str;
 }
+
+#[derive(Debug, Clone)]
+pub struct SinkContext {
+    pub(super) acker: Acker,
+    pub(super) resolver: Resolver,
+}
+
+impl SinkContext {
+    #[cfg(test)]
+    pub fn new_test(exec: TaskExecutor) -> Self {
+        Self {
+            acker: Acker::Null,
+            resolver: Resolver::new(Vec::new(), exec).unwrap(),
+        }
+    }
+
+    pub fn acker(&self) -> Acker {
+        self.acker.clone()
+    }
+
+    pub fn resolver(&self) -> Resolver {
+        self.resolver.clone()
+    }
+}
+
+pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
+
+inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
@@ -153,21 +193,77 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 
     fn output_type(&self) -> DataType;
+
+    fn transform_type(&self) -> &'static str;
+}
+
+pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
+
+inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestDefinition {
+    pub name: String,
+    pub input: TestInput,
+    pub outputs: Vec<TestOutput>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(untagged)]
+pub enum TestInputValue {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestInput {
+    pub insert_at: String,
+    #[serde(default = "default_test_input_type", rename = "type")]
+    pub type_str: String,
+    pub value: Option<String>,
+    pub log_fields: Option<IndexMap<String, TestInputValue>>,
+    pub metric: Option<Metric>,
+}
+
+fn default_test_input_type() -> String {
+    "raw".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestOutput {
+    pub extract_from: String,
+    pub conditions: Vec<TestCondition>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TestCondition {
+    String(String),
+    Embedded(Box<dyn conditions::ConditionConfig>),
 }
 
 // Helper methods for programming construction during tests
 impl Config {
     pub fn empty() -> Self {
         Self {
-            data_dir: None,
+            global: GlobalOptions {
+                data_dir: None,
+                dns_servers: Vec::new(),
+            },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
+            tests: Vec::new(),
         }
     }
 
@@ -216,18 +312,7 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars)
-            .map_err(|e| vec![e.to_string()])
-            .and_then(|config: Config| {
-                if config.sources.is_empty() {
-                    return Err(vec!["No sources defined in the config.".to_owned()]);
-                }
-                if config.sinks.is_empty() {
-                    return Err(vec!["No sinks defined in the config.".to_owned()]);
-                }
-
-                Ok(config)
-            })
+        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn contains_cycle(&self) -> bool {
@@ -253,4 +338,32 @@ impl Clone for Config {
 
 fn healthcheck_default() -> bool {
     true
+}
+
+#[cfg(test)]
+mod test {
+    use super::Config;
+    use std::path::PathBuf;
+
+    #[test]
+    fn default_data_dir() {
+        let config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            Some(PathBuf::from("/var/lib/vector")),
+            config.global.data_dir
+        )
+    }
 }

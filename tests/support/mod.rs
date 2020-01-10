@@ -7,12 +7,12 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
-use vector::buffers::Acker;
-use vector::event::{Event, Metric, ValueKind, MESSAGE};
+use vector::event::{metric::MetricValue, Event, ValueKind, MESSAGE};
+use vector::runtime::TaskExecutor;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
-    DataType, GlobalOptions, SinkConfig, SourceConfig, TransformConfig,
+    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
 };
 use vector::transforms::Transform;
 
@@ -29,7 +29,7 @@ pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
 }
 
 pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures::sync::mpsc::channel(0);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
@@ -76,6 +76,10 @@ impl SourceConfig for MockSourceConfig {
     fn output_type(&self) -> DataType {
         DataType::Any
     }
+
+    fn source_type(&self) -> &'static str {
+        "mock"
+    }
 }
 
 pub struct MockTransform {
@@ -91,40 +95,40 @@ impl Transform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
             }
-            Event::Metric(Metric::Counter {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
-                *val += self.increase;
-            }
-            Event::Metric(Metric::Histogram {
-                name: _,
-                val,
-                sample_rate: _,
-                timestamp: _,
-                tags: _,
-            }) => {
-                *val += self.increase;
-            }
-            Event::Metric(Metric::Gauge {
-                name: _,
-                val,
-                direction: _,
-                timestamp: _,
-                tags: _,
-            }) => {
-                *val += self.increase;
-            }
-            Event::Metric(Metric::Set {
-                name: _,
-                val,
-                timestamp: _,
-                tags: _,
-            }) => {
-                val.push_str(&self.suffix);
-            }
+            Event::Metric(metric) => match metric.value {
+                MetricValue::Counter { ref mut value } => {
+                    *value += self.increase;
+                }
+                MetricValue::Distribution {
+                    ref mut values,
+                    ref mut sample_rates,
+                } => {
+                    values.push(self.increase);
+                    sample_rates.push(1);
+                }
+                MetricValue::AggregatedHistogram {
+                    ref mut count,
+                    ref mut sum,
+                    ..
+                } => {
+                    *count += 1;
+                    *sum += self.increase;
+                }
+                MetricValue::AggregatedSummary {
+                    ref mut count,
+                    ref mut sum,
+                    ..
+                } => {
+                    *count += 1;
+                    *sum += self.increase;
+                }
+                MetricValue::Gauge { ref mut value, .. } => {
+                    *value += self.increase;
+                }
+                MetricValue::Set { ref mut values, .. } => {
+                    values.insert(self.suffix.clone());
+                }
+            },
         };
         Some(event)
     }
@@ -144,7 +148,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
+    fn build(&self, _exec: TaskExecutor) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -157,6 +161,10 @@ impl TransformConfig for MockTransformConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Any
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "mock"
     }
 }
 
@@ -172,7 +180,7 @@ impl MockSinkConfig {
     pub fn new(sender: Sender<Event>, healthy: bool) -> Self {
         Self {
             sender: Some(sender),
-            healthy: healthy,
+            healthy,
         }
     }
 }
@@ -185,12 +193,12 @@ enum HealthcheckError {
 
 #[typetag::serde(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), vector::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
         let sink = self
             .sender
             .clone()
             .unwrap()
-            .stream_ack(acker)
+            .stream_ack(cx.acker())
             .sink_map_err(|e| error!("Error sending in sink {}", e));
         let healthcheck = match self.healthy {
             true => future::ok(()),
@@ -201,5 +209,9 @@ impl SinkConfig for MockSinkConfig {
 
     fn input_type(&self) -> DataType {
         DataType::Any
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "mock"
     }
 }

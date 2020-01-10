@@ -10,7 +10,7 @@ use vector::test_util::{
 };
 use vector::topology::config::TransformConfig;
 use vector::topology::{self, config};
-use vector::{sinks, sources, transforms};
+use vector::{runtime, sinks, sources, transforms};
 
 mod batch;
 mod buffering;
@@ -54,14 +54,19 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -81,9 +86,9 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 
@@ -100,14 +105,19 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -127,9 +137,9 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 
@@ -146,14 +156,19 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -173,9 +188,9 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 
@@ -193,14 +208,19 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -228,10 +248,10 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
         .throughput(Throughput::Bytes(
-            (num_lines * line_size * num_writers) as u32,
+            (num_lines * line_size * num_writers) as u64,
         )),
     );
 }
@@ -251,20 +271,30 @@ fn benchmark_interconnected(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
-                    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
+                    config.add_source(
+                        "in1",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr1),
+                    );
+                    config.add_source(
+                        "in2",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr2),
+                    );
                     config.add_sink(
                         "out1",
                         &["in1", "in2"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr1.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr1.to_string(),
+                        ),
                     );
                     config.add_sink(
                         "out2",
                         &["in1", "in2"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr2.to_string(),
+                        ),
                     );
 
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines1 = count_receive(&out_addr1);
                     let output_lines2 = count_receive(&out_addr2);
@@ -289,9 +319,9 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size * 2) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size * 2) as u64)),
     );
 }
 
@@ -308,7 +338,10 @@ fn benchmark_transforms(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                    config.add_source(
+                        "in",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    );
                     config.add_transform(
                         "parser",
                         &["in"],
@@ -329,9 +362,11 @@ fn benchmark_transforms(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["filter"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr.to_string(),
+                        ),
                     );
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
@@ -356,10 +391,10 @@ fn benchmark_transforms(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
         .throughput(Throughput::Bytes(
-            (num_lines * (line_size + "status=404".len())) as u32,
+            (num_lines * (line_size + "status=404".len())) as u64,
         )),
     );
 }
@@ -372,13 +407,14 @@ fn benchmark_regex(c: &mut Criterion) {
         Benchmark::new("regex", move |b| {
             b.iter_with_setup(
                 || {
+                    let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     let parser =transforms::regex_parser::RegexParserConfig {
                         // Many captures to stress the regex parser
                         regex: r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into(),
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build().unwrap();
+                    }.build(rt.executor()).unwrap();
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)
@@ -417,8 +453,14 @@ fn benchmark_complex(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
-                    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
+                    config.add_source(
+                        "in1",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr1),
+                    );
+                    config.add_source(
+                        "in2",
+                        sources::socket::SocketConfig::make_tcp_config(in_addr2),
+                    );
                     config.add_transform(
                         "parser",
                         &["in1", "in2"],
@@ -463,29 +505,39 @@ fn benchmark_complex(c: &mut Criterion) {
                     config.add_sink(
                         "out_all",
                         &["parser"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr_all.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr_all.to_string(),
+                        ),
                     );
                     config.add_sink(
                         "out_sampled",
                         &["sampler"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr_sampled.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr_sampled.to_string(),
+                        ),
                     );
                     config.add_sink(
                         "out_200",
                         &["filter_200"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr_200.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr_200.to_string(),
+                        ),
                     );
                     config.add_sink(
                         "out_404",
                         &["filter_404"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr_404.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr_404.to_string(),
+                        ),
                     );
                     config.add_sink(
                         "out_500",
                         &["filter_500"],
-                        sinks::tcp::TcpSinkConfig::new(out_addr_500.to_string()),
+                        sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                            out_addr_500.to_string(),
+                        ),
                     );
-                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let mut rt = runtime::Runtime::new().unwrap();
 
                     let output_lines_all = count_receive(&out_addr_all);
                     let output_lines_sampled = count_receive(&out_addr_sampled);
@@ -546,7 +598,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     assert_eq!(output_lines_all, num_lines * 2);
                     assert_relative_eq!(
                         output_lines_sampled as f32 / num_lines as f32,
-                        0.2,
+                        0.1,
                         epsilon = 0.01
                     );
                     assert!(output_lines_200 > 0);
@@ -555,7 +607,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(2),
+        .sample_size(10),
     );
 }
 
@@ -571,7 +623,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
+                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now());
 
                     (Template::from("index-%Y.%m.%d"), event)
                 },
@@ -588,7 +640,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
+                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now());
 
                     (Template::from("index"), event)
                 },

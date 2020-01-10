@@ -1,12 +1,14 @@
-use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
+use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
+use metric::{MetricKind, MetricValue};
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
+pub mod flatten;
 pub mod metric;
 mod unflatten;
 
@@ -20,8 +22,6 @@ lazy_static! {
     pub static ref MESSAGE: Atom = Atom::from("message");
     pub static ref HOST: Atom = Atom::from("host");
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
-    pub static ref STREAM: Atom = Atom::from("stream");
-    pub static ref CONTAINER: Atom = Atom::from("container");
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -90,29 +90,41 @@ impl LogEvent {
         self.fields.get(key).map(|v| &v.value)
     }
 
+    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut ValueKind> {
+        self.fields.get_mut(key).map(|v| &mut v.value)
+    }
+
+    pub fn contains(&self, key: &Atom) -> bool {
+        self.fields.contains_key(key)
+    }
+
     pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
         self.fields.remove(key).map(|v| v.value)
     }
 
-    pub fn is_structured(&self) -> bool {
-        self.fields.iter().any(|(_, v)| v.explicit)
-    }
-
-    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
+    pub fn insert_explicit<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<ValueKind>,
+    {
         self.fields.insert(
-            key,
+            key.into(),
             Value {
-                value,
+                value: value.into(),
                 explicit: true,
             },
         );
     }
 
-    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
+    pub fn insert_implicit<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<ValueKind>,
+    {
         self.fields.insert(
-            key,
+            key.into(),
             Value {
-                value,
+                value: value.into(),
                 explicit: false,
             },
         );
@@ -126,7 +138,7 @@ impl LogEvent {
         self.fields.keys()
     }
 
-    pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
+    pub fn all_fields(&self) -> FieldsIter {
         FieldsIter {
             inner: self.fields.iter(),
             explicit_only: false,
@@ -137,7 +149,7 @@ impl LogEvent {
         unflatten::Unflatten::from(self.fields)
     }
 
-    pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
+    pub fn explicit_fields(&self) -> FieldsIter {
         FieldsIter {
             inner: self.fields.iter(),
             explicit_only: true,
@@ -249,7 +261,7 @@ impl From<DateTime<Utc>> for ValueKind {
 
 impl From<f32> for ValueKind {
     fn from(value: f32) -> Self {
-        ValueKind::Float(value as f64)
+        ValueKind::Float(f64::from(value))
     }
 }
 
@@ -355,89 +367,56 @@ impl From<proto::EventWrapper> for Event {
                 Event::Log(LogEvent { fields })
             }
             EventProto::Metric(proto) => {
-                let metric = proto.metric.unwrap();
-                match metric {
-                    MetricProto::Counter(counter) => {
-                        let timestamp = counter
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+                let kind = match proto.kind() {
+                    proto::metric::Kind::Incremental => MetricKind::Incremental,
+                    proto::metric::Kind::Absolute => MetricKind::Absolute,
+                };
 
-                        let tags = if !counter.tags.is_empty() {
-                            Some(counter.tags)
-                        } else {
-                            None
-                        };
+                let name = proto.name;
 
-                        Event::Metric(Metric::Counter {
-                            name: counter.name,
-                            val: counter.val,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                    MetricProto::Histogram(hist) => {
-                        let timestamp = hist
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+                let timestamp = proto
+                    .timestamp
+                    .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                        let tags = if !hist.tags.is_empty() {
-                            Some(hist.tags)
-                        } else {
-                            None
-                        };
+                let tags = if !proto.tags.is_empty() {
+                    Some(proto.tags)
+                } else {
+                    None
+                };
 
-                        Event::Metric(Metric::Histogram {
-                            name: hist.name,
-                            val: hist.val,
-                            sample_rate: hist.sample_rate,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                    MetricProto::Gauge(gauge) => {
-                        let direction = match gauge.direction() {
-                            proto::gauge::Direction::None => None,
-                            proto::gauge::Direction::Plus => Some(metric::Direction::Plus),
-                            proto::gauge::Direction::Minus => Some(metric::Direction::Minus),
-                        };
+                let value = match proto.value.unwrap() {
+                    MetricProto::Counter(counter) => MetricValue::Counter {
+                        value: counter.value,
+                    },
+                    MetricProto::Gauge(gauge) => MetricValue::Gauge { value: gauge.value },
+                    MetricProto::Set(set) => MetricValue::Set {
+                        values: set.values.into_iter().collect(),
+                    },
+                    MetricProto::Distribution(dist) => MetricValue::Distribution {
+                        values: dist.values,
+                        sample_rates: dist.sample_rates,
+                    },
+                    MetricProto::AggregatedHistogram(hist) => MetricValue::AggregatedHistogram {
+                        buckets: hist.buckets,
+                        counts: hist.counts,
+                        count: hist.count,
+                        sum: hist.sum,
+                    },
+                    MetricProto::AggregatedSummary(summary) => MetricValue::AggregatedSummary {
+                        quantiles: summary.quantiles,
+                        values: summary.values,
+                        count: summary.count,
+                        sum: summary.sum,
+                    },
+                };
 
-                        let tags = if !gauge.tags.is_empty() {
-                            Some(gauge.tags)
-                        } else {
-                            None
-                        };
-
-                        let timestamp = gauge
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
-
-                        Event::Metric(Metric::Gauge {
-                            name: gauge.name,
-                            val: gauge.val,
-                            direction,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                    MetricProto::Set(set) => {
-                        let timestamp = set
-                            .timestamp
-                            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
-
-                        let tags = if !set.tags.is_empty() {
-                            Some(set.tags)
-                        } else {
-                            None
-                        };
-
-                        Event::Metric(Metric::Set {
-                            name: set.name,
-                            val: set.val,
-                            timestamp,
-                            tags,
-                        })
-                    }
-                }
+                Event::Metric(Metric {
+                    name,
+                    timestamp,
+                    tags,
+                    kind,
+                    value,
+                })
             }
         }
     }
@@ -479,11 +458,12 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric::Counter {
+            Event::Metric(Metric {
                 name,
-                val,
                 timestamp,
                 tags,
+                kind,
+                value,
             }) => {
                 let timestamp = timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
@@ -492,98 +472,59 @@ impl From<Event> for proto::EventWrapper {
 
                 let tags = tags.unwrap_or_default();
 
-                let counter = proto::Counter {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Counter(counter)),
-                });
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(Metric::Histogram {
-                name,
-                val,
-                sample_rate,
-                timestamp,
-                tags,
-            }) => {
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
-                });
-
-                let tags = tags.unwrap_or_default();
-
-                let hist = proto::Histogram {
-                    name,
-                    val,
-                    sample_rate,
-                    timestamp,
-                    tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Histogram(hist)),
-                });
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(Metric::Gauge {
-                name,
-                val,
-                direction,
-                timestamp,
-                tags,
-            }) => {
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
-                });
-
-                let direction = match direction {
-                    None => proto::gauge::Direction::None,
-                    Some(metric::Direction::Plus) => proto::gauge::Direction::Plus,
-                    Some(metric::Direction::Minus) => proto::gauge::Direction::Minus,
+                let kind = match kind {
+                    MetricKind::Incremental => proto::metric::Kind::Incremental,
+                    MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let tags = tags.unwrap_or_default();
+                let metric = match value {
+                    MetricValue::Counter { value } => {
+                        MetricProto::Counter(proto::Counter { value })
+                    }
+                    MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
+                    MetricValue::Set { values } => MetricProto::Set(proto::Set {
+                        values: values.into_iter().collect(),
+                    }),
+                    MetricValue::Distribution {
+                        values,
+                        sample_rates,
+                    } => MetricProto::Distribution(proto::Distribution {
+                        values,
+                        sample_rates,
+                    }),
+                    MetricValue::AggregatedHistogram {
+                        buckets,
+                        counts,
+                        count,
+                        sum,
+                    } => MetricProto::AggregatedHistogram(proto::AggregatedHistogram {
+                        buckets,
+                        counts,
+                        count,
+                        sum,
+                    }),
+                    MetricValue::AggregatedSummary {
+                        quantiles,
+                        values,
+                        count,
+                        sum,
+                    } => MetricProto::AggregatedSummary(proto::AggregatedSummary {
+                        quantiles,
+                        values,
+                        count,
+                        sum,
+                    }),
+                };
 
-                let gauge = proto::Gauge {
+                let event = EventProto::Metric(proto::Metric {
                     name,
-                    val,
-                    direction,
                     timestamp,
                     tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Gauge(gauge)),
-                });
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(Metric::Set {
-                name,
-                val,
-                timestamp,
-                tags,
-            }) => {
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
+                    kind,
+                    value: Some(metric),
                 });
 
-                let tags = tags.unwrap_or_default();
-
-                let set = proto::Set {
-                    name,
-                    val,
-                    timestamp,
-                    tags,
-                };
-                let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Set(set)),
-                });
                 proto::EventWrapper { event: Some(event) }
             }
         }
@@ -608,12 +549,10 @@ impl From<Bytes> for Event {
             fields: HashMap::new(),
         });
 
+        event.as_mut_log().insert_implicit(MESSAGE.clone(), message);
         event
             .as_mut_log()
-            .insert_implicit(MESSAGE.clone(), message.into());
-        event
-            .as_mut_log()
-            .insert_implicit(TIMESTAMP.clone(), Utc::now().into());
+            .insert_implicit(TIMESTAMP.clone(), Utc::now());
 
         event
     }
@@ -686,12 +625,8 @@ mod test {
     #[test]
     fn serialization() {
         let mut event = Event::from("raw log line");
-        event
-            .as_mut_log()
-            .insert_explicit("foo".into(), "bar".into());
-        event
-            .as_mut_log()
-            .insert_explicit("bar".into(), "baz".into());
+        event.as_mut_log().insert_explicit("foo", "bar");
+        event.as_mut_log().insert_explicit("bar", "baz");
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
@@ -720,16 +655,12 @@ mod test {
         use serde_json::json;
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert_explicit("int".into(), 4.into());
+        event.as_mut_log().insert_explicit("int", 4);
+        event.as_mut_log().insert_explicit("float", 5.5);
+        event.as_mut_log().insert_explicit("bool", true);
         event
             .as_mut_log()
-            .insert_explicit("float".into(), 5.5.into());
-        event
-            .as_mut_log()
-            .insert_explicit("bool".into(), true.into());
-        event
-            .as_mut_log()
-            .insert_explicit("string".into(), "thisisastring".into());
+            .insert_explicit("string", "thisisastring");
 
         let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(map["float"], json!(5.5));
@@ -744,11 +675,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
-        event.as_mut_log().insert_implicit(
-            "Pitbull".into(),
-            "The bigger they are, the harder they fall".into(),
-        );
+            .insert_explicit("Ke$ha", "It's going down, I'm yelling timber");
+        event
+            .as_mut_log()
+            .insert_implicit("Pitbull", "The bigger they are, the harder they fall");
 
         let all = event
             .as_log()

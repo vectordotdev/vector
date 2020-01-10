@@ -1,0 +1,36 @@
+/**
+ * Copyright (c) 2017-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.docTitle {
+  font-size: 3rem;
+  margin-bottom: 3rem;
+}
+
+@media only screen and (max-width: 996px) {
+  .docTitle {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+  }
+}
+
+.docItemContainer {
+  margin: 0 auto;
+  max-width: 45em;
+}
+
+.paginator {
+  border-top: 1px solid var(--ifm-hr-border-color);
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 2 ) 0 calc( var(--ifm-spacing-horizontal) * 2 );
+  padding-top: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+@media (max-width: 996px) {
+  .paginator {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

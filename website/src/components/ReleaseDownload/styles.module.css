@@ -1,0 +1,200 @@
+@keyframes downloadHeroInitial {
+  0% {
+    background-size: 100% 100%;
+  }
+  100% {
+    background-size: 750% 750%;
+  }
+}
+
+@keyframes downloadHeroPulsating {
+  0% {
+    background-size: 750% 750%;
+  }
+  50% {
+    background-size: 500% 500%;
+  }
+  100% {
+    background-size: 750% 750%;
+  }
+}
+
+.downloadHeroBanner {
+  animation: downloadHeroInitial 700ms cubic-bezier(0.000, 1.650, 0.000, 1.650), downloadHeroPulsating 2.5s linear infinite;
+  animation-delay: 1.5s, 2.2s;
+  animation-fill-mode: forwards;
+  background-image: radial-gradient(ellipse at center calc( 50% + 25px ), rgba(var(--ifm-color-primary-rgb), 0.2), transparent 5%);
+  background-position: center center;
+  border-bottom: 0px none;
+  margin-top: 0;
+  margin-bottom: 0;
+  min-height: auto;
+  padding-top: 0;
+  padding-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+@keyframes downloadHeroBox {
+  0% {
+    fill: black;
+  }
+  100% {
+    fill: #10E7FF;
+  }
+}
+
+.downloadHeroBanner svg {
+  width: 100%;
+}
+
+.downloadHeroBanner svg [fill="#10E7FF"] {
+  animation: downloadHeroBox 1ms linear;
+  animation-delay: 1.5s;
+  animation-fill-mode: forwards;
+  fill: rgba(0, 0, 0, 1);
+}
+
+.downloadLine {
+  height: 150px;
+  margin-bottom: -19px;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes lineDown {
+  0% {
+    height: 0%;
+  }
+  100% {
+    height: 100%;
+  }
+}
+
+.downloadLine div {
+  animation: lineDown 1.5s cubic-bezier(0.680, 0, 1.000, 0.025);
+  animation-fill-mode: forwards;
+  background: linear-gradient(to bottom, var(--ifm-color-primary), rgba( var(--ifm-color-primary-rgb), 0.8 ));
+  box-shadow: 0 0 30px 10px rgba( var(--ifm-color-primary-rgb), 0.4 );
+  height: 0%;
+  width: 10px;
+  margin: 0 auto;
+}
+
+.releaseSelect {
+  font-size: 0.8em;
+  margin: calc(var(--ifm-spacing-vertical) * 2) auto var(--ifm-spacing-vertical) auto;
+  width: 500px;
+}
+
+.downloadTableContainer {
+  max-width: 650px;
+}
+
+.downloadTable {
+  display: table;
+}
+
+.downloadTable > div {
+  display: table-row;
+}
+
+.downloadTable > div > div {
+  display: table-cell;
+  padding: calc( var(--ifm-spacing-vertical) / 2 );
+  vertical-align: top;
+}
+
+.downloadTable > div > div:first-child {
+  text-align: right;
+  width: 30%;
+}
+
+@media (max-width: 996px) {
+  .downloadTable,
+  .downloadTable > div,
+  .downloadTable > div > div {
+    display: block;
+  }
+
+  .downloadTable > div {
+    padding-bottom: var(--ifm-spacing-vertical);
+  }
+
+  .downloadTable > div > div {
+    padding: 0;
+  }
+
+  .downloadTable > div > div:first-child {
+    font-size: 0.9em;
+    font-weight: bold;
+    padding: 0;
+    text-align: left;
+    text-transform: uppercase;
+    width: auto;
+  }
+}
+
+.downloadFiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.downloadFiles > li {
+  display: block;
+  margin-bottom: calc( var(--ifm-spacing-vertical) / 4 );
+}
+
+.downloadFiles > li:hover {
+  background: var(--ifm-panel-background);
+}
+
+.downloadFiles > li:last-child {
+  padding-left: calc( 150px + var(--ifm-spacing-horizontal) );
+}
+
+.downloadFiles > li > span {
+  display: inline-block;
+  margin-right: var(--ifm-spacing-horizontal);
+  width: 150px;
+}
+
+.downloadFiles > li > span > code {
+  float: right;
+  margin-left: 5px;
+}
+
+.downloadFiles > li > ul {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+}
+
+.downloadFiles > li > ul > li {
+  display: inline-block;
+  margin-right: calc( var(--ifm-spacing-horizontal) / 2 );
+}
+
+@media (max-width: 996px) {
+  .downloadFiles > li {
+    margin-bottom: var(--ifm-spacing-vertical);
+  }
+
+  .downloadFiles > li:last-child {
+    padding-left: 0;
+  }
+
+  .downloadFiles > li > span {
+    display: block;
+    margin: 0;
+    width: auto;
+  }
+
+  .downloadFiles > li > span > code {
+    float: none;
+  }
+}
+
+.downloadGetStartedContainer {
+  max-width: 600px;
+  text-align: center;
+}

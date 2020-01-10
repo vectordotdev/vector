@@ -13,14 +13,21 @@
 #   $RUST_LTO - possible values are "lto", "lto=thin", ""
 #   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
+#   $ARCHIVE_TYPE - archive type, either "tar.gz" or "zip"
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
 STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
+ARCHIVE_TYPE=${ARCHIVE_TYPE:-tar.gz}
 
 if [ -z "$FEATURES" ]; then
     FEATURES="default"
+fi
+
+CHANNEL="$(scripts/util/release-channel.sh)"
+if [ "$CHANNEL" == "nightly" ]; then
+  FEATURES="$FEATURES nightly"
 fi
 
 set -eu
@@ -49,7 +56,7 @@ if [ -z "$NATIVE_BUILD" ]; then
   build_flags="$build_flags --target $TARGET"
 fi
 
-
+on_exit=""
 
 # Currently the only way to set Rust codegen LTO type (-C lto, as opposed to
 # -C compiler-plugin-lto) at build time for a crate with library dependencies
@@ -57,8 +64,9 @@ fi
 # https://github.com/rust-lang/cargo/issues/4349 and
 # https://bugzilla.mozilla.org/show_bug.cgi?id=1386371#c2.
 if [ -n "$RUST_LTO" ]; then
+  on_exit="mv Cargo.toml.orig Cargo.toml; $on_exit"
+  trap "$on_exit" EXIT
   cp Cargo.toml Cargo.toml.orig
-  trap "mv Cargo.toml.orig Cargo.toml" EXIT
   case "$RUST_LTO" in
     lto) lto_value="true";;
     lto=thin) lto_value="\"thin\"";;
@@ -68,7 +76,8 @@ fi
 
 # Rename the rust-toolchain file so that we can use our custom version of rustc installed
 # on release containers.
-trap "mv rust-toolchain.bak rust-toolchain" EXIT
+on_exit="mv rust-toolchain.bak rust-toolchain; $on_exit"
+trap "$on_exit" EXIT
 mv rust-toolchain rust-toolchain.bak
 
 if [ "$FEATURES" != "default" ]; then
@@ -88,8 +97,15 @@ rm -rf $archive_dir
 mkdir -p $archive_dir
 
 # Copy root level files
-cp -av README.md $archive_dir
-cp -av LICENSE $archive_dir
+
+if [[ $TARGET == *windows* ]]; then
+  suffix=".txt"
+else
+  suffix=""
+fi
+cp -av README.md $archive_dir/README.md$suffix
+# Create the license file for binary distributions (LICENSE + NOTICE)
+cat LICENSE NOTICE > $archive_dir/LICENSE$suffix
 
 # Copy the vector binary to /bin
 mkdir -p $archive_dir/bin
@@ -97,23 +113,34 @@ cp -av $target_dir/release/vector $archive_dir/bin
 
 # Copy the entire config dir to /config
 cp -rv config $archive_dir/config
+# Remove templates sources
+rm $archive_dir/config/*.erb
 
-# Copy /etc usefule files
-mkdir -p $archive_dir/etc/systemd
-cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
-mkdir -p $archive_dir/etc/init.d
-cp -av distribution/init.d/vector $archive_dir/etc/init.d
+if [[ $TARGET == *linux* ]]; then
+  # Copy /etc useful files
+  mkdir -p $archive_dir/etc/systemd
+  cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
+  mkdir -p $archive_dir/etc/init.d
+  cp -av distribution/init.d/vector $archive_dir/etc/init.d
+fi
 
-# Build the release tar
+# Build the release archive
 _old_dir=$(pwd)
 cd $target_dir
-tar -czvf vector-$TARGET.tar.gz ./$archive_dir_name
+if [ "$ARCHIVE_TYPE" == "tar.gz" ]; then
+  tar cvf - ./$archive_dir_name | gzip -9 > vector-$TARGET.$ARCHIVE_TYPE
+elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
+  powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'$TARGET'.'$ARCHIVE_TYPE' -Path "./'$archive_dir_name'/*"'
+else
+  echo "Unsupported combination of ARCHIVE_TYPE and TARGET"
+  exit 1
+fi
 cd $_old_dir
 
 # Move to the artifacts dir
 mkdir -p $artifacts_dir
-mv -v $target_dir/vector-$TARGET.tar.gz $artifacts_dir
-echo "Moved $target_dir/vector-$TARGET.tar.gz to $artifacts_dir"
+mv -v $target_dir/vector-$TARGET.$ARCHIVE_TYPE $artifacts_dir
+echo "Moved $target_dir/vector-$TARGET.$ARCHIVE_TYPE to $artifacts_dir"
 
 # Cleanup
 rm -rf $archive_dir

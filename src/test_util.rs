@@ -1,4 +1,6 @@
+use crate::runtime::Runtime;
 use crate::Event;
+
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -14,7 +16,6 @@ use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::{Builder, Runtime};
 use tokio::util::FutureExt;
 
 #[macro_export]
@@ -41,6 +42,8 @@ pub fn trace_init() {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_env_filter(env)
         .finish();
+
+    let _ = tracing_log::LogTracer::init();
     let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
 }
 
@@ -64,6 +67,18 @@ pub fn send_lines(
                 })
                 .map(|_| ())
         })
+}
+
+pub fn temp_file() -> std::path::PathBuf {
+    let path = std::env::temp_dir();
+    let file_name = random_string(16);
+    path.join(file_name + ".log")
+}
+
+pub fn temp_dir() -> std::path::PathBuf {
+    let path = std::env::temp_dir();
+    let dir_name = random_string(16);
+    path.join(dir_name)
 }
 
 pub fn random_lines_with_stream(
@@ -93,7 +108,7 @@ pub fn random_nested_events_with_stream(
 
         let tree = random_pseudonested_map(len, breadth, depth);
         for (k, v) in tree.into_iter() {
-            log.insert_explicit(k.into(), v.into())
+            log.insert_explicit(k, v)
         }
 
         Event::Log(log)
@@ -150,7 +165,7 @@ pub fn wait_for(f: impl Fn() -> bool) {
     let limit = std::time::Duration::from_secs(5);
     let mut attempts = 0;
     while !f() {
-        std::thread::sleep(wait.clone());
+        std::thread::sleep(wait);
         attempts += 1;
         if attempts * wait > limit {
             panic!("timed out while waiting");
@@ -170,7 +185,7 @@ where
 }
 
 pub fn runtime() -> Runtime {
-    Builder::new().core_threads(1).build().unwrap()
+    Runtime::single_threaded().unwrap()
 }
 
 pub fn wait_for_tcp(addr: SocketAddr) {
@@ -290,7 +305,7 @@ impl CountReceiver {
 }
 
 pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
-    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = Runtime::new().unwrap();
 
     let listener = TcpListener::bind(addr).unwrap();
 

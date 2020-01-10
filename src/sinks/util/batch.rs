@@ -1,6 +1,27 @@
 use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct BatchConfig {
+    pub batch_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
+}
+
+impl BatchConfig {
+    pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
+        BatchSettings {
+            size: self.batch_size.unwrap_or(size as usize),
+            timeout: Duration::from_secs(self.batch_timeout.unwrap_or(timeout)),
+        }
+    }
+}
+
+pub struct BatchSettings {
+    pub size: usize,
+    pub timeout: Duration,
+}
 
 pub trait Batch {
     type Input;
@@ -140,11 +161,11 @@ where
             if let Some(duration) = &self.max_linger {
                 // We just inserted the first item of a new batch, so set our delay to the longest time
                 // we want to allow that item to linger in the batch before being flushed.
-                self.linger_deadline = Some(Delay::new(Instant::now() + duration.clone()));
+                self.linger_deadline = Some(Delay::new(Instant::now() + *duration));
             }
         }
 
-        self.batch.push(item.into());
+        self.batch.push(item);
 
         Ok(AsyncSink::Ready)
     }

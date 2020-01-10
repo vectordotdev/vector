@@ -1,10 +1,16 @@
 use crate::event::ValueKind;
 use chrono::{DateTime, Local, ParseError as ChronoParseError, TimeZone, Utc};
+use lazy_static::lazy_static;
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::num::{ParseFloatError, ParseIntError};
+use std::path::PathBuf;
 use std::str::FromStr;
 use string_cache::DefaultAtom as Atom;
+
+lazy_static! {
+    pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
+}
 
 #[derive(Debug, Snafu)]
 pub enum ConversionError {
@@ -66,11 +72,11 @@ impl FromStr for Conversion {
 /// Helper function to parse a conversion map and check against a list of names
 pub fn parse_check_conversion_map(
     types: &HashMap<Atom, String>,
-    names: &Vec<Atom>,
+    names: &[Atom],
 ) -> Result<HashMap<Atom, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
-    let names: HashSet<Atom> = names.into_iter().map(|s| s.into()).collect();
-    for (name, _) in types {
+    let names: HashSet<Atom> = names.iter().map(|s| s.into()).collect();
+    for name in types.keys() {
         if !names.contains(name) {
             warn!(
                 message = "Field was specified in the types but is not a valid field name.",
@@ -87,7 +93,7 @@ pub fn parse_conversion_map(
     types: &HashMap<Atom, String>,
 ) -> Result<HashMap<Atom, Conversion>, ConversionError> {
     types
-        .into_iter()
+        .iter()
         .map(|(field, typename)| {
             typename
                 .parse::<Conversion>()
@@ -269,6 +275,7 @@ mod tests {
             .convert(value.into())
     }
 
+    #[cfg(unix)] // https://github.com/timberio/vector/issues/1201
     #[test]
     fn timestamp_conversion() {
         assert_eq!(
@@ -277,6 +284,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
     #[test]
     fn timestamp_param_conversion() {
         assert_eq!(
@@ -285,6 +293,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
     #[test]
     fn parse_timestamp_auto() {
         std::env::set_var("TZ", TIMEZONE);

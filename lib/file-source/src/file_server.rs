@@ -6,11 +6,12 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Read, Seek, Write};
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
 use tracing::field;
+
+use crate::metadata_ext::PortableMetadataExt;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -98,7 +99,7 @@ impl FileServer {
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .unwrap_or(time::SystemTime::now())
+                .unwrap_or_else(|_| time::SystemTime::now())
         });
 
         for (path, file_id) in existing_files {
@@ -214,6 +215,10 @@ impl FileServer {
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                if !watcher.should_read() {
+                    continue;
+                }
+
                 let mut bytes_read: usize = 0;
                 while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
                     if sz > 0 {
@@ -327,8 +332,8 @@ impl Checkpointer {
         let directory = data_dir.join("checkpoints");
         let glob_string = directory.join("*").to_string_lossy().into_owned();
         Checkpointer {
-            directory: directory,
-            glob_string: glob_string,
+            directory,
+            glob_string,
             checkpoints: HashMap::new(),
         }
     }
@@ -392,8 +397,8 @@ impl Fingerprinter {
         match *self {
             Fingerprinter::DevInode => {
                 let metadata = fs::metadata(path)?;
-                let dev = metadata.dev();
-                let ino = metadata.ino();
+                let dev = metadata.portable_dev();
+                let ino = metadata.portable_ino();
                 buffer.clear();
                 buffer.write_all(&dev.to_be_bytes())?;
                 buffer.write_all(&ino.to_be_bytes())?;

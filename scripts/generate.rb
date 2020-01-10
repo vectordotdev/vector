@@ -21,14 +21,18 @@ require_relative "setup"
 # Requires
 #
 
+require_relative "generate/post_processors/component_importer"
 require_relative "generate/post_processors/link_definer"
-require_relative "generate/post_processors/option_referencer"
+require_relative "generate/post_processors/option_linker"
+require_relative "generate/post_processors/section_referencer"
 require_relative "generate/post_processors/section_sorter"
-require_relative "generate/post_processors/toml_syntax_switcher"
 require_relative "generate/templates"
 
-require_relative "generate/core_ext/hash"
-require_relative "generate/core_ext/string"
+#
+# Flags
+#
+
+dry_run = ARGV.include?("--dry-run")
 
 #
 # Functions
@@ -63,10 +67,15 @@ def link_valid?(value)
 end
 
 def post_process(content, doc, links)
-  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
-  content = PostProcessors::SectionSorter.sort!(content)
-  content = PostProcessors::OptionReferencer.reference!(content)
-  content = PostProcessors::LinkDefiner.define!(content, doc, links)
+  if doc.end_with?(".md")
+    content = content.clone
+    content = PostProcessors::ComponentImporter.import!(content)
+    content = PostProcessors::SectionSorter.sort!(content)
+    content = PostProcessors::SectionReferencer.reference!(content)
+    content = PostProcessors::LinkDefiner.define!(content, doc, links)
+    content = PostProcessors::OptionLinker.link!(content)
+  end
+
   content
 end
 
@@ -106,27 +115,74 @@ title("Generating files...")
 # Setup
 #
 
-metadata =
-  begin
-    Metadata.load!(META_ROOT, DOCS_ROOT)
-  rescue Exception => e
-    error!(e.message)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+templates = Templates.new(ROOT_DIR, metadata)
+
+#
+# Create missing release pages
+#
+
+metadata.releases_list.each do |release|
+  template_path = "#{PAGES_ROOT}/releases/#{release.version}/download.js"
+
+  if !File.exists?(template_path)
+    dirname = File.dirname(template_path)
+
+    unless File.directory?(dirname)
+      FileUtils.mkdir_p(dirname)
+    end
+
+    contents =
+      <<~EOF
+      import React from 'react';
+
+      import ReleaseDownload from '@site/src/components/ReleaseDownload';
+
+      function Download() {
+        return <ReleaseDownload version="#{release.version}" />
+      }
+
+      export default Download;
+      EOF
+
+    File.open(template_path, 'w+') { |file| file.write(contents) }
   end
+
+  template_path = "#{PAGES_ROOT}/releases/#{release.version}.js"
+
+  if !File.exists?(template_path)
+    contents =
+      <<~EOF
+      import React from 'react';
+
+      import Layout from '@theme/Layout';
+      import ReleaseNotes from '@site/src/components/ReleaseNotes';
+
+      function ReleaseNotesPage() {
+        const version = "#{release.version}";
+
+        return (
+          <Layout title={`Vector v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
+            <main>
+              <ReleaseNotes version={version} />
+            </main>
+          </Layout>
+        );
+      }
+
+      export default ReleaseNotesPage;
+      EOF
+
+    File.open(template_path, 'w+') { |file| file.write(contents) }
+  end
+end
 
 #
 # Create missing component templates
 #
 
 metadata.components.each do |component|
-  # Base .md file to ensure links to the new source work
-  md_path = "#{DOCS_ROOT}/usage/configuration/#{component.type.pluralize}/#{component.name}.md"
-
-  if !File.exists?(md_path)
-    File.open(md_path, 'w+') { |file| file.write("") }
-  end
-
-  # Configuration templates
-  template_path = "#{TEMPLATES_DIR}/docs/usage/configuration/#{component.type.pluralize}/#{component.name}.md.erb"
+  template_path = "#{REFERENCE_ROOT}/#{component.type.pluralize}/#{component.name}.md.erb"
 
   if !File.exists?(template_path)
     contents = templates.component_default(component)
@@ -134,45 +190,52 @@ metadata.components.each do |component|
   end
 end
 
+erb_paths =
+  Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
+  to_a.
+  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }.
+  filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix") }
+
+#
+# Create missing .md files
+#
+
+erb_paths.each do |erb_path|
+  md_path = erb_path.gsub(/\.erb$/, "")
+  if !File.exists?(md_path)
+    File.open(md_path, "w") {}
+  end
+end
+
 #
 # Render templates
 #
 
-templates = Templates.new(TEMPLATES_DIR, metadata)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+templates = Templates.new(ROOT_DIR, metadata)
 
-Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
-  to_a.
+erb_paths.
   select { |path| !templates.partial?(path) }.
   each do |template_path|
-    target_file = template_path.gsub(/^#{TEMPLATES_DIR}\//, "").gsub(/\.erb$/, "")
+    target_file = template_path.gsub(/^#{ROOT_DIR}\//, "").gsub(/\.erb$/, "")
     target_path = "#{ROOT_DIR}/#{target_file}"
-    
-    content =
-      begin
-        templates.render(target_file)
-      rescue Exception => e
-        error!(e.message)
-      end
-
+    content = templates.render(target_file)
     content = post_process(content, target_path, metadata.links)
-
-
-    # Create the file if it does not exist
-    if !File.exists?(target_path)
-      File.open(target_path, "w") {}
-    end
-
     current_content = File.read(target_path)
 
     if current_content != content
-      action = false ? "Will be changed" : "Changed"
+      action = dry_run ? "Will be changed" : "Changed"
       say("#{action} - #{target_file}", color: :green)
-      File.write(target_path, content)
+      File.write(target_path, content) if !dry_run
     else
-      action = false ? "Will not be changed" : "Not changed"
+      action = dry_run ? "Will not be changed" : "Not changed"
       say("#{action} - #{target_file}", color: :blue)
     end
   end
+
+if dry_run
+  return
+end
 
 #
 # Post process individual docs
@@ -180,17 +243,21 @@ Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
 
 title("Post processing generated files...")
 
-docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
-docs = docs + ["#{ROOT_DIR}/README.md"]
-docs = docs - ["#{DOCS_ROOT}/SUMMARY.md"]
+docs =
+  Dir.glob("#{DOCS_ROOT}/**/*.md").to_a +
+    Dir.glob("#{POSTS_ROOT}/**/*.md").to_a +
+    ["#{ROOT_DIR}/README.md"]
+
 docs.each do |doc|
-  content = File.read(doc)
-  if content.include?("THIS FILE IS AUTOGENERATED")
-    say("Skipped - #{doc}", color: :blue)
+  path = doc.gsub(/^#{ROOT_DIR}\//, "")
+  original_content = File.read(doc)
+  new_content = post_process(original_content, doc, metadata.links)
+
+  if original_content != new_content
+    File.write(doc, new_content)
+    say("Processed - #{path}", color: :green)
   else
-    content = post_process(content, doc, metadata.links)
-    File.write(doc, content)
-    say("Processed - #{doc}", color: :green)
+    say("Not changed - #{path}", color: :blue)
   end
 end
 

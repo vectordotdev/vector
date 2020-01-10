@@ -22,27 +22,36 @@ bench: ## Run internal benchmarks
 	@cargo bench --all
 
 build: ## Build the project
-	@cargo build
+	@cargo build --no-default-features --features="$${FEATURES:-default}"
 
-check: check-code check-fmt check-generate
+check: check-code check-fmt check-generate check-examples
 
-check-code: ## Checks code for compilation errors
-	@cargo check --all --all-features --all-targets
+check-code: ## Checks code for compilation errors (only default features)
+	@cargo check --all --all-targets
 
 check-fmt: ## Checks code formatting correctness
+	@scripts/check-style.sh
 	@cargo fmt -- --check
 
 check-generate: ## Checks for pending `make generate` changes
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/check-generate.sh
+
+check-examples: ## Validates the config examples
+	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
+
+check-version: ## Checks that the version in Cargo.toml is up-to-date
+	@bundle install --gemfile=scripts/Gemfile --quiet
+	@scripts/check-version.rb
 
 CHECK_URLS=false
 export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/generate.rb
 
 fmt: ## Format code
+	@scripts/check-style.sh --fix
 	@cargo fmt
 
 release: ## Release a new Vector version
@@ -59,6 +68,9 @@ signoff: ## Signsoff all previous commits since branch creation
 test: ## Spins up Docker resources and runs _every_ test
 	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4
+
+clean: ## Remove build artifacts
+	@cargo clean
 
 ##@ Releasing
 
@@ -84,18 +96,18 @@ release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
 
 release-github: ## Release to Github
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/release-github.rb
 
 release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
 
 release-meta: ## Prepares the release metadata
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/release-meta.rb
 
 release-rollback:
-	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/release-rollback.rb
 
 release-s3: ## Release artifacts to S3

@@ -46,7 +46,7 @@ expanding into more specifics.
 
 ## Assumptions
 
-1. **You are familiar with the [docs](https://docs.vector.dev).**
+1. **You are familiar with the [docs](https://vector.dev/docs/).**
 2. **You know about the [Vector community](https://vector.dev/community/),
    use this for help.**
 
@@ -54,9 +54,9 @@ expanding into more specifics.
 
 ### Git Branches
 
-_All_ changes must be made in a branch and submitted as [pull \
-requests](#pull-requests). Vector does not adopt any type of branch naming
-style, but please use something descriptive of your changes.
+_All_ changes must be made in a branch and submitted as [pull requests](#pull-requests).
+Vector does not adopt any type of branch naming style, but please use something
+descriptive of your changes.
 
 ### Git Commits
 
@@ -130,7 +130,7 @@ updated versions of Vector through various channels.
 1. Install Rust via [`rustup`](https://rustup.rs/):
 
    ```bash
-   curl https://sh.rustup.rs -sSf | sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 2. [Install Docker](https://docs.docker.com/install/). Docker
@@ -147,7 +147,7 @@ updated versions of Vector through various channels.
 * [`/benches`](/benches) - Internal benchmarks.
 * [`/config`](/config) - Public facing Vector config, included in releases.
 * [`/distribution`](/distribution) - Distribution artifacts for various targets.
-* [`/docs`](/docs) - https://docs.vector.dev source.
+* [`/docs`](/docs) - https://vector.dev/docs/ source.
 * [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 * [`/proto`](/proto) - Protobuf definitions.
 * [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
@@ -177,12 +177,16 @@ make fmt
 
 #### Documentation
 
-Vector places _high_ importance on documentation. As such, most of the
-Vector documentation is auto-generated via the `make generate` command. As
-a developer you do not need to understand the intricate details of the
-generation system, but you do need to understand how to use it.
+Documentation is extremely important to the Vector project. Ideally, all
+contributions that will change or add behavior to Vector should include the
+relevant updates to the documentation website.
 
-1. All source, transform, and sink 
+The project attempts to make documentation updates as easy as possible, reducing
+most of it down to a few small changes which are outlined in
+[DOCUMENTING.md](/DOCUMENTING.md).
+
+Regardless of whether your changes require documentation updates you should
+always run `make generate` before attempting to merge your commits.
 
 #### Changelog
 
@@ -269,7 +273,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 ### Benchmarking
 
-All benchmarks are placed in the [`/benchmarks`](/benchmarks) folder. Yuo can
+All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make benchmarks` command.
 
 ## FAQ
@@ -332,7 +336,7 @@ patent licenses as well. These rights are granted to everyone.
 
 Nope! The DCO confirms that you are entitled to submit the code, which assumes
 that you are authorized to do so.  It treats you like an adult and relies on
-your accurate statement about your rights to submit a contribution.  
+your accurate statement about your rights to submit a contribution.
 
 ### What if I forgot to sign my commits?
 

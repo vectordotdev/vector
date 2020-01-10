@@ -1,0 +1,38 @@
+# JSON Configuration Example
+# ------------------------------------------------------------------------------
+# A simple example that parses incoming data as JSON. This example also
+# demonstrated wrapped JSON, showing that you can chain parsers.
+
+data_dir = "/var/lib/vector"
+
+# Ingest data
+# Example: {"message": "{\"parent\": \"{\\\"child\\\": \\\"value2\\\"}\"}"}
+# Docs: https://vector.dev/docs/reference/sources/file
+[sources.logs]
+  type         = "file"
+  include      = ["/var/log/*.log"]
+  ignore_older = 86400 # 1 day
+
+# Parse the data as JSON
+# Docs: https://vector.dev/docs/reference/transforms/json_parser
+[transforms.parse_root_json]
+  inputs       = ["logs"]
+  type         = "json_parser"
+  field        = "message" # default
+
+[transforms.parse_parent_json]
+  inputs       = ["parse_root_json"]
+  type         = "json_parser"
+  field        = "parent"
+
+[transforms.parse_child_json]
+  inputs       = ["parse_parent_json"]
+  type         = "json_parser"
+  field        = "child"
+
+# Print the data to STDOUT for inspection
+# Docs: https://vector.dev/docs/reference/sinks/console
+[sinks.out]
+  inputs       = ["parse_child_json"]
+  type         = "console"
+  encoding     = "json"

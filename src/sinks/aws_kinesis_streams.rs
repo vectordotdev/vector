@@ -1,25 +1,24 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{
-        retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, SinkExt,
-    },
-    topology::config::{DataType, SinkConfig},
+    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core::RusotoFuture;
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_kinesis::{
     Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
+use std::{convert::TryInto, fmt, sync::Arc};
 use string_cache::DefaultAtom as Atom;
-use tower::{Service, ServiceBuilder};
+use tower::Service;
 use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
@@ -36,16 +35,17 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+    #[serde(default, flatten)]
+    pub batch: BatchConfig,
+    #[serde(flatten)]
+    pub request: TowerRequestConfig,
+}
 
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        request_timeout_secs: Some(30),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -57,56 +57,48 @@ pub enum Encoding {
     Json,
 }
 
+inventory::submit! {
+    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
+}
+
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        let sink = KinesisService::new(config, acker)?;
-        let healthcheck = healthcheck(self.clone())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let sink = KinesisService::new(config, cx)?;
         Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
         DataType::Log
     }
+
+    fn sink_type(&self) -> &'static str {
+        "aws_kinesis_streams"
+    }
 }
 
 impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
-        acker: Acker,
+        cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
+        let client = Arc::new(create_client(
+            config.region.clone().try_into()?,
+            cx.resolver(),
+        )?);
 
-        let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
-        let batch_timeout = config.batch_timeout.unwrap_or(1);
-
-        let timeout = config.request_timeout_secs.unwrap_or(30);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
 
-        let policy = FixedRetryPolicy::new(
-            retry_attempts,
-            Duration::from_secs(retry_backoff_secs),
-            KinesisRetryLogic,
-        );
-
         let kinesis = KinesisService { client, config };
 
-        let svc = ServiceBuilder::new()
-            .concurrency_limit(in_flight_limit)
-            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-            .retry(policy)
-            .timeout(Duration::from_secs(timeout))
-            .service(kinesis);
-
-        let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(Vec::new(), batch_size, Duration::from_secs(batch_timeout))
+        let sink = request
+            .batch_sink(KinesisRetryLogic, kinesis, cx.acker())
+            .batched_with_min(Vec::new(), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
@@ -115,7 +107,7 @@ impl KinesisService {
 
 impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
     type Response = PutRecordsOutput;
-    type Error = PutRecordsError;
+    type Error = RusotoError<PutRecordsError>;
     type Future = Instrumented<RusotoFuture<PutRecordsOutput, PutRecordsError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -151,14 +143,14 @@ impl fmt::Debug for KinesisService {
 struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = PutRecordsError;
+    type Error = RusotoError<PutRecordsError>;
     type Response = PutRecordsOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            PutRecordsError::HttpDispatch(_) => true,
-            PutRecordsError::ProvisionedThroughputExceeded(_) => true,
-            PutRecordsError::Unknown(res) if res.status.is_server_error() => true,
+            RusotoError::HttpDispatch(_) => true,
+            RusotoError::Service(PutRecordsError::ProvisionedThroughputExceeded(_)) => true,
+            RusotoError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }
     }
@@ -168,7 +160,7 @@ impl RetryLogic for KinesisRetryLogic {
 enum HealthcheckError {
     #[snafu(display("ListStreams failed: {}", source))]
     ListStreamsFailed {
-        source: rusoto_kinesis::ListStreamsError,
+        source: RusotoError<rusoto_kinesis::ListStreamsError>,
     },
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
@@ -179,8 +171,8 @@ enum HealthcheckError {
     NoMatchingStreamName { stream_name: String },
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
-    let client = KinesisClient::new(config.region.try_into()?);
+fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
+    let client = create_client(config.region.try_into()?, resolver)?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -203,6 +195,15 @@ fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
         });
 
     Ok(Box::new(fut))
+}
+
+fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisClient> {
+    use rusoto_credential::DefaultCredentialsProvider;
+
+    let p = DefaultCredentialsProvider::new()?;
+    let d = crate::sinks::util::rusoto::client(resolver)?;
+
+    Ok(KinesisClient::new_with(d, p, region))
 }
 
 fn encode_event(
@@ -233,15 +234,17 @@ fn encode_event(
 
     let log = event.into_log();
     let data = match encoding {
-        &Encoding::Json => {
+        Encoding::Json => {
             serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
         }
 
-        &Encoding::Text => log
+        Encoding::Text => log
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
-            .unwrap_or(Vec::new()),
+            .unwrap_or_default(),
     };
+
+    let data = Bytes::from(data);
 
     Some(PutRecordsRequestEntry {
         data,
@@ -252,7 +255,7 @@ fn encode_event(
 
 fn gen_partition_key() -> String {
     random::<[char; 16]>()
-        .into_iter()
+        .iter()
         .fold(String::new(), |mut s, c| {
             s.push(*c);
             s
@@ -280,9 +283,7 @@ mod tests {
     fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("key".into(), "value".into());
+        event.as_mut_log().insert_explicit("key", "value");
         let event = encode_event(event, &None, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
@@ -294,9 +295,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_custom_partition_key() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("key".into(), "some_key".into());
+        event.as_mut_log().insert_implicit("key", "some_key");
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
@@ -308,7 +307,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert_implicit("key".into(), random_string(300).into());
+            .insert_implicit("key", random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
@@ -321,15 +320,15 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        buffers::Acker,
         region::RegionOrEndpoint,
+        runtime,
         test_util::{random_lines_with_stream, random_string},
+        topology::config::SinkContext,
     };
     use futures::{Future, Sink};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
-    use tokio::runtime::Runtime;
 
     #[test]
     fn kinesis_put_records() {
@@ -345,20 +344,24 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
-            batch_size: Some(2),
+            batch: BatchConfig {
+                batch_size: Some(2),
+                batch_timeout: None,
+            },
             ..Default::default()
         };
 
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = KinesisService::new(config, Acker::Null).unwrap();
+        let sink = KinesisService::new(config, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
         let (mut input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
@@ -369,7 +372,7 @@ mod integration_tests {
 
         let mut output_lines = records
             .into_iter()
-            .map(|e| String::from_utf8(e.data).unwrap())
+            .map(|e| String::from_utf8(e.data.to_vec()).unwrap())
             .collect::<Vec<_>>();
 
         input_lines.sort();

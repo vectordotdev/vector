@@ -14,6 +14,14 @@ echo "Checking for pending generation changes..."
 
 changes=$(scripts/generate.rb --dry-run | grep 'Will be changed' || true)
 
+if [[ "$?" != "0" ]]; then
+  echo 'The `scripts/generate.rb --dry-run` command returned an error:'
+  echo ''
+  echo "$changes"
+  echo ''
+  exit 1
+fi
+
 if [[ -n "$changes" ]]; then
   echo 'It looks like the following files would change if `make generate` was run:'
   echo ''
@@ -21,7 +29,7 @@ if [[ -n "$changes" ]]; then
   echo ''
   echo 'This usually means that auto-generated sections were updated. '
   echo 'Instead, you should update the files in the /.meta dir and then run '
-  ecgo '`make generate`. See the ./DOCUMENTING.md guide for more info.'
+  echo '`make generate`. See the ./DOCUMENTING.md guide for more info.'
   exit 1
 else
   echo 'Nice! No generation changes detected.'

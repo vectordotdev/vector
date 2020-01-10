@@ -4,38 +4,31 @@
 #
 # SUMMARY
 #
-#   Builds the Vector docker images
+#   Builds the Vector docker images and optionally
+#   pushes it to the Docker registry
 
-set -eu
+set -eux
 
 CHANNEL=$(scripts/util/release-channel.sh)
+VERSION=$(scripts/version.sh)
+DATE=$(date -u +%Y-%m-%d)
+PUSH=${PUSH:-}
+PLATFORM=${PLATFORM:-linux/amd64,linux/arm64,linux/arm}
 
 #
 # Functions
 #
 
-verify() {
-  tag=$1
-  container_id=$(docker run -d $tag)
-  sleep 2
-  state=$(docker inspect $container_id -f {{.State.Running}})
+build() {
+  base=$1
+  version=$2
 
-  if [[ "$state" != "true" ]]; then
-    echo "Docker container $tag failed to start"
-    exit 1
-  fi
-
-  docker stop $container_id
-
-  echo "Docker container $tag started successfully"
+  docker buildx build \
+    --platform="$PLATFORM" \
+    --tag timberio/vector:$version-$base \
+    target/artifacts \
+    -f distribution/docker/$base/Dockerfile ${PUSH:+--push}
 }
-
-#
-# Prepare
-#
-
-cp -av target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz distribution/docker/alpine
-cp -av target/artifacts/vector-amd64.deb distribution/docker/debian
 
 #
 # Build
@@ -43,26 +36,24 @@ cp -av target/artifacts/vector-amd64.deb distribution/docker/debian
 
 echo "Building timberio/vector:* Docker images"
 
-if [[ "$CHANNEL" == "latest" ]]; then
-  docker build --tag timberio/vector:$VERSION-alpine distribution/docker/alpine
-  docker build --tag timberio/vector:latest-alpine distribution/docker/alpine
-  docker build --tag timberio/vector:$VERSION-debian distribution/docker/debian
-  docker build --tag timberio/vector:latest-debian distribution/docker/debian
-elif [[ "$CHANNEL" == "nightly" ]]; then
-  docker build --tag timberio/vector:nightly-alpine distribution/docker/alpine
-  docker build --tag timberio/vector:nightly-debian distribution/docker/debian
-fi
-
-#
-# Verify
-#
+export DOCKER_CLI_EXPERIMENTAL=enabled
+docker run --rm --privileged docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28d
+docker buildx rm vector-builder || true
+docker buildx create --use --name vector-builder
+docker buildx install
 
 if [[ "$CHANNEL" == "latest" ]]; then
-  verify timberio/vector:$VERSION-alpine
-  verify timberio/vector:latest-alpine
-  verify timberio/vector:$VERSION-debian
-  verify timberio/vector:latest-debian
+  version_exact=$VERSION
+  version_minor_x=$(echo $VERSION | sed 's/\.[0-9]*$/.X/g')
+  version_major_x=$(echo $VERSION | sed 's/\.[0-9]*\.[0-9]*$/.X/g')
+
+  for i in $version_exact $version_minor_x $version_major_x latest; do
+    build alpine $i
+    build debian $i
+  done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  verify timberio/vector:nightly-alpine
-  verify timberio/vector:nightly-debian
+  for i in nightly-$DATE nightly; do
+    build alpine $i
+    build debian $i
+  done
 fi

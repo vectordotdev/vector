@@ -1,0 +1,114 @@
+.performance-tests__prompt {
+  padding: calc( var(--ifm-spacing-vertical) * 6 ) var(--ifm-spacing-horizontal);
+  text-align: center;
+}
+
+.performance-tests--switcher {
+  --vector-switcher-color: var(--ifm-heading-color);
+  --vector-switcher-active-background: var(--ifm-color-primary);
+  --vector-switcher-active-color: var(--ifm-background-color);
+
+  background: var(--ifm-panel-background);
+  border: 1px solid var(--ifm-panel-border-color);
+  border-radius: var(--ifm-global-radius);
+  box-shadow: var(--ifm-panel-box-shadow);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  padding: calc( var(--ifm-spacing-vertical) / 3 ) calc( var(--ifm-spacing-horizontal) / 2 );
+}
+
+.performance-tests--switcher .react-select-container {
+  --react-select-color: var(--vector-switcher-color);
+  flex-basis: 33.33%;
+}
+
+.performance-tests--switcher .react-select-container:last-child {
+  border-right: 0px none;
+}
+
+.performance-tests--switcher .react-select__control {
+  background: transparent;
+  border-color: transparent;
+  cursor: pointer !important;
+}
+
+.performance-tests--switcher .react-select__control:hover {
+  border-color: transparent;
+}
+
+.performance-tests--switcher .react-select__input {
+  color: var(--react-select-color);
+}
+
+.performance-tests--switcher .react-select__input input {
+  box-shadow: none;
+}
+
+.performance-tests--switcher .react-select__single-value {
+  color: var(--react-select-color);
+  font-weight: 600;
+}
+
+.performance-tests--switcher .react-select__placeholder {
+  color: var(--react-select-color);
+  font-weight: 600;
+  opacity: 0.5;
+}
+
+.performance-tests--switcher .react-select__indicator-separator {
+  background-color: var(--ifm-background-color);
+  display: none;
+}
+
+.performance-tests--switcher .react-select__indicator svg {
+  color: var(--react-select-color);
+}
+
+.performance-tests--switcher .react-select__menu {
+  background: var(--ifm-panel-background-solid);
+  border-radius: var(--ifm-global-radius);
+  color: var(--ifm-color-content);
+}
+
+.performance-tests--switcher .react-select__option:hover {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-background-color);
+}
+
+.performance-tests--switcher .react-select__option--is-selected {
+  background: var(--ifm-color-primary);
+  color: var(--ifm-background-color);
+}
+
+.performance-tests--switcher .react-select__option--is-focused {
+  background: var(--ifm-panel-background-active);
+  color: var(--ifm-color-content);
+}
+
+.performance-tests--switcher .pills {
+  color: var(--vector-switcher-color);
+  margin: 3px 0 0 0;
+}
+
+.performance-tests--switcher .pills .pill-item--active {
+  background: var(--vector-switcher-active-background);
+  color: var(--vector-switcher-active-color);
+}
+
+@media (max-width: 480px) {
+  .performance-tests--switcher {
+    display: block;
+  }
+
+  .performance-tests--switcher .pills {
+    border-top: 1px dotted rgba( var(--ifm-background-color-rgb), 0.5 );
+    display: flex;
+    padding-top: calc( var(--ifm-spacing-vertical) / 2 );
+  }
+
+  .performance-tests--switcher .pills li {
+    flex-grow: 1;
+    text-align: center;
+  }
+}

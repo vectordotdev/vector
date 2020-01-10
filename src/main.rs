@@ -9,14 +9,27 @@ use std::{
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
+#[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{metrics, topology, trace};
+use vector::{
+    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 struct Opts {
+    #[structopt(flatten)]
+    root: RootOpts,
+
+    #[structopt(subcommand)]
+    sub_command: Option<SubCommand>,
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(rename_all = "kebab-case")]
+struct RootOpts {
     /// Read configuration from the specified file
     #[structopt(
         name = "config",
@@ -31,7 +44,7 @@ struct Opts {
     #[structopt(short, long)]
     require_healthy: bool,
 
-    /// Exit on startup after config verification and optional healthchecks run
+    /// Exit on startup after config verification and optional healthchecks are run
     #[structopt(short, long)]
     dry_run: bool,
 
@@ -64,6 +77,38 @@ struct Opts {
     color: Option<Color>,
 }
 
+#[derive(StructOpt, Debug)]
+#[structopt(rename_all = "kebab-case")]
+enum SubCommand {
+    /// Validate the target config, then exit.
+    Validate(Validate),
+
+    /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
+    Test(unit_test::Opts),
+
+    /// List available components, then exit.
+    List(list::Opts),
+
+    /// Generate a Vector configuration containing a list of components.
+    Generate(generate::Opts),
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(rename_all = "kebab-case")]
+struct Validate {
+    /// Ensure that the config topology is correct and that all components resolve
+    #[structopt(short, long)]
+    topology: bool,
+
+    /// Fail validation on warnings
+    #[structopt(short, long)]
+    deny_warnings: bool,
+
+    /// Any number of Vector config files to validate. If none are specified the
+    /// default config path `/etc/vector/vector.toml` will be targeted.
+    paths: Vec<PathBuf>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum Color {
     Auto,
@@ -87,9 +132,31 @@ impl std::str::FromStr for Color {
     }
 }
 
+fn get_version() -> String {
+    #[cfg(feature = "nightly")]
+    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+    #[cfg(not(feature = "nightly"))]
+    let pkg_version = built_info::PKG_VERSION;
+
+    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
+    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
+        .unwrap()
+        .format("%Y-%m-%d");
+    let built_string = if let Some(commit_hash) = commit_hash {
+        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
+    } else {
+        built_info::TARGET.into()
+    };
+    format!("{} ({})", pkg_version, built_string)
+}
+
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let opts = Opts::from_args();
+    let version = get_version();
+    let app = Opts::clap().version(&version[..]);
+    let root_opts = Opts::from_clap(&app.get_matches());
+    let opts = root_opts.root;
+    let sub_command = root_opts.sub_command;
 
     let level = match opts.quiet {
         0 => match opts.verbose {
@@ -108,13 +175,17 @@ fn main() {
             format!("vector={}", level),
             format!("codec={}", level),
             format!("file_source={}", level),
+            format!("tower_limit=trace"),
         ]
         .join(",")
         .to_string()
     };
 
     let color = match opts.color.clone().unwrap_or(Color::Auto) {
+        #[cfg(unix)]
         Color::Auto => atty::is(atty::Stream::Stdout),
+        #[cfg(windows)]
+        Color::Auto => false, // ANSI colors are not supported by cmd.exe
         Color::Always => true,
         Color::Never => false,
     };
@@ -126,6 +197,15 @@ fn main() {
         levels.as_str(),
         opts.metrics_addr.map(|_| metrics_sink),
     );
+
+    sub_command.map(|s| {
+        std::process::exit(match s {
+            SubCommand::Validate(v) => validate(&v),
+            SubCommand::List(l) => list::cmd(&l),
+            SubCommand::Test(t) => unit_test::cmd(&t),
+            SubCommand::Generate(g) => generate::cmd(&g),
+        })
+    });
 
     info!("Log level {:?} is enabled.", level);
 
@@ -159,12 +239,9 @@ fn main() {
     });
 
     let mut rt = {
-        let mut builder = tokio::runtime::Builder::new();
-
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
-        builder.core_threads(min(4, threads));
-
-        builder.build().expect("Unable to create async runtime")
+        let num_threads = min(4, threads);
+        runtime::Runtime::with_thread_count(num_threads).expect("Unable to create async runtime")
     };
 
     let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
@@ -193,7 +270,7 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let pieces = topology::validate(&config).unwrap_or_else(|| {
+    let pieces = topology::validate(&config, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -212,65 +289,104 @@ fn main() {
         std::process::exit(exitcode::OK);
     }
 
-    let sigint = Signal::new(SIGINT).flatten_stream();
-    let sigterm = Signal::new(SIGTERM).flatten_stream();
-    let sigquit = Signal::new(SIGQUIT).flatten_stream();
-    let sighup = Signal::new(SIGHUP).flatten_stream();
+    #[cfg(unix)]
+    {
+        let sigint = Signal::new(SIGINT).flatten_stream();
+        let sigterm = Signal::new(SIGTERM).flatten_stream();
+        let sigquit = Signal::new(SIGQUIT).flatten_stream();
+        let sighup = Signal::new(SIGHUP).flatten_stream();
 
-    let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
+        let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
 
-    let signal = loop {
-        let signal = future::poll_fn(|| signals.poll());
-        let crash = future::poll_fn(|| graceful_crash.poll());
+        let signal = loop {
+            let signal = future::poll_fn(|| signals.poll());
+            let crash = future::poll_fn(|| graceful_crash.poll());
 
-        let next = signal
-            .select2(crash)
-            .wait()
+            let next = signal
+                .select2(crash)
+                .wait()
+                .map_err(|_| ())
+                .expect("Neither stream errors");
+
+            let signal = match next {
+                future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
+                future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
+            };
+
+            if signal != SIGHUP {
+                break signal;
+            }
+
+            // Reload config
+            info!(
+                message = "Reloading config.",
+                path = ?opts.config_path
+            );
+
+            let file = if let Some(file) = open_config(&opts.config_path) {
+                file
+            } else {
+                continue;
+            };
+
+            trace!("Parsing config");
+            let config = vector::topology::Config::load(file);
+            let config = handle_config_errors(config);
+            if let Some(config) = config {
+                let success =
+                    topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
+                if !success {
+                    error!("Reload was not successful.");
+                }
+            } else {
+                error!("Reload aborted.");
+            }
+        };
+
+        if signal == SIGINT || signal == SIGTERM {
+            use futures::future::Either;
+
+            info!("Shutting down.");
+            let shutdown = topology.stop();
+            metrics_trigger.cancel();
+
+            match rt.block_on(shutdown.select2(signals.into_future())) {
+                Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
+                Ok(Either::B(_)) => {
+                    info!("Shutting down immediately.");
+                    // Dropping the shutdown future will immediately shut the server down
+                }
+                Err(_) => unreachable!(),
+            }
+        } else if signal == SIGQUIT {
+            info!("Shutting down immediately");
+            drop(topology);
+        } else {
+            unreachable!();
+        }
+    }
+    #[cfg(windows)]
+    {
+        let ctrl_c = tokio_signal::ctrl_c().flatten_stream().into_future();
+        let crash = future::poll_fn(move || graceful_crash.poll());
+
+        let interruption = rt
+            .block_on(ctrl_c.select2(crash))
             .map_err(|_| ())
             .expect("Neither stream errors");
 
-        let signal = match next {
-            future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
-            future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
-        };
-
-        if signal != SIGHUP {
-            break signal;
-        }
-
-        // Reload config
-        info!(
-            message = "Reloading config.",
-            path = ?opts.config_path
-        );
-
-        let file = if let Some(file) = open_config(&opts.config_path) {
-            file
-        } else {
-            continue;
-        };
-
-        trace!("Parsing config");
-        let config = vector::topology::Config::load(file);
-        let config = handle_config_errors(config);
-        if let Some(config) = config {
-            let success = topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
-            if !success {
-                error!("Reload was not successful.");
-            }
-        } else {
-            error!("Reload aborted.");
-        }
-    };
-
-    if signal == SIGINT || signal == SIGTERM {
         use futures::future::Either;
+
+        let ctrl_c = match interruption {
+            Either::A(((_, ctrl_c_stream), _)) => ctrl_c_stream.into_future(),
+            Either::B((_, ctrl_c)) => ctrl_c,
+        };
 
         info!("Shutting down.");
         let shutdown = topology.stop();
         metrics_trigger.cancel();
 
-        match rt.block_on(shutdown.select2(signals.into_future())) {
+        match rt.block_on(shutdown.select2(ctrl_c)) {
             Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
             Ok(Either::B(_)) => {
                 info!("Shutting down immediately.");
@@ -278,11 +394,6 @@ fn main() {
             }
             Err(_) => unreachable!(),
         }
-    } else if signal == SIGQUIT {
-        info!("Shutting down immediately");
-        drop(topology);
-    } else {
-        unreachable!();
     }
 
     rt.shutdown_now().wait().unwrap();
@@ -313,6 +424,76 @@ fn open_config(path: &Path) -> Option<File> {
             }
         }
     }
+}
+
+fn validate(opts: &Validate) -> exitcode::ExitCode {
+    let paths = if opts.paths.len() > 0 {
+        &opts.paths
+    } else {
+        &DEFAULT_CONFIG_PATHS
+    };
+
+    for config_path in paths {
+        let file = if let Some(file) = open_config(&config_path) {
+            file
+        } else {
+            error!(
+                message = "Failed to open config file.",
+                path = ?config_path
+            );
+            return exitcode::CONFIG;
+        };
+
+        trace!(
+            message = "Parsing config.",
+            path = ?config_path
+        );
+
+        let config = vector::topology::Config::load(file);
+        let config = handle_config_errors(config);
+        let config = config.unwrap_or_else(|| {
+            error!(
+                message = "Failed to parse config file.",
+                path = ?config_path
+            );
+            std::process::exit(exitcode::CONFIG);
+        });
+
+        if opts.topology {
+            let exit = match topology::builder::check(&config) {
+                Err(errors) => {
+                    for error in errors {
+                        error!("Topology error: {}", error);
+                    }
+                    Some(exitcode::CONFIG)
+                }
+                Ok(warnings) => {
+                    for warning in &warnings {
+                        warn!("Topology warning: {}", warning);
+                    }
+                    if opts.deny_warnings && !warnings.is_empty() {
+                        Some(exitcode::CONFIG)
+                    } else {
+                        None
+                    }
+                }
+            };
+            if exit.is_some() {
+                error!(
+                    message = "Failed to verify config file topology.",
+                    path = ?config_path
+                );
+                return exit.unwrap();
+            }
+        }
+
+        debug!(
+            message = "Validation successful.",
+            path = ?config_path
+        );
+    }
+
+    exitcode::OK
 }
 
 #[allow(unused)]

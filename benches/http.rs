@@ -5,7 +5,7 @@ use hyper::{Body, Response, Server};
 use std::net::SocketAddr;
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
-    sinks, sources,
+    runtime, sinks, sources,
     topology::{self, config},
 };
 
@@ -22,7 +22,10 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                config.add_source(
+                    "in",
+                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                );
                 config.add_sink(
                     "out",
                     &["in"],
@@ -33,7 +36,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                     },
                 );
 
-                let mut rt = tokio::runtime::Runtime::new().unwrap();
+                let mut rt = runtime::Runtime::new().unwrap();
 
                 let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                 wait_for_tcp(in_addr);
@@ -52,7 +55,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("http", bench);
 }
@@ -70,7 +73,10 @@ fn benchmark_http_gzip(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+                config.add_source(
+                    "in",
+                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                );
                 config.add_sink(
                     "out",
                     &["in"],
@@ -80,7 +86,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                     },
                 );
 
-                let mut rt = tokio::runtime::Runtime::new().unwrap();
+                let mut rt = runtime::Runtime::new().unwrap();
 
                 let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                 wait_for_tcp(in_addr);
@@ -99,7 +105,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("http", bench);
 }

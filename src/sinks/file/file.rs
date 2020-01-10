@@ -2,36 +2,47 @@ use super::Encoding;
 use crate::event::{self, Event};
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
-use std::{ffi, io, path};
-use tokio::{codec::Encoder, fs::file, io::AsyncWrite};
+use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use std::{ffi, fmt, io, path};
+use tokio::{
+    codec::Encoder,
+    fs::{self, file},
+    io::AsyncWrite,
+};
 
 const INITIAL_CAPACITY: usize = 8 * 1024;
 const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
-#[derive(Debug)]
 pub struct File {
     state: State,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     buffer: BytesMut,
     codec: BytesDelimitedCodec,
 }
 
-#[derive(Debug)]
 enum State {
-    Creating(file::OpenFuture<BytesPath>),
+    Creating(Box<dyn Future<Item = file::File, Error = io::Error> + Send + 'static>),
     Open(file::File),
     Closed,
 }
 
 impl File {
-    pub fn new(path: Bytes, encoding: Option<Encoding>) -> Self {
-        let path = BytesPath(path);
+    pub fn new(path: Bytes, encoding: Encoding) -> Self {
+        let path = BytesPath::new(path);
+        let parent = path.as_ref().parent().map(|p| p.to_path_buf());
 
-        let fut = file::OpenOptions::new()
+        let dir_fut = if let Some(parent) = parent {
+            future::Either::A(fs::create_dir_all(parent))
+        } else {
+            future::Either::B(future::ok(()))
+        };
+
+        let file_fut = file::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path);
+
+        let fut = Box::new(dir_fut.and_then(|_| file_fut));
 
         let state = State::Creating(fut);
         let buffer = BytesMut::with_capacity(INITIAL_CAPACITY);
@@ -48,14 +59,14 @@ impl File {
     fn encode_event(&self, event: Event) -> Bytes {
         let log = event.into_log();
 
-        match (&self.encoding, log.is_structured()) {
-            (&Some(Encoding::Ndjson), _) | (None, true) => serde_json::to_vec(&log.unflatten())
+        match self.encoding {
+            Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
-            (&Some(Encoding::Text), _) | (None, false) => log
+            Encoding::Text => log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes())
-                .unwrap_or(Bytes::new()),
+                .unwrap_or_default(),
         }
     }
 }
@@ -117,8 +128,7 @@ impl Sink for File {
                         io::ErrorKind::WriteZero,
                         "failed to \
                          write frame to transport",
-                    )
-                    .into());
+                    ));
                 }
 
                 let _ = self.buffer.split_to(n);
@@ -128,7 +138,7 @@ impl Sink for File {
             try_ready!(file.poll_flush());
 
             trace!("framed transport flushed");
-            return Ok(Async::Ready(()));
+            Ok(Async::Ready(()))
         } else {
             unreachable!()
         }
@@ -147,13 +157,44 @@ impl Sink for File {
 }
 
 #[derive(Debug, Clone)]
-struct BytesPath(Bytes);
+struct BytesPath {
+    #[cfg(unix)]
+    path: Bytes,
+    #[cfg(windows)]
+    path: path::PathBuf,
+}
+
+impl BytesPath {
+    #[cfg(unix)]
+    fn new(path: Bytes) -> BytesPath {
+        BytesPath { path }
+    }
+    #[cfg(windows)]
+    fn new(path: Bytes) -> BytesPath {
+        let utf8_string = String::from_utf8_lossy(&path[..]);
+        let path = path::PathBuf::from(utf8_string.as_ref());
+        BytesPath { path }
+    }
+}
 
 impl AsRef<path::Path> for BytesPath {
+    #[cfg(unix)]
     fn as_ref(&self) -> &path::Path {
         use std::os::unix::ffi::OsStrExt;
-        let os_str = ffi::OsStr::from_bytes(&self.0[..]);
+        let os_str = ffi::OsStr::from_bytes(&self.path);
         &path::Path::new(os_str)
+    }
+    #[cfg(windows)]
+    fn as_ref(&self) -> &path::Path {
+        &self.path.as_ref()
+    }
+}
+
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("File")
+            .field("encoding", &self.encoding)
+            .finish()
     }
 }
 
@@ -162,16 +203,18 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        test_util::{lines_from_file, random_lines_with_stream, random_nested_events_with_stream},
+        test_util::{
+            lines_from_file, random_lines_with_stream, random_nested_events_with_stream, temp_file,
+        },
     };
     use futures::Stream;
     use std::{collections::HashMap, path::PathBuf};
-    use tempfile::tempdir;
 
     #[test]
     fn encode_text() {
+        let path = temp_file();
         let (input, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, None);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path);
 
         for (input, output) in input.into_iter().zip(output) {
             assert_eq!(input, output);
@@ -180,8 +223,9 @@ mod tests {
 
     #[test]
     fn encode_json() {
+        let path = temp_file();
         let (input, events) = random_nested_events_with_stream(4, 3, 3, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, None);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
 
         for (input, output) in input.into_iter().zip(output) {
             let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
@@ -202,13 +246,59 @@ mod tests {
 
     #[test]
     fn file_is_appended() {
-        let directory = tempdir().unwrap().into_path();
+        let path = temp_file();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
-        test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory.clone()));
+        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
 
         let (mut input2, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, Some(directory));
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path);
+
+        let mut input = vec![];
+        input.append(&mut input1);
+        input.append(&mut input2);
+
+        assert_eq!(output.len(), input.len());
+
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    #[test]
+    fn create_dir() {
+        let path = temp_file();
+
+        let (mut input1, events) = random_lines_with_stream(100, 16);
+        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+
+        let (mut input2, events) = random_lines_with_stream(100, 16);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+
+        let mut input = vec![];
+        input.append(&mut input1);
+        input.append(&mut input2);
+
+        assert_eq!(output.len(), input.len());
+
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    #[test]
+    fn create_file() {
+        let path = temp_file();
+
+        // create just the directory and not the file
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+
+        let (mut input1, events) = random_lines_with_stream(100, 16);
+        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+
+        // Reopen the file to add more content to it
+        let (mut input2, events) = random_lines_with_stream(100, 16);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
 
         let mut input = vec![];
         input.append(&mut input1);
@@ -224,17 +314,13 @@ mod tests {
     fn test_unpartitioned_with_encoding<S>(
         events: S,
         encoding: Encoding,
-        directory: Option<PathBuf>,
+        path: PathBuf,
     ) -> Vec<String>
     where
         S: 'static + Stream<Item = Event, Error = ()> + Send,
     {
-        let path = directory
-            .unwrap_or(tempdir().unwrap().into_path())
-            .join("test.out");
-
         let b = Bytes::from(path.clone().to_str().unwrap().as_bytes());
-        let sink = File::new(b, Some(encoding));
+        let sink = File::new(b, encoding);
 
         let mut rt = crate::test_util::runtime();
         let pump = sink

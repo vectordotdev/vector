@@ -2,12 +2,12 @@ use super::{
     retries::RetryLogic,
     tls::{TlsConnectorExt, TlsSettings},
 };
+use crate::dns::Resolver;
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
-use native_tls::TlsConnector;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -18,38 +18,42 @@ use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 pub type Response = hyper::Response<Bytes>;
+pub type Error = hyper::Error;
 
 #[derive(Clone)]
 pub struct HttpService {
-    inner: InstrumentedService<Client<HttpsConnector<HttpConnector>, Vec<u8>>, Request<Vec<u8>>>,
+    inner: InstrumentedService<
+        Client<HttpsConnector<HttpConnector<Resolver>>, Vec<u8>>,
+        Request<Vec<u8>>,
+    >,
     request_builder: Arc<RequestBuilder>,
 }
 
 impl HttpService {
-    pub fn builder() -> HttpServiceBuilder {
-        HttpServiceBuilder::new()
+    pub fn builder(resolver: Resolver) -> HttpServiceBuilder {
+        HttpServiceBuilder::new(resolver)
     }
 
-    pub fn new<F>(request_builder: F) -> Self
+    pub fn new<F>(resolver: Resolver, request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        Self::builder().build(request_builder)
+        Self::builder(resolver).build(request_builder)
     }
 }
 
 /// A builder for `HttpService`s
-#[derive(Default)]
+#[derive(Debug)]
 pub struct HttpServiceBuilder {
-    threads: usize,
+    resolver: Resolver,
     tls_settings: Option<TlsSettings>,
 }
 
 impl HttpServiceBuilder {
-    fn new() -> Self {
+    fn new(resolver: Resolver) -> Self {
         Self {
-            threads: 4,
-            ..Default::default()
+            resolver,
+            tls_settings: None,
         }
     }
 
@@ -58,28 +62,26 @@ impl HttpServiceBuilder {
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new(self.threads);
+        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
         http.enforce_http(false);
+
         let mut tls = native_tls::TlsConnector::builder();
         if let Some(settings) = self.tls_settings {
             tls.use_tls_settings(settings);
         }
+
         let tls = tls.build().expect("TLS initialization failed");
+
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
+
         let inner = Client::with_client(client).instrument(info_span!("http"));
         HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
-    }
-
-    /// Set the number of threads used by the `HttpService`
-    pub fn threads(mut self, threads: usize) -> Self {
-        self.threads = threads;
-        self
     }
 
     /// Set the standard TLS settings
@@ -89,19 +91,33 @@ impl HttpServiceBuilder {
     }
 }
 
-pub fn https_client(
-    tls: TlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>>> {
-    let mut http = HttpConnector::new(1);
+pub fn connector(
+    resolver: Resolver,
+    tls_settings: TlsSettings,
+) -> crate::Result<HttpsConnector<HttpConnector<Resolver>>> {
+    let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
-    let tls = TlsConnector::builder().use_tls_settings(tls).build()?;
-    let https = HttpsConnector::from((http, tls));
+
+    let mut tls = native_tls::TlsConnector::builder();
+
+    tls.use_tls_settings(tls_settings);
+
+    let https = HttpsConnector::from((http, tls.build()?));
+
+    Ok(https)
+}
+
+pub fn https_client(
+    resolver: Resolver,
+    tls: TlsSettings,
+) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector<Resolver>>>> {
+    let https = connector(resolver, tls)?;
     Ok(hyper::Client::builder().build(https))
 }
 
 impl Service<Vec<u8>> for HttpService {
     type Response = Response;
-    type Error = hyper::Error;
+    type Error = Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -184,13 +200,16 @@ mod test {
 
     #[test]
     fn util_http_it_makes_http_requests() {
+        let rt = crate::test_util::runtime();
         let addr = crate::test_util::next_addr();
+        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpService::new(move |body| {
+        let mut service = HttpService::new(resolver, move |body| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
@@ -223,13 +242,13 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::runtime::Runtime::new().unwrap();
 
         rt.spawn(server);
 
         rt.block_on(req).unwrap();
 
-        rt.shutdown_now();
+        let _ = rt.shutdown_now();
 
         let (body, _rest) = rx.into_future().wait().unwrap();
         assert_eq!(body.unwrap().unwrap(), "hello");

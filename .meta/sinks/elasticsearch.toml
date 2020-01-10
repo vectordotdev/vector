@@ -1,16 +1,19 @@
 [sinks.elasticsearch]
+title = "Elasticsearch"
 batch_size = 10490000
 batch_timeout = 1
 beta = true
 buffer = true
+common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-rate_limit_duration = 1
-rate_limit_num = 5
-retry_attempts = 5
-retry_backoff_secs = 1
+request_rate_limit_duration_secs = 1
+request_rate_limit_num =5
+request_retry_attempts = 5
+request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 60
 service_provider = "Elastic"
@@ -25,16 +28,18 @@ description = "The `doc_type` for your index data. This is only relevant for Ela
 
 [sinks.elasticsearch.options.host]
 type = "string"
+common = true
 examples = ["http://10.24.32.122:9000"]
-null = false
-description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
+null = true
+description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
 
 [sinks.elasticsearch.options.index]
 type = "string"
+common = true
 default = "vector-%F"
 examples = [
+  "application-{{ application_id }}-%Y-%m-%d",
   "vector-%Y-%m-%d",
-  "application-{{ application_id }}-%Y-%m-%d"
 ]
 null = false
 templateable = true
@@ -47,13 +52,13 @@ description = "Options for basic authentication."
 
 [sinks.elasticsearch.options.basic_auth.options.password]
 type = "string"
-examples = ["password"]
+examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
 description = "The basic authentication password."
 
 [sinks.elasticsearch.options.basic_auth.options.user]
 type = "string"
-examples = ["username"]
+examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
 description = "The basic authentication user name."
 
@@ -62,27 +67,38 @@ type = "table"
 null = true
 description = "Options for custom headers."
 
-[sinks.elasticsearch.options.headers.options."*"]
+[sinks.elasticsearch.options.headers.options."`[header-name]`"]
 type = "string"
-examples = [{ name = "X-Powered-By", value = "Vector"}]
+examples = [
+  {Authorization = "${TOKEN_ENV_VAR}"},
+  {"X-Powered-By" = "Vector"}
+]
 null = false
 description = "A custom header to be added to each outgoing Elasticsearch request."
 
 [sinks.elasticsearch.options.provider]
 type = "string"
-enum = ["default", "aws"]
 null = true
 default = "default"
-description = "The provider of the Elasticsearch service."
+description = """\
+The provider of the Elasticsearch service. This is used to properly \
+authenticate with the Elasticsearch cluster. For example, authentication \
+for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we \
+obtain AWS credentials to properly sign the request.\
+"""
+
+[sinks.elasticsearch.options.provider.enum]
+default = "A generic Elasticsearch provider."
+aws = "The [AWS Elasticsearch Service][urls.aws_elasticsearch]."
 
 [sinks.elasticsearch.options.query]
 type = "table"
 null = true
 description = "Custom parameters to Elasticsearch query string."
 
-[sinks.elasticsearch.options.query.options."*"]
+[sinks.elasticsearch.options.query.options."`[parameter-name]`"]
 type = "string"
-examples = [{ name = "X-Powered-By", value = "Vector"}]
+examples = [{"X-Powered-By" = "Vector"}]
 null = false
 description = "A custom parameter to be added to each Elasticsearch request."
 
@@ -91,3 +107,21 @@ type = "string"
 examples = ["us-east-1"]
 null = true
 description = "When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance."
+
+[[sinks.elasticsearch.output.examples]]
+label = "Generic"
+body = """\
+```http
+POST <host>/_bulk HTTP/1.1
+Host: <host>
+Content-Type: application/x-ndjson
+Content-Length: <byte_size>
+
+{ "index" : { "_index" : "<index>" } }
+<json_encoded_log>
+{ "index" : { "_index" : "<index>" } }
+<json_encoded_log>
+{ "index" : { "_index" : "<index>" } }
+<json_encoded_log>
+```\
+"""
