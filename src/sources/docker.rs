@@ -103,13 +103,12 @@ struct DockerSourceCore {
 }
 
 impl DockerSourceCore {
-    /// Only logs created at, or after this moment are logged.
     fn new(config: DockerConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = Docker::new();
 
-        // Only logs created at, or after this moment are logged.
+        // Only log events created at-or-after this moment are logged.
         let now = chrono::Local::now();
         info!(
             message = "Capturing logs from now on",
