@@ -13,7 +13,7 @@ pub struct MergeConfig {
     /// The field that indicates that the event is partial. A consequent stream
     /// of partial events along with the first non-partial event will be merged
     /// together.
-    pub partial_event_indicator_field: Atom,
+    pub partial_event_marker: Atom,
     /// Fields to merge. The values of these fields will be merged into the
     /// first partial event. Fields not specified here will be ignored.
     /// Merging process takes the first buffered partial event, then loops over
@@ -31,7 +31,7 @@ inventory::submit! {
 impl Default for MergeConfig {
     fn default() -> Self {
         Self {
-            partial_event_indicator_field: event::PARTIAL.clone(),
+            partial_event_marker: event::PARTIAL.clone(),
             merge_fields: vec![event::MESSAGE.clone()],
         }
     }
@@ -58,7 +58,7 @@ impl TransformConfig for MergeConfig {
 
 #[derive(Debug)]
 pub struct Merge {
-    partial_event_indicator_field: Atom,
+    partial_event_marker: Atom,
     merge_fields: Vec<Atom>,
     partial_events: Vec<Event>,
 }
@@ -66,7 +66,7 @@ pub struct Merge {
 impl From<MergeConfig> for Merge {
     fn from(config: MergeConfig) -> Self {
         Self {
-            partial_event_indicator_field: config.partial_event_indicator_field,
+            partial_event_marker: config.partial_event_marker,
             merge_fields: config.merge_fields,
             partial_events: Vec::new(),
         }
@@ -84,14 +84,12 @@ impl Transform for Merge {
         // custom partial markers.
 
         // Determine whether the current event is partial.
-        let is_partial = event.as_log().contains(&self.partial_event_indicator_field);
+        let is_partial = event.as_log().contains(&self.partial_event_marker);
 
-        // If current event is partial, remove the partial indicator field and
-        // stash it.
+        // If current event is partial, remove the partial marker from the event
+        // and stash it.
         if is_partial {
-            event
-                .as_mut_log()
-                .remove(&self.partial_event_indicator_field);
+            event.as_mut_log().remove(&self.partial_event_marker);
             self.partial_events.push(event);
             return None;
         }
