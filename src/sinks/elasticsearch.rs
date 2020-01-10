@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -36,7 +36,7 @@ pub struct ElasticSearchConfig {
     pub compression: Option<Compression>,
     pub provider: Option<Provider>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchBytesConfig,
     // TODO: This should be an Option, but when combined with flatten we never seem to get back
     // a None. For now, we get optionality by handling the error during parsing when nothing is
     // passed. See https://github.com/timberio/vector/issues/1160
@@ -666,8 +666,8 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchConfig {
-                size: Some(1),
+            batch: BatchBytesConfig {
+                max_size: Some(1),
                 timeout_secs: None,
             },
             ..Default::default()

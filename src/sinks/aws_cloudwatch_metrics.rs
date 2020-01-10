@@ -3,7 +3,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        retries::RetryLogic, rusoto, BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -33,7 +33,7 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }

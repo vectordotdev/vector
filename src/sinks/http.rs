@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -46,7 +46,7 @@ pub struct HttpSinkConfig {
     pub compression: Option<Compression>,
     pub encoding: Encoding,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,

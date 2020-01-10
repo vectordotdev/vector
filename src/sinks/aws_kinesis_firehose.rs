@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -33,7 +33,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -256,7 +256,10 @@ mod integration_tests {
     use crate::{
         region::RegionOrEndpoint,
         runtime,
-        sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchConfig, Provider},
+        sinks::{
+            elasticsearch::{ElasticSearchCommon, ElasticSearchConfig, Provider},
+            util::BatchEventsConfig,
+        },
         test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
     };
@@ -284,8 +287,8 @@ mod integration_tests {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
             encoding: Encoding::Json, // required for ES destination w/ localstack
-            batch: BatchConfig {
-                size: Some(2),
+            batch: BatchEventsConfig {
+                max_events: Some(2),
                 timeout_secs: None,
             },
             request: TowerRequestConfig {

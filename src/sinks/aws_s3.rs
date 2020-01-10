@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, BatchConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
+        retries::RetryLogic, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
         ServiceBuilderExt, SinkExt, TowerRequestConfig,
     },
     template::Template,
@@ -43,7 +43,7 @@ pub struct S3SinkConfig {
     pub encoding: Encoding,
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -664,8 +664,8 @@ mod integration_tests {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch: BatchConfig {
-                size: Some(batch_size),
+            batch: BatchBytesConfig {
+                max_size: Some(batch_size),
                 timeout_secs: Some(5),
             },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),

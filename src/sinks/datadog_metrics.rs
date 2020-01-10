@@ -2,7 +2,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -44,7 +44,7 @@ pub struct DatadogConfig {
     pub host: String,
     pub api_key: String,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }

@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -36,7 +36,7 @@ pub struct KinesisSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -344,8 +344,8 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
-            batch: BatchConfig {
-                size: Some(2),
+            batch: BatchEventsConfig {
+                max_events: Some(2),
                 timeout_secs: None,
             },
             ..Default::default()

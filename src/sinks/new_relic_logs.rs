@@ -1,6 +1,6 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{BatchConfig, Compression, TowerRequestConfig},
+    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use indexmap::IndexMap;
@@ -31,7 +31,7 @@ pub struct NewRelicLogsConfig {
     pub region: Option<NewRelicLogsRegion>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchBytesConfig,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -74,10 +74,10 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => "https://log-api.eu.newrelic.com/log/v1",
         };
 
-        let batch = BatchConfig {
+        let batch = BatchBytesConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            size: Some(self.batch.size.unwrap_or(bytesize::mib(5u64) as usize)),
+            max_size: Some(self.batch.max_size.unwrap_or(bytesize::mib(5u64) as usize)),
             ..self.batch
         };
 
@@ -143,7 +143,10 @@ mod tests {
         assert_eq!(http_config.uri, "https://log-api.newrelic.com/log/v1");
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
-        assert_eq!(http_config.batch.size, Some(bytesize::mib(5u64) as usize));
+        assert_eq!(
+            http_config.batch.max_size,
+            Some(bytesize::mib(5u64) as usize)
+        );
         assert_eq!(http_config.request.in_flight_limit, Some(100));
         assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
@@ -159,7 +162,7 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::default();
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.size = Some(bytesize::mib(8u64) as usize);
+        nr_config.batch.max_size = Some(bytesize::mib(8u64) as usize);
         nr_config.request.in_flight_limit = Some(12);
         nr_config.request.rate_limit_num = Some(24);
 
@@ -168,7 +171,10 @@ mod tests {
         assert_eq!(http_config.uri, "https://log-api.eu.newrelic.com/log/v1");
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
-        assert_eq!(http_config.batch.size, Some(bytesize::mib(8u64) as usize));
+        assert_eq!(
+            http_config.batch.max_size,
+            Some(bytesize::mib(8u64) as usize)
+        );
         assert_eq!(http_config.request.in_flight_limit, Some(12));
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
@@ -186,7 +192,7 @@ mod tests {
         region = "eu"
 
         [batch]
-        size = 8388608
+        max_size = 8388608
 
         [request]
         in_flight_limit = 12
@@ -199,7 +205,10 @@ mod tests {
         assert_eq!(http_config.uri, "https://log-api.eu.newrelic.com/log/v1");
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
-        assert_eq!(http_config.batch.size, Some(bytesize::mib(8u64) as usize));
+        assert_eq!(
+            http_config.batch.max_size,
+            Some(bytesize::mib(8u64) as usize)
+        );
         assert_eq!(http_config.request.in_flight_limit, Some(12));
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(

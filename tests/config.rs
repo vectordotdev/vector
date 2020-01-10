@@ -316,7 +316,7 @@ fn bad_s3_region() {
         endpoint = "this shoudlnt work"
 
         [sinks.out4.batch]
-        size = 100000
+        max_size = 100000
       "#,
     )
     .unwrap_err();
@@ -507,7 +507,7 @@ fn parses_sink_full_request() {
 }
 
 #[test]
-fn parses_sink_full_batch() {
+fn parses_sink_full_batch_bytes() {
     load(
         r#"
         [sources.in]
@@ -520,7 +520,30 @@ fn parses_sink_full_batch() {
         encoding = "json"
 
         [sinks.out.batch]
-        size = 100
+        max_size = 100
+        timeout_secs = 10
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_batch_event() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "aws_cloudwatch_logs"
+        inputs = ["in"]
+        region = "us-east-1"
+        group_name = "test"
+        stream_name = "test"
+        encoding = "json"
+
+        [sinks.out.batch]
+        max_events = 100
         timeout_secs = 10
         "#,
     )

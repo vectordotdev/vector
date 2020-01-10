@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -32,7 +32,7 @@ pub struct PubsubConfig {
     pub credentials_path: Option<String>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
