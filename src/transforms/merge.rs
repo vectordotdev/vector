@@ -10,11 +10,17 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct MergeConfig {
-    /// The field that indicates the message is partial. A consequent stream of
-    /// partial messages along with the first non-partial message will be merged
+    /// The field that indicates that the event is partial. A consequent stream
+    /// of partial events along with the first non-partial event will be merged
     /// together.
     pub partial_event_indicator_field: Atom,
-    /// Fields to merge - the values of these will be concatenated.
+    /// Fields to merge. The values of these fields will be merged into the
+    /// first partial event. Fields not specified here will be ignored.
+    /// Merging process takes the first buffered partial event, then loops over
+    /// the rest of them and merges in the fields from each buffered partial
+    /// event.
+    /// Finally, the non-partial event fields are merged in, producing the
+    /// resulting merged event.
     pub merge_fields: Vec<Atom>,
 }
 
@@ -52,13 +58,8 @@ impl TransformConfig for MergeConfig {
 
 #[derive(Debug)]
 pub struct Merge {
-    /// The field that indicates the message is partial. A consequent stream of
-    /// partial messages along with the first non-partial message will be merged
-    /// together.
     partial_event_indicator_field: Atom,
-    /// Fields to merge - the values of these will be concatenated.
     merge_fields: Vec<Atom>,
-    /// Buffer used to keep partial events.
     partial_events: Vec<Event>,
 }
 
