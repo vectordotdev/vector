@@ -326,7 +326,7 @@ fn test_reclaim_disk_space() {
     let send = send_lines(in_addr, input_lines2.clone().into_iter());
     rt.block_on(send).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(5000));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     block_on(topology.stop()).unwrap();
 
