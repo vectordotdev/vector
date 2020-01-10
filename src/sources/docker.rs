@@ -1,3 +1,7 @@
+use crate::transforms::{
+    merge::{Merge, MergeConfig},
+    Transform,
+};
 use crate::{
     event::{self, Event, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -44,6 +48,7 @@ pub struct DockerConfig {
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
     partial_event_marker: Option<Atom>,
+    no_auto_partial_merge: bool,
 }
 
 impl Default for DockerConfig {
@@ -53,6 +58,7 @@ impl Default for DockerConfig {
             include_labels: None,
             include_images: None,
             partial_event_marker: Some(event::PARTIAL.clone()),
+            no_auto_partial_merge: false,
         }
     }
 }
@@ -209,6 +215,23 @@ impl DockerSource {
         config: DockerConfig,
         out: Sender<Event>,
     ) -> crate::Result<impl Future<Item = (), Error = ()>> {
+        // Built-in merge transform config.
+        // We spawn a merge transform per docker log event stream (which
+        // happens to be per container).
+        // If `None`, no merging is performed, allowing use to effectively
+        // opt-out from the built-in automating partial message merging.
+        let merge_transform_config = if config.no_auto_partial_merge {
+            None
+        } else {
+            config
+                .partial_event_marker
+                .clone()
+                .map(|partial_event_marker| MergeConfig {
+                    partial_event_marker,
+                    merge_fields: vec![event::MESSAGE.clone()],
+                })
+        };
+
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
 
@@ -227,7 +250,7 @@ impl DockerSource {
         // t2 -- outside: container stoped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
-        let esb = EventStreamBuilder::new(core, out, main_send);
+        let esb = EventStreamBuilder::new(core, out, main_send, merge_transform_config);
 
         // Construct, capture currently running containers, and do main future(self)
         Ok(DockerSource {
@@ -479,6 +502,8 @@ struct EventStreamBuilder {
     out: Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: UnboundedSender<ContainerLogInfo>,
+    /// A built-in merge transform config.
+    merge_transform_config: Option<MergeConfig>,
 }
 
 impl EventStreamBuilder {
@@ -486,11 +511,13 @@ impl EventStreamBuilder {
         core: DockerSourceCore,
         out: Sender<Event>,
         main_send: UnboundedSender<ContainerLogInfo>,
+        merge_transform_config: Option<MergeConfig>,
     ) -> Self {
         EventStreamBuilder {
             core: Arc::new(core),
             out,
             main_send,
+            merge_transform_config,
         }
     }
 
@@ -549,7 +576,7 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut state = Some((self.main_send.clone(), info));
         let partial_event_marker = self.core.config.partial_event_marker.clone();
-        tokio::prelude::stream::poll_fn(move || {
+        let event_stream = tokio::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
                 // Main event loop
@@ -590,9 +617,25 @@ impl EventStreamBuilder {
             }
 
             Ok(Async::Ready(None))
-        })
-        .forward(self.out.clone().sink_map_err(|_| ()))
-        .map(|_| ())
+        });
+
+        // Prepare merge transform is the configuration is available, otherwise
+        // user must've opted out from the automatic merging, so we skip
+        // the merge transform creation.
+        let mut merge_transform: Option<Merge> =
+            self.merge_transform_config.clone().map(Into::into);
+
+        // Pass all events to merge transform is there is some, and return them
+        // as is otherwise. We can't perform the check outside of `filter_map`
+        // because the resulting stream type has to be of a particular type.
+        let event_stream = event_stream.filter_map(move |event| match merge_transform {
+            Some(ref mut merge_transform) => Transform::transform(merge_transform, event),
+            None => Some(event),
+        });
+
+        event_stream
+            .forward(self.out.clone().sink_map_err(|_| ()))
+            .map(|_| ())
     }
 }
 
