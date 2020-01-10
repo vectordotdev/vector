@@ -292,14 +292,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   data_dir = "/var/lib/vector"
 
-  # Include only entries from the local system
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  local_only = true
-  local_only = false
-
   # The list of units names to monitor. If empty or not present, all units are
   # accepted. Unit names lacking a `"."` will have `".service"` appended to make
   # them a valid service unit name.
