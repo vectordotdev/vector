@@ -18591,9 +18591,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": [
-        "filter"
-      ],
+      "function_category": "shape",
       "id": "concat_transform",
       "name": "concat",
       "operating_systems": [
@@ -18723,6 +18721,26 @@ module.exports = {
       ],
       "service_provider": null,
       "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "merge": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to merge partial log events into a single event.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "merge",
+      "id": "merge_transform",
+      "name": "merge",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
 

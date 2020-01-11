@@ -1,0 +1,138 @@
+[transforms.merge]
+title = "Merge"
+allow_you_to_description = "merge partial log events into a single event"
+common = false
+function_category = "merge"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.merge.options.merge_fields]
+type = "[string]"
+common = true
+default = ["message"]
+null = false
+description = """\
+Fields to merge.
+
+The values of these fields will be merged into the _first_ partial event. \
+Fields not specified here will be ignored. Merging process takes the first \
+buffered partial event, then loops over the rest of them and merges in the \
+fields from each buffered partial event. The last event with the field takes \
+priority and overrides the previous event.
+
+Finally, the non-partial event fields are merged in, producing the resulting \
+merged event.\
+"""
+
+[transforms.merge.options.partial_event_marker]
+type = "string"
+common = true
+default = "_partial"
+null = false
+description = """\
+The field that indicates that the event is partial. A consequent stream of \
+partial events along with the first non-partial event will be merged together.\
+"""
+
+[[transforms.merge.output.log.examples]]
+label = "Default"
+body = """\
+Given the following _default_ configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.merge_events]
+  type = "merge"
+  inputs = [...]
+```
+
+And these two partial [`log` events][docs.data-model.log]:
+
+<CodeHeader fileName="first log event" />
+
+```javascript
+{
+  "message": "First",
+  "_partial": true,
+  "custom_field": "value1"
+}
+```
+
+and
+
+<CodeHeader fileName="second log event" />
+
+```javascript
+{
+  "message": "Second",
+  "_partial": true,
+  "custom_field": "value2"
+}
+```
+
+A single _merged_ log event will be produced:
+
+```javascript
+{
+  "message": "FirstSecond",
+  "custom_field": "value1"
+}
+```
+
+Notice that `custom_field` is not overridden. This is because it was not \
+specified in the `merge_fields` option.\
+"""
+
+[[transforms.merge.output.log.examples]]
+label = "With Merge Fields"
+body = """\
+Given the following _default_ configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.merge_events]
+  type = "merge"
+  inputs = [...]
+  merge_fields = ["message", "custom_field"]
+```
+
+And these two partial [`log` events][docs.data-model.log]:
+
+<CodeHeader fileName="first log event" />
+
+```javascript
+{
+  "message": "First",
+  "_partial": true,
+  "custom_field": "value1"
+}
+```
+
+and
+
+<CodeHeader fileName="second log event" />
+
+```javascript
+{
+  "message": "Second",
+  "_partial": true,
+  "custom_field": "value2"
+}
+```
+
+A single _merged_ log event will be produced:
+
+```javascript
+{
+  "message": "FirstSecond",
+  "custom_field": "value2"
+}
+```
+
+Notice that `custom_field` is overridden. This is because it was specified \
+in the `merge_fields` option.\
+"""

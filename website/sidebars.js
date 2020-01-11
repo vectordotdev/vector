@@ -168,6 +168,8 @@ module.exports = {
             
               "reference/transforms/lua",
             
+              "reference/transforms/merge",
+            
               "reference/transforms/regex_parser",
             
               "reference/transforms/remove_fields",

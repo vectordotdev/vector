@@ -70,6 +70,7 @@ scopes:
   - json_parser transform
   - log_to_metric transform
   - lua transform
+  - merge transform
   - regex_parser transform
   - remove_fields transform
   - remove_tags transform

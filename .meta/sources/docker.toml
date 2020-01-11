@@ -60,6 +60,25 @@ A list of image names to match against. If not provided, \
 all images will be included.\
 """
 
+[sources.docker.options.no_auto_partial_merge]
+type = "bool"
+common = false
+default = false
+null = false
+description = """\
+Setting this to `false` will disable the automatic merging of partial events.\
+"""
+
+[sources.docker.options.partial_event_marker]
+type = "string"
+common = false
+default = "_partial"
+null = false
+description = """\
+The field that indicates that the event is partial. A consequent stream of \
+partial events along with the first non-partial event will be merged together.\
+"""
+
 [sources.docker.output.log.fields.container_created_at]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]

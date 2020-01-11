@@ -23,6 +23,21 @@ The Vector `docker` source ingests data through the docker engine daemon and out
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -37,6 +52,28 @@ import CodeHeader from '@site/src/components/CodeHeader';
   include_images = ["my_image_name", "httpd", "redis"] # example, no default
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[sources.my_source_id]
+  # REQUIRED
+  type = "docker" # must be: "docker"
+
+  # OPTIONAL
+  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
+  include_images = ["my_image_name", "httpd", "redis"] # example, no default
+  include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
+  no_auto_partial_merge = false # default
+  partial_event_marker = "_partial" # default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -112,6 +149,52 @@ A list of image names to match against. If not provided, all images will be incl
 ### include_labels
 
 A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  name={"no_auto_partial_merge"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### no_auto_partial_merge
+
+Setting this to `false` will disable the automatic merging of partial events. See [Message Splitting & Merging](#message-splitting--merging) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"_partial"}
+  enumValues={null}
+  examples={["_partial"]}
+  name={"partial_event_marker"}
+  nullable={false}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### partial_event_marker
+
+The field that indicates that the event is partial. A consequent stream of partial events along with the first non-partial event will be merged together. See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
 </Field>
@@ -357,6 +440,16 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
+
+### Message Splitting & Merging
+
+Docker, by default, will split log messages that exceed 16kb. This can be a
+rather frustrating problem because it produces malformed log messages that are
+difficult to work with. Vector's `docker` source solves this by default,
+automatically merging these messages into a single message. You can turn this
+off via the [`no_auto_partial_merge`](#no_auto_partial_merge) option. Furthermore, you can adjust
+the marker that we use to determine if an event is partial via the
+`partial_event_marker` option.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
