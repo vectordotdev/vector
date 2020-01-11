@@ -50,6 +50,16 @@ containers. This should follow the described label's synatx in [docker object \
 labels docs][urls.docker_object_labels].\
 """
 
+[sources.docker.options.include_images]
+type = "[string]"
+common = true
+examples = [["my_image_name", "httpd", "redis"]]
+null = true
+description = """\
+A list of image names to match against. If not provided, \
+all images will be included. \
+"""
+
 [sources.docker.output.log.fields.container_created_at]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]

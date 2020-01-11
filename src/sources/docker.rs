@@ -42,6 +42,7 @@ type DockerEvent = shiplift::rep::Event;
 pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
+    include_images: Option<Vec<String>>,
 }
 
 impl DockerConfig {
@@ -80,7 +81,9 @@ impl SourceConfig for DockerConfig {
         _globals: &GlobalOptions,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
-        Ok(Box::new(DockerSource::new(self.clone(), out)) as Box<_>)
+        DockerSource::new(self.clone(), out)
+            .map(Box::new)
+            .map(|source| source as Box<_>)
     }
 
     fn output_type(&self) -> DataType {
@@ -95,29 +98,29 @@ impl SourceConfig for DockerConfig {
 struct DockerSourceCore {
     config: DockerConfig,
     docker: Docker,
-    /// Only logs created at, or after this moment are logged. UNIX timestamp
-    now_timestamp: i64,
+    /// Only logs created at, or after this moment are logged.
+    now_timestamp: DateTime<Utc>,
 }
 
 impl DockerSourceCore {
     /// Only logs created at, or after this moment are logged.
-    fn new(config: DockerConfig) -> Self {
+    fn new(config: DockerConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = Docker::new();
 
         // Only logs created at, or after this moment are logged.
         let now = chrono::Local::now();
-        let now_timestamp = now.timestamp();
         info!(
             message = "Capturing logs from now on",
             now = %now.to_rfc3339()
         );
-        DockerSourceCore {
+
+        Ok(DockerSourceCore {
             config,
             docker,
-            now_timestamp,
-        }
+            now_timestamp: now.into(),
+        })
     }
 
     /// Returns event stream coming from docker.
@@ -127,7 +130,7 @@ impl DockerSourceCore {
         let mut options = shiplift::builder::EventsOptions::builder();
 
         // Limit events to those after core creation
-        options.since(&(self.now_timestamp as u64));
+        options.since(&(self.now_timestamp.timestamp() as u64));
 
         // event  | emmited on commands
         // -------+-------------------
@@ -155,6 +158,10 @@ impl DockerSourceCore {
 
         if let Some(include_labels) = &self.config.include_labels {
             filters.extend(include_labels.iter().map(|l| EventFilter::Label(l.clone())));
+        }
+
+        if let Some(include_images) = &self.config.include_images {
+            filters.extend(include_images.iter().map(|l| EventFilter::Image(l.clone())));
         }
 
         options.filter(filters);
@@ -187,9 +194,12 @@ struct DockerSource {
 }
 
 impl DockerSource {
-    fn new(config: DockerConfig, out: Sender<Event>) -> impl Future<Item = (), Error = ()> {
+    fn new(
+        config: DockerConfig,
+        out: Sender<Event>,
+    ) -> crate::Result<impl Future<Item = (), Error = ()>> {
         // Only logs created at, or after this moment are logged.
-        let core = DockerSourceCore::new(config);
+        let core = DockerSourceCore::new(config)?;
 
         // main event stream, with whom only newly started/restarted containers will be loged.
         let events = core.docker_event_stream();
@@ -209,7 +219,7 @@ impl DockerSource {
         let esb = EventStreamBuilder::new(core, out, main_send);
 
         // Construct, capture currently running containers, and do main future(self)
-        DockerSource {
+        Ok(DockerSource {
             esb,
             events: Box::new(events) as Box<_>,
             containers: HashMap::new(),
@@ -217,7 +227,7 @@ impl DockerSource {
             main_recv,
         }
         .running_containers()
-        .and_then(|source| source)
+        .and_then(|source| source))
     }
 
     /// Future that captures currently running containers, and starts event streams for them.
@@ -226,6 +236,7 @@ impl DockerSource {
 
         // by docker API, using both type of include results in AND between them
         // TODO: missing feature in shiplift to include ContainerFilter::Name
+
         // Include-label
         options.filter(
             self.esb
@@ -322,6 +333,14 @@ impl DockerSource {
                             id = field::display(&container.id)
                         );
                         continue;
+                    }
+
+                    // Include image check
+                    if let Some(images) = self.esb.core.config.include_images.as_ref() {
+                        let image_check = images.iter().any(|image| &container.image == image);
+                        if !images.is_empty() && !image_check {
+                            continue;
+                        }
                     }
 
                     let id = ContainerId::new(container.id);
@@ -631,8 +650,8 @@ impl ContainerState {
 struct ContainerLogInfo {
     /// Container docker ID
     id: ContainerId,
-    /// Unix timestamp of event which created this struct
-    created: i64,
+    /// Timestamp of event which created this struct
+    created: DateTime<Utc>,
     /// Timestamp of last log message with it's generation
     last_log: Option<(DateTime<FixedOffset>, u64)>,
     /// generation of ContainerState at event_stream creation
@@ -643,7 +662,7 @@ struct ContainerLogInfo {
 impl ContainerLogInfo {
     /// Container docker ID
     /// Unix timestamp of event which created this struct
-    fn new(id: ContainerId, metadata: ContainerMetadata, created: i64) -> Self {
+    fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
         ContainerLogInfo {
             id,
             created,
@@ -659,7 +678,7 @@ impl ContainerLogInfo {
         self.last_log
             .as_ref()
             .map(|&(ref d, _)| d.timestamp())
-            .unwrap_or(self.created)
+            .unwrap_or(self.created.timestamp())
             - 1
     }
 
@@ -692,7 +711,7 @@ impl ContainerLogInfo {
                         // noop
                     }
                     // Recieved log is not from before of creation
-                    None if self.created <= timestamp.timestamp() => (),
+                    None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
                             message = "Recieved older log",
@@ -739,7 +758,7 @@ impl ContainerLogInfo {
         }
         log_event.insert_implicit(NAME.clone(), self.metadata.name.clone());
         log_event.insert_implicit(IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert_implicit(CREATED_AT.clone(), self.metadata.created_at.clone());
+        log_event.insert_implicit(CREATED_AT.clone(), self.metadata.created_at.clone().into());
 
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
@@ -754,8 +773,8 @@ struct ContainerMetadata {
     name: ValueKind,
     /// image -> String
     image: ValueKind,
-    /// created_at -> DateTime<Utc>
-    created_at: ValueKind,
+    /// created_at
+    created_at: DateTime<Utc>,
 }
 
 impl ContainerMetadata {
@@ -792,6 +811,7 @@ mod tests {
     use super::*;
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
+    use futures::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
@@ -834,16 +854,27 @@ mod tests {
         label: L,
         rt: &mut runtime::Runtime,
     ) -> mpsc::Receiver<Event> {
-        trace_init();
-        let (sender, recv) = mpsc::channel(100);
-        rt.spawn(
+        source_with_config(
             DockerConfig {
                 include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
                 include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
                 ..DockerConfig::default()
-            }
-            .build("default", &GlobalOptions::default(), sender)
-            .unwrap(),
+            },
+            rt,
+        )
+    }
+
+    /// None if docker is not present on the system
+    fn source_with_config(
+        config: DockerConfig,
+        rt: &mut runtime::Runtime,
+    ) -> mpsc::Receiver<Event> {
+        trace_init();
+        let (sender, recv) = mpsc::channel(100);
+        rt.spawn(
+            config
+                .build("default", &GlobalOptions::default(), sender)
+                .unwrap(),
         );
         recv
     }
@@ -870,12 +901,11 @@ mod tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    /// Delay in seconds
-    fn delayed_container<'a, L: Into<Option<&'a str>>>(
+    /// Will resend message every so often.
+    fn eternal_container<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
         log: &str,
-        delay: u32,
         docker: &Docker,
         rt: &mut runtime::Runtime,
     ) -> String {
@@ -885,7 +915,7 @@ mod tests {
             vec![
                 "sh".to_owned(),
                 "-c".to_owned(),
-                format!("echo before; sleep {}; echo {}", delay, log),
+                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log),
             ],
             docker,
             rt,
@@ -964,6 +994,18 @@ mod tests {
             .map(|exit| info!("Container exited with status code: {}", exit.status_code))
     }
 
+    /// Returns once container is killed
+    #[must_use]
+    fn container_kill(
+        id: &str,
+        docker: &Docker,
+        rt: &mut runtime::Runtime,
+    ) -> Result<(), shiplift::errors::Error> {
+        trace!("Waiting container");
+        let future = docker.containers().get(id).kill(None);
+        rt.block_on(future)
+    }
+
     /// Returns once container is done running
     #[must_use]
     fn container_run(
@@ -1003,6 +1045,34 @@ mod tests {
             }
         }
         id
+    }
+
+    /// Once function returns, the container has entered into running state.
+    /// Container must be killed before removed.
+    fn running_container<'a, L: Into<Option<&'a str>>>(
+        name: &str,
+        label: L,
+        log: &str,
+        docker: &Docker,
+        rt: &mut runtime::Runtime,
+    ) -> String {
+        let out = source_with(&[name], None, rt);
+
+        let id = eternal_container(name, label, log, &docker, rt);
+        if let Err(error) = container_start(&id, &docker, rt) {
+            container_remove(&id, &docker, rt);
+            panic!("Container start failed with error: {:?}", error);
+        }
+
+        // Wait for before message
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+        assert_eq!(events[0].as_log()[&event::MESSAGE], "before".into());
+
+        id
+    }
+
+    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> impl Future<Item = bool, Error = ()> {
+        future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
     }
 
     #[test]
@@ -1093,21 +1163,15 @@ mod tests {
         let message = "14";
         let name = "vector_test_currently_running";
         let label = "vector_test_label_currently_running";
-        let delay = 3; // sec
 
         let mut rt = test_util::runtime();
         let docker = docker();
 
-        let id = delayed_container(name, label, message, delay, &docker, &mut rt);
-        if let Err(error) = container_start(&id, &docker, &mut rt) {
-            container_remove(&id, &docker, &mut rt);
-            panic!("Container start failed with error: {:?}", error);
-        }
+        let id = running_container(name, label, message, &docker, &mut rt);
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
         let out = source_with(&[name], None, &mut rt);
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-        let _ = container_wait(&id, &docker, &mut rt);
+        let _ = container_kill(&id, &docker, &mut rt);
         container_remove(&id, &docker, &mut rt);
 
         let log = events[0].as_log();
@@ -1117,5 +1181,76 @@ mod tests {
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
+    }
+
+    #[test]
+    fn include_image() {
+        let message = "15";
+        let name = "vector_test_include_image";
+        let config = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            ..DockerConfig::default()
+        };
+
+        let mut rt = test_util::runtime();
+        let out = source_with_config(config, &mut rt);
+        let docker = docker();
+
+        let id = container_log_n(1, name, None, message, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        container_remove(&id, &docker, &mut rt);
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+    }
+
+    #[test]
+    fn not_include_image() {
+        let message = "16";
+        let name = "vector_test_not_include_image";
+        let config_ex = DockerConfig {
+            include_images: Some(vec!["some_image".to_owned()]),
+            ..DockerConfig::default()
+        };
+
+        let mut rt = test_util::runtime();
+        let exclude_out = source_with_config(config_ex, &mut rt);
+        let docker = docker();
+
+        let id = container_log_n(1, name, None, message, &docker, &mut rt);
+        container_remove(&id, &docker, &mut rt);
+
+        assert!(rt.block_on(is_empty(exclude_out)).unwrap());
+    }
+
+    #[test]
+    fn not_include_running_image() {
+        let message = "17";
+        let name = "vector_test_not_include_running_image";
+        let config_ex = DockerConfig {
+            include_images: Some(vec!["some_image".to_owned()]),
+            ..DockerConfig::default()
+        };
+        let config_in = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            ..DockerConfig::default()
+        };
+
+        let mut rt = test_util::runtime();
+        let docker = docker();
+
+        let id = running_container(name, None, message, &docker, &mut rt);
+
+        let exclude_out = source_with_config(config_ex, &mut rt);
+        let include_out = source_with_config(config_in, &mut rt);
+
+        let _ = rt.block_on(collect_n(include_out, 1)).ok().unwrap();
+        let _ = container_kill(&id, &docker, &mut rt);
+        container_remove(&id, &docker, &mut rt);
+
+        assert!(rt.block_on(is_empty(exclude_out)).unwrap());
     }
 }

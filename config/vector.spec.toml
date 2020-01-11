@@ -67,6 +67,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"]
 
+  # A list of image names to match against. If not provided, all images will be
+  # included.
+  # 
+  # * optional
+  # * no default
+  # * type: [string]
+  include_images = ["my_image_name", "httpd", "redis"]
+
   # A list of container object labels to match against when filtering running
   # containers. This should follow the described label's synatx in docker object
   # labels docs.

@@ -34,6 +34,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
+  include_images = ["my_image_name", "httpd", "redis"] # example, no default
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
 
@@ -65,6 +66,29 @@ import Field from '@site/src/components/Field';
 
 A list of container IDs _or_ names to match against. Prefix matches are supported, meaning you can supply just the first few characters of the
 container ID or name. If not provided, all containers will be included.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["my_image_name","httpd","redis"]]}
+  name={"include_images"}
+  nullable={true}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+### include_images
+
+A list of image names to match against. If not provided, all images will be included. 
 
 
 </Field>
