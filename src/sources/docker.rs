@@ -758,7 +758,7 @@ impl ContainerLogInfo {
         }
         log_event.insert_implicit(NAME.clone(), self.metadata.name.clone());
         log_event.insert_implicit(IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert_implicit(CREATED_AT.clone(), self.metadata.created_at.clone().into());
+        log_event.insert_implicit(CREATED_AT.clone(), self.metadata.created_at.clone());
 
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);

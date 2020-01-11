@@ -88,7 +88,7 @@ container ID or name. If not provided, all containers will be included.
 
 ### include_images
 
-A list of image names to match against. If not provided, all images will be included. 
+A list of image names to match against. If not provided, all images will be included.
 
 
 </Field>
