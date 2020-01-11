@@ -461,7 +461,7 @@ The values contained within the summary that align with the [`quantiles`](#quant
 
 #### counter
 
-A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.
+A single value that can _only_ be incremented or reset to zero value, it cannot be decremented.
 
 <Fields filters={false}>
 
