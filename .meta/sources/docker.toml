@@ -57,7 +57,7 @@ examples = [["my_image_name", "httpd", "redis"]]
 null = true
 description = """\
 A list of image names to match against. If not provided, \
-all images will be included. \
+all images will be included.\
 """
 
 [sources.docker.output.log.fields.container_created_at]
