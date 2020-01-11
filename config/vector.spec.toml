@@ -67,26 +67,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"]
 
-  # A UTC timestamp of ISO 8601, RFC 3339, UNIX, or other similar formats.
-  # Containers created before the timestamp are excluded.
-  # 
-  # * optional
-  # * no default
-  # * type: string
-  include_created_after = "2019-11-27T20:47:17.431292Z"
-  include_created_after = "2019-11-27 20:47:17 "
-  include_created_after = "1576702402"
-
-  # A UTC timestamp of ISO 8601, RFC 3339, UNIX, or other similar formats.
-  # Containers created after the timestamp are excluded.
-  # 
-  # * optional
-  # * no default
-  # * type: string
-  include_created_before = "2019-11-27T20:47:17.431292Z"
-  include_created_before = "2019-11-27 20:47:17 "
-  include_created_before = "1576702402"
-
   # A list of image names to match against. If not provided, all images will be
   # included.
   # 

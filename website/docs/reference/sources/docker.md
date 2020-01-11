@@ -23,21 +23,6 @@ The Vector `docker` source ingests data through the docker engine daemon and out
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -52,28 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   include_images = ["my_image_name", "httpd", "redis"] # example, no default
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sources.my_source_id]
-  # REQUIRED
-  type = "docker" # example, must be: "docker"
-  
-  # OPTIONAL
-  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
-  include_created_after = "2019-11-27T20:47:17.431292Z" # example, no default
-  include_created_before = "2019-11-27T20:47:17.431292Z" # example, no default
-  include_images = ["my_image_name", "httpd", "redis"] # example, no default
-  include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -103,52 +66,6 @@ import Field from '@site/src/components/Field';
 
 A list of container IDs _or_ names to match against. Prefix matches are supported, meaning you can supply just the first few characters of the
 container ID or name. If not provided, all containers will be included. 
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-27T20:47:17.431292Z","2019-11-27 20:47:17 ","1576702402"]}
-  name={"include_created_after"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### include_created_after
-
-A UTC timestamp of ISO 8601, RFC 3339, UNIX, or other similar formats. Containers created before the timestamp are excluded. 
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["2019-11-27T20:47:17.431292Z","2019-11-27 20:47:17 ","1576702402"]}
-  name={"include_created_before"}
-  nullable={true}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### include_created_before
-
-A UTC timestamp of ISO 8601, RFC 3339, UNIX, or other similar formats. Containers created after the timestamp are excluded. 
 
 
 </Field>
