@@ -123,7 +123,7 @@ Given the following _default_ configuration:
   inputs = [...]
 ```
 
-And these two partial [`log` events][docs.data-model.log]:
+And these three partial [`log` events][docs.data-model.log]:
 
 <CodeHeader fileName="first log event" />
 
@@ -131,7 +131,8 @@ And these two partial [`log` events][docs.data-model.log]:
 {
   "message": "First",
   "_partial": true,
-  "custom_field": "value1"
+  "custom_string_field": "value1",
+  "custom_int_field": 1
 }
 ```
 
@@ -143,7 +144,20 @@ and
 {
   "message": "Second",
   "_partial": true,
-  "custom_field": "value2"
+  "custom_string_field": "value2",
+  "custom_int_field": 2
+}
+```
+
+and
+
+<CodeHeader fileName="third log event" />
+
+```javascript
+{
+  "message": "Third",
+  "custom_string_field": "value3",
+  "custom_int_field": 3
 }
 ```
 
@@ -151,12 +165,13 @@ A single _merged_ log event will be produced:
 
 ```javascript
 {
-  "message": "FirstSecond",
-  "custom_field": "value1"
+  "message": "FirstSecondThird",
+  "custom_string_field": "value1",
+  "custom_int_field": 1
 }
 ```
 
-Notice that `custom_field` is not overridden. This is because it was not specified in the [`merge_fields`](#merge_fields) option.
+Notice that `custom_string_field` and `custom_int_field` were not overridden. This is because they were not listed in the [`merge_fields`](#merge_fields) option.
 
 </TabItem>
 
@@ -170,10 +185,10 @@ Given the following _default_ configuration:
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
-  merge_fields = ["message", "custom_field"]
+  merge_fields = ["message", "custom_string_field", "custom_int_field"]
 ```
 
-And these two partial [`log` events][docs.data-model.log]:
+And these three partial [`log` events][docs.data-model.log]:
 
 <CodeHeader fileName="first log event" />
 
@@ -181,7 +196,8 @@ And these two partial [`log` events][docs.data-model.log]:
 {
   "message": "First",
   "_partial": true,
-  "custom_field": "value1"
+  "custom_string_field": "value1",
+  "custom_int_field": 1
 }
 ```
 
@@ -193,7 +209,20 @@ and
 {
   "message": "Second",
   "_partial": true,
-  "custom_field": "value2"
+  "custom_string_field": "value2",
+  "custom_int_field": 2
+}
+```
+
+and
+
+<CodeHeader fileName="third log event" />
+
+```javascript
+{
+  "message": "Third",
+  "custom_string_field": "value3",
+  "custom_int_field": 3
 }
 ```
 
@@ -201,8 +230,9 @@ A single _merged_ log event will be produced:
 
 ```javascript
 {
-  "message": "FirstSecond",
-  "custom_field": "value2"
+  "message": "FirstSecondThird",
+  "custom_string_field": "value1value2value3",
+  "custom_int_field": 3
 }
 ```
 

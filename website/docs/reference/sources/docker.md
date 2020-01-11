@@ -183,7 +183,7 @@ Setting this to `false` will disable the automatic merging of partial events. Se
   enumValues={null}
   examples={["_partial"]}
   name={"partial_event_marker"}
-  nullable={false}
+  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -194,7 +194,7 @@ Setting this to `false` will disable the automatic merging of partial events. Se
 
 ### partial_event_marker
 
-The field that indicates that the event is partial. A consequent stream of partial events along with the first non-partial event will be merged together. See [Message Splitting & Merging](#message-splitting--merging) for more info.
+The field name to be added to events that are detected to contain an incomplete message (i.e. partial events). If set to `null`, no field will be added to partial event. This allows to opt-out of partial event detection. See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
 </Field>
