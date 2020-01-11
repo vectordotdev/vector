@@ -1,7 +1,6 @@
 use crate::{
     event::{self, Event, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    types::parse_timestamp,
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset, Utc};
@@ -44,10 +43,6 @@ pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
-    /// Guesses timestamp format.
-    include_created_after: Option<String>,
-    /// Guesses timestamp format.
-    include_created_before: Option<String>,
 }
 
 impl DockerConfig {
@@ -105,30 +100,11 @@ struct DockerSourceCore {
     docker: Docker,
     /// Only logs created at, or after this moment are logged.
     now_timestamp: DateTime<Utc>,
-
-    /// Parsed config.include_created_after.
-    include_created_after: Option<DateTime<Utc>>,
-    /// Parsed config.include_created_before.
-    include_created_before: Option<DateTime<Utc>>,
 }
 
 impl DockerSourceCore {
     /// Only logs created at, or after this moment are logged.
     fn new(config: DockerConfig) -> crate::Result<Self> {
-        // Parse timestamps
-
-        let include_created_after = config
-            .include_created_after
-            .as_ref()
-            .map(|timestamp| parse_timestamp(timestamp))
-            .transpose()?;
-
-        let include_created_before = config
-            .include_created_before
-            .as_ref()
-            .map(|timestamp| parse_timestamp(timestamp))
-            .transpose()?;
-
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = Docker::new();
@@ -144,8 +120,6 @@ impl DockerSourceCore {
             config,
             docker,
             now_timestamp: now.into(),
-            include_created_after,
-            include_created_before,
         })
     }
 
@@ -193,17 +167,6 @@ impl DockerSourceCore {
         options.filter(filters);
 
         self.docker.events(&options.build())
-    }
-
-    /// True if passes check.
-    fn created_at_check(&self, created_at: DateTime<Utc>) -> bool {
-        self.include_created_after
-            .map(|after| after <= created_at)
-            .unwrap_or(true)
-            && self
-                .include_created_before
-                .map(|before| created_at <= before)
-                .unwrap_or(true)
     }
 }
 
@@ -534,24 +497,8 @@ impl EventStreamBuilder {
                     .map_err(|error| error!(message="Metadata extraction failed",%error))
             });
 
-        // Created at check
-        let core = self.core.clone();
-        let container_id = id.clone();
-        let filtered = metadata_fetch.and_then(move |metadata| {
-            if core.created_at_check(metadata.created_at) {
-                Ok(metadata)
-            } else {
-                trace!(message = "Container failed created_at check",
-                        id = %container_id.as_str(),
-                        created_at = ?metadata.created_at,
-                        include_created_after = ?core.include_created_after,
-                        include_created_before = ?core.include_created_before);
-                Err(())
-            }
-        });
-
         let this = self.clone();
-        let task = filtered.and_then(move |metadata| {
+        let task = metadata_fetch.and_then(move |metadata| {
             this.start_event_stream(ContainerLogInfo::new(id, metadata, this.core.now_timestamp))
         });
 
@@ -1308,68 +1255,5 @@ mod tests {
         container_remove(&id, &docker, &mut rt);
 
         assert!(rt.block_on(is_empty(exclude_out)).unwrap());
-    }
-
-    #[test]
-    fn created_after() {
-        let message_before = "18";
-        let message_after = "19";
-        let name_before = "vector_test_created_after_0";
-        let name_after = "vector_test_created_after_1";
-
-        let mut rt = test_util::runtime();
-        let docker = docker();
-
-        let id0 = running_container(name_before, None, message_before, &docker, &mut rt);
-
-        let config = DockerConfig {
-            include_containers: Some(vec![name_before.to_owned(), name_after.to_owned()]),
-            include_created_after: Some(Utc::now().to_rfc3339()),
-            ..DockerConfig::default()
-        };
-        let source = source_with_config(config, &mut rt);
-
-        let id1 = running_container(name_after, None, message_after, &docker, &mut rt);
-
-        let events = rt.block_on(collect_n(source, 2)).ok().unwrap();
-
-        let _ = container_kill(&id0, &docker, &mut rt);
-        container_remove(&id0, &docker, &mut rt);
-        let _ = container_kill(&id1, &docker, &mut rt);
-        container_remove(&id1, &docker, &mut rt);
-
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "before".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], message_after.into());
-    }
-
-    #[test]
-    fn created_before() {
-        let message_before = "20";
-        let message_after = "21";
-        let name_before = "vector_test_created_before_0";
-        let name_after = "vector_test_created_before_1";
-
-        let mut rt = test_util::runtime();
-        let docker = docker();
-
-        let id0 = running_container(name_before, None, message_before, &docker, &mut rt);
-
-        let config = DockerConfig {
-            include_containers: Some(vec![name_before.to_owned(), name_after.to_owned()]),
-            include_created_before: Some(Utc::now().to_rfc3339()),
-            ..DockerConfig::default()
-        };
-        let source = source_with_config(config, &mut rt);
-
-        let id1 = log_container(name_after, None, message_after, &docker, &mut rt);
-
-        let events = rt.block_on(collect_n(source, 1)).ok().unwrap();
-
-        let _ = container_kill(&id0, &docker, &mut rt);
-        container_remove(&id0, &docker, &mut rt);
-        container_remove(&id1, &docker, &mut rt);
-
-        let log = events[0].as_log();
-        assert_eq!(log[&event::MESSAGE], message_before.into());
     }
 }
