@@ -229,6 +229,7 @@ impl DockerSource {
                 .map(|partial_event_marker| MergeConfig {
                     partial_event_marker,
                     merge_fields: vec![event::MESSAGE.clone()],
+                    stream_discriminant_fields: vec![],
                 })
         };
 
