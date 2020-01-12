@@ -218,14 +218,23 @@ impl DockerSource {
         // Built-in merge transform config.
         // We spawn a merge transform per docker log event stream (which
         // happens to be per container).
-        // If `None`, no merging is performed, allowing use to effectively
-        // opt-out from the built-in automating partial message merging.
+        // If `None` or empty string, no merging is performed, allowing use to
+        // effectively opt-out from the built-in automating partial message
+        // merging.
         let merge_transform_config = if config.no_auto_partial_merge {
             None
         } else {
             config
                 .partial_event_marker
                 .clone()
+                .and_then(|partial_event_marker| {
+                    // Allow using empty value as if it's `None`.
+                    if partial_event_marker.is_empty() {
+                        None
+                    } else {
+                        Some(partial_event_marker)
+                    }
+                })
                 .map(|partial_event_marker| MergeConfig {
                     partial_event_marker,
                     merge_fields: vec![event::MESSAGE.clone()],
