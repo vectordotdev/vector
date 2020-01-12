@@ -1763,10 +1763,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * default: 1049000
+    # * default: 500
     # * type: int
     # * unit: bytes
-    max_events = 1049000
+    max_events = 500
 
     # The maximum age of a batch before it is flushed.
     #
@@ -1942,10 +1942,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * default: 1049000
+    # * default: 500
     # * type: int
     # * unit: bytes
-    max_events = 1049000
+    max_events = 500
 
     # The maximum age of a batch before it is flushed.
     #

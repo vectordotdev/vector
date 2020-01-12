@@ -74,7 +74,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_events = 1049000 # default, bytes
+    max_events = 500 # default, bytes
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
@@ -130,9 +130,9 @@ Configures the sink batching behavior.
 
 <Field
   common={false}
-  defaultValue={1049000}
+  defaultValue={500}
   enumValues={null}
-  examples={[1049000]}
+  examples={[500]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}

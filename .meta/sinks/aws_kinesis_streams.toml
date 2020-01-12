@@ -1,6 +1,6 @@
 [sinks.aws_kinesis_streams]
 title = "AWS Kinesis Data Streams"
-batch_max_events = 1049000
+batch_max_events = 500
 batch_timeout_secs = 1
 beta = true
 buffer = true

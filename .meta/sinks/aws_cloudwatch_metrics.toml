@@ -1,5 +1,7 @@
 [sinks.aws_cloudwatch_metrics]
 title = "AWS Cloudwatch Metrics"
+batch_max_events = 20
+batch_timeout_secs = 1
 beta = true
 buffer = false
 common = false
