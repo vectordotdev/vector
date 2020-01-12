@@ -3510,12 +3510,12 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # A list of host and port pairs that the Kafka client should contact to
-  # bootstrap its cluster metadata.
+  # A comma delimited list of host and port pairs that the Kafka client should
+  # contact to bootstrap its cluster metadata.
   #
   # * required
-  # * type: [string]
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
+  # * type: string
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value

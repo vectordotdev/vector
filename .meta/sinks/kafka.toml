@@ -13,12 +13,12 @@ write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls
 tls_options = ["+enabled", "-verify"]
 
 [sinks.kafka.options.bootstrap_servers]
-type = "[string]"
+type = "string"
 common = true
-examples = [["10.14.22.123:9092", "10.14.23.332:9092"]]
+examples = ["10.14.22.123:9092,10.14.23.332:9092"]
 null = false
 description = """\
-A list of host and port pairs that the Kafka client should contact to bootstrap \
+A comma delimited list of host and port pairs that the Kafka client should contact to bootstrap \
 its cluster metadata.\
 """
 
