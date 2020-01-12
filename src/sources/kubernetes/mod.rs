@@ -28,6 +28,10 @@ use string_cache::DefaultAtom as Atom;
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
+lazy_static! {
+    pub static ref POD_UID: Atom = Atom::from("pod_uid");
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct KubernetesConfig {}
@@ -308,7 +312,7 @@ fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     for regex in regexes {
         let mut config = RegexParserConfig::default();
 
-        config.field = Some("pod_uid".into());
+        config.field = Some(POD_UID);
         config.regex = regex;
         // Remove pod_uid as it isn't usable anywhere else.
         config.drop_field = true;
@@ -386,7 +390,7 @@ mod tests {
         has(&event, "container_name", "busybox");
         has(
             &event,
-            "pod_uid",
+            POD_UID.as_str(),
             "default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e",
         );
     }
@@ -418,8 +422,8 @@ mod tests {
     #[test]
     fn pod_uid_transform_namespace_name_uid() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert(
-            "pod_uid",
+        event.as_mut_log().insert_explicit(
+            POD_UID.as_str(),
             "kube-system_kube-apiserver-minikube_8f6b5d95bfe4bcf4cc9c4d8435f0668b".to_owned(),
         );
 
@@ -435,9 +439,10 @@ mod tests {
     #[test]
     fn pod_uid_transform_uid() {
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert("pod_uid", "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned());
+        event.as_mut_log().insert_explicit(
+            POD_UID.as_str(),
+            "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned(),
+        );
 
         let mut transform = transform_pod_uid().unwrap();
 
