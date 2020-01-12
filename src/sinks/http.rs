@@ -2,14 +2,13 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{https_client, Auth, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, stream::iter_ok, Future, Sink};
-use headers::HeaderMapExt;
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -40,8 +39,7 @@ pub struct HttpSinkConfig {
     pub uri: String,
     pub method: Option<HttpMethod>,
     pub healthcheck_uri: Option<String>,
-    #[serde(flatten)]
-    pub basic_auth: Option<BasicAuth>,
+    pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
@@ -80,13 +78,6 @@ pub enum Encoding {
     Json,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct BasicAuth {
-    user: String,
-    password: String,
-}
-
 inventory::submit! {
     SinkDescription::new::<HttpSinkConfig>("http")
 }
@@ -101,7 +92,7 @@ impl SinkConfig for HttpSinkConfig {
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
                 let healthcheck =
-                    healthcheck(healthcheck_uri, self.basic_auth.clone(), cx.resolver(), tls)?;
+                    healthcheck(healthcheck_uri, self.auth.clone(), cx.resolver(), tls)?;
                 Ok((sink, healthcheck))
             }
             None => Ok((sink, Box::new(future::ok(())))),
@@ -133,7 +124,7 @@ fn http(
 
     let encoding = config.encoding.clone();
     let headers = config.headers.clone();
-    let basic_auth = config.basic_auth.clone();
+    let basic_auth = config.auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
     let http_service = HttpService::builder(cx.resolver())
@@ -174,7 +165,7 @@ fn http(
             let mut request = builder.body(body).unwrap();
 
             if let Some(auth) = &basic_auth {
-                auth.apply(request.headers_mut());
+                auth.apply(&mut request);
             }
 
             request
@@ -191,7 +182,7 @@ fn http(
 
 fn healthcheck(
     uri: String,
-    auth: Option<BasicAuth>,
+    auth: Option<Auth>,
     resolver: Resolver,
     tls_settings: TlsSettings,
 ) -> crate::Result<super::Healthcheck> {
@@ -199,7 +190,7 @@ fn healthcheck(
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
-        auth.apply(request.headers_mut());
+        auth.apply(&mut request);
     }
 
     let client = https_client(resolver, tls_settings)?;
@@ -217,13 +208,6 @@ fn healthcheck(
         });
 
     Ok(Box::new(healthcheck))
-}
-
-impl BasicAuth {
-    fn apply(&self, header_map: &mut http::header::HeaderMap) {
-        let auth = headers::Authorization::basic(&self.user, &self.password);
-        header_map.typed_insert(auth)
-    }
 }
 
 fn validate_headers(headers: &Option<IndexMap<String, String>>) -> crate::Result<()> {
@@ -375,10 +359,13 @@ mod tests {
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        user = "waldo"
         compression = "gzip"
-        password = "hunter2"
         encoding = "ndjson"
+
+        [auth]
+        strategy = "basic"
+        user = "waldo"
+        password = "hunter2"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
@@ -435,10 +422,13 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         method = "put"
-        user = "waldo"
         compression = "gzip"
-        password = "hunter2"
         encoding = "ndjson"
+
+        [auth]
+        strategy = "basic"
+        user = "waldo"
+        password = "hunter2"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();

@@ -16,7 +16,7 @@ request_retry_attempts = 5
 request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 60
-service_provider = "Datadog"
+service_providers = ["Datadog"]
 write_to_description = "[Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)"
 
 [sinks.datadog_metrics.options.api_key]

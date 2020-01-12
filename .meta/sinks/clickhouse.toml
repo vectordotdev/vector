@@ -20,6 +20,34 @@ request_timeout_secs = 30
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
 tls_options = []
 
+[sinks.clickhouse.options.auth]
+type = "table"
+common = false
+null = true
+description = "Options for the authentication strategy."
+
+[sinks.clickhouse.options.auth.options.strategy]
+type = "string"
+null = false
+description = "The authentication strategy to use."
+
+[sinks.clickhouse.options.auth.options.strategy.enum]
+basic = "The [basic authentication strategy][urls.basic_auth]."
+
+[sinks.clickhouse.options.auth.options.password]
+type = "string"
+examples = ["${PASSWORD_ENV_VAR}", "password"]
+null = false
+relevant_when = {strategy = "basic"}
+description = "The basic authentication password."
+
+[sinks.clickhouse.options.auth.options.user]
+type = "string"
+examples = ["${USERNAME_ENV_VAR}", "username"]
+null = false
+relevant_when = {strategy = "basic"}
+description = "The basic authentication user name."
+
 [sinks.clickhouse.options.host]
 type = "string"
 common = true
@@ -40,21 +68,3 @@ common = true
 examples = ["mydatabase"]
 null = true
 description = "The database that contains the stable that data will be inserted into."
-
-[sinks.clickhouse.options.basic_auth]
-type = "table"
-common = true
-null = true
-description = "Options for basic authentication."
-
-[sinks.clickhouse.options.basic_auth.options.password]
-type = "string"
-examples = ["${PASSWORD_ENV_VAR}", "password"]
-null = false
-description = "The basic authentication password."
-
-[sinks.clickhouse.options.basic_auth.options.user]
-type = "string"
-examples = ["${USERNAME_ENV_VAR}", "username"]
-null = false
-description = "The basic authentication user name."

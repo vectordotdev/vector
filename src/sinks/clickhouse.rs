@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
-        http::{https_client, HttpRetryLogic, HttpService, Response},
+        http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
         BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
@@ -10,7 +10,6 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
-use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Request};
@@ -26,7 +25,7 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
-    pub basic_auth: Option<ClickHouseBasicAuthConfig>,
+    pub auth: Option<Auth>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
     #[serde(flatten)]
@@ -62,20 +61,6 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ClickHouseBasicAuthConfig {
-    pub password: String,
-    pub user: String,
-}
-
-impl ClickHouseBasicAuthConfig {
-    fn apply(&self, header_map: &mut http::header::HeaderMap) {
-        let auth = headers::Authorization::basic(&self.user, &self.password);
-        header_map.typed_insert(auth)
-    }
-}
-
 fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
@@ -89,7 +74,7 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
     let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-    let basic_auth = config.basic_auth.clone();
+    let auth = config.auth.clone();
 
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
@@ -109,8 +94,8 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
 
             let mut request = builder.body(body).unwrap();
 
-            if let Some(auth) = &basic_auth {
-                auth.apply(request.headers_mut());
+            if let Some(auth) = &auth {
+                auth.apply(&mut request);
             }
 
             request
@@ -142,8 +127,8 @@ fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<s
     let uri = format!("{}/?query=SELECT%201", config.host);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
-    if let Some(auth) = &config.basic_auth {
-        auth.apply(request.headers_mut());
+    if let Some(auth) = &config.auth {
+        auth.apply(&mut request);
     }
 
     let tls = TlsSettings::from_options(&config.tls)?;

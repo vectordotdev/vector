@@ -502,3 +502,65 @@ fn parses_sink_full_request() {
     )
     .unwrap();
 }
+
+#[test]
+fn parses_sink_full_auth() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "http"
+        inputs = ["in"]
+        uri = "https://localhost"
+        encoding = "json"
+
+        [sinks.out.auth]
+        strategy = "basic"
+        user = "user"
+        password = "password"
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_es_basic_auth() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "elasticsearch"
+        inputs = ["in"]
+        host = "https://localhost"
+
+        [sinks.out.auth]
+        strategy = "basic"
+        user = "user"
+        password = "password"
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_es_aws() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "elasticsearch"
+        inputs = ["in"]
+        region = "us-east-1"
+
+        [sinks.out.auth]
+        strategy = "aws"
+        "#,
+    )
+    .unwrap();
+}

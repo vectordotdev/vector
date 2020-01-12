@@ -9,7 +9,7 @@ function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
 service_limits_short_link = "aws_cw_metrics_service_limits"
-service_provider = "Amazon"
+service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
 
 [sinks.aws_cloudwatch_metrics.options.namespace]

@@ -16,7 +16,7 @@ request_retry_attempts = 5
 request_retry_backoff_secs = 1
 request_in_flight_limit = 10
 request_timeout_secs = 60
-service_provider = "Splunk"
+service_providers = ["Splunk"]
 write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
 tls_options = []
 

@@ -44,19 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "clickhouse" # must be: "clickhouse"
   inputs = ["my-source-id"] # example
   host = "http://localhost:8123" # example
   table = "mytable" # example
 
-  # OPTIONAL - General
+  # OPTIONAL
   database = "mydatabase" # example, no default
-
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
 ```
 
 </TabItem>
@@ -91,10 +86,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - requests
   compression = "gzip" # default, must be: "gzip" (if supplied)
 
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
+  # OPTIONAL - Auth
+  [sinks.my_sink_id.auth]
+    strategy = "basic" # must be: "basic"
+    password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
+    user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -127,11 +123,11 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  name={"basic_auth"}
+  name={"auth"}
   nullable={true}
   path={null}
   relevantWhen={null}
@@ -141,9 +137,9 @@ import Field from '@site/src/components/Field';
   unit={null}
   >
 
-### basic_auth
+### auth
 
-Options for basic authentication.
+Options for the authentication strategy.
 
 <Fields filters={false}>
 
@@ -155,8 +151,8 @@ Options for basic authentication.
   examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
   nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
   required={true}
   templateable={false}
   type={"string"}
@@ -174,12 +170,35 @@ The basic authentication password.
 <Field
   common={true}
   defaultValue={null}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["basic"]}
+  name={"strategy"}
+  nullable={false}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
   nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
   required={true}
   templateable={false}
   type={"string"}
@@ -861,6 +880,7 @@ attempts and backoff rate with the [`request_retry_attempts`](#request_retry_att
 [docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.guarantees]: /docs/about/guarantees/
+[urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [urls.gzip]: https://www.gzip.org/

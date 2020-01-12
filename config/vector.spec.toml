@@ -2372,14 +2372,22 @@ end
   compression = "gzip"
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.clickhouse.basic_auth]
+  [sinks.clickhouse.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -2387,6 +2395,7 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -2807,14 +2816,23 @@ end
   request_timeout_secs = 60
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.elasticsearch.basic_auth]
+  [sinks.elasticsearch.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * enum: "aws" or "basic"
+    strategy = "aws"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -2822,6 +2840,7 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -3360,14 +3379,22 @@ end
   request_timeout_secs = 30
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.http.basic_auth]
+  [sinks.http.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -3375,6 +3402,7 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 

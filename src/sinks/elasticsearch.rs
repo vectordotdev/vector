@@ -34,7 +34,6 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
-    pub provider: Option<Provider>,
     #[serde(default, flatten)]
     pub batch: BatchConfig,
     // TODO: This should be an Option, but when combined with flatten we never seem to get back
@@ -44,7 +43,7 @@ pub struct ElasticSearchConfig {
     pub region: RegionOrEndpoint,
     #[serde(flatten)]
     pub request: TowerRequestConfig,
-    pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
+    pub auth: Option<ElasticSearchAuth>,
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
@@ -58,18 +57,21 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ElasticSearchBasicAuthConfig {
-    pub password: String,
-    pub user: String,
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+pub enum ElasticSearchAuth {
+    Basic { user: String, password: String },
+    Aws,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
-pub enum Provider {
-    Default,
-    Aws,
+impl ElasticSearchAuth {
+    pub fn apply<B>(&self, req: &mut Request<B>) {
+        if let Self::Basic { user, password } = &self {
+            use headers::HeaderMapExt;
+            let auth = headers::Authorization::basic(&user, &password);
+            req.headers_mut().typed_insert(auth);
+        }
+    }
 }
 
 inventory::submit! {
@@ -119,10 +121,13 @@ enum ParseError {
 
 impl ElasticSearchCommon {
     pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        let authorization = config.basic_auth.as_ref().map(|auth| {
-            let token = format!("{}:{}", auth.user, auth.password);
-            format!("Basic {}", base64::encode(token.as_bytes()))
-        });
+        let authorization = match &config.auth {
+            Some(ElasticSearchAuth::Basic { user, password }) => {
+                let token = format!("{}:{}", user, password);
+                Some(format!("Basic {}", base64::encode(token.as_bytes())))
+            }
+            _ => None,
+        };
 
         let region: Option<Region> = match (&config.region).try_into() {
             Ok(region) => Some(region),
@@ -130,14 +135,14 @@ impl ElasticSearchCommon {
             Err(error) => return Err(error.into()),
         };
 
-        let provider = config.provider.unwrap_or(Provider::Default);
+        // let provider = config.provider.unwrap_or(Provider::Default);
 
-        let base_url = match provider {
-            Provider::Default => match config.host {
+        let base_url = match &config.auth {
+            Some(ElasticSearchAuth::Basic { .. }) | None => match config.host {
                 Some(ref host) => host.clone(),
                 None => return Err(ParseError::DefaultRequiresHost.into()),
             },
-            Provider::Aws => match region {
+            Some(ElasticSearchAuth::Aws) => match region {
                 None => return Err(ParseError::AWSRequiresRegion.into()),
                 Some(ref region) => match region {
                     // Adapted from rusoto_core::signature::build_hostname, which is unfortunately not pub
@@ -156,9 +161,9 @@ impl ElasticSearchCommon {
         uri.parse::<Uri>()
             .with_context(|| InvalidHost { host: &base_url })?;
 
-        let credentials = match provider {
-            Provider::Default => None,
-            Provider::Aws => {
+        let credentials = match &config.auth {
+            Some(ElasticSearchAuth::Basic { .. }) | None => None,
+            Some(ElasticSearchAuth::Aws) => {
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
@@ -446,7 +451,14 @@ mod tests {
 
     #[test]
     fn host_is_required_for_default() {
-        let err = parse_config_err(r#"provider = "default""#);
+        let err = parse_config_err(
+            r#"
+        [auth]
+        strategy = "basic"
+        user = "user"
+        password = "password"
+        "#,
+        );
         assert_downcast_matches!(err, ParseError, ParseError::DefaultRequiresHost);
     }
 
@@ -454,8 +466,10 @@ mod tests {
     fn host_is_not_required_for_aws() {
         let result = parse_config(
             r#"
-                provider = "aws"
-                region = "us-east-1"
+            region = "us-east-1"
+
+            [auth]
+            strategy = "aws"
             "#,
         );
         // If not running in an AWS context, this will fail with a
@@ -477,7 +491,12 @@ mod tests {
 
     #[test]
     fn region_is_required_for_aws() {
-        let err = parse_config_err(r#"provider = "aws""#);
+        let err = parse_config_err(
+            r#"
+        [auth]
+        strategy = "aws"
+        "#,
+        );
         assert_downcast_matches!(err, ParseError, ParseError::AWSRequiresRegion { .. });
     }
 }
@@ -583,7 +602,7 @@ mod integration_tests {
     #[test]
     fn insert_events_on_aws() {
         run_insert_tests(ElasticSearchConfig {
-            provider: Some(Provider::Aws),
+            auth: Some(ElasticSearchAuth::Aws),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
             ..config()
         });

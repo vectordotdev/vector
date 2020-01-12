@@ -84,10 +84,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 60 # default, seconds
 
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
+  # OPTIONAL - Auth
+  [sinks.my_sink_id.auth]
+    strategy = "aws" # example, enum
+    password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
+    user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -133,7 +134,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  name={"basic_auth"}
+  name={"auth"}
   nullable={true}
   path={null}
   relevantWhen={null}
@@ -143,9 +144,9 @@ import Field from '@site/src/components/Field';
   unit={null}
   >
 
-### basic_auth
+### auth
 
-Options for basic authentication.
+Options for the authentication strategy.
 
 <Fields filters={false}>
 
@@ -157,8 +158,8 @@ Options for basic authentication.
   examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
   nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
   required={true}
   templateable={false}
   type={"string"}
@@ -176,12 +177,35 @@ The basic authentication password.
 <Field
   common={true}
   defaultValue={null}
+  enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["aws","basic"]}
+  name={"strategy"}
+  nullable={false}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
   nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
   required={true}
   templateable={false}
   type={"string"}
@@ -1043,6 +1067,7 @@ You can read more about the complete syntax in the
 [docs.guarantees]: /docs/about/guarantees/
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
 [urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
+[urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
