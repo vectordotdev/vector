@@ -1553,9 +1553,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 1049000
     # * type: int
     # * unit: bytes
+    max_events = 1049000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -1762,9 +1763,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 1049000
     # * type: int
     # * unit: bytes
+    max_events = 1049000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -1940,9 +1942,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 1049000
     # * type: int
     # * unit: bytes
+    max_events = 1049000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -2169,9 +2172,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 10490000
     # * type: int
     # * unit: bytes
+    max_size = 10490000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -2408,9 +2412,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 1049000
     # * type: int
     # * unit: bytes
+    max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -2684,9 +2689,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 20
     # * type: int
     # * unit: bytes
+    max_events = 20
 
     # The maximum age of a batch before it is flushed.
     #
@@ -2862,9 +2868,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 10490000
     # * type: int
     # * unit: bytes
+    max_size = 10490000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3174,9 +3181,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 10485760
     # * type: int
     # * unit: bytes
+    max_size = 10485760
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3434,9 +3442,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 1049000
     # * type: int
     # * unit: bytes
+    max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3827,9 +3836,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 524000
     # * type: int
     # * unit: bytes
+    max_size = 524000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -4218,9 +4228,10 @@ end
     # The maximum size of a batch before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 1049000
     # * type: int
     # * unit: bytes
+    max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
     #

@@ -4,7 +4,8 @@ require_relative "option"
 require_relative "sink"
 
 class BatchingSink < Sink
-  attr_reader :batch_max_size,
+  attr_reader :batch_max_events,
+    :batch_max_size,
     :batch_timeout_secs,
     :request_in_flight_limit,
     :request_rate_limit_duration,
@@ -17,7 +18,8 @@ class BatchingSink < Sink
     super(hash)
 
     batch_is_simple = hash["batch_is_simple"] == true
-    @batch_max_size = hash.fetch("batch_max_size")
+    @batch_max_events = hash["batch_max_events"]
+    @batch_max_size = hash["batch_max_size"]
     @batch_timeout_secs = hash.fetch("batch_timeout_secs")
     @request_in_flight_limit = hash.fetch("request_in_flight_limit")
     @request_rate_limit_duration_secs = hash.fetch("request_rate_limit_duration_secs")
@@ -26,29 +28,52 @@ class BatchingSink < Sink
     @request_retry_backoff_secs = hash.fetch("request_retry_backoff_secs")
     @request_timeout_secs = hash.fetch("request_timeout_secs")
 
+    # Requirements
+
+    if !@batch_max_events && !@batch_max_size
+      raise("#{self.class.name} must supply one of `batch_max_events` or `batch_max_size`")
+    end
+
+    if @batch_max_events && @batch_max_size
+      raise("#{self.class.name} must supply either `batch_max_events` or `batch_max_size`")
+    end
+
     # Common options - batching
 
-    batch_options =
-      {
-        "max_size" =>
-          {
-            "default" => @batch_size,
-            "description" => "The maximum size of a batch before it is flushed.",
-            "null" => false,
-            "simple" => batch_is_simple,
-            "type" => "int",
-            "unit" => "bytes"
-          },
+    batch_options = {}
 
-        "timeout_secs" =>
-          {
-            "default" => @batch_timeout_secs,
-            "description" => "The maximum age of a batch before it is flushed.",
-            "null" => false,
-            "simple" => batch_is_simple,
-            "type" => "int",
-            "unit" => "seconds"
-          }
+    if @batch_max_events
+      batch_options["max_events"] =
+        {
+          "default" => @batch_max_events,
+          "description" => "The maximum size of a batch before it is flushed.",
+          "null" => false,
+          "simple" => batch_is_simple,
+          "type" => "int",
+          "unit" => "bytes"
+        }
+    end
+
+    if @batch_max_size
+      batch_options["max_size"] =
+        {
+          "default" => @batch_max_size,
+          "description" => "The maximum size of a batch before it is flushed.",
+          "null" => false,
+          "simple" => batch_is_simple,
+          "type" => "int",
+          "unit" => "bytes"
+        }
+    end
+
+    batch_options["timeout_secs"] =
+      {
+        "default" => @batch_timeout_secs,
+        "description" => "The maximum age of a batch before it is flushed.",
+        "null" => false,
+        "simple" => batch_is_simple,
+        "type" => "int",
+        "unit" => "seconds"
       }
 
     @options.batch =

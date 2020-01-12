@@ -78,7 +78,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = nil # example, no default, bytes
+    max_events = 1049000 # default, bytes
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
@@ -134,10 +134,10 @@ Configures the sink batching behavior.
 
 <Field
   common={false}
-  defaultValue={null}
+  defaultValue={1049000}
   enumValues={null}
-  examples={[]}
-  name={"max_size"}
+  examples={[1049000]}
+  name={"max_events"}
   path={"batch"}
   relevantWhen={null}
   required={false}
@@ -146,7 +146,7 @@ Configures the sink batching behavior.
   unit={"bytes"}
   >
 
-#### max_size
+#### max_events
 
 The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
@@ -218,7 +218,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model#event] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -240,7 +240,7 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 
 #### max_size
 
-The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of the buffer on the disk.
 
 
 </Field>
@@ -664,8 +664,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured [`max_size`](#max_size) (default: ` bytes`).
+1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
+2. The batch size meets or exceeds the configured [`max_events`](#max_events).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 

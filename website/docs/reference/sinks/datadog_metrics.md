@@ -71,7 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = nil # example, no default, bytes
+    max_events = 20 # default, bytes
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Request
@@ -142,10 +142,10 @@ Configures the sink batching behavior.
 
 <Field
   common={false}
-  defaultValue={null}
+  defaultValue={20}
   enumValues={null}
-  examples={[]}
-  name={"max_size"}
+  examples={[20]}
+  name={"max_events"}
   path={"batch"}
   relevantWhen={null}
   required={false}
@@ -154,7 +154,7 @@ Configures the sink batching behavior.
   unit={"bytes"}
   >
 
-#### max_size
+#### max_events
 
 The maximum size of a batch before it is flushed.
 
