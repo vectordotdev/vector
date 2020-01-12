@@ -13,7 +13,7 @@ class Sink < Component
     :healthcheck,
     :output,
     :service_limits_short_link,
-    :service_provider,
+    :service_providers,
     :tls,
     :write_to_description
 
@@ -29,7 +29,7 @@ class Sink < Component
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_provider = hash["service_provider"]
+    @service_providers = hash["service_provider"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -107,7 +107,7 @@ class Sink < Component
 
     # Endpoint option
 
-    if service_provider == "AWS"
+    if service_provider?("AWS")
       @env_vars.AWS_ACCESS_KEY_ID =
         Option.new({
           "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
@@ -311,6 +311,10 @@ class Sink < Component
     else
       raise("Unhandled egress_method: #{egress_method.inspect}")
     end
+  end
+
+  def service_provider?(provider_name)
+    service_providers.collect(&:downcase).include?(provider_name.downcase)
   end
 
   def streaming?

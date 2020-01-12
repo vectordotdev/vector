@@ -21,22 +21,32 @@ request_timeout_secs = 30
 write_to_description = "a generic HTTP endpoint"
 tls_options = []
 
-[sinks.http.options.basic_auth]
+[sinks.http.options.auth]
 type = "table"
-common = true
+common = false
 null = true
-description = "Options for basic authentication."
+description = "Options for the authentication strategy."
 
-[sinks.http.options.basic_auth.options.password]
+[sinks.http.options.auth.options.strategy]
+type = "string"
+null = false
+description = "The authentication strategy to use."
+
+[sinks.http.options.auth.options.strategy.enum]
+basic = "The [basic authentication strategy][urls.basic_auth]."
+
+[sinks.http.options.auth.options.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
 null = false
+relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
-[sinks.http.options.basic_auth.options.user]
+[sinks.http.options.auth.options.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
 null = false
+relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
 
 [sinks.http.options.headers]

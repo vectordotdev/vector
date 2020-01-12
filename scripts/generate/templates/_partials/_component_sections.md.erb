@@ -1,4 +1,4 @@
-<%- if component.sink? && component.service_provider == "AWS" -%>
+<%- if component.sink? && component.service_provider?("AWS") -%>
 ### Authentication
 
 Vector checks for AWS credentials in the following order:

@@ -16,15 +16,58 @@ request_retry_attempts = 5
 request_retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 60
-service_provider = "Elastic"
+service_providers = ["AWS", "Elastic"]
 write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
 tls_options = []
+
+[sinks.elasticsearch.options.auth]
+type = "table"
+common = false
+null = true
+description = "Options for the authentication strategy."
+
+[sinks.elasticsearch.options.auth.options.strategy]
+type = "string"
+null = false
+description = "The authentication strategy to use."
+
+[sinks.elasticsearch.options.auth.options.strategy.enum]
+aws = "Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch]."
+basic = "The [basic authentication strategy][urls.basic_auth]."
+
+[sinks.elasticsearch.options.auth.options.password]
+type = "string"
+examples = ["${PASSWORD_ENV_VAR}", "password"]
+null = false
+relevant_when = {strategy = "basic"}
+description = "The basic authentication password."
+
+[sinks.elasticsearch.options.auth.options.user]
+type = "string"
+examples = ["${USERNAME_ENV_VAR}", "username"]
+null = false
+relevant_when = {strategy = "basic"}
+description = "The basic authentication user name."
 
 [sinks.elasticsearch.options.doc_type]
 type = "string"
 default = "_doc"
 null = false
 description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
+
+[sinks.elasticsearch.options.headers]
+type = "table"
+null = true
+description = "Options for custom headers."
+
+[sinks.elasticsearch.options.headers.options."`[header-name]`"]
+type = "string"
+examples = [
+  {Authorization = "${TOKEN_ENV_VAR}"},
+  {"X-Powered-By" = "Vector"}
+]
+null = false
+description = "A custom header to be added to each outgoing Elasticsearch request."
 
 [sinks.elasticsearch.options.host]
 type = "string"
@@ -44,37 +87,6 @@ examples = [
 null = false
 templateable = true
 description = "Index name to write events to."
-
-[sinks.elasticsearch.options.basic_auth]
-type = "table"
-null = true
-description = "Options for basic authentication."
-
-[sinks.elasticsearch.options.basic_auth.options.password]
-type = "string"
-examples = ["${PASSWORD_ENV_VAR}", "password"]
-null = false
-description = "The basic authentication password."
-
-[sinks.elasticsearch.options.basic_auth.options.user]
-type = "string"
-examples = ["${USERNAME_ENV_VAR}", "username"]
-null = false
-description = "The basic authentication user name."
-
-[sinks.elasticsearch.options.headers]
-type = "table"
-null = true
-description = "Options for custom headers."
-
-[sinks.elasticsearch.options.headers.options."`[header-name]`"]
-type = "string"
-examples = [
-  {Authorization = "${TOKEN_ENV_VAR}"},
-  {"X-Powered-By" = "Vector"}
-]
-null = false
-description = "A custom header to be added to each outgoing Elasticsearch request."
 
 [sinks.elasticsearch.options.provider]
 type = "string"
