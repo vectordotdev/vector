@@ -1578,6 +1578,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1586,15 +1595,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -1781,6 +1781,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1789,15 +1798,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -1955,6 +1955,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1963,15 +1972,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2180,6 +2180,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2188,15 +2197,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2405,6 +2405,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2413,15 +2422,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2840,6 +2840,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2848,15 +2857,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3146,6 +3146,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3154,15 +3163,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3393,6 +3393,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3401,15 +3410,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3566,6 +3566,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3574,15 +3583,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3780,6 +3780,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3788,15 +3797,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3928,6 +3928,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3936,15 +3945,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -4162,6 +4162,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -4170,15 +4179,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -4333,6 +4333,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -4341,15 +4350,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #

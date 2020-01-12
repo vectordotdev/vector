@@ -102,8 +102,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
+    max_events = 500 # default, events, relevant when type = "memory"
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 ```
 
@@ -213,6 +213,29 @@ Configures the sink specific buffer.
 
 <Field
   common={false}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  name={"max_events"}
+  nullable={true}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model#event] allowed in the buffer.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -229,29 +252,6 @@ Configures the sink specific buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  name={"num_items"}
-  nullable={true}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### num_items
-
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
 
 
 </Field>
