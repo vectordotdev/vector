@@ -257,8 +257,8 @@ mod integration_tests {
         region::RegionOrEndpoint,
         runtime,
         sinks::{
+            elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchEventsConfig,
-            elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig}
         },
         test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
