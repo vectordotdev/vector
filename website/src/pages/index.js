@@ -48,12 +48,12 @@ const features = [
     icon: 'unlock',
     description: (
       <>
-        Vector does not favor any specific storage. It fosters a fair, open ecosystem with the user's best interest in mind.
+        Vector does not favor any storage and fosters a fair, open ecosystem with your best interest in mind. Lock-in free and future proof.
       </>
     ),
   },
   {
-    title: 'Agent or Service',
+    title: 'One Tool',
     icon: 'codepen',
     description: (
       <>
@@ -62,7 +62,7 @@ const features = [
     ),
   },
   {
-    title: 'Logs, Metrics, & Events',
+    title: 'All Data',
     icon: 'shuffle',
     description: (
       <>
@@ -75,7 +75,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of a programmable runtime. Handle complex use cases with ease!
+        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of programmable runtimes. Handle complex use cases without limitation.
       </>
     ),
   },
@@ -84,7 +84,7 @@ const features = [
     icon: 'shield',
     description: (
       <>
-        Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
+        Guarantees matter, and Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
       </>
     ),
   },
@@ -109,7 +109,7 @@ function Features({features}) {
   return (
     <section className={styles.features}>
       <div className="container">
-        <AnchoredH2 id="features">Features</AnchoredH2>
+        <AnchoredH2 id="features">Why Vector?</AnchoredH2>
         {rows}
       </div>
     </section>
@@ -132,8 +132,8 @@ function Performance() {
   return (
     <section className={styles.performance}>
       <div className="container">
-        <AnchoredH2 id="performance">Outperforms</AnchoredH2>
-        <div className="sub-title">Higher throughout with a lower memory footprint</div>
+        <AnchoredH2 id="performance">Performance That Doesn't Deter</AnchoredH2>
+        <div className="sub-title">Built for the most demanding production environments</div>
 
         <PerformanceTests />
       </div>
@@ -145,8 +145,8 @@ function Correctness() {
   return (
     <section className={styles.correctness}>
       <div className="container">
-        <AnchoredH2 id="correctness">Correct</AnchoredH2>
-        <div className="sub-title">Obsessed with the details and getting it right</div>
+        <AnchoredH2 id="correctness">Correct To The Smallest Details</AnchoredH2>
+        <div className="sub-title">We're obsessed with getting the details right</div>
 
         <div className="table-responsive">
           <table className="comparison">
@@ -265,8 +265,8 @@ function Integrations() {
   return (
     <section className={classnames(styles.integrations, 'integrations')}>
       <div className="container">
-        <AnchoredH2 id="integrations">Integrates With Everything</AnchoredH2>
-        <div className="sub-title">Sources, transforms, and sinks make it easy to compose pipelines</div>
+        <AnchoredH2 id="integrations">Quality Integrations Built Into The Core</AnchoredH2>
+        <div className="sub-title">Actively maintained integrations. Gone are the days of dormant low-quality plugins.</div>
 
         <div className={classnames(styles.components, 'components')}>
           <h3>
@@ -313,8 +313,8 @@ function Topologies() {
   return (
     <section className="topologies">
       <div className="container">
-        <AnchoredH2 id="topologies">One Tool For Any Topology</AnchoredH2>
-        <div className="sub-title">One tool, one mental model, gets data from A to B</div>
+        <AnchoredH2 id="topologies">One Tool For Your Entire Pipeline</AnchoredH2>
+        <div className="sub-title">Get data from A to B without patching tools together</div>
 
         <Tabs
           centered={true}
@@ -451,7 +451,7 @@ function Home() {
           )}
           <h1>Take Control Of Your Observability Data</h1>
           <p className="hero__subtitle">
-            Vector is an <a href={repoUrl()}>open-source</a> utility for building <a href="#performance">high performance</a> observability pipelines.
+            Vector is an <a href={repoUrl()}>open-source</a> utility for building <a href="#topologies">end-to-end</a>, <a href="#performance">high performance</a> observability pipelines.
           </p>
           <div className="hero__buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
