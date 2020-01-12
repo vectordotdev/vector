@@ -521,7 +521,7 @@ impl EventStreamBuilder {
             .follow(true)
             .stdout(true)
             .stderr(true)
-            // TODO: missing feature in shiplift to use .since(info.log_since())
+            .since(info.log_since())
             .timestamps(true);
 
         let mut stream = self
@@ -673,7 +673,6 @@ impl ContainerLogInfo {
     }
 
     /// Only logs after or equal to this point need to be fetched
-    #[allow(dead_code)]
     fn log_since(&self) -> i64 {
         self.last_log
             .as_ref()
