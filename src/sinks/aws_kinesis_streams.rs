@@ -89,7 +89,7 @@ impl KinesisService {
             cx.resolver(),
         )?);
 
-        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();

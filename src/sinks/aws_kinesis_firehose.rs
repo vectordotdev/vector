@@ -83,7 +83,7 @@ impl KinesisFirehoseService {
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = create_client(config.region.clone().try_into()?, cx.resolver())?;
 
-        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
