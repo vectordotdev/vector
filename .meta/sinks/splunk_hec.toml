@@ -1,7 +1,7 @@
 [sinks.splunk_hec]
 title = "Splunk HEC"
-batch_size = 1049000
-batch_timeout = 1
+batch_max_size = 1049000
+batch_timeout_secs = 1
 buffer = true
 common = true
 delivery_guarantee = "at_least_once"
@@ -24,12 +24,12 @@ tls_options = []
 type = "string"
 common = true
 examples = ["my-splunk-host.com"]
-null = false
+required = true
 description = "Your Splunk HEC host."
 
 [sinks.splunk_hec.options.token]
 type = "string"
 common = true
 examples = ["${TOKEN_ENV_VAR}", "A94A8FE5CCB19BA61C4C08"]
-null = false
+required = true
 description = "Your Splunk HEC token."

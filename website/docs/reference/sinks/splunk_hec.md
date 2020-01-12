@@ -44,14 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "splunk_hec" # must be: "splunk_hec"
-  inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
-
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
 ```
 
 </TabItem>
@@ -62,28 +56,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "splunk_hec" # must be: "splunk_hec"
-  inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
-
   # OPTIONAL - General
+  type = "splunk_hec" # no default, must be: "splunk_hec" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 
-  # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, seconds
+  # OPTIONAL - requests
+  encoding = "ndjson" # example, no default, enum
 
-  # OPTIONAL - Requests
-  request_in_flight_limit = 10 # default
-  request_rate_limit_duration_secs = 1 # default, seconds
-  request_rate_limit_num = 10 # default
-  request_retry_attempts = 5 # default
-  request_retry_backoff_secs = 1 # default, seconds
-  request_timeout_secs = 60 # default, seconds
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 1049000 # default, bytes
+    timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -91,6 +78,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
     max_events = 500 # default, events, relevant when type = "memory"
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+  # OPTIONAL - Request
+  [sinks.my_sink_id.request]
+    in_flight_limit = 10 # default
+    rate_limit_duration_secs = 1 # default, seconds
+    rate_limit_num = 10 # default
+    retry_attempts = 5 # default
+    retry_backoff_secs = 1 # default, seconds
+    timeout_secs = 60 # default, seconds
 
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -117,12 +113,32 @@ import Field from '@site/src/components/Field';
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
-  name={"batch_size"}
-  nullable={false}
-  path={null}
+  name={"max_size"}
+  path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -130,7 +146,7 @@ import Field from '@site/src/components/Field';
   unit={"bytes"}
   >
 
-### batch_size
+#### max_size
 
 The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
@@ -143,9 +159,8 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"batch_timeout"}
-  nullable={false}
-  path={null}
+  name={"timeout_secs"}
+  path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -153,10 +168,15 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   unit={"seconds"}
   >
 
-### batch_timeout
+#### timeout_secs
 
 The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -167,7 +187,6 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   enumValues={null}
   examples={[]}
   name={"buffer"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -178,7 +197,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink specific buffer.
+Configures the sink buffer behavior.
 
 <Fields filters={false}>
 
@@ -189,7 +208,6 @@ Configures the sink specific buffer.
   enumValues={null}
   examples={[500]}
   name={"max_events"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
@@ -212,7 +230,6 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
@@ -223,7 +240,7 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 
 #### max_size
 
-The maximum size of the buffer on the disk.
+The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -235,7 +252,6 @@ The maximum size of the buffer on the disk.
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -258,7 +274,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
   name={"when_full"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -281,15 +296,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
   name={"encoding"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -309,7 +323,6 @@ The encoding format used to serialize the events before outputting.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -332,7 +345,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={null}
   examples={["my-splunk-host.com"]}
   name={"host"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -351,12 +363,32 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### request
+
+Configures the sink request behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
   defaultValue={10}
   enumValues={null}
   examples={[10]}
-  name={"request_in_flight_limit"}
-  nullable={false}
-  path={null}
+  name={"in_flight_limit"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -364,7 +396,7 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
   unit={null}
   >
 
-### request_in_flight_limit
+#### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
@@ -377,9 +409,8 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"request_rate_limit_duration_secs"}
-  nullable={false}
-  path={null}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -387,9 +418,9 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   unit={"seconds"}
   >
 
-### request_rate_limit_duration_secs
+#### rate_limit_duration_secs
 
-The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -400,9 +431,8 @@ The window used for the [`request_rate_limit_num`](#request_rate_limit_num) opti
   defaultValue={10}
   enumValues={null}
   examples={[10]}
-  name={"request_rate_limit_num"}
-  nullable={false}
-  path={null}
+  name={"rate_limit_num"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -410,9 +440,9 @@ The window used for the [`request_rate_limit_num`](#request_rate_limit_num) opti
   unit={null}
   >
 
-### request_rate_limit_num
+#### rate_limit_num
 
-The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -423,9 +453,8 @@ The maximum number of requests allowed within the [`request_rate_limit_duration_
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  name={"request_retry_attempts"}
-  nullable={false}
-  path={null}
+  name={"retry_attempts"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -433,7 +462,7 @@ The maximum number of requests allowed within the [`request_rate_limit_duration_
   unit={null}
   >
 
-### request_retry_attempts
+#### retry_attempts
 
 The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
@@ -446,9 +475,8 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"request_retry_backoff_secs"}
-  nullable={false}
-  path={null}
+  name={"retry_backoff_secs"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -456,7 +484,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   unit={"seconds"}
   >
 
-### request_retry_backoff_secs
+#### retry_backoff_secs
 
 The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
@@ -469,9 +497,8 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   defaultValue={60}
   enumValues={null}
   examples={[60]}
-  name={"request_timeout_secs"}
-  nullable={false}
-  path={null}
+  name={"timeout_secs"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -479,10 +506,15 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   unit={"seconds"}
   >
 
-### request_timeout_secs
+#### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -493,7 +525,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   enumValues={null}
   examples={[]}
   name={"tls"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -515,7 +546,6 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   name={"ca_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -538,7 +568,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   name={"crt_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -561,7 +590,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   enumValues={null}
   examples={["PassWord1"]}
   name={"key_pass"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -584,7 +612,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
   name={"key_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -607,7 +634,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   enumValues={null}
   examples={[true,false]}
   name={"verify_certificate"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -630,7 +656,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   enumValues={null}
   examples={[true,false]}
   name={"verify_hostname"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -658,7 +683,6 @@ If `true` (the default), Vector will validate the configured remote host name ag
   enumValues={null}
   examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
   name={"token"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -693,8 +717,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured [`batch_timeout`](#batch_timeout) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured [`batch_size`](#batch_size) (default: `1049000 bytes`).
+1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
+2. The batch size meets or exceeds the configured [`max_size`](#max_size).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
@@ -731,10 +755,10 @@ If you'd like to disable health checks for this sink you can set the
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
-`request_rate_limit_num` options to ensure Vector does not exceed the specified
+downstream service. Start with the [`rate_limit_duration_secs`](#rate_limit_duration_secs) and
+`rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
+which this window is saturated with the [`in_flight_limit`](#in_flight_limit) option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -746,8 +770,8 @@ with the Vector team by [opening an issie][urls.new_splunk_hec_sink_issue].
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
-`request_retry_backoff_secs` options.
+attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
+`retry_backoff_secs` options.
 
 ### Setup
 

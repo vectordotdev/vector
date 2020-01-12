@@ -16,7 +16,7 @@ tls_options = ["+enabled", "-verify"]
 type = "string"
 common = true
 examples = ["10.14.22.123:9092,10.14.23.332:9092"]
-null = false
+required = true
 description = """\
 A comma delimited list of host and port pairs that the Kafka client should contact to bootstrap \
 its cluster metadata.\
@@ -26,7 +26,7 @@ its cluster metadata.\
 type = "string"
 common = true
 examples = ["user_id"]
-null = false
+required = true
 description = """\
 The log field name to use for the topic key. If unspecified, the key will be \
 randomly generated. If the field does not exist on the log, a blank value \
@@ -37,5 +37,5 @@ will be used.\
 type = "string"
 common = true
 examples = ["topic-1234"]
-null = false
+required = true
 description = "The Kafka topic name to write events to."

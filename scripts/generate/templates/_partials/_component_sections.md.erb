@@ -36,8 +36,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch_timeout` (default: `<%= component.options.batch_timeout.human_default %>`).
-2. The batch size meets or exceeds the configured `batch_size` (default: `<%= component.options.batch_size.human_default %>`).
+1. The batch age meets or exceeds the configured `timeout_secs`.
+2. The batch size meets or exceeds the configured <% if component.options.batch.options.max_size %>`max_size`<% else %>`max_events`<% end %>.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 <%- end -%>
@@ -73,7 +73,7 @@ accessible by the downstream service doing the scraping.
 
 Health checks ensure that the downstream service is accessible and ready to
 accept data. This check is performed upon sink initialization.
-<%- if component.options.healthcheck_uri -%>
+<%- if !component.options.healthcheck_uri.nil? -%>
 In order to run this check you must provide a value for the `healthcheck_uri`
 option.
 <%- end -%>
@@ -105,15 +105,15 @@ You'll notice that Vector's [template sytax](#template-syntax) is supported
 for these options, enabling you to use field values as the partition's key.
 <%- end -%>
 <%- end -%>
-<%- if component.options.request_rate_limit_duration_secs -%>
+<%- if !component.options.request.nil? -%>
 
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the `request_rate_limit_duration_secs` and
-`request_rate_limit_num` options to ensure Vector does not exceed the specified
+downstream service. Start with the `rate_limit_duration_secs` and
+`rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the `request_in_flight_limit` option, which
+which this window is saturated with the `in_flight_limit` option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -121,14 +121,14 @@ Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
 with the Vector team by [opening an issie][urls.new_<%= component.id %>_issue].
 <%- end -%>
-<%- if component.options.request_retry_attempts -%>
+<%- if !component.options.request.nil? -%>
 
 ### Retry Policy
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the `request_retry_attempts` and
-`request_retry_backoff_secs` options.
+attempts and backoff rate with the `retry_attempts` and
+`retry_backoff_secs` options.
 <%- end -%>
 <%- if component.sink? && component.streaming? -%>
 

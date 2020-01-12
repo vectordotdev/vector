@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, Auth, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -43,18 +43,18 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_in_flight_limit: Some(10),
-        request_timeout_secs: Some(30),
-        request_rate_limit_num: Some(10),
+        in_flight_limit: Some(10),
+        timeout_secs: Some(30),
+        rate_limit_num: Some(10),
         ..Default::default()
     };
 }

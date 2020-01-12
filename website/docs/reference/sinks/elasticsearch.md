@@ -44,13 +44,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "elasticsearch" # must be: "elasticsearch"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
-  host = "http://10.24.32.122:9000" # example, no default
+  doc_type = "_doc" # default
   index = "vector-%F" # default
+  host = "http://10.24.32.122:9000" # example, no default
 ```
 
 </TabItem>
@@ -60,35 +56,26 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "elasticsearch" # must be: "elasticsearch"
-  inputs = ["my-source-id"] # example
-
   # OPTIONAL - General
   doc_type = "_doc" # default
+  index = "vector-%F" # default
+  type = "elasticsearch" # no default, must be: "elasticsearch" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
-  index = "vector-%F" # default
   provider = "default" # default, enum
   region = "us-east-1" # example, no default
-
-  # OPTIONAL - Batching
-  batch_size = 10490000 # default, bytes
-  batch_timeout = 1 # default, seconds
-
-  # OPTIONAL - Requests
-  request_in_flight_limit = 5 # default
-  request_rate_limit_duration_secs = 1 # default, seconds
-  request_rate_limit_num = 5 # default
-  request_retry_attempts = 5 # default
-  request_retry_backoff_secs = 1 # default, seconds
-  request_timeout_secs = 60 # default, seconds
 
   # OPTIONAL - Auth
   [sinks.my_sink_id.auth]
     strategy = "aws" # example, enum
     password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 10490000 # default, bytes
+    timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -105,6 +92,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Query
   [sinks.my_sink_id.query]
     X-Powered-By = "Vector" # example
+
+  # OPTIONAL - Request
+  [sinks.my_sink_id.request]
+    in_flight_limit = 5 # default
+    rate_limit_duration_secs = 1 # default, seconds
+    rate_limit_num = 5 # default
+    retry_attempts = 5 # default
+    retry_backoff_secs = 1 # default, seconds
+    timeout_secs = 60 # default, seconds
 
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -135,7 +131,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"auth"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -157,7 +152,6 @@ Options for the authentication strategy.
   enumValues={null}
   examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
-  nullable={false}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
   required={true}
@@ -180,7 +174,6 @@ The basic authentication password.
   enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["aws","basic"]}
   name={"strategy"}
-  nullable={false}
   path={"auth"}
   relevantWhen={null}
   required={true}
@@ -203,7 +196,6 @@ The authentication strategy to use.
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
-  nullable={false}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
   required={true}
@@ -227,12 +219,32 @@ The basic authentication user name.
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
-  name={"batch_size"}
-  nullable={false}
-  path={null}
+  name={"max_size"}
+  path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -240,7 +252,7 @@ The basic authentication user name.
   unit={"bytes"}
   >
 
-### batch_size
+#### max_size
 
 The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
@@ -253,9 +265,8 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"batch_timeout"}
-  nullable={false}
-  path={null}
+  name={"timeout_secs"}
+  path={"batch"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -263,10 +274,15 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   unit={"seconds"}
   >
 
-### batch_timeout
+#### timeout_secs
 
 The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -277,7 +293,6 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   enumValues={null}
   examples={[]}
   name={"buffer"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -288,7 +303,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink specific buffer.
+Configures the sink buffer behavior.
 
 <Fields filters={false}>
 
@@ -299,7 +314,6 @@ Configures the sink specific buffer.
   enumValues={null}
   examples={[500]}
   name={"max_events"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
@@ -322,7 +336,6 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
@@ -333,7 +346,7 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
 
 #### max_size
 
-The maximum size of the buffer on the disk.
+The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -345,7 +358,6 @@ The maximum size of the buffer on the disk.
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -368,7 +380,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
   name={"when_full"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -391,15 +402,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"_doc"}
   enumValues={null}
   examples={["_doc"]}
   name={"doc_type"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -419,7 +429,6 @@ The [`doc_type`](#doc_type) for your index data. This is only relevant for Elast
   enumValues={null}
   examples={[]}
   name={"headers"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -441,7 +450,6 @@ Options for custom headers.
   enumValues={null}
   examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
   name={"`[header-name]`"}
-  nullable={false}
   path={"headers"}
   relevantWhen={null}
   required={true}
@@ -469,7 +477,6 @@ A custom header to be added to each outgoing Elasticsearch request.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -492,7 +499,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={null}
   examples={["http://10.24.32.122:9000"]}
   name={"host"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -515,10 +521,9 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
   enumValues={null}
   examples={["application-{{ application_id }}-%Y-%m-%d","vector-%Y-%m-%d"]}
   name={"index"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={true}
   type={"string"}
   unit={null}
@@ -538,7 +543,6 @@ Index name to write events to. See [Template Syntax](#template-syntax) for more 
   enumValues={{"default":"A generic Elasticsearch provider.","aws":"The [AWS Elasticsearch Service][urls.aws_elasticsearch]."}}
   examples={["default","aws"]}
   name={"provider"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -561,7 +565,6 @@ The provider of the Elasticsearch service. This is used to properly authenticate
   enumValues={null}
   examples={[]}
   name={"query"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -583,7 +586,6 @@ Custom parameters to Elasticsearch query string.
   enumValues={null}
   examples={[{"X-Powered-By":"Vector"}]}
   name={"`[parameter-name]`"}
-  nullable={false}
   path={"query"}
   relevantWhen={null}
   required={true}
@@ -611,7 +613,6 @@ A custom parameter to be added to each Elasticsearch request.
   enumValues={null}
   examples={["us-east-1"]}
   name={"region"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -630,12 +631,32 @@ When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### request
+
+Configures the sink request behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  name={"request_in_flight_limit"}
-  nullable={false}
-  path={null}
+  name={"in_flight_limit"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -643,7 +664,7 @@ When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of
   unit={null}
   >
 
-### request_in_flight_limit
+#### in_flight_limit
 
 The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
 
@@ -656,9 +677,8 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"request_rate_limit_duration_secs"}
-  nullable={false}
-  path={null}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -666,32 +686,9 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   unit={"seconds"}
   >
 
-### request_rate_limit_duration_secs
+#### rate_limit_duration_secs
 
-The window used for the [`request_rate_limit_num`](#request_rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"request_rate_limit_num"}
-  nullable={false}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-### request_rate_limit_num
-
-The maximum number of requests allowed within the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -702,9 +699,8 @@ The maximum number of requests allowed within the [`request_rate_limit_duration_
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  name={"request_retry_attempts"}
-  nullable={false}
-  path={null}
+  name={"rate_limit_num"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -712,7 +708,29 @@ The maximum number of requests allowed within the [`request_rate_limit_duration_
   unit={null}
   >
 
-### request_retry_attempts
+#### rate_limit_num
+
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"retry_attempts"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+#### retry_attempts
 
 The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
 
@@ -725,9 +743,8 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"request_retry_backoff_secs"}
-  nullable={false}
-  path={null}
+  name={"retry_backoff_secs"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -735,7 +752,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   unit={"seconds"}
   >
 
-### request_retry_backoff_secs
+#### retry_backoff_secs
 
 The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
 
@@ -748,9 +765,8 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   defaultValue={60}
   enumValues={null}
   examples={[60]}
-  name={"request_timeout_secs"}
-  nullable={false}
-  path={null}
+  name={"timeout_secs"}
+  path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
@@ -758,10 +774,15 @@ The amount of time to wait before attempting a failed request again. See [Retry 
   unit={"seconds"}
   >
 
-### request_timeout_secs
+#### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -772,7 +793,6 @@ The maximum time a request can take before being aborted. It is highly recommend
   enumValues={null}
   examples={[]}
   name={"tls"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -794,7 +814,6 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   name={"ca_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -817,7 +836,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   name={"crt_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -840,7 +858,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   enumValues={null}
   examples={["PassWord1"]}
   name={"key_pass"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -863,7 +880,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
   name={"key_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -886,7 +902,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   enumValues={null}
   examples={[true,false]}
   name={"verify_certificate"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -909,7 +924,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   enumValues={null}
   examples={[true,false]}
   name={"verify_hostname"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -972,8 +986,8 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Batches* are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured [`batch_timeout`](#batch_timeout) (default: `1 seconds`).
-2. The batch size meets or exceeds the configured [`batch_size`](#batch_size) (default: `10490000 bytes`).
+1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
+2. The batch size meets or exceeds the configured [`max_size`](#max_size).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
@@ -1019,10 +1033,10 @@ document][docs.data_model].
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the [`request_rate_limit_duration_secs`](#request_rate_limit_duration_secs) and
-`request_rate_limit_num` options to ensure Vector does not exceed the specified
+downstream service. Start with the [`rate_limit_duration_secs`](#rate_limit_duration_secs) and
+`rate_limit_num` options to ensure Vector does not exceed the specified
 number of requests in the specified window. You can further control the pace at
-which this window is saturated with the [`request_in_flight_limit`](#request_in_flight_limit) option, which
+which this window is saturated with the [`in_flight_limit`](#in_flight_limit) option, which
 will guarantee no more than the specified number of requests are in-flight at
 any given time.
 
@@ -1034,8 +1048,8 @@ with the Vector team by [opening an issie][urls.new_elasticsearch_sink_issue].
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the [`request_retry_attempts`](#request_retry_attempts) and
-`request_retry_backoff_secs` options.
+attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
+`retry_backoff_secs` options.
 
 ### Template Syntax
 

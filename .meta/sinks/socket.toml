@@ -14,7 +14,7 @@ tls_options = ["+enabled"]
 [sinks.socket.options.mode]
 type = "string"
 common = true
-null = false
+required = true
 description = "The type of socket to use. Currently only `tcp` is valid."
 
 [sinks.socket.options.mode.enum]
@@ -24,5 +24,5 @@ tcp = "Use the TCP protocol."
 type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
-null = false
+required = true
 description = "The address to bind to."

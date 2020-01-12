@@ -44,14 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
   mode = "tcp" # must be: "tcp"
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 ```
 
 </TabItem>
@@ -62,16 +56,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "socket" # must be: "socket"
-  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
   mode = "tcp" # must be: "tcp"
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
   # OPTIONAL - General
+  type = "socket" # no default, must be: "socket" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
+
+  # OPTIONAL - requests
+  encoding = "json" # example, no default, enum
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -110,7 +104,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["92.12.333.224:5000"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -133,7 +126,6 @@ The address to bind to.
   enumValues={null}
   examples={[]}
   name={"buffer"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -144,7 +136,7 @@ The address to bind to.
 
 ### buffer
 
-Configures the sink specific buffer.
+Configures the sink buffer behavior.
 
 <Fields filters={false}>
 
@@ -155,7 +147,6 @@ Configures the sink specific buffer.
   enumValues={null}
   examples={[500]}
   name={"max_events"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
@@ -178,7 +169,6 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
@@ -201,7 +191,6 @@ The maximum size of the buffer on the disk.
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -224,7 +213,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
   name={"when_full"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -247,15 +235,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   name={"encoding"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -275,7 +262,6 @@ The encoding format used to serialize the events before outputting.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -298,7 +284,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={{"tcp":"Use the TCP protocol."}}
   examples={["tcp"]}
   name={"mode"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -321,7 +306,6 @@ The type of socket to use. Currently only `tcp` is valid.
   enumValues={null}
   examples={[]}
   name={"tls"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -343,7 +327,6 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   name={"ca_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -366,7 +349,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   name={"crt_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -389,7 +371,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   enumValues={null}
   examples={[false,true]}
   name={"enabled"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -412,7 +393,6 @@ Enable TLS during connections to the remote.
   enumValues={null}
   examples={["PassWord1"]}
   name={"key_pass"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -435,7 +415,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
   name={"key_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -458,7 +437,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   enumValues={null}
   examples={[true,false]}
   name={"verify_certificate"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -481,7 +459,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   enumValues={null}
   examples={[true,false]}
   name={"verify_hostname"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}

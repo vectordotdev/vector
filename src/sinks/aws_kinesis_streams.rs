@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -35,15 +35,15 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_timeout_secs: Some(30),
+        timeout_secs: Some(30),
         ..Default::default()
     };
 }
@@ -89,7 +89,7 @@ impl KinesisService {
             cx.resolver(),
         )?);
 
-        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
@@ -344,9 +344,9 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
-            batch: BatchConfig {
-                batch_size: Some(2),
-                batch_timeout: None,
+            batch: BatchEventsConfig {
+                max_events: Some(2),
+                timeout_secs: None,
             },
             ..Default::default()
         };

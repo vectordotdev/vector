@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -34,14 +34,14 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
     // TODO: This should be an Option, but when combined with flatten we never seem to get back
     // a None. For now, we get optionality by handling the error during parsing when nothing is
     // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
     pub auth: Option<ElasticSearchAuth>,
 
@@ -685,9 +685,9 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
             ..Default::default()
         }

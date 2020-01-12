@@ -1,5 +1,7 @@
 [sinks.aws_cloudwatch_metrics]
 title = "AWS Cloudwatch Metrics"
+batch_max_events = 20
+batch_timeout_secs = 1
 beta = true
 buffer = false
 common = false
@@ -16,12 +18,12 @@ write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.a
 type = "string"
 common = true
 examples = ["service"]
-null = false
+required = true
 description = "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
 
 [sinks.aws_cloudwatch_metrics.options.region]
 type = "string"
 common = true
 examples = ["us-east-1"]
-null = false
+required = true
 description = "The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides."

@@ -1,8 +1,8 @@
 [sinks.new_relic_logs]
 title = "New Relic Logs"
 batch_is_simple = true
-batch_size = 524000
-batch_timeout = 1
+batch_max_size = 524000
+batch_timeout_secs = 1
 buffer = true
 common = false
 delivery_guarantee = "at_least_once"
@@ -23,21 +23,18 @@ write_to_description = "[New Relic's log service][urls.new_relic] via their [log
 type = "string"
 common = true
 examples = ["xxxx", "${LICENSE_KEY_ENV_VAR}"]
-null = true
 description = "Your New Relic license key (if applicable)."
 
 [sinks.new_relic_logs.options.insert_key]
 type = "string"
 common = true
 examples = ["xxxx", "${INSERT_KEY_ENV_VAR}"]
-null = true
 description = "Your New Relic insert key (if applicable)."
 
 [sinks.new_relic_logs.options.region]
 type = "string"
 common = true
 default = "us"
-null = true
 description = "The API region to send logs to."
 
 [sinks.new_relic_logs.options.region.enum]

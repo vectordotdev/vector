@@ -1,7 +1,7 @@
 [sinks.aws_kinesis_firehose]
 title = "AWS Kinesis Firehose"
-batch_size = 1049000
-batch_timeout = 1
+batch_max_events = 500
+batch_timeout_secs = 1
 beta = true
 buffer = true
 common = false
@@ -25,14 +25,14 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
 type = "string"
 common = true
 examples = ["us-east-1"]
-null = false
+required = true
 description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis Firehose delivery stream resides."
 
 [sinks.aws_kinesis_firehose.options.stream_name]
 type = "string"
 common = true
 examples = ["my-stream"]
-null = false
+required = true
 description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Firehose delivery stream."
 
 [[sinks.aws_kinesis_firehose.output.examples]]

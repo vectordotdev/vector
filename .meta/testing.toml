@@ -1,27 +1,27 @@
 [testing.tests]
 type = "[table]"
 common = true
-null = false
+required = true
 description = "A table that defines a unit test."
 
 [testing.tests.options.name]
 type = "string"
 examples = ["foo test"]
 common = true
-null = false
+required = true
 description = "A unique identifier for this test."
 
 [testing.tests.options.input]
 type = "table"
 common = true
-null = false
+required = true
 description = "A table that defines a unit test input event."
 
 [testing.tests.options.input.options.insert_at]
 type = "string"
 examples = ["foo"]
 common = true
-null = false
+required = true
 description = """\
 The name of a transform, the input event will be delivered to this transform in \
 order to begin the test.\
@@ -30,7 +30,7 @@ order to begin the test.\
 [testing.tests.options.input.options.type]
 type = "string"
 examples = ["raw", "log", "metric"]
-null = false
+required = true
 common = true
 description = "The event type."
 
@@ -43,20 +43,18 @@ metric = "Creates a metric event, where its type and fields are specified in the
 type = "string"
 examples = ["some message contents"]
 relevant_when = {type = "raw"}
-null = true
 common = true
 description = "Specifies the log message field contents when the input type is 'raw'."
 
 [testing.tests.options.input.options.log_fields]
 type = "table"
-null = true
 common = false
 relevant_when = {type = "log"}
 description = "Specifies the log fields when the input type is 'log'."
 
 [testing.tests.options.input.options.log_fields.options."`[field-name]`"]
 type = "*"
-null = false
+required = true
 examples = [
   {message = "some message contents"},
   {host = "myhost"},
@@ -67,14 +65,13 @@ A key/value pair representing a field to be added to the input event.\
 
 [testing.tests.options.input.options.metric]
 type = "table"
-null = true
 common = false
 relevant_when = {type = "metric"}
 description = "Specifies the metric type when the input type is 'metric'."
 
 [testing.tests.options.input.options.metric.options.type]
 type = "string"
-null = false
+required = true
 examples = ["counter"]
 common = true
 description = "The metric type."
@@ -88,7 +85,7 @@ set = "A [set metric type][docs.data-model.metric#set]."
 [testing.tests.options.input.options.metric.options.name]
 type = "string"
 examples = ["duration_total"]
-null = false
+required = true
 common = true
 description = """\
 The name of the metric. Defaults to `<field>_total` for `counter` and \
@@ -97,7 +94,6 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 
 [testing.tests.options.input.options.metric.options.tags]
 type = "table"
-null = true
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
@@ -107,7 +103,7 @@ examples = [
   {host = "foohost"},
   {region = "us-east-1"},
 ]
-null = false
+required = true
 common = true
 description = """\
 Key/value pairs representing [metric tags][docs.data-model.metric#tags].\
@@ -116,8 +112,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].\
 [testing.tests.options.input.options.metric.options.val]
 type = "float"
 examples = [10.2]
-optional = false
-null = false
+required = true
 description = """\
 Amount to increment/decrement or gauge.\
 """
@@ -125,8 +120,7 @@ Amount to increment/decrement or gauge.\
 [testing.tests.options.input.options.metric.options.timestamp]
 type = "string"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
-null = false
+required = true
 description = """\
 Time metric was created/ingested.\
 """
@@ -134,14 +128,12 @@ Time metric was created/ingested.\
 [testing.tests.options.input.options.metric.options.sample_rate]
 type = "float"
 examples = [1]
-null = true
 description = """\
 The bucket/distribution the metric is a part of.\
 """
 
 [testing.tests.options.input.options.metric.options.direction]
 type = "string"
-null = true
 description = """\
 The direction to increase or decrease the gauge value.\
 """
@@ -153,14 +145,14 @@ minus = "Decrease the gauge"
 [testing.tests.options.outputs]
 type = "[table]"
 common = true
-null = false
+required = true
 description = "A table that defines a unit test expected output."
 
 [testing.tests.options.outputs.options.extract_from]
 type = "string"
 examples = ["foo"]
 common = true
-null = false
+required = true
 description = """\
 The name of a transform, at the end of the test events extracted from this \
 transform will be checked against a table of conditions.\
@@ -169,7 +161,7 @@ transform will be checked against a table of conditions.\
 [testing.tests.options.outputs.options.conditions]
 type = "[table]"
 common = true
-null = false
+required = true
 description = """\
 A table that defines a collection of conditions to check against the output of a \
 transform. A test is considered to have passed when each condition has resolved \
@@ -178,7 +170,7 @@ true for one or more events extracted from the target transform.\
 
 [testing.tests.options.outputs.options.conditions.options.type]
 type = "string"
-null = false
+required = true
 examples = ["check_fields"]
 common = true
 description = """\
@@ -188,7 +180,6 @@ available.\
 
 [testing.tests.options.outputs.options.conditions.options."`<field_name>`.eq"]
 type = "string"
-null = true
 examples = [
   { "message.eq" = "this is the content to match against" }
 ]
@@ -199,7 +190,6 @@ Check whether a fields contents exactly matches the value specified.\
 
 [testing.tests.options.outputs.options.conditions.options."`<field_name>`.neq"]
 type = "string"
-null = true
 examples = [
   { "method.neq" = "POST" }
 ]
@@ -210,7 +200,6 @@ Check whether a fields contents does not match the value specified.\
 
 [testing.tests.options.outputs.options.conditions.options."`<field_name>`.exists"]
 type = "bool"
-null = true
 examples = [
   { "host.exists" = true }
 ]

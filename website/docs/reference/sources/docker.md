@@ -23,20 +23,48 @@ The Vector `docker` source ingests data through the docker engine daemon and out
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "docker" # must be: "docker"
-
-  # OPTIONAL
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
   include_images = ["my_image_name", "httpd", "redis"] # example, no default
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[sources.my_source_id]
+  type = "docker" # no default, must be: "docker" (if supplied)
+  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
+  include_images = ["my_image_name", "httpd", "redis"] # example, no default
+  include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -53,7 +81,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["my_container_name","container_prefix","9b6247364a03"]]}
   name={"include_containers"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -77,7 +104,6 @@ container ID or name. If not provided, all containers will be included.
   enumValues={null}
   examples={[["my_image_name","httpd","redis"]]}
   name={"include_images"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -100,7 +126,6 @@ A list of image names to match against. If not provided, all images will be incl
   enumValues={null}
   examples={[["label_key1=label_value1","label_key2=label_value2"]]}
   name={"include_labels"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -125,15 +150,14 @@ A list of container object labels to match against when filtering running contai
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
   name={"DOCKER_HOST"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -148,15 +172,14 @@ The docker host to connect to. See [Connecting to the Docker daemon](#connecting
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
   name={"DOCKER_VERIFY_TLS"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}

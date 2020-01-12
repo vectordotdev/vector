@@ -41,7 +41,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["/var/lib/vector"]}
   name={"data_dir"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -64,7 +63,6 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
   enumValues={null}
   examples={[["0.0.0.0:53"]]}
   name={"dns_servers"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}

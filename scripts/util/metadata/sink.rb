@@ -189,9 +189,9 @@ class Sink < Component
       buffer_option =
         Option.new({
           "name" => "buffer",
-          "description" => "Configures the sink specific buffer.",
+          "description" => "Configures the sink buffer behavior.",
           "options" => buffer_options,
-          "null" => true,
+          "null" => false,
           "type" => "table"
         })
 

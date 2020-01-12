@@ -13,13 +13,11 @@ through_description = "log records from journald"
 [sources.journald.options.current_boot_only]
 type = "bool"
 common = true
-null = true
 default = true
 description = "Include only entries from the current boot."
 
 [sources.journald.options.batch_size]
 type = "int"
-null = true
 default = 16
 description = """\
 The systemd journal is read in batches, and a checkpoint is set at the \
@@ -29,7 +27,6 @@ end of each batch. This option limits the size of the batch.\
 [sources.journald.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
-null = true
 description = """\
 The directory used to persist the journal checkpoint position. By \
 default, the global `data_dir` is used. Please make sure the Vector \
@@ -38,14 +35,12 @@ project has write permissions to this dir.\
 
 [sources.journald.options.local_only]
 type = "bool"
-null = true
 default = true
 description = "Include only entries from the local system"
 
 [sources.journald.options.units]
 type = "[string]"
 common = true
-null = true
 default = []
 examples = [["ntpd", "sysinit.target"]]
 description = """\
@@ -121,7 +116,6 @@ examples = [
   {_SYSTEMD_UNIT = "ntpd.service"},
   {_BOOT_ID = "124c781146e841ae8d9b4590df8b9231"},
 ]
-optional = true
 description = """\
 Additional Journald fields are passed through as log fields.
 """
@@ -129,7 +123,7 @@ Additional Journald fields are passed through as log fields.
 [sources.journald.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-optional = false
+required = true
 description = """\
 The value of the journald `_HOSTNAME` field.\
 """
@@ -137,7 +131,7 @@ The value of the journald `_HOSTNAME` field.\
 [sources.journald.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The value of the journald `MESSAGE` field.\
 """
@@ -145,7 +139,7 @@ The value of the journald `MESSAGE` field.\
 [sources.journald.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.\
 """

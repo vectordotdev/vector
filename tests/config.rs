@@ -282,7 +282,6 @@ fn bad_s3_region() {
         [sinks.out1]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -291,7 +290,6 @@ fn bad_s3_region() {
         [sinks.out2]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -301,7 +299,6 @@ fn bad_s3_region() {
         [sinks.out3]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
@@ -312,12 +309,14 @@ fn bad_s3_region() {
         [sinks.out4]
         type = "aws_s3"
         inputs = ["in"]
-        batch_size = 100000
         compression = "gzip"
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         endpoint = "this shoudlnt work"
+
+        [sinks.out4.batch]
+        max_size = 100000
       "#,
     )
     .unwrap_err();
@@ -474,7 +473,9 @@ fn parses_sink_partial_request() {
         inputs = ["in"]
         uri = "https://localhost"
         encoding = "json"
-        request_in_flight_limit = 42
+
+        [sinks.out.request]
+        in_flight_limit = 42
         "#,
     )
     .unwrap();
@@ -492,12 +493,58 @@ fn parses_sink_full_request() {
         inputs = ["in"]
         uri = "https://localhost"
         encoding = "json"
-        request_in_flight_limit = 42
-        request_timeout_secs = 2
-        request_rate_limit_duration_secs = 3
-        request_rate_limit_num = 4
-        request_retry_attempts = 5
-        request_retry_backoff_secs = 6
+
+        [sinks.out.request]
+        in_flight_limit = 42
+        timeout_secs = 2
+        rate_limit_duration_secs = 3
+        rate_limit_num = 4
+        retry_attempts = 5
+        retry_backoff_secs = 6
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_batch_bytes() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "http"
+        inputs = ["in"]
+        uri = "https://localhost"
+        encoding = "json"
+
+        [sinks.out.batch]
+        max_size = 100
+        timeout_secs = 10
+        "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn parses_sink_full_batch_event() {
+    load(
+        r#"
+        [sources.in]
+        type = "stdin"
+
+        [sinks.out]
+        type = "aws_cloudwatch_logs"
+        inputs = ["in"]
+        region = "us-east-1"
+        group_name = "test"
+        stream_name = "test"
+        encoding = "json"
+
+        [sinks.out.batch]
+        max_events = 100
+        timeout_secs = 10
         "#,
     )
     .unwrap();

@@ -2,7 +2,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -43,15 +43,15 @@ pub struct DatadogConfig {
     #[serde(default = "default_host")]
     pub host: String,
     pub api_key: String,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_retry_attempts: Some(5),
+        retry_attempts: Some(5),
         ..Default::default()
     };
 }

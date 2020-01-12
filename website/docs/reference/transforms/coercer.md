@@ -20,15 +20,40 @@ The Vector `coercer` transform accepts [`log`][docs.data-model.log] events and a
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "coercer" # must be: "coercer"
-  inputs = ["my-source-id"] # example
+  [transforms.my_transform_id.types]
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # OPTIONAL - General
+  type = "coercer" # no default, must be: "coercer" (if supplied)
+  inputs = ["my-source-id"] # example, no default
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
@@ -40,6 +65,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
     timestamp = "timestamp|%F" # example
     timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -56,7 +85,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"types"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -73,15 +101,14 @@ Key/Value pairs representing mapped log field types.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
   name={"`[field-name]`"}
-  nullable={false}
   path={"types"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

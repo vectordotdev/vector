@@ -5,7 +5,7 @@ use crate::{
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -25,9 +25,9 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
     #[serde(flatten)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -245,12 +245,12 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
             request: TowerRequestConfig {
-                request_retry_attempts: Some(1),
+                retry_attempts: Some(1),
                 ..Default::default()
             },
             ..Default::default()
@@ -288,9 +288,9 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
             ..Default::default()
         };
