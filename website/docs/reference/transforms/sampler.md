@@ -20,6 +20,21 @@ The Vector `sampler` transform accepts [`log`][docs.data-model.log] events and a
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -27,13 +42,31 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "sampler" # must be: "sampler"
-  inputs = ["my-source-id"] # example
   rate = 10 # example
 
   # OPTIONAL
   pass_list = ["[error]", "field2"] # example, no default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED
+  rate = 10 # example
+
+  # OPTIONAL
+  type = "sampler" # no default, must be: "sampler" (if supplied)
+  inputs = ["my-source-id"] # example, no default
+  pass_list = ["[error]", "field2"] # example, no default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -50,7 +83,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["[error]","field2"]]}
   name={"pass_list"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -73,7 +105,6 @@ A list of regular expression patterns to exclude events from sampling. If an eve
   enumValues={null}
   examples={[10]}
   name={"rate"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

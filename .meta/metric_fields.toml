@@ -1,6 +1,6 @@
 [metric_fields.kind]
 type = "string"
-optional = false
+required = true
 description = """\
 The metric value kind. This determines how the value is merged downstream if \
 metrics are aggregated.
@@ -13,7 +13,7 @@ incremental = "The value is incremental and is used to form a holistic value by 
 [metric_fields.name]
 type = "string"
 examples = ["login.count", "response_time"]
-optional = false
+required = true
 description = """\
 The metric name.\
 """
@@ -21,7 +21,7 @@ The metric name.\
 [metric_fields.tags]
 type = "map"
 examples = [{host = "my.host.com"}]
-optional = false
+required = true
 description = """\
 Tags that add additional metadata or context to the metric. These are simple \
 key/value pairs in `string` format and cannot be nested.\
@@ -30,7 +30,7 @@ key/value pairs in `string` format and cannot be nested.\
 [metric_fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The metric timestamp, representing when the metric was created/ingested within \
 Vector.\
@@ -38,7 +38,7 @@ Vector.\
 
 [metric_fields.type]
 type = "struct"
-optional = false
+required = true
 description = """\
 A metric must be one of 6 types.\
 """
@@ -46,7 +46,6 @@ A metric must be one of 6 types.\
 
 [metric_fields.type.fields.counter]
 type = "struct"
-optional = true
 description = """\
 A single value that can _only_ be incremented or reset to zero value, it \
 cannot be decremented.\
@@ -55,7 +54,7 @@ cannot be decremented.\
 [metric_fields.type.fields.counter.fields.value]
 type = "double"
 examples = [2.6, 5.0]
-optional = false
+required = true
 description = """\
 The value to increment the counter by. Can only be positive.\
 """
@@ -63,7 +62,6 @@ The value to increment the counter by. Can only be positive.\
 
 [metric_fields.type.fields.gauge]
 type = "struct"
-optional = true
 description = """\
 A gauge represents a point-in-time value that can increase and decrease. \
 Vector's internal gauge type represents changes to that value. Gauges should be \
@@ -73,7 +71,7 @@ used to track fluctuations in values, like current memory or CPU usage.\
 [metric_fields.type.fields.gauge.fields.value]
 type = "double"
 examples = [554222.0]
-optional = false
+required = true
 description = """\
 A specific point-in-time value for the gauge.\
 """
@@ -81,7 +79,6 @@ A specific point-in-time value for the gauge.\
 
 [metric_fields.type.fields.set]
 type = "struct"
-optional = true
 description = """\
 A set represents a count of unique values, AKA the cardinality.\
 """
@@ -89,7 +86,7 @@ A set represents a count of unique values, AKA the cardinality.\
 [metric_fields.type.fields.set.fields.values]
 type = "[string]"
 examples = [["unique item 1", "unique item 2"]]
-optional = false
+required = true
 description = """\
 The list of unique values.\
 """
@@ -97,7 +94,6 @@ The list of unique values.\
 
 [metric_fields.type.fields.distribution]
 type = "struct"
-optional = true
 description = """\
 A dsitribution represents a distribution of sampled values.\
 """
@@ -105,7 +101,7 @@ A dsitribution represents a distribution of sampled values.\
 [metric_fields.type.fields.distribution.fields.values]
 type = "[double]"
 examples = [[12.0, 43.3, 25.2]]
-optional = false
+required = true
 description = """\
 The list of values contained within the distribution.\
 """
@@ -113,7 +109,7 @@ The list of values contained within the distribution.\
 [metric_fields.type.fields.distribution.fields.sample_rates]
 type = "[int]"
 examples = [[12, 43, 25]]
-optional = false
+required = true
 description = """\
 The rate at which each individual value was sampled.\
 """
@@ -121,7 +117,6 @@ The rate at which each individual value was sampled.\
 
 [metric_fields.type.fields.aggregated_histogram]
 type = "struct"
-optional = true
 description = """\
 Also called a "timer". A `aggregated_histogram` samples observations (usually \
 things like request durations or response sizes) and counts them in \
@@ -131,7 +126,7 @@ configurable buckets. It also provides a sum of all observed values.\
 [metric_fields.type.fields.aggregated_histogram.fields.buckets]
 type = "[double]"
 examples = [[1, 2, 5, 10, 25]]
-optional = false
+required = true
 description = """\
 The buckets contained within this histogram.\
 """
@@ -139,7 +134,7 @@ The buckets contained within this histogram.\
 [metric_fields.type.fields.aggregated_histogram.fields.counts]
 type = "[int]"
 examples = [[1, 5, 25, 2, 5]]
-optional = false
+required = true
 description = """\
 The number of values contained within each bucket.\
 """
@@ -147,7 +142,7 @@ The number of values contained within each bucket.\
 [metric_fields.type.fields.aggregated_histogram.fields.count]
 type = "int"
 examples = [54]
-optional = false
+required = true
 description = """\
 The total number of values contained within the histogram.\
 """
@@ -155,7 +150,7 @@ The total number of values contained within the histogram.\
 [metric_fields.type.fields.aggregated_histogram.fields.sum]
 type = "double"
 examples = [524.0]
-optional = false
+required = true
 description = """\
 The sum of all values contained within the histogram.\
 """
@@ -163,7 +158,6 @@ The sum of all values contained within the histogram.\
 
 [metric_fields.type.fields.aggregated_summary]
 type = "struct"
-optional = true
 description = """\
 Similar to a histogram, a summary samples observations (usually things like \
 request durations and response sizes). While it also provides a total count \
@@ -174,7 +168,7 @@ quantiles over a sliding time window.
 [metric_fields.type.fields.aggregated_summary.fields.quantiles]
 type = "[double]"
 examples = [[0.1, 0.5, 0.75, 1.0]]
-optional = false
+required = true
 description = """\
 The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.\
 """
@@ -182,7 +176,7 @@ The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.\
 [metric_fields.type.fields.aggregated_summary.fields.values]
 type = "[double]"
 examples = [[2.1, 4.68, 23.02, 120.1]]
-optional = false
+required = true
 description = """\
 The values contained within the summary that align with the `quantiles`.\
 """
@@ -190,7 +184,7 @@ The values contained within the summary that align with the `quantiles`.\
 [metric_fields.type.fields.aggregated_summary.fields.count]
 type = "int"
 examples = [54]
-optional = false
+required = true
 description = """\
 The total number of values contained within the summary.\
 """
@@ -198,7 +192,7 @@ The total number of values contained within the summary.\
 [metric_fields.type.fields.aggregated_summary.fields.sum]
 type = "double"
 examples = [524.0]
-optional = false
+required = true
 description = """\
 The sum of all values contained within the summary.\
 """

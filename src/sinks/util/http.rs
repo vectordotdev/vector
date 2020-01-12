@@ -8,6 +8,7 @@ use futures::{Future, Poll, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -170,6 +171,24 @@ impl RetryLogic for HttpRetryLogic {
                 Some(format!("{}: {}", status, String::from_utf8_lossy(response.body())).into())
             }
             _ => None,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+pub enum Auth {
+    Basic { user: String, password: String },
+}
+
+impl Auth {
+    pub fn apply<B>(&self, req: &mut Request<B>) {
+        match &self {
+            Auth::Basic { user, password } => {
+                use headers::HeaderMapExt;
+                let auth = headers::Authorization::basic(&user, &password);
+                req.headers_mut().typed_insert(auth);
+            }
         }
     }
 }

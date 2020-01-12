@@ -12,7 +12,6 @@ resources = []
 type = "[string]"
 common = true
 default = ["message"]
-null = false
 description = """\
 Fields to merge.
 
@@ -30,7 +29,6 @@ merged event.\
 type = "string"
 common = true
 default = "_partial"
-null = false
 description = """\
 The field that indicates that the event is partial. A consequent stream of \
 partial events along with the first non-partial event will be merged together.\

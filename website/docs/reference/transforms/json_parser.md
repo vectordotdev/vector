@@ -41,14 +41,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "json_parser" # must be: "json_parser"
-  inputs = ["my-source-id"] # example
-  drop_invalid = true # example
-
   # OPTIONAL
   drop_field = true # default
   field = "message" # default
+
+  # REQUIRED
+  drop_invalid = true # example
 ```
 
 </TabItem>
@@ -58,16 +56,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "json_parser" # must be: "json_parser"
-  inputs = ["my-source-id"] # example
-  drop_invalid = true # example
-
   # OPTIONAL
   drop_field = true # default
   field = "message" # default
+  type = "json_parser" # no default, must be: "json_parser" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   overwrite_target = false # default
   target_field = "target" # example, no default
+
+  # REQUIRED
+  drop_invalid = true # example
 ```
 
 </TabItem>
@@ -89,10 +87,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[true,false]}
   name={"drop_field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -112,7 +109,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   enumValues={null}
   examples={[true]}
   name={"drop_invalid"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -135,10 +131,9 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   enumValues={null}
   examples={["message"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -158,7 +153,6 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
   enumValues={null}
   examples={[false,true]}
   name={"overwrite_target"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -181,7 +175,6 @@ If [`target_field`](#target_field) is set and the log contains a field of the sa
   enumValues={null}
   examples={["target"]}
   name={"target_field"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}

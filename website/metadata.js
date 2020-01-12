@@ -17761,7 +17761,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Amazon",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17783,7 +17783,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Amazon",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17805,7 +17805,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Amazon",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17827,7 +17827,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Amazon",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17849,7 +17849,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Amazon",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17939,7 +17939,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Datadog",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17961,7 +17961,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Elastic",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -18005,7 +18005,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Google",
+      "service_provider": null,
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -18049,7 +18049,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Confluent",
+      "service_provider": null,
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -18071,7 +18071,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "New Relic",
+      "service_provider": null,
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -18137,7 +18137,7 @@ module.exports = {
         "macos",
         "windows"
       ],
-      "service_provider": "Splunk",
+      "service_provider": null,
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [

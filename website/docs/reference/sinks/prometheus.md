@@ -44,10 +44,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "prometheus" # must be: "prometheus"
-  inputs = ["my-source-id"] # example
+  # REQUIRED
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
+
+  # OPTIONAL
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
+  flush_period_secs = 60 # default, seconds
 ```
 
 </TabItem>
@@ -58,14 +61,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "prometheus" # must be: "prometheus"
-  inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
 
   # OPTIONAL
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
   flush_period_secs = 60 # default, seconds
+  type = "prometheus" # no default, must be: "prometheus" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 ```
 
@@ -88,7 +91,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["0.0.0.0:9598"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -106,15 +108,14 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
   enumValues={null}
   examples={[[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]]}
   name={"buckets"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
@@ -129,15 +130,14 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
   name={"flush_period_secs"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -157,7 +157,6 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -180,7 +179,6 @@ Enables/disables the sink healthcheck upon start.
   enumValues={null}
   examples={["service"]}
   name={"namespace"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

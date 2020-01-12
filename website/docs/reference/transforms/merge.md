@@ -20,20 +20,47 @@ The Vector [`merge`](#merge) transform accepts [`log`][docs.data-model.log] even
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "merge" # must be: "merge"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
   merge_fields = ["message"] # default
   partial_event_marker = "_partial" # default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  type = "merge" # no default, must be: "merge" (if supplied)
+  inputs = ["my-source-id"] # example, no default
+  merge_fields = ["message"] # default
+  partial_event_marker = "_partial" # default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -50,7 +77,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["message"]]}
   name={"merge_fields"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -77,7 +103,6 @@ Finally, the non-partial event fields are merged in, producing the resulting mer
   enumValues={null}
   examples={["_partial"]}
   name={"partial_event_marker"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -102,14 +127,10 @@ The [`merge`](#merge) transform accepts [`log`][docs.data-model.log] events and 
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="default"
   values={[{"label":"Default","value":"default"},{"label":"With Merge Fields","value":"with-merge-fields"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="default">
 

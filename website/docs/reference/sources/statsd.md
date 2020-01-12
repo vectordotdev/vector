@@ -23,15 +23,47 @@ The Vector `statsd` source ingests data through the StatsD UDP protocol and outp
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
-  type = "statsd" # must be: "statsd"
   address = "127.0.0.1:8126" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[sources.my_source_id]
+  # REQUIRED
+  address = "127.0.0.1:8126" # example
+
+  # OPTIONAL
+  type = "statsd" # no default, must be: "statsd" (if supplied)
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -48,7 +80,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["127.0.0.1:8126"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -73,14 +104,10 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="counter"
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer","value":"timer"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 

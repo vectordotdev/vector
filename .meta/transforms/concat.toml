@@ -11,7 +11,7 @@ resources = []
 [transforms.concat.options.target]
 type = "string"
 examples = ["dest_field_name"]
-null = false
+required = true
 description = """\
 The name for the new label.\
 """
@@ -20,8 +20,7 @@ The name for the new label.\
 type = "string"
 default = " "
 examples = [" ", ",", "_", "+"]
-null = false
-optional = true
+required = true
 description = """\
 The string that is used to join all items.\
 """
@@ -29,7 +28,7 @@ The string that is used to join all items.\
 [transforms.concat.options.items]
 type = "[string]"
 examples = [["fist[..3]", "second[-5..]", "third[3..6]"]]
-null = false
+required = true
 description = """\
 A list of substring definitons in the format of source_field[start..end]. \
 For both start and end negative values are counted from the end of the \

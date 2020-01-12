@@ -3,7 +3,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        retries::RetryLogic, rusoto, BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -32,16 +32,16 @@ pub struct CloudWatchMetricsSinkConfig {
     pub namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_timeout_secs: Some(30),
-        request_rate_limit_num: Some(150),
+        timeout_secs: Some(30),
+        rate_limit_num: Some(150),
         ..Default::default()
     };
 }

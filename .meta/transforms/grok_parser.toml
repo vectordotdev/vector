@@ -16,7 +16,7 @@ types_coercion = true
 type = "bool"
 common = true
 default = true
-null = false
+required = true
 description = """\
 If `true` will drop the specified `field` after parsing.\
 """
@@ -26,7 +26,7 @@ types_coercion = true
 type = "string"
 common = true
 default = "message"
-null = false
+required = true
 description = """\
 The log field to execute the `pattern` against. Must be a `string` value.\
 """
@@ -35,5 +35,5 @@ The log field to execute the `pattern` against. Must be a `string` value.\
 type = "string"
 common = true
 examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
-null = false
+required = true
 description = "The [Grok pattern][urls.grok_patterns]"

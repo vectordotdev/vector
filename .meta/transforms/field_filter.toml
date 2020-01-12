@@ -13,14 +13,14 @@ resources = []
 type = "string"
 common = true
 examples = ["file"]
-null = false
+required = true
 description = "The target log field to compare against the `value`."
 
 [transforms.field_filter.options.value]
 type = "string"
 common = true
 examples = ["/var/log/nginx.log"]
-null = false
+required = true
 description = """\
 If the value of the specified `field` matches this value then the event \
 will be permitted, otherwise it is dropped.\

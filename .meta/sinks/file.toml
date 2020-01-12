@@ -17,13 +17,12 @@ examples = [
   "vector-%Y-%m-%d.log",
   "application-{{ application_id }}-%Y-%m-%d.log"
 ]
-null = false
+required = true
 templateable = true
 description = "File name to write events to."
 
 [sinks.file.options.idle_timeout_secs]
 type = "int"
-null = true
 default = "30"
 description = """\
 The amount of time a file can be idle  and stay open. \
