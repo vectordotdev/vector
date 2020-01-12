@@ -69,7 +69,7 @@ most sense if the downstream service is designed for streaming, as it takes
 load off of the downstream Vector service. For example, you might want to take
 advantage of [Big Query's streaming inserts][urls.big_query_streaming]. This
 feature is designed for rapid streaming and it has the added benefit of making
-data quickly available for querying. To implement this, you can forgo using a
+data quickly available for querying. To implement this, you can force using a
 centralized Vector service entirely and stream data directly from your client
 nodes.
 
