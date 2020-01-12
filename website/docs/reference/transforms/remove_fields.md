@@ -20,16 +20,48 @@ The Vector `remove_fields` transform accepts [`log`][docs.data-model.log] events
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_fields" # must be: "remove_fields"
-  inputs = ["my-source-id"] # example
   fields = ["field1", "field2"] # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED
+  fields = ["field1", "field2"] # example
+
+  # OPTIONAL
+  type = "remove_fields" # no default, must be: "remove_fields" (if supplied)
+  inputs = ["my-source-id"] # example, no default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -46,7 +78,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["field1","field2"]]}
   name={"fields"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

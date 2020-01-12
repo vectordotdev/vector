@@ -1,7 +1,7 @@
 [sinks.gcp_pubsub]
 title = "GCP PubSub"
-batch_size = 10485760
-batch_timeout = 1
+batch_max_size = 10485760
+batch_timeout_secs = 1
 beta = true
 buffer = true
 common = true
@@ -23,7 +23,6 @@ tls_options = []
 
 [sinks.gcp_pubsub.options.api_key]
 type = "string"
-null = true
 description = """\
 A Google Cloud API key used to authenticate access the pubsub project and topic. \
 Either this or `credentials_path` must be set.\
@@ -31,7 +30,6 @@ Either this or `credentials_path` must be set.\
 
 [sinks.gcp_pubsub.options.credentials_path]
 type = "string"
-null = true
 description = """\
 The filename for a Google Cloud service account credentials JSON file \
 used to authenticate access to the pubsub project and topic. \
@@ -41,13 +39,13 @@ Either this or `api_key` must be set.\
 [sinks.gcp_pubsub.options.project]
 type = "string"
 common = false
-null = false
+required = true
 examples = ["vector-123456"]
 description = "The project name to which to publish logs."
 
 [sinks.gcp_pubsub.options.topic]
 type = "string"
 common = false
-null = false
+required = true
 examples = ["this-is-a-topic"]
 description = "The topic within the project to which to publish logs."

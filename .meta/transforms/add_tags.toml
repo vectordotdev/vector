@@ -11,7 +11,7 @@ resources = []
 [transforms.add_tags.options.tags]
 type = "table"
 common = true
-null = false
+required = true
 description = """\
 A table of key/value pairs representing the tags to be added to the \
 metric.\
@@ -19,7 +19,7 @@ metric.\
 
 [transforms.add_tags.options.tags.options."`[tag-name]`"]
 type = "string"
-null = false
+required = true
 examples = [
   {"static_tag" = "my value"},
   {"env_tag" = "${ENV_VAR}"},

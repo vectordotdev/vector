@@ -44,8 +44,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
 ```
 
@@ -57,11 +55,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
 
   # OPTIONAL - General
+  type = "vector" # no default, must be: "vector" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 
   # OPTIONAL - Buffer
@@ -91,7 +89,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["92.12.333.224:5000"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -114,7 +111,6 @@ The downstream Vector address.
   enumValues={null}
   examples={[]}
   name={"buffer"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -125,7 +121,7 @@ The downstream Vector address.
 
 ### buffer
 
-Configures the sink specific buffer.
+Configures the sink buffer behavior.
 
 <Fields filters={false}>
 
@@ -136,7 +132,6 @@ Configures the sink specific buffer.
   enumValues={null}
   examples={[500]}
   name={"max_events"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
   required={false}
@@ -159,7 +154,6 @@ The maximum number of [events][docs.data-model#event] allowed in the buffer.
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
@@ -182,7 +176,6 @@ The maximum size of the buffer on the disk.
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -205,7 +198,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
   name={"when_full"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -233,7 +225,6 @@ The behavior when the buffer becomes full.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}

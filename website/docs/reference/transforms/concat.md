@@ -41,10 +41,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "concat" # must be: "concat"
-  inputs = ["my-source-id"] # example
+  # REQUIRED
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
+
+  # OPTIONAL
+  joiner = " " # default
 ```
 
 </TabItem>
@@ -55,13 +57,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "concat" # must be: "concat"
-  inputs = ["my-source-id"] # example
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
 
   # OPTIONAL
   joiner = " " # default
+  type = "concat" # no default, must be: "concat" (if supplied)
+  inputs = ["my-source-id"] # example, no default
 ```
 
 </TabItem>
@@ -83,7 +85,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["fist[..3]","second[-5..]","third[3..6]"]]}
   name={"items"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -101,15 +102,14 @@ A list of substring definitons in the format of source_field[start..end]. For bo
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={" "}
   enumValues={null}
   examples={[" ",",","_","+"]}
   name={"joiner"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -129,7 +129,6 @@ The string that is used to join all items.
   enumValues={null}
   examples={["dest_field_name"]}
   name={"target"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

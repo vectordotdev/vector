@@ -1,7 +1,7 @@
 [sinks.clickhouse]
 title = "Clickhouse"
-batch_size = 1049000
-batch_timeout = 1
+batch_max_size = 1049000
+batch_timeout_secs = 1
 beta = true
 buffer = true
 common = true
@@ -23,12 +23,11 @@ tls_options = []
 [sinks.clickhouse.options.auth]
 type = "table"
 common = false
-null = true
 description = "Options for the authentication strategy."
 
 [sinks.clickhouse.options.auth.options.strategy]
 type = "string"
-null = false
+required = true
 description = "The authentication strategy to use."
 
 [sinks.clickhouse.options.auth.options.strategy.enum]
@@ -37,14 +36,14 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 [sinks.clickhouse.options.auth.options.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-null = false
+required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
 [sinks.clickhouse.options.auth.options.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-null = false
+required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
 
@@ -52,19 +51,18 @@ description = "The basic authentication user name."
 type = "string"
 common = true
 examples = ["http://localhost:8123"]
-null = false
+required = true
 description = "The host url of the [Clickhouse][urls.clickhouse] server."
 
 [sinks.clickhouse.options.table]
 type = "string"
 common = true
 examples = ["mytable"]
-null = false
+required = true
 description = "The table that data will be inserted into."
 
 [sinks.clickhouse.options.database]
 type = "string"
 common = true
 examples = ["mydatabase"]
-null = true
 description = "The database that contains the stable that data will be inserted into."

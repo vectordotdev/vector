@@ -11,7 +11,7 @@ through_description = "a socket, such as a TCP, UDP, or Unix socket"
 [sources.socket.options.mode]
 type = "string"
 common = true
-null = false
+required = true
 description = "The type of socket to use."
 
 [sources.socket.options.mode.enum]
@@ -22,7 +22,7 @@ udp = "The UDP protocol."
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#3"]
-null = false
+required = true
 description = """The address to listen for connections on, \
 or "systemd#N" to use the Nth socket passed by systemd socket activation. \
 Valid for "tcp" and "udp" sockets.\
@@ -32,7 +32,7 @@ Valid for "tcp" and "udp" sockets.\
 name = "host_key"
 type = "string"
 category = "Context"
-null = false
+required = true
 default = "host"
 section = "context"
 description = """\
@@ -43,7 +43,6 @@ Valid for "tcp" and "udp" sockets.\
 [sources.socket.options.max_length]
 type = "int"
 default = 102400
-null = true
 unit = "bytes"
 description = """\
 The maximum bytes size of incoming messages before they are discarded. \
@@ -53,7 +52,7 @@ Valid for "tcp" and "udp" sockets.\
 [sources.socket.options.shutdown_timeout_secs]
 type = "int"
 default = 30
-null = false
+required = true
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown. \
@@ -76,7 +75,7 @@ output = """\
 [sources.socket.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-optional = false
+required = true
 description = """\
 The upstream hostname.
 """
@@ -84,7 +83,7 @@ The upstream hostname.
 [sources.socket.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The raw message, unaltered.
 """
@@ -92,7 +91,7 @@ The raw message, unaltered.
 [sources.socket.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The exact time the event was ingested.\
 """

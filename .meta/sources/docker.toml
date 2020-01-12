@@ -13,15 +13,13 @@ through_description = "the docker engine daemon"
 type = "string"
 default = "unix:///var/run/docker.sock"
 examples = ["unix://path/to/socket", "tcp://host:2375/path"]
-null = false
-optional = true
+required = true
 description = "The docker host to connect to."
 
 [sources.docker.env_vars.DOCKER_VERIFY_TLS]
 type = "bool"
 default = true
-null = false
-optional = true
+required = true
 description = """\
 If `true` (the default), Vector will validate the TLS certificate of the \
 remote host. Do NOT set this to `false` unless you understand the risks of \
@@ -32,7 +30,6 @@ not verifying the remote certificate.\
 type = "[string]"
 common = true
 examples = [["my_container_name", "container_prefix", "9b6247364a03"]]
-null = true
 description = """\
 A list of container IDs _or_ names to match against. Prefix matches are \
 supported, meaning you can supply just the first few characters of the
@@ -43,7 +40,6 @@ container ID or name. If not provided, all containers will be included.\
 type = "[string]"
 common = true
 examples = [["label_key1=label_value1", "label_key2=label_value2"]]
-null = true
 description = """\
 A list of container object labels to match against when filtering running \
 containers. This should follow the described label's synatx in [docker object \
@@ -54,7 +50,6 @@ labels docs][urls.docker_object_labels].\
 type = "[string]"
 common = true
 examples = [["my_image_name", "httpd", "redis"]]
-null = true
 description = """\
 A list of image names to match against. If not provided, \
 all images will be included.\
@@ -63,7 +58,7 @@ all images will be included.\
 [sources.docker.output.log.fields.container_created_at]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 A UTC timestamp representing when the container was created.\
 """
@@ -71,7 +66,7 @@ A UTC timestamp representing when the container was created.\
 [sources.docker.output.log.fields.container_id]
 type = "string"
 examples = ["9b6247364a03", "715ebfcee040"]
-optional = false
+required = true
 description = """\
 The Docker container ID that the log was collected from.\
 """
@@ -79,7 +74,7 @@ The Docker container ID that the log was collected from.\
 [sources.docker.output.log.fields.container_name]
 type = "string"
 examples = ["evil_ptolemy", "nostalgic_stallman"]
-optional = false
+required = true
 description = """\
 The Docker container name that the log was collected from.\
 """
@@ -87,7 +82,7 @@ The Docker container name that the log was collected from.\
 [sources.docker.output.log.fields.image]
 type = "string"
 examples = ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
-optional = false
+required = true
 description = """\
 The image name that the container is based on.\
 """
@@ -99,7 +94,7 @@ examples = [
   {"com.example.name" = "Vector"},
   {"com.example.build-date" = "2029-04-12T23:20:50.52Z"},
 ]
-optional = false
+required = true
 description = """\
 [Docker object labels][urls.docker_object_labels]. Each label is inserted \
 with it's exact key/value pair.\
@@ -108,7 +103,7 @@ with it's exact key/value pair.\
 [sources.docker.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The raw log message, unaltered.\
 """
@@ -116,7 +111,7 @@ The raw log message, unaltered.\
 [sources.docker.output.log.fields.stream]
 type = "string"
 enum = ["stdout", "stderr"]
-optional = false
+required = true
 description = """\
 The [standard stream][urls.standard_streams] that the log was collected from.\
 """
@@ -124,7 +119,7 @@ The [standard stream][urls.standard_streams] that the log was collected from.\
 [sources.docker.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The UTC timestamp extracted from the Docker log event.\
 """

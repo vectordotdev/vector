@@ -1,8 +1,8 @@
 [sinks.http]
 title = "HTTP"
 batch_is_simple = true
-batch_size = 1049000
-batch_timeout = 1
+batch_max_size = 1049000
+batch_timeout_secs = 1
 buffer = true
 common = true
 compressions = ["gzip"]
@@ -24,12 +24,11 @@ tls_options = []
 [sinks.http.options.auth]
 type = "table"
 common = false
-null = true
 description = "Options for the authentication strategy."
 
 [sinks.http.options.auth.options.strategy]
 type = "string"
-null = false
+required = true
 description = "The authentication strategy to use."
 
 [sinks.http.options.auth.options.strategy.enum]
@@ -38,20 +37,19 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 [sinks.http.options.auth.options.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-null = false
+required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
 [sinks.http.options.auth.options.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-null = false
+required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
 
 [sinks.http.options.headers]
 type = "table"
-null = true
 description = "Options for custom headers."
 
 [sinks.http.options.headers.options."`[header-key]`"]
@@ -60,20 +58,19 @@ examples = [
   {"Authorization" = "${TOKEN_ENV_VAR}"},
   {"X-Powered-By" = "Vector"},
 ]
-null = false
+required = true
 description = "A custom header to be added to each outgoing HTTP request."
 
 [sinks.http.options.healthcheck_uri]
 type = "string"
 examples = ["https://10.22.212.22:9000/_health"]
-null = true
 description = "A URI that Vector can request in order to determine the service health."
 
 [sinks.http.options.uri]
 type = "string"
 common = true
 examples = ["https://10.22.212.22:9000/endpoint"]
-null = false
+required = true
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
 
 [[sinks.http.output.examples]]

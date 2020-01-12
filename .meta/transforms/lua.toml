@@ -27,13 +27,12 @@ if event["host"] == nil then
 end\
 """
 ]
-null = false
+required = true
 description = "The inline Lua source to evaluate."
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
 examples = [["/etc/vector/lua"]]
-null = true
 common = true
 description = """\
 A list of directories search when loading a Lua file via the `require` \

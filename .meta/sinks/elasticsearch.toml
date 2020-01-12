@@ -1,7 +1,7 @@
 [sinks.elasticsearch]
 title = "Elasticsearch"
-batch_size = 10490000
-batch_timeout = 1
+batch_max_size = 10490000
+batch_timeout_secs = 1
 beta = true
 buffer = true
 common = true
@@ -23,12 +23,11 @@ tls_options = []
 [sinks.elasticsearch.options.auth]
 type = "table"
 common = false
-null = true
 description = "Options for the authentication strategy."
 
 [sinks.elasticsearch.options.auth.options.strategy]
 type = "string"
-null = false
+required = true
 description = "The authentication strategy to use."
 
 [sinks.elasticsearch.options.auth.options.strategy.enum]
@@ -38,26 +37,25 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 [sinks.elasticsearch.options.auth.options.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-null = false
+required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
 [sinks.elasticsearch.options.auth.options.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-null = false
+required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
 
 [sinks.elasticsearch.options.doc_type]
 type = "string"
 default = "_doc"
-null = false
+required = true
 description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
 
 [sinks.elasticsearch.options.headers]
 type = "table"
-null = true
 description = "Options for custom headers."
 
 [sinks.elasticsearch.options.headers.options."`[header-name]`"]
@@ -66,14 +64,13 @@ examples = [
   {Authorization = "${TOKEN_ENV_VAR}"},
   {"X-Powered-By" = "Vector"}
 ]
-null = false
+required = true
 description = "A custom header to be added to each outgoing Elasticsearch request."
 
 [sinks.elasticsearch.options.host]
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
-null = true
 description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
 
 [sinks.elasticsearch.options.index]
@@ -84,13 +81,12 @@ examples = [
   "application-{{ application_id }}-%Y-%m-%d",
   "vector-%Y-%m-%d",
 ]
-null = false
+required = true
 templateable = true
 description = "Index name to write events to."
 
 [sinks.elasticsearch.options.provider]
 type = "string"
-null = true
 default = "default"
 description = """\
 The provider of the Elasticsearch service. This is used to properly \
@@ -105,19 +101,17 @@ aws = "The [AWS Elasticsearch Service][urls.aws_elasticsearch]."
 
 [sinks.elasticsearch.options.query]
 type = "table"
-null = true
 description = "Custom parameters to Elasticsearch query string."
 
 [sinks.elasticsearch.options.query.options."`[parameter-name]`"]
 type = "string"
 examples = [{"X-Powered-By" = "Vector"}]
-null = false
+required = true
 description = "A custom parameter to be added to each Elasticsearch request."
 
 [sinks.elasticsearch.options.region]
 type = "string"
 examples = ["us-east-1"]
-null = true
 description = "When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance."
 
 [[sinks.elasticsearch.output.examples]]
