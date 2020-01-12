@@ -84,7 +84,7 @@ impl Transform for Merge {
         // easily, as we expect users to rely on `lua` transform to implement
         // custom partial markers.
 
-        // If current event as the partial indicator, cosider itt partial.
+        // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
         if event
             .as_mut_log()
