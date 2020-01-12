@@ -236,7 +236,7 @@ A single _merged_ log event will be produced:
 }
 ```
 
-Notice that `custom_field` is overridden. This is because it was specified in the [`merge_fields`](#merge_fields) option.
+Notice that `custom_string_field` is concatenated and `custom_int_field` overridden. This is because it was specified in the [`merge_fields`](#merge_fields) option.
 
 </TabItem>
 </Tabs>

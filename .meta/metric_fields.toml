@@ -48,7 +48,8 @@ A metric must be one of 6 types.\
 type = "struct"
 optional = true
 description = """\
-A single value that can _only_ be incremented or reset to zero value, it cannot be incremented.\
+A single value that can _only_ be incremented or reset to zero value, it \
+cannot be decremented.\
 """
 
 [metric_fields.type.fields.counter.fields.value]

@@ -93,7 +93,7 @@ dns_servers = ["0.0.0.0:53"]
   no_auto_partial_merge = true
 
   # The field name to be added to events that are detected to contain an
-  # incomplete message (i.e. partial events). If set to `null`, no field will be
+  # incomplete message (i.e. partial events). If set to `""`, no field will be
   # added to partial event. This allows to opt-out of partial event detection.
   #
   # * optional

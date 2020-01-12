@@ -194,7 +194,7 @@ Setting this to `false` will disable the automatic merging of partial events. Se
 
 ### partial_event_marker
 
-The field name to be added to events that are detected to contain an incomplete message (i.e. partial events). If set to `null`, no field will be added to partial event. This allows to opt-out of partial event detection. See [Message Splitting & Merging](#message-splitting--merging) for more info.
+The field name to be added to events that are detected to contain an incomplete message (i.e. partial events). If set to `""`, no field will be added to partial event. This allows to opt-out of partial event detection. See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
 </Field>
