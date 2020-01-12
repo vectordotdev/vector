@@ -7,20 +7,17 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
 
-Vector is a [high-performance][pages.index#performance],
-[open-source][urls.vector_repo] monitoring and observability data router. It
-makes [collecting][docs.sources], [transforming][docs.transforms], and
-[sending][docs.sinks] logs, metrics and events easy. It decouples data
-collection from your services, giving you data ownership and control, among
-many other benefits.
+Vector is an [open-source][urls.vector_repo] utility for building observability
+pipelines. [Collect][docs.sources], [transform][docs.transforms], and
+[route][docs.sinks] log, metrics and events with one simple tool.
 
 Built in [Rust][urls.rust], Vector places high-value on
 [performance][pages.index#performance], [correctness][pages.index#correctness],
 and [operator friendliness][docs.administration]. It compiles to a single static
 binary and is designed to be [deployed][docs.deployment] across your entire
 infrastructure, serving both as a light-weight [agent][docs.roles.agent] and a
-highly efficient [service][docs.roles.service], making it the single tool you
-need to get data from A to B.
+highly efficient [service][docs.roles.service]. Take back ownership and control
+of your observability data with Vector.
 
 import Jump from '@site/src/components/Jump';
 

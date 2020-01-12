@@ -67,6 +67,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"]
 
+  # A list of image names to match against. If not provided, all images will be
+  # included.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  include_images = ["my_image_name", "httpd", "redis"]
+
   # A list of container object labels to match against when filtering running
   # containers. This should follow the described label's synatx in docker object
   # labels docs.
@@ -1570,6 +1578,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1578,15 +1595,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -1773,6 +1781,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1781,15 +1798,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -1947,6 +1955,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1955,15 +1972,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2172,6 +2180,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2180,15 +2197,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2364,14 +2372,22 @@ end
   compression = "gzip"
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.clickhouse.basic_auth]
+  [sinks.clickhouse.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -2379,6 +2395,7 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -2397,6 +2414,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2405,15 +2431,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2799,14 +2816,23 @@ end
   request_timeout_secs = 60
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.elasticsearch.basic_auth]
+  [sinks.elasticsearch.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * enum: "aws" or "basic"
+    strategy = "aws"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -2814,6 +2840,7 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -2832,6 +2859,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2840,15 +2876,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3138,6 +3165,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3146,15 +3182,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3352,14 +3379,22 @@ end
   request_timeout_secs = 30
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.http.basic_auth]
+  [sinks.http.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -3367,6 +3402,7 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -3385,6 +3421,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3393,15 +3438,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3502,12 +3538,12 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # A list of host and port pairs that the Kafka client should contact to
-  # bootstrap its cluster metadata.
+  # A comma delimited list of host and port pairs that the Kafka client should
+  # contact to bootstrap its cluster metadata.
   #
   # * required
-  # * type: [string]
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
+  # * type: string
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value
@@ -3558,6 +3594,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3566,15 +3611,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3772,6 +3808,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3780,15 +3825,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3920,6 +3956,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3928,15 +3973,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -4154,6 +4190,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -4162,15 +4207,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -4325,6 +4361,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -4333,15 +4378,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #

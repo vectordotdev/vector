@@ -257,8 +257,8 @@ mod integration_tests {
         region::RegionOrEndpoint,
         runtime,
         sinks::{
-            elasticsearch::{ElasticSearchCommon, ElasticSearchConfig, Provider},
             util::BatchEventsConfig,
+            elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig}
         },
         test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
@@ -311,7 +311,7 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(1));
 
         let config = ElasticSearchConfig {
-            provider: Some(Provider::Aws),
+            auth: Some(ElasticSearchAuth::Aws),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
             index: Some(stream.clone()),
             ..Default::default()

@@ -449,10 +449,9 @@ function Home() {
               {newPost.title}
             </Link>
           )}
-          <h1>Vector Makes Observability Data Simple</h1>
+          <h1>Take Control Of Your Observability Data</h1>
           <p className="hero__subtitle">
-            Vector is an <a href={repoUrl()}>open-source</a> utility for
-            collecting, transforming, and routing logs, metrics, and events.
+            Vector is an <a href={repoUrl()}>open-source</a> utility for building <a href="#performance">high performance</a> observability pipelines.
           </p>
           <div className="hero__buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>

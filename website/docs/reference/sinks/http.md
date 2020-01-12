@@ -51,11 +51,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # REQUIRED - requests
   encoding = "ndjson" # example, enum
-
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
 ```
 
 </TabItem>
@@ -89,16 +84,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   request_retry_backoff_secs = 1 # default, seconds
   request_timeout_secs = 30 # default, seconds
 
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "${PASSWORD_ENV_VAR}" # example
-    user = "${USERNAME_ENV_VAR}" # example
+  # OPTIONAL - Auth
+  [sinks.my_sink_id.auth]
+    strategy = "basic" # must be: "basic"
+    password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
+    user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
+    max_events = 500 # default, events, relevant when type = "memory"
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 
   # OPTIONAL - Headers
@@ -130,11 +126,11 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  name={"basic_auth"}
+  name={"auth"}
   nullable={true}
   path={null}
   relevantWhen={null}
@@ -144,9 +140,9 @@ import Field from '@site/src/components/Field';
   unit={null}
   >
 
-### basic_auth
+### auth
 
-Options for basic authentication.
+Options for the authentication strategy.
 
 <Fields filters={false}>
 
@@ -158,8 +154,8 @@ Options for basic authentication.
   examples={["${PASSWORD_ENV_VAR}","password"]}
   name={"password"}
   nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
   required={true}
   templateable={false}
   type={"string"}
@@ -177,12 +173,35 @@ The basic authentication password.
 <Field
   common={true}
   defaultValue={null}
+  enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
+  examples={["basic"]}
+  name={"strategy"}
+  nullable={false}
+  path={"auth"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
   name={"user"}
   nullable={false}
-  path={"basic_auth"}
-  relevantWhen={null}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
   required={true}
   templateable={false}
   type={"string"}
@@ -272,6 +291,29 @@ Configures the sink specific buffer.
 
 <Field
   common={false}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  name={"max_events"}
+  nullable={true}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model#event] allowed in the buffer.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -288,29 +330,6 @@ Configures the sink specific buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  name={"num_items"}
-  nullable={true}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### num_items
-
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
 
 
 </Field>
