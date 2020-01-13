@@ -58,7 +58,7 @@ pub struct TowerRequestConfig {
     pub rate_limit_num: Option<u64>,           // 5
     pub retry_attempts: Option<usize>,         // max_value()
     pub retry_max_duration_secs: Option<u64>,
-    pub retry_initial_backoff_secs: Option<u64>,       // 1
+    pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
 impl TowerRequestConfig {
@@ -79,10 +79,11 @@ impl TowerRequestConfig {
                 .retry_attempts
                 .or(defaults.retry_attempts)
                 .unwrap_or(usize::max_value()),
-            retry_max_duration_secs: Duration::from_secs(self
-                .retry_max_duration_secs
-                .or(defaults.retry_max_duration_secs)
-                .unwrap_or(3600)),
+            retry_max_duration_secs: Duration::from_secs(
+                self.retry_max_duration_secs
+                    .or(defaults.retry_max_duration_secs)
+                    .unwrap_or(3600),
+            ),
             retry_initial_backoff_secs: Duration::from_secs(
                 self.retry_initial_backoff_secs
                     .or(defaults.retry_initial_backoff_secs)
@@ -105,7 +106,12 @@ pub struct TowerRequestSettings {
 
 impl TowerRequestSettings {
     pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
-        FixedRetryPolicy::new(self.retry_attempts, self.retry_initial_backoff_secs, self.retry_max_duration_secs, logic)
+        FixedRetryPolicy::new(
+            self.retry_attempts,
+            self.retry_initial_backoff_secs,
+            self.retry_max_duration_secs,
+            logic,
+        )
     }
 
     pub fn batch_sink<B, L, S, T>(
