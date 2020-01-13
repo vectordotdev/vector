@@ -1644,13 +1644,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -1854,13 +1864,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2033,13 +2053,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2263,13 +2293,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2503,13 +2543,23 @@ end
     # * type: int
     retry_attempts = 9223372036854775807
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2738,13 +2788,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2982,13 +3042,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3272,13 +3342,23 @@ end
     # * type: int
     retry_attempts = 9223372036854775807
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3545,13 +3625,23 @@ end
     # * type: int
     retry_attempts = 10
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3927,13 +4017,23 @@ end
     # * type: int
     retry_attempts = 10
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -4319,13 +4419,23 @@ end
     # * type: int
     retry_attempts = 5
 
-    # The amount of time to wait before attempting a failed request again.
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
     #
     # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
