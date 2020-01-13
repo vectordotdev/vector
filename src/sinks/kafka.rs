@@ -31,7 +31,7 @@ enum BuildError {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KafkaSinkConfig {
-    bootstrap_servers: Vec<String>,
+    bootstrap_servers: String,
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
@@ -89,8 +89,7 @@ impl SinkConfig for KafkaSinkConfig {
 impl KafkaSinkConfig {
     fn to_rdkafka(&self) -> crate::Result<rdkafka::ClientConfig> {
         let mut client_config = rdkafka::ClientConfig::new();
-        let bs = self.bootstrap_servers.join(",");
-        client_config.set("bootstrap.servers", &bs);
+        client_config.set("bootstrap.servers", &self.bootstrap_servers);
         if let Some(ref tls) = self.tls {
             let enabled = tls.enabled.unwrap_or(false);
             client_config.set(
@@ -320,7 +319,6 @@ mod integration_test {
     }
 
     fn kafka_happy_path(server: &str, tls: Option<KafkaSinkTlsConfig>) {
-        let bootstrap_servers = vec![server.into()];
         let topic = format!("test-{}", random_string(10));
 
         let tls_enabled = tls
@@ -328,7 +326,7 @@ mod integration_test {
             .map(|tls| tls.enabled.unwrap_or(false))
             .unwrap_or(false);
         let config = KafkaSinkConfig {
-            bootstrap_servers: bootstrap_servers.clone(),
+            bootstrap_servers: server.to_string(),
             topic: topic.clone(),
             encoding: Encoding::Text,
             key_field: None,
@@ -345,8 +343,7 @@ mod integration_test {
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
-        let bs = bootstrap_servers.join(",");
-        client_config.set("bootstrap.servers", &bs);
+        client_config.set("bootstrap.servers", server);
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
         if tls_enabled {

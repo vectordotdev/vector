@@ -6,8 +6,8 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
-        TowerRequestConfig, TowerRequestSettings,
+        rusoto, BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer,
+        SinkExt, TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -57,9 +57,9 @@ pub struct CloudwatchLogsSinkConfig {
     pub encoding: Encoding,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
@@ -850,9 +850,9 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            batch: BatchConfig {
-                batch_timeout: None,
-                batch_size: Some(2),
+            batch: BatchEventsConfig {
+                timeout_secs: None,
+                max_events: Some(2),
             },
             ..Default::default()
         };

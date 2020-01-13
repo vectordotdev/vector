@@ -1,7 +1,6 @@
 [log_fields.host]
 type = "string"
 examples = ["my.host.com"]
-optional = true
 description = """\
 Represents the originating host of the log. This is commonly used in \
 [sources][docs.sources] but can be overridden via the `host_field` option for \
@@ -11,7 +10,7 @@ relevant sources.\
 [log_fields.message]
 type = "string"
 examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
-optional = false
+required = true
 description = """\
 Represents the log message. This is the key used when ingesting raw string data.\
 """
@@ -19,7 +18,7 @@ Represents the log message. This is the key used when ingesting raw string data.
 [log_fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 A normalized [Rust DateTime struct][urls.rust_date_time] in UTC.\
 """
@@ -29,7 +28,6 @@ type = "*"
 examples = [
   {my-key = "my-value"}
 ]
-optional = true
 description = """\
 In addition to the defined fields, you are welcome to add your own fields.\
 """

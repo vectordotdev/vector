@@ -20,6 +20,21 @@ The Vector `lua` transform accepts [`log`][docs.data-model.log] events and allow
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -27,8 +42,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "lua" # must be: "lua"
-  inputs = ["my-source-id"] # example
   source = """
 require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
 
@@ -45,6 +58,36 @@ end
   search_dirs = ["/etc/vector/lua"] # example, no default
 ```
 
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED
+  source = """
+require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""
+
+  # OPTIONAL
+  type = "lua" # no default, must be: "lua" (if supplied)
+  inputs = ["my-source-id"] # example, no default
+  search_dirs = ["/etc/vector/lua"] # example, no default
+```
+
+</TabItem>
+
+</Tabs>
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -60,7 +103,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["/etc/vector/lua"]]}
   name={"search_dirs"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -83,7 +125,6 @@ A list of directories search when loading a Lua file via the `require` function.
   enumValues={null}
   examples={["require(\"script\") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
   name={"source"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -104,8 +145,6 @@ The inline Lua source to evaluate. See [Global Variables](#global-variables) for
 
 ## Output
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="timings"
@@ -115,8 +154,6 @@ import Tabs from '@theme/Tabs';
     { label: 'Drop Event', value: 'drop_event', },
   ]
 }>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="add_fields">
 

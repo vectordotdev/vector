@@ -52,7 +52,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"metrics"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -74,7 +73,6 @@ A table of key/value pairs representing the keys to be added to the event.
   enumValues={null}
   examples={["duration"]}
   name={"field"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={null}
   required={true}
@@ -92,15 +90,14 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
   name={"increment_by_value"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -120,7 +117,6 @@ If `true` the metric will be incremented by the [`field`](#field) value. If `fal
   enumValues={null}
   examples={["duration_total"]}
   name={"name"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={null}
   required={true}
@@ -143,7 +139,6 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   enumValues={null}
   examples={[]}
   name={"tags"}
-  nullable={true}
   path={"metrics"}
   relevantWhen={null}
   required={false}
@@ -165,7 +160,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   enumValues={null}
   examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
   name={"`[tag-name]`"}
-  nullable={false}
   path={"metrics.tags"}
   relevantWhen={null}
   required={true}
@@ -193,7 +187,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environ
   enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
   examples={["counter","gauge","histogram","set"]}
   name={"type"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={null}
   required={true}

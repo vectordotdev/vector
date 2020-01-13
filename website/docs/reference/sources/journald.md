@@ -44,10 +44,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "journald" # must be: "journald"
-
-  # OPTIONAL
   current_boot_only = true # default
   units = [] # default
 ```
@@ -59,10 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "journald" # must be: "journald"
-
-  # OPTIONAL
+  type = "journald" # no default, must be: "journald" (if supplied)
   batch_size = 16 # default
   current_boot_only = true # default
   data_dir = "/var/lib/vector" # example, no default
@@ -89,7 +82,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[16]}
   name={"batch_size"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -112,7 +104,6 @@ The systemd journal is read in batches, and a checkpoint is set at the end of ea
   enumValues={null}
   examples={[true,false]}
   name={"current_boot_only"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -135,7 +126,6 @@ Include only entries from the current boot.
   enumValues={null}
   examples={["/var/lib/vector"]}
   name={"data_dir"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -158,7 +148,6 @@ The directory used to persist the journal checkpoint position. By default, the g
   enumValues={null}
   examples={[true,false]}
   name={"local_only"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -181,7 +170,6 @@ Include only entries from the local system
   enumValues={null}
   examples={[["ntpd","sysinit.target"]]}
   name={"units"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}

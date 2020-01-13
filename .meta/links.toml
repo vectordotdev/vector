@@ -31,6 +31,7 @@ aws_kinesis_streams_service_limits = "https://docs.aws.amazon.com/streams/latest
 aws_kinesis_firehose_service_limits = "https://docs.aws.amazon.com/firehose/latest/dev/limits.html"
 aws_kinesis_split_shards = "https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html"
 aws_s3 = "https://aws.amazon.com/s3/"
+aws_s3_endpoints = "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_endpoint"
 aws_s3_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region"
 aws_s3_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
 basic_auth = "https://en.wikipedia.org/wiki/Basic_access_authentication"

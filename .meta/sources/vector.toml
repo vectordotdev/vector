@@ -13,7 +13,7 @@ through_description = "another upstream [`vector` sink][docs.sinks.vector]"
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#1"]
-null = false
+required = true
 description = """The TCP address to listen for connections on, \
 or "systemd#N" to use the Nth socket passed by systemd socket activation.\
 """
@@ -21,7 +21,7 @@ or "systemd#N" to use the Nth socket passed by systemd socket activation.\
 [sources.vector.options.shutdown_timeout_secs]
 type = "int"
 default = 30
-null = false
+required = true
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\

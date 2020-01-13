@@ -20,20 +20,53 @@ The Vector `regex_parser` transform accepts [`log`][docs.data-model.log] events 
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "regex_parser" # must be: "regex_parser"
-  inputs = ["my-source-id"] # example
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
-
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
+
+  # REQUIRED - General
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
+
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # OPTIONAL - General
+  drop_field = true # default
+  field = "message" # default
+  type = "regex_parser" # no default, must be: "regex_parser" (if supplied)
+  inputs = ["my-source-id"] # example, no default
+
+  # REQUIRED - General
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
@@ -45,6 +78,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
     timestamp = "timestamp|%F" # example
     timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -61,10 +98,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[true,false]}
   name={"drop_field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -84,10 +120,9 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   enumValues={null}
   examples={["message"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -107,7 +142,6 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
   enumValues={null}
   examples={["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]}
   name={"regex"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -130,7 +164,6 @@ The Regular Expression to apply. Do not include the leading or trailing `/`. See
   enumValues={null}
   examples={[]}
   name={"types"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -147,15 +180,14 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
   name={"`[field-name]`"}
-  nullable={false}
   path={"types"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

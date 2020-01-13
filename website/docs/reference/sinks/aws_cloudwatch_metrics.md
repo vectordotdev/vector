@@ -44,8 +44,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example
 ```
@@ -58,12 +56,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example
 
   # OPTIONAL
+  type = "aws_cloudwatch_metrics" # no default, must be: "aws_cloudwatch_metrics" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 ```
 
@@ -86,7 +84,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -109,7 +106,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={null}
   examples={["service"]}
   name={"namespace"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -132,7 +128,6 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   enumValues={null}
   examples={["us-east-1"]}
   name={"region"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
