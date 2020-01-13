@@ -12,7 +12,6 @@ through_description = "one or more local files"
 [sources.file.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
-null = true
 description = """\
 The directory used to persist file checkpoint positions. By default, the \
 [global `data_dir` option][docs.configuration#data_dir] is used. Please make \
@@ -23,7 +22,7 @@ sure the Vector project has write permissions to this dir.\
 type = "[string]"
 common = true
 examples = [["/var/log/nginx/*.log"]]
-null = false
+required = true
 description = """\
 Array of file patterns to include. [Globbing](#globbing) is supported.\
 """
@@ -31,7 +30,6 @@ Array of file patterns to include. [Globbing](#globbing) is supported.\
 [sources.file.options.exclude]
 type = "[string]"
 examples = [["/var/log/nginx/*.[0-9]*.log"]]
-null = true
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported.\
 *Takes precedence over the [`include` option](#include).*\
@@ -41,7 +39,7 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.\
 type = "string"
 category = "Context"
 default = "file"
-null = false
+required = true
 section = "context"
 description = """\
 The key name added to each event with the full path of the file.\
@@ -50,7 +48,7 @@ The key name added to each event with the full path of the file.\
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
-null = false
+required = true
 unit = "milliseconds"
 description = """\
 Delay between file discovery calls. This controls the interval at which \
@@ -62,7 +60,7 @@ name = "host_key"
 type = "string"
 category = "Context"
 default = "host"
-null = false
+required = true
 section = "context"
 description = """\
 The key name added to each event representing the current host.\
@@ -72,7 +70,6 @@ The key name added to each event representing the current host.\
 type = "int"
 common = true
 examples = [86400]
-null = true
 unit = "seconds"
 description = """\
 Ignore files with a data modification date that does not exceed this age.\
@@ -81,7 +78,6 @@ Ignore files with a data modification date that does not exceed this age.\
 [sources.file.options.max_line_bytes]
 type = "int"
 unit = "bytes"
-null = true
 default = 102400
 description = """\
 The maximum number of a bytes a line can contain before being \
@@ -92,7 +88,7 @@ files.\
 [sources.file.options.start_at_beginning]
 type = "bool"
 common = true
-null = false
+required = true
 default = false
 description = """\
 When `true` Vector will read from the beginning of new files, when \
@@ -101,7 +97,6 @@ When `true` Vector will read from the beginning of new files, when \
 
 [sources.file.options.fingerprinting]
 type = "table"
-null = true
 description = """\
 Configuration for how the file source should identify files.\
 """
@@ -109,7 +104,6 @@ Configuration for how the file source should identify files.\
 [sources.file.options.fingerprinting.options.strategy]
 type = "string"
 default = "checksum"
-null = true
 description = """\
 The strategy used to uniquely identify files. This is important for \
 [checkpointing](#checkpointing) when file rotation is used.\
@@ -122,7 +116,7 @@ device_and_inode = "Uses the [device and inode][urls.inode] to unique identify f
 [sources.file.options.fingerprinting.options.fingerprint_bytes]
 type = "int"
 default = 256
-null = false
+required = true
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
 description = """\
@@ -133,7 +127,7 @@ fingerprint.\
 [sources.file.options.fingerprinting.options.ignored_header_bytes]
 type = "int"
 default = 0
-null = false
+required = true
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
 description = """\
@@ -144,7 +138,6 @@ fingerprint. This is helpful if all files share a common header.\
 [sources.file.options.message_start_indicator]
 type = "string"
 category = "Multi-line"
-null = true
 examples = ["^(INFO|ERROR)"]
 description = """\
 When present, Vector will aggregate multiple lines into a single event, using \
@@ -157,7 +150,6 @@ a regular expression, so remember to anchor as appropriate.\
 type = "int"
 category = "Multi-line"
 default = 1000
-null = true
 unit = "milliseconds"
 description = """\
 When `message_start_indicator` is present, this sets the amount of time Vector \
@@ -169,7 +161,6 @@ or not it has seen a line indicating the start of a new message.\
 type = "int"
 category = "Priority"
 default = 2048
-null = true
 unit = "bytes"
 description = """\
 An approximate limit on the amount of data read from a single file at a given \
@@ -181,7 +172,6 @@ type = "bool"
 category = "Priority"
 common = true
 default = false
-null = true
 description = """\
 Instead of balancing read capacity fairly across all watched files, prioritize \
 draining the oldest files before moving on to read data from younger files.\
@@ -191,7 +181,7 @@ draining the oldest files before moving on to read data from younger files.\
 type = "string"
 examples = ["/var/log/nginx.log"]
 key_name_option = "file_key"
-optional = false
+required = true
 description = """\
 The _full_ path of the file tha the log originated from.\
 """
@@ -200,7 +190,7 @@ The _full_ path of the file tha the log originated from.\
 type = "string"
 examples = ["my.host.com"]
 key_name_option = "host_key"
-optional = false
+required = true
 description = """\
 The current hostname, equivalent to the `gethostname` command.\
 """
@@ -208,7 +198,7 @@ The current hostname, equivalent to the `gethostname` command.\
 [sources.file.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The raw log message, unaltered.\
 """
@@ -216,7 +206,7 @@ The raw log message, unaltered.\
 [sources.file.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The exact time the event was ingested.\
 """

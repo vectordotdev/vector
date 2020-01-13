@@ -10,5 +10,5 @@ output_types = ["metric"]
 type = "[string]"
 common = true
 examples = [["tag1", "tag2"]]
-null = false
+required = true
 description = "The tag names to drop."

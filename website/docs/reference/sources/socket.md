@@ -44,9 +44,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "socket" # must be: "socket"
+  # REQUIRED - General
   address = "0.0.0.0:9000" # example
   mode = "tcp" # example, enum
+
+  # OPTIONAL - General
+  shutdown_timeout_secs = 30 # default, seconds
+
+  # OPTIONAL - Context
+  host_key = "host" # default
 ```
 
 </TabItem>
@@ -57,13 +63,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example
   mode = "tcp" # example, enum
 
   # OPTIONAL - General
-  max_length = 102400 # default, bytes
   shutdown_timeout_secs = 30 # default, seconds
+  type = "socket" # no default, must be: "socket" (if supplied)
+  max_length = 102400 # default, bytes
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -88,7 +94,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#3"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -106,15 +111,14 @@ The address to listen for connections on, or "systemd#N" to use the Nth socket p
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
   name={"host_key"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -134,7 +138,6 @@ The key name added to each event representing the current host. Valid for "tcp" 
   enumValues={null}
   examples={[102400]}
   name={"max_length"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -157,7 +160,6 @@ The maximum bytes size of incoming messages before they are discarded. Valid for
   enumValues={{"tcp":"The TCP protocol.","udp":"The UDP protocol."}}
   examples={["tcp","udp"]}
   name={"mode"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -175,15 +177,14 @@ The type of socket to use.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
   name={"shutdown_timeout_secs"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}

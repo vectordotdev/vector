@@ -14,7 +14,6 @@ write_to_description = "[StatsD][urls.statsd] metrics service"
 type = "string"
 common = true
 examples = ["127.0.0.1:8125"]
-null = true
 default = "127.0.0.1:8125"
 description = "The UDP socket address to send stats to."
 
@@ -22,7 +21,7 @@ description = "The UDP socket address to send stats to."
 type = "string"
 common = true
 examples = ["service"]
-null = false
+required = true
 description = "A prefix that will be added to all metric names."
 
 [[sinks.statsd.output.examples]]

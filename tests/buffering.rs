@@ -244,6 +244,7 @@ fn test_max_size_resume() {
 }
 
 #[test]
+#[ignore]
 fn test_reclaim_disk_space() {
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();

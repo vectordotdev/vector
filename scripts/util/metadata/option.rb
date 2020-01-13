@@ -28,10 +28,10 @@ class Option
     :display,
     :enum,
     :examples,
-    :null,
     :options,
     :partition_key,
     :relevant_when,
+    :required,
     :templateable,
     :type,
     :unit
@@ -44,25 +44,22 @@ class Option
     @enum = hash["enum"]
     @examples = hash["examples"] || []
     @name = hash.fetch("name")
-    if !hash.key?("null")
-      raise hash.inspect
-    end
-    @null = hash.fetch("null")
     @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
+    @required = hash["required"] == true
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
     @category = hash["category"] || ((@options.to_h.values.empty? || inline?) ? "General" : @name.humanize)
 
-    if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
-      raise ArgumentError.new("#{self.class.name}#null must be a boolean")
+    if @required == true && !@defualt.nil?
+      raise ArgumentError.new("#{self.class.name}#required must be false if there is a default")
     end
 
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
-      raise ArgumentError.new("#{self.class.name}#null must be a hash of conditions")
+      raise ArgumentError.new("#{self.class.name}#relevant_when must be a hash of conditions")
     end
 
     if !TYPES.include?(@type)
@@ -198,7 +195,7 @@ class Option
   end
 
   def required?
-    default.nil? && null == false
+    @required == true
   end
 
   def table?
@@ -218,10 +215,10 @@ class Option
       display: display,
       enum: enum,
       examples: examples,
-      null: null,
       options: options,
       partition_key: partition_key,
       relevant_when: relevant_when,
+      required: required?,
       templateable: templateable,
       type: type,
       unit: unit

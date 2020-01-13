@@ -12,7 +12,7 @@ through_description = "the StatsD UDP protocol"
 [sources.statsd.options.address]
 type = "string"
 common = true
-null = false
+required = true
 examples = ["127.0.0.1:8126"]
 description = "UDP socket address to bind to."
 

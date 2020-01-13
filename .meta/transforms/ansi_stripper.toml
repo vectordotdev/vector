@@ -12,5 +12,5 @@ resources = []
 type = "string"
 common = true
 default = "message"
-null = false
+required = true
 description = "The target field to strip ANSI characters from."

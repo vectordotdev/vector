@@ -14,14 +14,14 @@ write_to_description = "[Prometheus][urls.prometheus] metrics service"
 type = "string"
 common = true
 examples = ["0.0.0.0:9598"]
-null = false
+required = true
 description = "The address to expose for scraping."
 
 [sinks.prometheus.options.namespace]
 type = "string"
 common = true
 examples = ["service"]
-null = false
+required = true
 description = """\
 A prefix that will be added to all metric names.
 It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].\
@@ -30,7 +30,7 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-null = false
+required = true
 unit = "seconds"
 description = """\
 Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms.\
@@ -39,7 +39,7 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
 [sinks.prometheus.options.flush_period_secs]
 type = "int"
 default = 60
-null = false
+required = true
 unit = "seconds"
 description = """\
 Time interval between [set][docs.data-model.metric#set] values are reset.\

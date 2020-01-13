@@ -12,7 +12,6 @@ through_description = "the Syslog 5424 protocol"
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
-null = true
 relevant_when = {mode = ["tcp", "udp"]}
 description = """\
 The TCP or UDP address to listen for connections on, or "systemd#N" to use \
@@ -23,7 +22,7 @@ the Nth socket passed by systemd socket activation.\
 name = "host_key"
 type = "string"
 category = "Context"
-null = false
+required = true
 default = "host"
 section = "context"
 description = """\
@@ -33,7 +32,6 @@ The key name added to each event representing the current host.\
 [sources.syslog.options.max_length]
 type = "int"
 default = 102400
-null = true
 unit = "bytes"
 description = """\
 The maximum bytes size of incoming messages before they are discarded.\
@@ -42,7 +40,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 [sources.syslog.options.mode]
 type = "string"
 common = true
-null = false
+required = true
 description = "The input mode."
 
 [sources.syslog.options.mode.enum]
@@ -54,7 +52,6 @@ unix = "Read uncoming Syslog data through a Unix socker."
 type = "string"
 common = true
 examples = ["/path/to/socket"]
-null = true
 relevant_when = {mode = "unix"}
 description = """\
 The unix socket path. *This should be absolute path.*
@@ -63,7 +60,6 @@ The unix socket path. *This should be absolute path.*
 [sources.syslog.output.log.fields.appname]
 type = "string"
 examples = ["app-name"]
-optional = true
 description = """\
 The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 appname is not found, then the key will not be added.\
@@ -73,7 +69,7 @@ appname is not found, then the key will not be added.\
 type = "string"
 examples = ["my.host.com"]
 key_name_option = "host_key"
-optional = false
+required = true
 description = """\
 The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 hostname is not found, then Vector will use the upstream hostname. In the \
@@ -83,7 +79,6 @@ case where `mode` = `"unix"` the socket path will be used.\
 [sources.syslog.output.log.fields.facility]
 type = "string"
 examples = ["1"]
-optional = true
 description = """\
 The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 facility is not found, then the key will not be added.\
@@ -92,7 +87,7 @@ facility is not found, then the key will not be added.\
 [sources.syslog.output.log.fields.message]
 type = "string"
 examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
-optional = false
+required = true
 description = """\
 The raw message, unaltered.
 """
@@ -100,7 +95,6 @@ The raw message, unaltered.
 [sources.syslog.output.log.fields.msgid]
 type = "string"
 examples = ["ID47"]
-optional = true
 description = """\
 The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 msgid is not found, then the key will not be added.\
@@ -109,7 +103,6 @@ msgid is not found, then the key will not be added.\
 [sources.syslog.output.log.fields.procid]
 type = "int"
 examples = [8710]
-optional = true
 description = """\
 The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 procid is not found, then the key will not be added.\
@@ -118,7 +111,6 @@ procid is not found, then the key will not be added.\
 [sources.syslog.output.log.fields.severity]
 type = "string"
 examples = ["notice"]
-optional = true
 description = """\
 The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 severity is not found, then the key will not be added.\
@@ -127,7 +119,7 @@ severity is not found, then the key will not be added.\
 [sources.syslog.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The timestamp extracted from the incoming line. If a timestamp is not found, \
 then Vector will use the current time.\
@@ -136,7 +128,6 @@ then Vector will use the current time.\
 [sources.syslog.output.log.fields.version]
 type = "int"
 examples = [1]
-optional = true
 description = """\
 The version extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
 version is not found, then the key will not be added.

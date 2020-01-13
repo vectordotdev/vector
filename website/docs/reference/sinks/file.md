@@ -44,13 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
-
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
 ```
 
 </TabItem>
@@ -61,16 +55,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
-
   # OPTIONAL - General
+  type = "file" # no default, must be: "file" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   idle_timeout_secs = "30" # default
+
+  # OPTIONAL - requests
+  encoding = "ndjson" # example, no default, enum
 ```
 
 </TabItem>
@@ -87,15 +81,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
   name={"encoding"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -115,7 +108,6 @@ The encoding format used to serialize the events before outputting.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -138,7 +130,6 @@ Enables/disables the sink healthcheck upon start.
   enumValues={null}
   examples={["30"]}
   name={"idle_timeout_secs"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -162,7 +153,6 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
   enumValues={null}
   examples={["vector-%Y-%m-%d.log","application-{{ application_id }}-%Y-%m-%d.log"]}
   name={"path"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
