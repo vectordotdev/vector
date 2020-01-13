@@ -1648,10 +1648,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -1860,10 +1860,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2041,10 +2041,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2273,10 +2273,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2515,10 +2515,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2752,10 +2752,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2998,10 +2998,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3290,10 +3290,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3565,10 +3565,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3949,10 +3949,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -4343,10 +4343,10 @@ end
     # to select future backoffs.
     #
     # * optional
-    # * default: 1
+    # * default: 10
     # * type: int
     # * unit: seconds
-    retry_initial_backoff_secs = 1
+    retry_initial_backoff_secs = 10
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,

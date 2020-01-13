@@ -99,7 +99,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 5 # default
     retry_attempts = 5 # default
-    retry_initial_backoff_secs = 1 # default, seconds
+    retry_initial_backoff_secs = 10 # default, seconds
     timeout_secs = 60 # default, seconds
 
   # OPTIONAL - Tls
@@ -740,9 +740,9 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 <Field
   common={false}
-  defaultValue={1}
+  defaultValue={10}
   enumValues={null}
-  examples={[1]}
+  examples={[10]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
