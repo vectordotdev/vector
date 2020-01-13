@@ -163,7 +163,7 @@ function VectorComponents(props) {
   }
 
   if (onlyProviders.size > 0) {
-    components = components.filter(component => onlyProviders.has(component.service_provider) );
+    components = components.filter(component => Array.from(onlyProviders).every(x => component.service_providers.includes(x)));
   }
 
   //
@@ -181,7 +181,8 @@ function VectorComponents(props) {
 
   const serviceProviders = new Set(
     _(components).
-      map(component => component.service_provider).
+      map(component => component.service_providers).
+      flatten().
       uniq().
       compact().
       sort().

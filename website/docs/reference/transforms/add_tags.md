@@ -20,21 +20,52 @@ The Vector `add_tags` transform accepts [`metric`][docs.data-model.metric] event
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "add_tags" # must be: "add_tags"
-  inputs = ["my-source-id"] # example
+  [transforms.my_transform_id.tags]
+    static_tag = "my value" # example
+    env_tag = "${ENV_VAR}" # example
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # OPTIONAL - General
+  type = "add_tags" # no default, must be: "add_tags" (if supplied)
+  inputs = ["my-source-id"] # example, no default
 
   # REQUIRED - Tags
   [transforms.my_transform_id.tags]
     static_tag = "my value" # example
     env_tag = "${ENV_VAR}" # example
 ```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -51,7 +82,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"tags"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -73,7 +103,6 @@ A table of key/value pairs representing the tags to be added to the metric.
   enumValues={null}
   examples={[{"static_tag":"my value"},{"env_tag":"${ENV_VAR}"}]}
   name={"`[tag-name]`"}
-  nullable={false}
   path={"tags"}
   relevantWhen={null}
   required={true}

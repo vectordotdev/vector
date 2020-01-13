@@ -11,19 +11,17 @@
 </p>
 
 
-Vector is a [high-performance][pages.index#performance] monitoring and
-observability data router. It makes [collecting][docs.sources],
-[transforming][docs.transforms], and [sending][docs.sinks] logs, metrics, and
-events easy. It decouples data collection & routing from your services, giving
-you control and data ownership, among many other benefits.
+Vector is an [open-source][urls.vector_repo] utility for building observability
+pipelines. [Collect][docs.sources], [transform][docs.transforms], and
+[route][docs.sinks] log, metrics and events with one simple tool.
 
 Built in [Rust][urls.rust], Vector places high-value on
 [performance][pages.index#performance], [correctness][pages.index#correctness],
 and [operator friendliness][docs.administration]. It compiles to a single static
 binary and is designed to be [deployed][docs.deployment] across your entire
 infrastructure, serving both as a light-weight [agent][docs.roles.agent] and a
-highly efficient [service][docs.roles.service], making the process of getting
-data from A to B simple and unified.
+highly efficient [service][docs.roles.service]. Take back ownership and control
+of your observability data with Vector.
 
 
 <!--
@@ -194,6 +192,7 @@ Or use your own [preferred method][docs.installation].
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vector_twitter]: https://twitter.com/timberdotio
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

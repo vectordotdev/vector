@@ -15,7 +15,7 @@ mod disk;
 #[serde(rename_all = "snake_case")]
 pub enum BufferConfig {
     Memory {
-        num_items: usize,
+        max_events: usize,
         when_full: WhenFull,
     },
     #[cfg(feature = "leveldb")]
@@ -28,7 +28,7 @@ pub enum BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         BufferConfig::Memory {
-            num_items: 500,
+            max_events: 500,
             when_full: Default::default(),
         }
     }
@@ -95,10 +95,10 @@ impl BufferConfig {
     > {
         match &self {
             BufferConfig::Memory {
-                num_items,
+                max_events,
                 when_full,
             } => {
-                let (tx, rx) = mpsc::channel(*num_items);
+                let (tx, rx) = mpsc::channel(*max_events);
                 let tx = BufferInputCloner::Memory(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, Acker::Null))

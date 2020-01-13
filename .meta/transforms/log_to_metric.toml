@@ -11,7 +11,7 @@ resources = []
 [transforms.log_to_metric.options.metrics]
 type = "[table]"
 common = true
-null = false
+required = true
 description = """\
 A table of key/value pairs representing the keys to be added to the \
 event.\
@@ -19,7 +19,7 @@ event.\
 
 [transforms.log_to_metric.options.metrics.options.type]
 type = "string"
-null = false
+required = true
 common = true
 description = "The metric type."
 
@@ -32,14 +32,14 @@ set = "A [set metric type][docs.data-model.metric#set]."
 [transforms.log_to_metric.options.metrics.options.field]
 type = "string"
 examples = ["duration"]
-null = false
+required = true
 common = true
 description = "The log field to use as the metric."
 
 [transforms.log_to_metric.options.metrics.options.increment_by_value]
 type = "bool"
 default = false
-null = false
+required = true
 relevant_when = {type = "counter"}
 description = """\
 If `true` the metric will be incremented by the `field` value. If `false` \
@@ -49,7 +49,7 @@ the metric will be incremented by 1 regardless of the `field` value.\
 [transforms.log_to_metric.options.metrics.options.name]
 type = "string"
 examples = ["duration_total"]
-null = false
+required = true
 common = true
 description = """\
 The name of the metric. Defaults to `<field>_total` for `counter` and \
@@ -59,7 +59,6 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 [transforms.log_to_metric.options.metrics.options.tags]
 type = "table"
 display = "inline"
-null = true
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
@@ -70,7 +69,7 @@ examples = [
   {"region" = "us-east-1"},
   {"status" = "{{status}}"},
 ]
-null = false
+required = true
 common = true
 description = """\
 Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environment \

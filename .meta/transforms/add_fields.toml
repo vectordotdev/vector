@@ -11,7 +11,7 @@ resources = []
 [transforms.add_fields.options.fields]
 type = "table"
 common = true
-null = false
+required = true
 description = """\
 A table of key/value pairs representing the keys to be added to the \
 event.\
@@ -19,7 +19,7 @@ event.\
 
 [transforms.add_fields.options.fields.options."`[field-name]`"]
 type = "*"
-null = false
+required = true
 examples = [
   {"string_field" = "string value"},
   {"env_var_field" = "${ENV_VAR}"},

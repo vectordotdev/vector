@@ -23,16 +23,49 @@ The Vector `prometheus` source ingests data through the Prometheus text expositi
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
-  type = "prometheus" # must be: "prometheus"
   hosts = ["http://localhost:9090"] # example
   scrape_interval_secs = 1 # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[sources.my_source_id]
+  # REQUIRED
+  hosts = ["http://localhost:9090"] # example
+  scrape_interval_secs = 1 # example
+
+  # OPTIONAL
+  type = "prometheus" # no default, must be: "prometheus" (if supplied)
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -49,7 +82,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["http://localhost:9090"]]}
   name={"hosts"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -72,7 +104,6 @@ Host addresses to scrape metrics from.
   enumValues={null}
   examples={[1]}
   name={"scrape_interval_secs"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -97,14 +128,10 @@ The `prometheus` source ingests data through the Prometheus text exposition form
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="counter"
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 

@@ -20,6 +20,21 @@ The Vector [`geoip`](#geoip) transform accepts [`log`][docs.data-model.log] even
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[
+    { label: 'Common', value: 'common', },
+    { label: 'Advanced', value: 'advanced', },
+  ]
+}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -27,14 +42,33 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "geoip" # must be: "geoip"
-  inputs = ["my-source-id"] # example
   database = "/path/to/GeoLite2-City.mmdb" # example
   source = "ip_address" # example
 
   # OPTIONAL
   target = "geoip" # default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+
+```toml
+[transforms.my_transform_id]
+  # REQUIRED
+  database = "/path/to/GeoLite2-City.mmdb" # example
+  source = "ip_address" # example
+
+  # OPTIONAL
+  target = "geoip" # default
+  type = "geoip" # no default, must be: "geoip" (if supplied)
+  inputs = ["my-source-id"] # example, no default
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Options
 
@@ -51,7 +85,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["/path/to/GeoLite2-City.mmdb"]}
   name={"database"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -75,7 +108,6 @@ Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City
   enumValues={null}
   examples={["ip_address","x-forwarded-for"]}
   name={"source"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -98,10 +130,9 @@ The field name that contains the IP address. This field should contain a valid I
   enumValues={null}
   examples={["geoip"]}
   name={"target"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
