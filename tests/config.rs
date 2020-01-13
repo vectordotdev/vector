@@ -500,7 +500,8 @@ fn parses_sink_full_request() {
         rate_limit_duration_secs = 3
         rate_limit_num = 4
         retry_attempts = 5
-        retry_backoff_secs = 6
+        retry_max_duration_secs = 10
+        retry_initial_backoff_secs = 6
         "#,
     )
     .unwrap();
