@@ -1651,7 +1651,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -1863,7 +1863,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2044,7 +2044,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2276,7 +2276,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2518,7 +2518,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -2755,7 +2755,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3001,7 +3001,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3293,7 +3293,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3568,7 +3568,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -3952,7 +3952,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
@@ -4346,7 +4346,7 @@ end
     # * default: 1
     # * type: int
     # * unit: seconds
-    retry_backoff_secs = 1
+    retry_initial_backoff_secs = 1
 
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,

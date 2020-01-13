@@ -11,7 +11,7 @@ class BatchingSink < Sink
     :request_rate_limit_duration,
     :request_rate_limit_num,
     :request_retry_attempts,
-    :request_retry_backoff_secs,
+    :request_retry_initial_backoff_secs,
     :request_timeout_secs
 
   def initialize(hash)
@@ -25,7 +25,7 @@ class BatchingSink < Sink
     @request_rate_limit_duration_secs = hash.fetch("request_rate_limit_duration_secs")
     @request_rate_limit_num = hash.fetch("request_rate_limit_num")
     @request_retry_attempts = hash.fetch("request_retry_attempts")
-    @request_retry_backoff_secs = hash.fetch("request_retry_backoff_secs")
+    @request_retry_initial_backoff_secs = hash.fetch("request_retry_initial_backoff_secs")
     @request_timeout_secs = hash.fetch("request_timeout_secs")
 
     # Requirements
@@ -121,9 +121,9 @@ class BatchingSink < Sink
           "type" => "int"
         },
 
-      "retry_backoff_secs" =>
+      "retry_initial_backoff_secs" =>
         {
-          "default" => @request_retry_backoff_secs,
+          "default" => @request_retry_initial_backoff_secs,
           "description" => "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.",
           "null" => false,
           "type" => "int",
