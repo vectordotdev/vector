@@ -124,7 +124,7 @@ class BatchingSink < Sink
       "retry_backoff_secs" =>
         {
           "default" => @request_retry_backoff_secs,
-          "description" => "The amount of time to wait before attempting a failed request again.",
+          "description" => "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.",
           "null" => false,
           "type" => "int",
           "unit" => "seconds"

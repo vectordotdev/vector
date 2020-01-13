@@ -552,7 +552,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 #### retry_backoff_secs
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs. See [Retry Policy](#retry-policy) for more info.
 
 
 </Field>
