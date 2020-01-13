@@ -1008,14 +1008,16 @@ dns_servers = ["0.0.0.0:53"]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `javascript`.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
-  # * must be: "javascript"
+  # * must be: "javascript" (if supplied)
   type = "javascript"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: [string]
   inputs = ["my-source-id"]
 

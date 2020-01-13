@@ -53,11 +53,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "javascript" # must be: "javascript"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
   handler = "handler" # example, no default
   source = """
 event => ({...event, field: 'value'})
@@ -72,11 +67,8 @@ event => ({...event, field: 'value'})
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "javascript" # must be: "javascript"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
+  type = "javascript" # no default, must be: "javascript" (if supplied)
+  inputs = ["my-source-id"] # example, no default
   handler = "handler" # example, no default
   memory_limit = 10000000 # example, no default
   path = "/etc/vector/transform.js" # example, no default
@@ -105,7 +97,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["handler"]}
   name={"handler"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -128,7 +119,6 @@ Name of the handler function. See [Environment Variables](#environment-variables
   enumValues={null}
   examples={[10000000]}
   name={"memory_limit"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -151,7 +141,6 @@ Maximum allowed RAM usage for JavaScript engine in bytes.
   enumValues={null}
   examples={["/etc/vector/transform.js"]}
   name={"path"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -174,7 +163,6 @@ The path to JavaScript source file with handler function.
   enumValues={null}
   examples={["event => ({...event, field: 'value'})\n"]}
   name={"source"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
