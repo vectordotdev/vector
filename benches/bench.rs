@@ -88,9 +88,9 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 
@@ -139,9 +139,9 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 
@@ -190,9 +190,9 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
 
@@ -250,10 +250,10 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
         .throughput(Throughput::Bytes(
-            (num_lines * line_size * num_writers) as u32,
+            (num_lines * line_size * num_writers) as u64,
         )),
     );
 }
@@ -321,9 +321,9 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size * 2) as u32)),
+        .throughput(Throughput::Bytes((num_lines * line_size * 2) as u64)),
     );
 }
 
@@ -393,10 +393,10 @@ fn benchmark_transforms(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(4)
+        .sample_size(10)
         .noise_threshold(0.05)
         .throughput(Throughput::Bytes(
-            (num_lines * (line_size + "status=404".len())) as u32,
+            (num_lines * (line_size + "status=404".len())) as u64,
         )),
     );
 }
@@ -600,7 +600,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     assert_eq!(output_lines_all, num_lines * 2);
                     assert_relative_eq!(
                         output_lines_sampled as f32 / num_lines as f32,
-                        0.2,
+                        0.1,
                         epsilon = 0.01
                     );
                     assert!(output_lines_200 > 0);
@@ -609,7 +609,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(2),
+        .sample_size(10),
     );
 }
 

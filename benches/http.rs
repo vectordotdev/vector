@@ -55,7 +55,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("http", bench);
 }
@@ -105,7 +105,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("http", bench);
 }
