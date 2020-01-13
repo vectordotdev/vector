@@ -483,7 +483,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
 
 ### start_at_beginning
 
-When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
+For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint.  See [Read Position](#read-position) for more info.
 
 
 </Field>
