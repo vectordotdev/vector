@@ -34,12 +34,12 @@ pub struct RetryPolicyFuture<L: RetryLogic> {
 }
 
 impl<L: RetryLogic> FixedRetryPolicy<L> {
-    pub fn new(remaining_attempts: usize, backoff: Duration, logic: L) -> Self {
+    pub fn new(remaining_attempts: usize, initial_backoff: Duration, max_duration: Duration, logic: L) -> Self {
         FixedRetryPolicy {
             remaining_attempts,
             previous_duration: Duration::from_secs(0),
-            current_duration: backoff,
-            max_duration: Duration::from_secs(10),
+            current_duration: initial_backoff,
+            max_duration,
             logic,
         }
     }
@@ -150,7 +150,7 @@ mod tests {
         clock::mock(|clock| {
             trace_init();
 
-            let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), SvcRetryLogic);
+            let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), Duration::from_secs(10), SvcRetryLogic);
 
             let (service, mut handle) = mock::pair();
             let mut svc = Retry::new(policy, service);
@@ -173,7 +173,7 @@ mod tests {
     fn service_error_no_retry() {
         trace_init();
 
-        let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), SvcRetryLogic);
+        let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), Duration::from_secs(10), SvcRetryLogic);
 
         let (service, mut handle) = mock::pair();
         let mut svc = Retry::new(policy, service);
@@ -190,7 +190,7 @@ mod tests {
         clock::mock(|clock| {
             trace_init();
 
-            let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), SvcRetryLogic);
+            let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), Duration::from_secs(10), SvcRetryLogic);
 
             let (service, mut handle) = mock::pair();
             let mut svc = Retry::new(policy, service);
@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn backoff_grows_to_max() {
-        let mut policy = FixedRetryPolicy::new(10, Duration::from_secs(1), SvcRetryLogic);
+        let mut policy = FixedRetryPolicy::new(10, Duration::from_secs(1), Duration::from_secs(10), SvcRetryLogic);
         assert_eq!(Duration::from_secs(1), policy.backoff());
 
         policy = policy.advance();
