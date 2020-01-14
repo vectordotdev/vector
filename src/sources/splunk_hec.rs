@@ -360,10 +360,24 @@ impl<R: Read> Stream for EventStream<R> {
                     }
                     log.insert_explicit(event::MESSAGE.clone(), string)
                 }
-                Value::Object(object) => {
+                Value::Object(mut object) => {
                     if object.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
+
+                    // Add 'line' value as 'event::MESSAGE'
+                    if let Some(line) = object.remove("line") {
+                        match line {
+                            // This don't quite fit the meaning of a event::MESSAGE
+                            Value::Array(_) | Value::Object(_) => {
+                                event::flatten::insert(log, "line", line)
+                            }
+                            _ => {
+                                event::flatten::insert(log, event::MESSAGE.clone(), line);
+                            }
+                        }
+                    }
+
                     flatten(log, object);
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
@@ -826,6 +840,20 @@ mod tests {
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
         assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+    }
+
+    #[test]
+    fn line_to_message() {
+        let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
+
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit("line", "hello");
+
+        let pump = sink.send(event);
+        let _ = rt.block_on(pump).unwrap();
+        let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
+
+        assert_eq!(event.as_log()[&event::MESSAGE], "hello".into());
     }
 
     #[test]
