@@ -121,6 +121,11 @@ spec:
           readOnly: true
         - name: tmp
           mountPath: /tmp/vector/
+        env:
+        - name: VECTOR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
 "#;
 
 static ECHO_YAML: &'static str = r#"

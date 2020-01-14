@@ -83,3 +83,8 @@ spec:
         - name: config-dir
           mountPath: /etc/vector
           readOnly: true
+        env:
+        - name: VECTOR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
