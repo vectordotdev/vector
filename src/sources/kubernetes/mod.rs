@@ -16,6 +16,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use futures::{sync::mpsc, Future, Sink, Stream};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 // ?NOTE
@@ -312,7 +313,7 @@ fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     for regex in regexes {
         let mut config = RegexParserConfig::default();
 
-        config.field = Some(POD_UID);
+        config.field = Some(POD_UID.clone());
         config.regex = regex;
         // Remove pod_uid as it isn't usable anywhere else.
         config.drop_field = true;
