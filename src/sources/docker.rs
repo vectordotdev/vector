@@ -280,7 +280,7 @@ impl DockerSource {
                         names = field::debug(&container.names)
                     );
 
-                    if !self.self_check(container.id.as_str(), container.image.as_str()) {
+                    if !self.exclude_vector(container.id.as_str(), container.image.as_str()) {
                         continue;
                     }
 
@@ -323,8 +323,9 @@ impl DockerSource {
             .map_err(|error| error!(message="Listing currently running containers, failed",%error))
     }
 
-    /// True if passed check
-    fn self_check<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
+    /// True if container with the given id and image must be excluded from logging,
+    /// because it's a vector instance, probably this one.
+    fn exclude_vector<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
         if self.exclude_self {
             let hostname_hint = self
                 .hostname
@@ -405,7 +406,7 @@ impl Future for DockerSource {
                                                         .map(|s| s.as_str()),
                                                 );
 
-                                            let self_check = self.self_check(
+                                            let self_check = self.exclude_vector(
                                                 id.as_str(),
                                                 event
                                                     .actor
