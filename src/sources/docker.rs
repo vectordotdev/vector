@@ -187,8 +187,6 @@ struct DockerSource {
     events: Box<dyn Stream<Item = DockerEvent, Error = shiplift::Error> + Send>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
-    /// collection of container_id not to be listened
-    ignore_container_id: Vec<ContainerId>,
     ///receives ContainerLogInfo comming from event stream futures
     main_recv: UnboundedReceiver<ContainerLogInfo>,
     /// It may contain shortened container id.
@@ -240,7 +238,6 @@ impl DockerSource {
             esb,
             events: Box::new(events) as Box<_>,
             containers: HashMap::new(),
-            ignore_container_id: Vec::new(),
             main_recv,
             hostname: env::var("HOSTNAME").ok(),
             exclude_self,
@@ -321,8 +318,6 @@ impl DockerSource {
                     self.containers.insert(id.clone(), self.esb.start(id));
                 }
 
-                // Sort for efficient lookup
-                self.ignore_container_id.sort();
                 self
             })
             .map_err(|error| error!(message="Listing currently running containers, failed",%error))
@@ -398,11 +393,6 @@ impl Future for DockerSource {
                                             state.running();
                                             self.esb.restart(state);
                                         } else {
-                                            let ignore_flag = self
-                                                .ignore_container_id
-                                                .binary_search_by(|a| a.as_str().cmp(id.as_str()))
-                                                .is_ok();
-
                                             // This check is necessary since shiplift doesn't have way to include
                                             // names into request to docker.
                                             let include_name =
@@ -424,7 +414,7 @@ impl Future for DockerSource {
                                                     .map(|s| s.as_str()),
                                             );
 
-                                            if !ignore_flag && include_name && self_check {
+                                            if include_name && self_check {
                                                 // Included
                                                 self.containers
                                                     .insert(id.clone(), self.esb.start(id));
