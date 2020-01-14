@@ -1,15 +1,16 @@
 #[cfg(test)]
 mod test;
 
+mod applicable_transform;
+mod file_source_builder;
+mod message_parser;
+
+use self::applicable_transform::ApplicableTransform;
 use crate::{
-    event::{self, Event, Value},
-    sources::{
-        file::{FileConfig, FingerprintingConfig},
-        Source,
-    },
+    event::{self, Event, ValueKind},
+    sources::Source,
     topology::config::{DataType, GlobalOptions, SourceConfig},
     transforms::{
-        json_parser::{JsonParser, JsonParserConfig},
         regex_parser::{RegexParser, RegexParserConfig},
         Transform,
     },
@@ -18,7 +19,6 @@ use chrono::{DateTime, Utc};
 use futures::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use string_cache::DefaultAtom as Atom;
 
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
@@ -41,9 +41,12 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct KubernetesConfig {
-    include_container_names: Option<Vec<String>>,
-    include_pod_uids: Option<Vec<String>>,
-    include_namespaces: Option<Vec<String>>,
+    #[serde(default)]
+    include_container_names: Vec<String>,
+    #[serde(default)]
+    include_pod_uids: Vec<String>,
+    #[serde(default)]
+    include_namespaces: Vec<String>,
 }
 
 #[typetag::serde(name = "kubernetes")]
@@ -63,11 +66,12 @@ impl SourceConfig for KubernetesConfig {
 
         let now = TimeFilter::new();
 
-        let (file_recv, file_source) = file_source(name, globals, self)?;
+        let (file_recv, file_source) =
+            self::file_source_builder::FileSourceBuilder::new(self).build(name, globals)?;
 
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;
-        let mut parse_message = parse_message()?;
+        let mut parse_message = self::message_parser::build_message_parser()?;
 
         // Kubernetes source
         let source = file_recv
@@ -116,175 +120,6 @@ impl TimeFilter {
     }
 }
 
-fn file_source(
-    kube_name: &str,
-    globals: &GlobalOptions,
-    config: &KubernetesConfig,
-) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
-    let mut file_config = FileConfig::default();
-
-    file_source_include(config, &mut file_config)?;
-    file_source_exclude(config, &mut file_config);
-
-    file_config.start_at_beginning = true;
-
-    // Filter out files that certainly don't have logs newer than now timestamp.
-    file_config.ignore_older = Some(10);
-
-    // oldest_first false, having all pods equaly serviced is of greater importance
-    //                     than having time order guarantee.
-
-    // CRI standard ensures unique naming.
-    file_config.fingerprinting = FingerprintingConfig::DevInode;
-
-    // Have a subdirectory for this source to avoid collision of naming its file source.
-    file_config.data_dir = Some(globals.resolve_and_make_data_subdir(None, kube_name)?);
-
-    let (file_send, file_recv) = mpsc::channel(1000);
-    let file_source = file_config
-        .build("file_source", globals, file_send)
-        .map_err(|e| format!("Failed in creating file source with error: {:?}", e))?;
-
-    Ok((file_recv, file_source))
-}
-
-fn file_source_include(
-    config: &KubernetesConfig,
-    file_config: &mut FileConfig,
-) -> crate::Result<()> {
-    // Default includes
-    let empty = ["".to_string()];
-    let any = ["*".to_string()];
-    let uid_glob = to_uid_forms("");
-
-    // Cross product of includes
-    for object_uid in flatten_include(
-        &Some(prepare_pod_uids(&config.include_pod_uids)?),
-        uid_glob.as_slice(),
-    ) {
-        for container_name in flatten_include(&config.include_container_names, &empty) {
-            // Will include logs of Kubernetes < v1.14.
-            file_config.include.push(
-                (LOG_DIRECTORY.to_owned()
-                    + format!("{}/{}*/*.log", object_uid, container_name).as_str())
-                .into(),
-            );
-
-            for namespace in flatten_include(&config.include_namespaces, &any) {
-                // Will include logs of Kubernetes >= v1.14.
-                file_config.include.push(
-                    (LOG_DIRECTORY.to_owned()
-                        + format!("{}_*_{}/{}*/*.log", namespace, object_uid, container_name)
-                            .as_str())
-                    .into(),
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
-
-// Parses partial UIDs and transforms them to two UID forms with glob [0-9A-Fa-f] filling
-// them up to 32 hexadecimal numbers.
-fn prepare_pod_uids(include: &Option<Vec<String>>) -> Result<Vec<String>, BuildError> {
-    let mut include_pod_uids = Vec::new();
-    for pod_uid in flatten_include(include, &[]) {
-        let mut pod_uid = pod_uid.clone();
-
-        if !pod_uid.chars().all(|c| {
-            c.is_numeric() || ('A'..='F').contains(&c) || ('a'..='f').contains(&c) || c == '-'
-        }) {
-            error!(message = "Configuration 'include_pod_uids' contains not UID", uid = ?pod_uid);
-            return Err(BuildError::IllegalCharacterInUid {
-                uid: pod_uid.clone(),
-            });
-        }
-
-        pod_uid.retain(|c| c != '-');
-
-        if pod_uid.chars().count() > 32 {
-            return Err(BuildError::UidToLarge {
-                uid: pod_uid.clone(),
-            });
-        }
-
-        include_pod_uids.append(&mut to_uid_forms(pod_uid.as_str()));
-    }
-
-    Ok(include_pod_uids)
-}
-
-fn file_source_exclude(config: &KubernetesConfig, file_config: &mut FileConfig) {
-    let no_include = flatten_include(&config.include_container_names, &[]).is_empty()
-        && flatten_include(&config.include_namespaces, &[]).is_empty()
-        && flatten_include(&config.include_pod_uids, &[]).is_empty();
-
-    // Default excludes
-    if no_include {
-        // Since there is no user intention in including specific namespace/pod/container,
-        // exclude kuberenetes and vector logs.
-
-        // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
-        // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
-        file_config
-            .exclude
-            .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
-
-        // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
-        file_config
-            .exclude
-            .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
-    }
-}
-
-fn flatten_include<'a>(o: &'a Option<Vec<String>>, default: &'a [String]) -> &'a [String] {
-    o.as_ref()
-        .map(|vec| vec.as_slice())
-        .filter(|slice| !slice.is_empty())
-        .unwrap_or(default)
-}
-
-// Transforms uid to two UID forms with glob [0-9A-Fa-f] filling
-// them up to 32 hexadecimal numbers.
-fn to_uid_forms(uid: &str) -> Vec<String> {
-    fn char_or_hexadecimal(it: &mut impl Iterator<Item = char>, n: usize) -> String {
-        let mut tmp = String::new();
-        for _ in 0..n {
-            if let Some(item) = it.next() {
-                tmp.push(item);
-            } else {
-                tmp.push_str("[0-9A-Fa-f]")
-            }
-        }
-        tmp
-    }
-
-    let mut it = uid.chars();
-    vec![
-        format!(
-            "{}-{}-{}-{}-{}",
-            char_or_hexadecimal(&mut it, 8),
-            char_or_hexadecimal(&mut it, 4),
-            char_or_hexadecimal(&mut it, 4),
-            char_or_hexadecimal(&mut it, 4),
-            char_or_hexadecimal(&mut it, 12)
-        ),
-        char_or_hexadecimal(&mut uid.chars(), 32),
-    ]
-}
-
-/// Determines format of message.
-/// This exists because Docker is still a special entity in Kubernetes as it can write in Json
-/// despite CRI defining it's own format.
-fn parse_message() -> crate::Result<ApplicableTransform> {
-    let transforms = vec![
-        Box::new(transform_json_message()) as Box<dyn Transform>,
-        transform_cri_message()?,
-    ];
-    Ok(ApplicableTransform::Candidates(transforms))
-}
-
 fn remove_ending_newline(mut event: Event) -> Event {
     if let Some(Value::Bytes(msg)) = event.as_mut_log().get_mut(&event::MESSAGE) {
         if msg.ends_with(&['\n' as u8]) {
@@ -292,88 +127,6 @@ fn remove_ending_newline(mut event: Event) -> Event {
         }
     }
     event
-}
-
-#[derive(Debug)]
-struct DockerMessageTransformer {
-    json_parser: JsonParser,
-    atom_time: Atom,
-    atom_log: Atom,
-}
-
-impl Transform for DockerMessageTransformer {
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut event = self.json_parser.transform(event)?;
-
-        // Rename fields
-        let log = event.as_mut_log();
-
-        // time -> timestamp
-        if let Some(Value::Bytes(timestamp_bytes)) = log.remove(&self.atom_time) {
-            match DateTime::parse_from_rfc3339(
-                String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
-            ) {
-                Ok(timestamp) => {
-                    log.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
-                }
-                Err(error) => {
-                    debug!(message = "Non rfc3339 timestamp.", %error, rate_limit_secs = 10);
-                    return None;
-                }
-            }
-        } else {
-            debug!(message = "Missing field.", field = %self.atom_time, rate_limit_secs = 10);
-            return None;
-        }
-
-        // log -> message
-        if let Some(message) = log.remove(&self.atom_log) {
-            log.insert(event::MESSAGE.clone(), message);
-        } else {
-            debug!(message = "Missing field.", field = %self.atom_log, rate_limit_secs = 10);
-            return None;
-        }
-
-        Some(event)
-    }
-}
-
-/// As defined by Docker
-fn transform_json_message() -> DockerMessageTransformer {
-    let mut config = JsonParserConfig::default();
-
-    // Drop so that it's possible to detect if message is in json format
-    config.drop_invalid = true;
-
-    config.drop_field = true;
-
-    DockerMessageTransformer {
-        json_parser: config.into(),
-        atom_time: Atom::from("time"),
-        atom_log: Atom::from("log"),
-    }
-}
-
-/// As defined by CRI
-fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
-    let mut rp_config = RegexParserConfig::default();
-    // message field
-    rp_config.regex =
-        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$"
-            .to_owned();
-    // drop field
-    rp_config
-        .types
-        .insert(event::TIMESTAMP.clone(), "timestamp|%+".to_owned());
-    // stream is a string
-    // message is a string
-    RegexParser::build(&rp_config).map_err(|e| {
-        format!(
-            "Failed in creating message regex transform with error: {:?}",
-            e
-        )
-        .into()
-    })
 }
 
 fn transform_file() -> crate::Result<Box<dyn Transform>> {
@@ -454,40 +207,6 @@ fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     Ok(ApplicableTransform::Candidates(transforms))
 }
 
-/// Contains several transforms. On the first message, transforms are tried
-/// out one after the other until the first successful one has been found.
-/// After that the transform will always be used.
-///
-/// If nothing succeds the message is still passed.
-enum ApplicableTransform {
-    Candidates(Vec<Box<dyn Transform>>),
-    Transform(Option<Box<dyn Transform>>),
-}
-
-impl Transform for ApplicableTransform {
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        match self {
-            Self::Candidates(candidates) => {
-                let candidate = candidates
-                    .iter_mut()
-                    .enumerate()
-                    .find_map(|(i, t)| t.transform(event.clone()).map(|event| (i, event)));
-                if let Some((i, event)) = candidate {
-                    let candidate = candidates.remove(i);
-                    *self = Self::Transform(Some(candidate));
-                    Some(event)
-                } else {
-                    *self = Self::Transform(None);
-                    warn!("No applicable transform.");
-                    None
-                }
-            }
-            Self::Transform(Some(transform)) => transform.transform(event),
-            Self::Transform(None) => Some(event),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,30 +235,6 @@ mod tests {
             &event,
             "pod_uid",
             "default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e",
-        );
-    }
-
-    #[test]
-    fn cri_message_transform() {
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert(
-            "message",
-            "2019-10-02T13:21:36.927620189+02:00 stdout F 12".to_owned(),
-        );
-
-        let mut transform = transform_cri_message().unwrap();
-
-        let event = transform.transform(event).expect("Transformed");
-
-        has(&event, event::MESSAGE.as_ref(), "12");
-        has(&event, "multiline_tag", "F");
-        has(&event, "stream", "stdout");
-        has(
-            &event,
-            event::TIMESTAMP.as_ref(),
-            DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
-                .unwrap()
-                .with_timezone(&Utc),
         );
     }
 
