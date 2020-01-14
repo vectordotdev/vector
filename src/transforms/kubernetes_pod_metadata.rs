@@ -57,7 +57,10 @@ impl TransformConfig for KubernetesPodMetadataConfig {
         let transform = KubernetesPodMetadata {
             metadata: client.metadata(),
         };
-        exec.spawn_std(client.run());
+        exec.spawn_std(async move {
+            info!(message = "Running MetadataClient.");
+            client.run().await;
+        });
 
         Ok(Box::new(transform))
     }
@@ -143,6 +146,7 @@ impl MetadataClient {
     /// list_version
     async fn fetch_pod_list(&self) -> String {
         loop {
+            info!(message = "Fetching Pod list.");
             let r_list = Api::v1Pod(self.kube.clone())
                 .list(&kube::api::ListParams {
                     field_selector: Some(self.field_selector()),
@@ -157,6 +161,7 @@ impl MetadataClient {
                     }
 
                     if let Some(version) = pod_list.metadata.resourceVersion {
+                        info!("Inital pod list fetched.");
                         return version;
                     }
                     debug!(message = "Missing pod list resource_version.")
@@ -165,6 +170,7 @@ impl MetadataClient {
             }
 
             // Retry with delay
+            info!(message = "Waiting.");
             Delay::new(Instant::now() + Duration::from_secs(1))
                 .compat()
                 .await
@@ -180,6 +186,7 @@ impl MetadataClient {
             .fields(&self.field_selector())
             .init_from(version);
 
+        info!("Watching pod list.");
         loop {
             let polled = informer.poll().await;
             match polled {
@@ -209,17 +216,17 @@ impl MetadataClient {
     }
 
     fn update(&self, pod: Pod) -> Option<()> {
+        trace!(message = "Trying to update Pod metadata.");
         let uid: Bytes = pod.metadata.uid.as_ref()?.as_str().into();
 
         let fields = self.fields(pod);
 
-        trace!(message = "Updating Pod metadata.", uid = ?uid);
-
         // TODO: This is blocking
         let mut map = self.metadata.write().ok()?;
 
-        map.insert(uid, fields);
+        trace!(message = "Updated Pod metadata.", uid = ?uid);
 
+        map.insert(uid, fields);
         Some(())
     }
 

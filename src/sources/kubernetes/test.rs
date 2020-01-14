@@ -108,7 +108,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-improve:latest
+        image: ktff/vector-kube-metadata:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
@@ -486,3 +486,71 @@ fn kube_object_uid() {
 
     panic!("Vector didn't log message: {:?}", message);
 }
+
+// ************************** kubernetes_pod_metadata TESTS ************************* //
+
+static CONFIG_MAP_YAML_WITH_METADATA: &'static str = r#"
+# ConfigMap which contains vector.toml configuration for pods.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: $(TEST_NAMESPACE)
+data:
+  vector-agent-config: |
+    # VECTOR.TOML
+    # Configuration for vector-agent
+
+    # Set global options
+    data_dir = "/tmp/vector/"
+
+    # Ingest logs from Kubernetes
+    [sources.kubernetes_logs]
+      type = "kubernetes"
+
+    [transforms.kube_metadata]
+      type = "kubernetes_pod_metadata"
+      inputs = ["kubernetes_logs"]
+      fields = ["name"]
+
+    [sinks.out]
+      type = "console"
+      inputs = ["kube_metadata"]
+      target = "stdout"
+
+      encoding = "json"
+      healthcheck = true
+
+  # This line is not in VECTOR.TOML
+"#;
+
+#[test]
+fn kube_metadata() {
+    let namespace = "vector-test-kube_metadata";
+    let message = "20";
+    let field = "pod.name";
+    let user_namespace = user_namespace(namespace);
+
+    let kube = Kube::new(namespace);
+    let user = Kube::new(user_namespace.clone());
+
+    // Start vector
+    let vector = start_vector(&kube, user_namespace.as_str());
+
+    // Start echo
+    let _echo = echo(&user, "echo", message);
+
+    // Verify logs
+    // If any daemon logged message, done.
+    for line in logs(&kube, &vector) {
+        if line.get(field).is_some() {
+            // DONE
+            return;
+        } else {
+            debug!(namespace,log=%line);
+        }
+    }
+    panic!("Vector didn't find field: {:?}", field);
+}
+
+// fn kube_metadata_running() {
