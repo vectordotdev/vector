@@ -45,6 +45,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "datadog_metrics" # must be: "datadog_metrics"
+  inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example
 
@@ -60,12 +62,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "datadog_metrics" # must be: "datadog_metrics"
+  inputs = ["my-source-id"] # example
   api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
   namespace = "service" # example
 
   # OPTIONAL - General
-  type = "datadog_metrics" # no default, must be: "datadog_metrics" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   host = "https://api.datadoghq.com" # default
 

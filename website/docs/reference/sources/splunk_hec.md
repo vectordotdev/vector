@@ -23,46 +23,19 @@ The Vector `splunk_hec` source ingests data through the [Splunk HTTP Event Colle
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
+  # REQUIRED
+  type = "splunk_hec" # must be: "splunk_hec"
+
+  # OPTIONAL
   address = "0.0.0.0:8088" # default
   token = "A94A8FE5CCB19BA61C4C08" # example, no default
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sources.my_source_id]
-  address = "0.0.0.0:8088" # default
-  type = "splunk_hec" # no default, must be: "splunk_hec" (if supplied)
-  token = "A94A8FE5CCB19BA61C4C08" # example, no default
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

@@ -20,21 +20,6 @@ The Vector `concat` transform accepts [`log`][docs.data-model.log] events and al
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -42,33 +27,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
+  type = "concat" # must be: "concat"
+  inputs = ["my-source-id"] # example
   items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
 
   # OPTIONAL
   joiner = " " # default
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  # REQUIRED
-  items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
-  target = "dest_field_name" # example
-
-  # OPTIONAL
-  joiner = " " # default
-  type = "concat" # no default, must be: "concat" (if supplied)
-  inputs = ["my-source-id"] # example, no default
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

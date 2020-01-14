@@ -45,6 +45,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "statsd" # must be: "statsd"
+  inputs = ["my-source-id"] # example
   namespace = "service" # example
 
   # OPTIONAL
@@ -59,11 +61,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "statsd" # must be: "statsd"
+  inputs = ["my-source-id"] # example
   namespace = "service" # example
 
   # OPTIONAL
-  type = "statsd" # no default, must be: "statsd" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   address = "127.0.0.1:8125" # default
   healthcheck = true # default
 ```

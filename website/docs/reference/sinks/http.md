@@ -44,6 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  type = "http" # must be: "http"
+  inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 ```
 
@@ -55,11 +57,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "http" # must be: "http"
+  inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 
   # OPTIONAL - General
-  type = "http" # no default, must be: "http" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
 

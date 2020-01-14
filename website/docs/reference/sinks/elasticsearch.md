@@ -44,6 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
+  type = "elasticsearch" # must be: "elasticsearch"
+  inputs = ["my-source-id"] # example
+
+  # OPTIONAL
   doc_type = "_doc" # default
   index = "vector-%F" # default
   host = "http://10.24.32.122:9000" # example, no default
@@ -56,11 +61,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED - General
+  type = "elasticsearch" # must be: "elasticsearch"
+  inputs = ["my-source-id"] # example
+
   # OPTIONAL - General
   doc_type = "_doc" # default
   index = "vector-%F" # default
-  type = "elasticsearch" # no default, must be: "elasticsearch" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
   provider = "default" # default, enum

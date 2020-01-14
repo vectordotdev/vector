@@ -45,6 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
+  type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example
   mode = "tcp" # example, enum
 
@@ -63,12 +64,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
+  type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example
   mode = "tcp" # example, enum
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds
-  type = "socket" # no default, must be: "socket" (if supplied)
   max_length = 102400 # default, bytes
 
   # OPTIONAL - Context

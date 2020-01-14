@@ -44,6 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  type = "socket" # must be: "socket"
+  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
   mode = "tcp" # must be: "tcp"
 ```
@@ -56,12 +58,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "socket" # must be: "socket"
+  inputs = ["my-source-id"] # example
   address = "92.12.333.224:5000" # example
   mode = "tcp" # must be: "tcp"
 
   # OPTIONAL - General
-  type = "socket" # no default, must be: "socket" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 
   # OPTIONAL - requests

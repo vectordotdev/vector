@@ -44,6 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
+  type = "new_relic_logs" # must be: "new_relic_logs"
+  inputs = ["my-source-id"] # example
+
+  # OPTIONAL
   insert_key = "xxxx" # example, no default
   license_key = "xxxx" # example, no default
   region = "us" # default, enum
@@ -56,9 +61,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED - General
+  type = "new_relic_logs" # must be: "new_relic_logs"
+  inputs = ["my-source-id"] # example
+
   # OPTIONAL - General
-  type = "new_relic_logs" # no default, must be: "new_relic_logs" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   insert_key = "xxxx" # example, no default
   license_key = "xxxx" # example, no default

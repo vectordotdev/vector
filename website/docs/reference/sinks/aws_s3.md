@@ -45,6 +45,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "aws_s3" # must be: "aws_s3"
+  inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
 
@@ -66,6 +68,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "aws_s3" # must be: "aws_s3"
+  inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
 
@@ -76,8 +80,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   key_prefix = "date=%F/" # default
 
   # OPTIONAL - General
-  type = "aws_s3" # no default, must be: "aws_s3" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   endpoint = "https://s3.us-east-1.amazonaws.com" # example, no default
   healthcheck = true # default
   region = "us-east-1" # example, no default

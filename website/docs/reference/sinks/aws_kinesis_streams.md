@@ -45,6 +45,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
+  inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example
 
@@ -60,12 +62,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
+  inputs = ["my-source-id"] # example
   region = "us-east-1" # example
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
-  type = "aws_kinesis_streams" # no default, must be: "aws_kinesis_streams" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   partition_key_field = "user_id" # example, no default
 

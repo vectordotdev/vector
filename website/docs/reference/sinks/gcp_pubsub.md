@@ -44,6 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  type = "gcp_pubsub" # must be: "gcp_pubsub"
+  inputs = ["my-source-id"] # example
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 ```
@@ -56,12 +58,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "gcp_pubsub" # must be: "gcp_pubsub"
+  inputs = ["my-source-id"] # example
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 
   # OPTIONAL - General
-  type = "gcp_pubsub" # no default, must be: "gcp_pubsub" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   api_key = nil # example, no default
   credentials_path = nil # example, no default
   healthcheck = true # default

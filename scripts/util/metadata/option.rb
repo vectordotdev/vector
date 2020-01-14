@@ -55,7 +55,7 @@ class Option
     @category = hash["category"] || ((@options.to_h.values.empty? || inline?) ? "General" : @name.humanize)
 
     if @required == true && !@defualt.nil?
-      raise ArgumentError.new("#{self.class.name}#required must be false if there is a default")
+      raise ArgumentError.new("#{self.class.name}#required must be false if there is a default for field #{@name}")
     end
 
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)

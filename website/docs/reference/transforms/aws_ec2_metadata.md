@@ -20,51 +20,22 @@ The Vector `aws_ec2_metadata` transform accepts [`log`][docs.data-model.log] eve
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED
+  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
+  inputs = ["my-source-id"] # example
+
+  # OPTIONAL
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
   host = "http://169.254.169.254" # default
   namespace = "" # default
   refresh_interval_secs = 10 # default
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  type = "aws_ec2_metadata" # no default, must be: "aws_ec2_metadata" (if supplied)
-  inputs = ["my-source-id"] # example, no default
-  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
-  host = "http://169.254.169.254" # default
-  namespace = "" # default
-  refresh_interval_secs = 10 # default
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

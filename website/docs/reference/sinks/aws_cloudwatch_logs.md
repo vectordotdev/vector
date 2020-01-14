@@ -45,6 +45,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
+  inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
@@ -62,13 +64,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
+  inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
   region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL - General
-  type = "aws_cloudwatch_logs" # no default, must be: "aws_cloudwatch_logs" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   create_missing_group = true # default
   create_missing_stream = true # default
   healthcheck = true # default

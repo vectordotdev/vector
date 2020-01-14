@@ -20,48 +20,15 @@ The Vector `add_fields` transform accepts [`log`][docs.data-model.log] events an
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  [transforms.my_transform_id.fields]
-    string_field = "string value" # example
-    env_var_field = "${ENV_VAR}" # example
-    int_field = 1 # example
-    float_field = 1.2 # example
-    bool_field = true # example
-    timestamp_field = 1979-05-27T00:32:00Z # example
-    parent = {child = "child_value"} # example
-    list_field = ["first", "second", "third"] # example
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  # OPTIONAL - General
-  type = "add_fields" # no default, must be: "add_fields" (if supplied)
-  inputs = ["my-source-id"] # example, no default
+  # REQUIRED - General
+  type = "add_fields" # must be: "add_fields"
+  inputs = ["my-source-id"] # example
 
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
@@ -74,10 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     parent = {child = "child_value"} # example
     list_field = ["first", "second", "third"] # example
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

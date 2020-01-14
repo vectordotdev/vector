@@ -23,21 +23,6 @@ The Vector `vector` source ingests data through another upstream [`vector` sink]
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -45,30 +30,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
+  type = "vector" # must be: "vector"
   address = "0.0.0.0:9000" # example
 
   # OPTIONAL
   shutdown_timeout_secs = 30 # default, seconds
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sources.my_source_id]
-  # REQUIRED
-  address = "0.0.0.0:9000" # example
-
-  # OPTIONAL
-  shutdown_timeout_secs = 30 # default, seconds
-  type = "vector" # no default, must be: "vector" (if supplied)
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

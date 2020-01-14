@@ -44,6 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  type = "splunk_hec" # must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 ```
@@ -56,12 +58,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "splunk_hec" # must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
   # OPTIONAL - General
-  type = "splunk_hec" # no default, must be: "splunk_hec" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 
   # OPTIONAL - requests
