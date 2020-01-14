@@ -183,7 +183,7 @@ impl MetadataClient {
         loop {
             let polled = informer.poll().await;
             match polled {
-                Ok(mut stream) => {
+                Ok(stream) => {
                     for event in stream.collect::<Vec<_>>().await {
                         match event {
                             Ok(WatchEvent::Added(pod)) | Ok(WatchEvent::Modified(pod)) => {
@@ -216,7 +216,7 @@ impl MetadataClient {
         trace!(message = "Updating Pod metadata.", uid = ?uid);
 
         // TODO: This is blocking
-        let map = self.metadata.write().ok()?;
+        let mut map = self.metadata.write().ok()?;
 
         map.insert(uid, fields);
 
@@ -287,8 +287,8 @@ fn all_fields() -> Vec<(
         }),
         field("subdomain", |pod| pod.spec.subdomain.clone()),
         // ------------------------ PodStatus ------------------------ //
-        field("host_ip", |pod| pod.status?.host_ip.clone()),
-        field("ip", |pod| pod.status?.pod_ip.clone()),
+        field("host_ip", |pod| pod.status.as_ref()?.host_ip.clone()),
+        field("ip", |pod| pod.status.as_ref()?.pod_ip.clone()),
     ]
 }
 
