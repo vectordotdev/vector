@@ -15,6 +15,7 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -24,15 +25,22 @@ use tokio::timer::Delay;
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
+/// Prefiks for all metadata fields
+const FIELD_PREFIX: &str = "pod.";
+
 type Pod = kube::api::Object<PodSpec, k8s_openapi::api::core::v1::PodStatus>;
 
+/// Shared HashMap of (key,value) fields for pods on this node.
+/// Joined on key - pod_uid field.
+///
+/// Mutex should work fine for this case.
 type JoinMap = Arc<RwLock<HashMap<Bytes, Vec<(Atom, ValueKind)>>>>;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct KubernetesPodMetadataConfig {
+    #[serde(default = "default_fields")]
     fields: Vec<String>,
-    namespace: Vec<String>,
 }
 
 inventory::submit! {
@@ -45,7 +53,7 @@ impl TransformConfig for KubernetesPodMetadataConfig {
         // Main idea is to have a background task which will premptively
         // acquire metadata for all pods on this node, and then maintaine that.
 
-        let client = MetadataClient::new(node_name()?)?;
+        let client = MetadataClient::new(node_name()?, self)?;
         let transform = KubernetesPodMetadata {
             metadata: client.metadata(),
         };
@@ -83,6 +91,7 @@ enum BuildError {
 }
 
 struct MetadataClient {
+    fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>>,
     metadata: JoinMap,
     node_name: String,
     kube: APIClient,
@@ -90,10 +99,24 @@ struct MetadataClient {
 
 impl MetadataClient {
     /// Stream of regets of list.
-    fn new(node_name: String) -> Result<Self, BuildError> {
+    fn new(
+        node_name: String,
+        trans_config: &KubernetesPodMetadataConfig,
+    ) -> Result<Self, BuildError> {
         let config = kube::config::incluster_config().context(KubeError)?;
         let kube = APIClient::new(config);
+
         Ok(Self {
+            fields: all_fields()
+                .into_iter()
+                .filter(|(key, _)| {
+                    trans_config
+                        .fields
+                        .iter()
+                        .any(|field| field.as_str() == *key)
+                })
+                .map(|(_, fun)| fun)
+                .collect(),
             metadata: Arc::default(),
             node_name,
             kube,
@@ -186,9 +209,9 @@ impl MetadataClient {
     }
 
     fn update(&self, pod: Pod) -> Option<()> {
-        let uid: Bytes = pod.metadata.uid?.into();
+        let uid: Bytes = pod.metadata.uid.as_ref()?.as_str().into();
 
-        let fields = self.fields(pod.spec);
+        let fields = self.fields(pod);
 
         trace!(message = "Updating Pod metadata.", uid = ?uid);
 
@@ -200,16 +223,12 @@ impl MetadataClient {
         Some(())
     }
 
-    fn fields(&self, spec: PodSpec) -> Vec<(Atom, ValueKind)> {
-        unimplemented!();
+    fn fields(&self, pod: Pod) -> Vec<(Atom, ValueKind)> {
+        self.fields.iter().flat_map(|fun| fun(&pod)).collect()
     }
 }
 
 pub struct KubernetesPodMetadata {
-    /// Shared HashMap of (key,value) fields for pods on this node.
-    /// Joined on key - pod_uid field.
-    ///
-    /// Mutex should work fine for this case.
     metadata: JoinMap,
 }
 
@@ -230,4 +249,82 @@ impl Transform for KubernetesPodMetadata {
 
         Some(event)
     }
+}
+
+fn default_fields() -> Vec<String> {
+    vec!["name", "namespace", "labels", "annotations", "node_name"]
+        .into_iter()
+        .map(Into::into)
+        .collect()
+}
+
+/// Returns list of all supported fields and their extraction function.
+fn all_fields() -> Vec<(
+    &'static str,
+    Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
+)> {
+    vec![
+        // ------------------------ ObjectMeta ------------------------ //
+        field("name", |pod| Some(pod.metadata.name.clone())),
+        field("namespace", |pod| pod.metadata.namespace.clone()),
+        field("creation_timestamp", |pod| {
+            pod.metadata.creation_timestamp.clone().map(|time| time.0)
+        }),
+        field("deletion_timestamp", |pod| {
+            pod.metadata.deletion_timestamp.clone().map(|time| time.0)
+        }),
+        collection_field("labels", |pod| &pod.metadata.labels),
+        collection_field("annotations", |pod| &pod.metadata.annotations),
+        // ------------------------ PodSpec ------------------------ //
+        field("node_name", |pod| pod.spec.node_name.clone()),
+        field("hostname", |pod| pod.spec.hostname.clone()),
+        field("priority", |pod| pod.spec.priority),
+        field("priority_class_name", |pod| {
+            pod.spec.priority_class_name.clone()
+        }),
+        field("service_account_name", |pod| {
+            pod.spec.service_account_name.clone()
+        }),
+        field("subdomain", |pod| pod.spec.subdomain.clone()),
+        // ------------------------ PodStatus ------------------------ //
+        field("host_ip", |pod| pod.status?.host_ip.clone()),
+        field("ip", |pod| pod.status?.pod_ip.clone()),
+    ]
+}
+
+fn field<T: Into<ValueKind>>(
+    name: &'static str,
+    fun: impl Fn(&Pod) -> Option<T> + Send + Sync + 'static,
+) -> (
+    &'static str,
+    Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
+) {
+    let key: Atom = with_prefix(name).into();
+    let fun = move |pod: &Pod| {
+        fun(pod)
+            .map(|data| vec![(key.clone(), data.into())])
+            .unwrap_or_default()
+    };
+    (name, Box::new(fun) as Box<_>)
+}
+
+fn collection_field(
+    name: &'static str,
+    fun: impl Fn(&Pod) -> &BTreeMap<String, String> + Send + Sync + 'static,
+) -> (
+    &'static str,
+    Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
+) {
+    let prefix_key = with_prefix(name) + ".";
+    let fun = move |pod: &Pod| {
+        fun(pod)
+            .iter()
+            .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
+            .collect()
+    };
+    (name, Box::new(fun) as Box<_>)
+}
+
+fn with_prefix(name: &str) -> String {
+    FIELD_PREFIX.to_owned() + name
 }
