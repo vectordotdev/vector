@@ -1,14 +1,13 @@
 ---
 id: <%= "#{source.name}_to_#{sink.name}" %>
-title: <%= "Writing #{source.title} Events to #{sink.title}" %>
-description: <%= %"Learn how to send #{source.title} events to #{sink.title} with optional enrichments." %>
+title: <%= "#{title}" %>
+description: <%= "#{description}" %>
 featured: true
-keywords: ["docker", "aws", "cloudwatch", "aws cloudwatch", "cloudwatch logs"]
+keywords: <%= "#{keywords.to_json}" %>
 ---
 
-This is a bespoke guide example. We'll be consuming
-<%= "`#{source.name}` #{event_from}s" %> and writing them to a
-`<%= sink.name %>` sink.
+In this guide we'll be consuming <%= "`#{source.name}` #{event_from}s" %> and
+writing them to a `<%= sink.name %>` sink.
 
 <!--truncate-->
 
@@ -24,7 +23,8 @@ Or [choose your preferred installation method][docs.installation].
 
 ## Configure a Source
 
-Next, create a config file and add a `<%= source.name %>` source:
+Next, create a config file in a local directory (called `config.toml`) and add a
+`<%= source.name %>` source by pasting in this snippet:
 
 ```toml
 <%= config_example(source.options_list, path: "#{source.type.pluralize}.my-source-id", common: true) %>
@@ -104,7 +104,7 @@ Now we configure our sink, making sure to set the input to `<%= next_input %>`:
 <%= config_example(sink_example.options_list, path: "#{sink_example.type.pluralize}.my-sink-id", common: true) %>
 ```
 
-## Run It
+## Run It
 
 That's it, we're ready to execute our pipeline. You can run it locally with:
 

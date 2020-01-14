@@ -3,12 +3,11 @@ id: docker_to_aws_cloudwatch_logs
 title: Writing Docker Events to AWS Cloudwatch Logs
 description: Learn how to send Docker events to AWS Cloudwatch Logs with optional enrichments.
 featured: true
-keywords: ["docker", "aws", "cloudwatch", "aws cloudwatch", "cloudwatch logs"]
+keywords: ["docker","aws cloudwatch logs"]
 ---
 
-This is a bespoke guide example. We'll be consuming
-`docker` logs and writing them to a
-`aws_cloudwatch_logs` sink.
+In this guide we'll be consuming `docker` logs and
+writing them to a `aws_cloudwatch_logs` sink.
 
 <!--truncate-->
 
@@ -30,7 +29,8 @@ Or [choose your preferred installation method][docs.installation].
 
 ## Configure a Source
 
-Next, create a config file and add a `docker` source:
+Next, create a config file in a local directory (called `config.toml`) and add a
+`docker` source by pasting in this snippet:
 
 ```toml
 [sources.my-source-id]
@@ -110,7 +110,7 @@ Now we configure our sink, making sure to set the input to `enricher`:
   create_missing_stream = true # default
 ```
 
-## Run It
+## Run It
 
 That's it, we're ready to execute our pipeline. You can run it locally with:
 

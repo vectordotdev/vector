@@ -5,7 +5,8 @@ description: <%= "#{description}" %>
 keywords: <%= "#{keywords.to_json}" %>
 ---
 
-In this guide we'll be consuming <%= "`#{source.name}` #{event_from}s" %> and writing them to a `<%= sink.name %>` sink.
+In this guide we'll be consuming <%= "`#{source.name}` #{event_from}s" %> and
+writing them to a `<%= sink.name %>` sink.
 
 <!--truncate-->
 
@@ -21,7 +22,8 @@ Or [choose your preferred installation method][docs.installation].
 
 ## Configure a Source
 
-Next, create a config file and add a `<%= source.name %>` source:
+Next, create a config file in a local directory (called `config.toml`) and add a
+`<%= source.name %>` source by pasting in this snippet:
 
 ```toml
 <%= config_example(source.options_list, path: "#{source.type.pluralize}.my-source-id", common: true) %>
@@ -109,7 +111,8 @@ That's it, we're ready to execute our pipeline. You can run it locally with:
 vector -c ./config.toml
 ```
 
-And choose from a range of strategies on [how to deploy it][docs.deployment].
+Vector is very flexible and can be deployed in a way that suits your target
+environment. For guidance check out our [deployment documentation][docs.deployment].
 
 [docs.installation]: /docs/setup/installation/
 [docs.deployment]: /docs/setup/deployment/

@@ -5,7 +5,8 @@ description: Learn how to send Socket events to Clickhouse with optional enrichm
 keywords: ["socket","clickhouse"]
 ---
 
-In this guide we'll be consuming `socket` logs and writing them to a `clickhouse` sink.
+In this guide we'll be consuming `socket` logs and
+writing them to a `clickhouse` sink.
 
 <!--truncate-->
 
@@ -27,7 +28,8 @@ Or [choose your preferred installation method][docs.installation].
 
 ## Configure a Source
 
-Next, create a config file and add a `socket` source:
+Next, create a config file in a local directory (called `config.toml`) and add a
+`socket` source by pasting in this snippet:
 
 ```toml
 [sources.my-source-id]
@@ -116,7 +118,8 @@ That's it, we're ready to execute our pipeline. You can run it locally with:
 vector -c ./config.toml
 ```
 
-And choose from a range of strategies on [how to deploy it][docs.deployment].
+Vector is very flexible and can be deployed in a way that suits your target
+environment. For guidance check out our [deployment documentation][docs.deployment].
 
 
 [docs.deployment]: /docs/setup/deployment/
