@@ -111,7 +111,6 @@ impl LogEvent {
             key.into(),
             Value {
                 value: value.into(),
-                explicit: true,
             },
         );
     }
@@ -125,7 +124,6 @@ impl LogEvent {
             key.into(),
             Value {
                 value: value.into(),
-                explicit: false,
             },
         );
     }
@@ -141,19 +139,11 @@ impl LogEvent {
     pub fn all_fields(&self) -> FieldsIter {
         FieldsIter {
             inner: self.fields.iter(),
-            explicit_only: false,
         }
     }
 
     pub fn unflatten(self) -> unflatten::Unflatten {
         unflatten::Unflatten::from(self.fields)
-    }
-
-    pub fn explicit_fields(&self) -> FieldsIter {
-        FieldsIter {
-            inner: self.fields.iter(),
-            explicit_only: true,
-        }
     }
 }
 
@@ -176,7 +166,6 @@ impl<K: Into<Atom>, V: Into<ValueKind>> FromIterator<(K, V)> for LogEvent {
                         key.into(),
                         Value {
                             value: value.into(),
-                            explicit: true,
                         },
                     )
                 })
@@ -188,7 +177,6 @@ impl<K: Into<Atom>, V: Into<ValueKind>> FromIterator<(K, V)> for LogEvent {
 #[derive(PartialEq, Debug, Clone)]
 pub struct Value {
     value: ValueKind,
-    explicit: bool,
 }
 
 impl Serialize for Value {
@@ -332,7 +320,6 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 }
 
 fn decode_value(input: proto::Value) -> Option<Value> {
-    let explicit = input.explicit;
     let value = match input.kind {
         Some(proto::value::Kind::RawBytes(data)) => Some(ValueKind::Bytes(data.into())),
         Some(proto::value::Kind::Timestamp(ts)) => Some(ValueKind::Timestamp(
@@ -346,10 +333,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
             None
         }
     };
-    value.map(|decoded| Value {
-        value: decoded,
-        explicit,
-    })
+    value.map(|decoded| Value { value: decoded })
 }
 
 impl From<proto::EventWrapper> for Event {
@@ -430,7 +414,6 @@ impl From<Event> for proto::EventWrapper {
                     .into_iter()
                     .map(|(k, v)| {
                         let value = proto::Value {
-                            explicit: v.explicit,
                             kind: match v.value {
                                 ValueKind::Bytes(b) => {
                                     Some(proto::value::Kind::RawBytes(b.to_vec()))
@@ -585,7 +568,6 @@ impl From<Metric> for Event {
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
     inner: std::collections::hash_map::Iter<'a, Atom, Value>,
-    explicit_only: bool,
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
@@ -597,10 +579,6 @@ impl<'a> Iterator for FieldsIter<'a> {
                 Some(next) => next,
                 None => return None,
             };
-
-            if self.explicit_only && !value.explicit {
-                continue;
-            }
 
             return Some((key, &value.value));
         }
@@ -635,16 +613,8 @@ mod test {
             "timestamp": event.as_log().get(&super::TIMESTAMP),
         });
 
-        let expected_explicit = serde_json::json!({
-            "foo": "bar",
-            "bar": "baz",
-        });
-
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(expected_all, actual_all);
-
-        let actual_explicit = serde_json::to_value(event.as_log().explicit_fields()).unwrap();
-        assert_eq!(expected_explicit, actual_explicit);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
         assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
@@ -697,21 +667,6 @@ mod test {
                     "The bigger they are, the harder they fall".to_string()
                 ),
             ]
-            .into_iter()
-            .collect::<HashSet<_>>()
-        );
-
-        let explicit_only = event
-            .as_log()
-            .explicit_fields()
-            .map(|(k, v)| (k, v.to_string_lossy()))
-            .collect::<HashSet<_>>();
-        assert_eq!(
-            explicit_only,
-            vec![(
-                &"Ke$ha".into(),
-                "It's going down, I'm yelling timber".to_string()
-            ),]
             .into_iter()
             .collect::<HashSet<_>>()
         );

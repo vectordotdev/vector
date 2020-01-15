@@ -188,7 +188,7 @@ fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<
 
     let mut body = match encoding {
         Encoding::Json => json!({
-            "fields": event.explicit_fields(),
+            "fields": event.all_fields(),
             "event": event.unflatten(),
             "time": timestamp,
         }),
