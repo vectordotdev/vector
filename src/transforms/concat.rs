@@ -179,7 +179,7 @@ impl Transform for Concat {
         let content = content_vec.join(self.joiner.as_bytes());
         event
             .as_mut_log()
-            .insert_explicit(self.target.clone(), content);
+            .insert(self.target.clone(), content);
 
         Some(event)
     }
@@ -196,8 +196,8 @@ mod tests {
         let mut event = Event::from("message");
         event
             .as_mut_log()
-            .insert_explicit("first", "Hello vector users");
-        event.as_mut_log().insert_explicit("second", "World");
+            .insert("first", "Hello vector users");
+        event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -217,8 +217,8 @@ mod tests {
         let mut event = Event::from("message");
         event
             .as_mut_log()
-            .insert_explicit("first", "Hello vector users");
-        event.as_mut_log().insert_explicit("second", "World");
+            .insert("first", "Hello vector users");
+        event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -237,8 +237,8 @@ mod tests {
         let mut event = Event::from("message");
         event
             .as_mut_log()
-            .insert_explicit("first", "Hello vector users");
-        event.as_mut_log().insert_explicit("second", "World");
+            .insert("first", "Hello vector users");
+        event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -261,7 +261,7 @@ mod tests {
         let mut event = Event::from("message");
         event
             .as_mut_log()
-            .insert_explicit("only", "Hello vector users");
+            .insert("only", "Hello vector users");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn concat_start_gt_len() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert_explicit("only", "World");
+        event.as_mut_log().insert("only", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn concat_end_gt_len() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert_explicit("only", "World");
+        event.as_mut_log().insert("only", "World");
 
         let mut transform = Concat::new(
             "out".into(),

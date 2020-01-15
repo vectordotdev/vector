@@ -226,7 +226,7 @@ mod tests {
     fn splunk_encode_event_json() {
         let host = "host".into();
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert_explicit("key", "value");
+        event.as_mut_log().insert("key", "value");
 
         let bytes = encode_event(&host, event, &Encoding::Json).unwrap();
 
@@ -348,7 +348,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("asdf", "hello");
+        event.as_mut_log().insert("asdf", "hello");
 
         let pump = sink.send(event);
 
@@ -380,10 +380,10 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("asdf", "hello");
+        event.as_mut_log().insert("asdf", "hello");
         event
             .as_mut_log()
-            .insert_implicit("host", "example.com:1234");
+            .insert("host", "example.com:1234");
 
         let pump = sink.send(event);
 
@@ -422,13 +422,13 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("asdf", "hello");
+        event.as_mut_log().insert("asdf", "hello");
         event
             .as_mut_log()
-            .insert_implicit("host", "example.com:1234");
+            .insert("host", "example.com:1234");
         event
             .as_mut_log()
-            .insert_explicit("roast", "beef.example.com:1234");
+            .insert("roast", "beef.example.com:1234");
 
         let pump = sink.send(event);
 

@@ -187,7 +187,7 @@ impl Transform for DockerMessageTransformer {
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
                 Ok(timestamp) => {
-                    log.insert_explicit(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
+                    log.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
                 }
                 Err(error) => {
                     debug!(message = "Non rfc3339 timestamp.", %error, rate_limit_secs = 10);
@@ -201,7 +201,7 @@ impl Transform for DockerMessageTransformer {
 
         // log -> message
         if let Some(message) = log.remove(&self.atom_log) {
-            log.insert_explicit(event::MESSAGE.clone(), message);
+            log.insert(event::MESSAGE.clone(), message);
         } else {
             debug!(message = "Missing field.", field = %self.atom_log, rate_limit_secs = 10);
             return None;
@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn file_path_transform() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("file","/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned());
+        event.as_mut_log().insert("file","/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned());
 
         let mut transform = transform_file().unwrap();
 
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn cri_message_transform() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
+        event.as_mut_log().insert(
             "message",
             "2019-10-02T13:21:36.927620189+02:00 stdout F 12".to_owned(),
         );
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn pod_uid_transform_namespace_name_uid() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
+        event.as_mut_log().insert(
             "pod_uid",
             "kube-system_kube-apiserver-minikube_8f6b5d95bfe4bcf4cc9c4d8435f0668b".to_owned(),
         );
@@ -437,7 +437,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event
             .as_mut_log()
-            .insert_explicit("pod_uid", "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned());
+            .insert("pod_uid", "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned());
 
         let mut transform = transform_pod_uid().unwrap();
 

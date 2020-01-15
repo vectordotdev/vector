@@ -113,7 +113,7 @@ fn kafka_source(
                                     return Err(error!(message = "Cannot extract key", error = ?e))
                                 }
                                 Some(Ok(key)) => {
-                                    event.as_mut_log().insert_implicit(key_field.clone(), key)
+                                    event.as_mut_log().insert(key_field.clone(), key)
                                 }
                             }
                         }

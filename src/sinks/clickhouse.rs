@@ -264,7 +264,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event
             .as_mut_log()
-            .insert_explicit("host", "example.com");
+            .insert("host", "example.com");
 
         let pump = sink.send(input_event.clone());
         rt.block_on(pump).unwrap();
@@ -305,7 +305,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event
             .as_mut_log()
-            .insert_explicit("host", "example.com");
+            .insert("host", "example.com");
 
         let pump = sink.send(input_event.clone());
 

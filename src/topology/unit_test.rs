@@ -175,7 +175,7 @@ fn build_unit_test(
                         TestInputValue::Integer(i) => (*i).into(),
                         TestInputValue::Float(f) => (*f).into(),
                     };
-                    event.as_mut_log().insert_explicit(path.to_owned(), value);
+                    event.as_mut_log().insert(path.to_owned(), value);
                 }
                 event
             } else {

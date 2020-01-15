@@ -76,7 +76,7 @@ impl Transform for Geoip {
                 if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
                     if let Some(city_names) = data.city.and_then(|c| c.names) {
                         if let Some(city_name_en) = city_names.get("en") {
-                            event.as_mut_log().insert_explicit(
+                            event.as_mut_log().insert(
                                 Atom::from(format!("{}.city_name", target_field)),
                                 ValueKind::from(city_name_en.to_string()),
                             );
@@ -85,7 +85,7 @@ impl Transform for Geoip {
 
                     let continent_code = data.continent.and_then(|c| c.code);
                     if let Some(continent_code) = continent_code {
-                        event.as_mut_log().insert_explicit(
+                        event.as_mut_log().insert(
                             Atom::from(format!("{}.continent_code", target_field)),
                             ValueKind::from(continent_code),
                         );
@@ -93,7 +93,7 @@ impl Transform for Geoip {
 
                     let iso_code = data.country.and_then(|cy| cy.iso_code);
                     if let Some(iso_code) = iso_code {
-                        event.as_mut_log().insert_explicit(
+                        event.as_mut_log().insert(
                             Atom::from(format!("{}.country_code", target_field)),
                             ValueKind::from(iso_code),
                         );
@@ -101,7 +101,7 @@ impl Transform for Geoip {
 
                     let time_zone = data.location.clone().and_then(|loc| loc.time_zone);
                     if let Some(time_zone) = time_zone {
-                        event.as_mut_log().insert_explicit(
+                        event.as_mut_log().insert(
                             Atom::from(format!("{}.timezone", target_field)),
                             ValueKind::from(time_zone),
                         );
@@ -109,7 +109,7 @@ impl Transform for Geoip {
 
                     let latitude = data.location.clone().and_then(|loc| loc.latitude);
                     if let Some(latitude) = latitude {
-                        event.as_mut_log().insert_explicit(
+                        event.as_mut_log().insert(
                             Atom::from(format!("{}.latitude", target_field)),
                             ValueKind::from(latitude.to_string()),
                         );
@@ -117,7 +117,7 @@ impl Transform for Geoip {
 
                     let longitude = data.location.clone().and_then(|loc| loc.longitude);
                     if let Some(longitude) = longitude {
-                        event.as_mut_log().insert_explicit(
+                        event.as_mut_log().insert(
                             Atom::from(format!("{}.longitude", target_field)),
                             ValueKind::from(longitude.to_string()),
                         );
@@ -125,7 +125,7 @@ impl Transform for Geoip {
 
                     let postal_code = data.postal.clone().and_then(|p| p.code);
                     if let Some(postal_code) = postal_code {
-                        event.as_mut_log().insert_explicit(
+                        event.as_mut_log().insert(
                             Atom::from(format!("{}.postal_code", target_field)),
                             ValueKind::from(postal_code),
                         );
@@ -160,7 +160,7 @@ impl Transform for Geoip {
             let e = event.as_mut_log();
             let d = e.get(&Atom::from(field.to_string()));
             match d {
-                None => e.insert_explicit(Atom::from(field.to_string()), ValueKind::from("")),
+                None => e.insert(Atom::from(field.to_string()), ValueKind::from("")),
                 _ => (),
             }
         }

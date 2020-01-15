@@ -269,8 +269,8 @@ mod tests {
     fn kafka_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("key", "value");
-        event.as_mut_log().insert_explicit("foo", "bar");
+        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert("foo", "bar");
 
         let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
 

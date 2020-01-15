@@ -100,7 +100,7 @@ impl Transform for Split {
                 .zip(split(value, self.separator.clone()).into_iter())
             {
                 match conversion.convert(value.as_bytes().into()) {
-                    Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
+                    Ok(value) => event.as_mut_log().insert(name.clone(), value),
                     Err(error) => {
                         debug!(
                             message = "Could not convert types.",

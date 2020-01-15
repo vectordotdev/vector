@@ -141,7 +141,7 @@ impl Transform for RegexParser {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: ValueKind = value[start..end].into();
                         match conversion.convert(capture) {
-                            Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
+                            Ok(value) => event.as_mut_log().insert(name.clone(), value),
                             Err(error) => {
                                 debug!(
                                     message = "Could not convert types.",

@@ -66,10 +66,10 @@ mod tests {
         let mut event = Event::from("message");
         event
             .as_mut_log()
-            .insert_explicit("to_remove", "some value");
+            .insert("to_remove", "some value");
         event
             .as_mut_log()
-            .insert_explicit("to_keep", "another value");
+            .insert("to_keep", "another value");
 
         let mut transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 

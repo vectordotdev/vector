@@ -357,7 +357,7 @@ mod tests {
     fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("key", "value");
+        event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
@@ -492,7 +492,7 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log().insert_implicit("i", format!("{}", i));
+            e.as_mut_log().insert("i", format!("{}", i));
             e
         });
 
@@ -544,7 +544,7 @@ mod integration_tests {
 
             let i = if i < 10 { 1 } else { 2 };
 
-            event.as_mut_log().insert_implicit("i", format!("{}", i));
+            event.as_mut_log().insert("i", format!("{}", i));
             tx.send(event).unwrap();
         }
 
@@ -555,7 +555,7 @@ mod integration_tests {
 
             let i = if i < 5 { 2 } else { 3 };
 
-            event.as_mut_log().insert_implicit("i", format!("{}", i));
+            event.as_mut_log().insert("i", format!("{}", i));
             tx.send(event).unwrap();
         }
 

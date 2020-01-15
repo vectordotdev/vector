@@ -358,7 +358,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert_explicit(event::MESSAGE.clone(), string)
+                    log.insert(event::MESSAGE.clone(), string)
                 }
                 Value::Object(mut object) => {
                     if object.is_empty() {
@@ -387,9 +387,9 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process channel field
         if let Some(Value::String(guid)) = json.get_mut("channel").map(Value::take) {
-            log.insert_explicit(CHANNEL.clone(), guid);
+            log.insert(CHANNEL.clone(), guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert_explicit(CHANNEL.clone(), guid.clone());
+            log.insert(CHANNEL.clone(), guid.clone());
         }
 
         // Process fields field
@@ -422,8 +422,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert_explicit(event::TIMESTAMP.clone(), time),
-            Time::Now(time) => log.insert_implicit(event::TIMESTAMP.clone(), time),
+            Time::Provided(time) => log.insert(event::TIMESTAMP.clone(), time),
+            Time::Now(time) => log.insert(event::TIMESTAMP.clone(), time),
         }
 
         // Extract default extracted fields
@@ -473,7 +473,7 @@ impl DefaultExtractor {
 
         // Add data field
         if let Some(index) = self.value.as_ref() {
-            log.insert_explicit(self.to_field.clone(), index.clone());
+            log.insert(self.to_field.clone(), index.clone());
         }
     }
 }
@@ -514,18 +514,18 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert_explicit(event::MESSAGE.clone(), message);
+    log.insert(event::MESSAGE.clone(), message);
 
     // Add channel
-    log.insert_explicit(CHANNEL.clone(), channel.as_bytes());
+    log.insert(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert_explicit(event::HOST.clone(), host.as_bytes());
+        log.insert(event::HOST.clone(), host.as_bytes());
     }
 
     // Add timestamp
-    log.insert_implicit(event::TIMESTAMP.clone(), Utc::now());
+    log.insert(event::TIMESTAMP.clone(), Utc::now());
 
     Ok(event)
 }
@@ -830,8 +830,8 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("greeting", "hello");
-        event.as_mut_log().insert_explicit("name", "bob");
+        event.as_mut_log().insert("greeting", "hello");
+        event.as_mut_log().insert("name", "bob");
 
         let pump = sink.send(event);
         let _ = rt.block_on(pump).unwrap();
@@ -847,7 +847,7 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("line", "hello");
+        event.as_mut_log().insert("line", "hello");
 
         let pump = sink.send(event);
         let _ = rt.block_on(pump).unwrap();

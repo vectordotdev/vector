@@ -102,20 +102,7 @@ impl LogEvent {
         self.fields.remove(key).map(|v| v.value)
     }
 
-    pub fn insert_explicit<K, V>(&mut self, key: K, value: V)
-    where
-        K: Into<Atom>,
-        V: Into<ValueKind>,
-    {
-        self.fields.insert(
-            key.into(),
-            Value {
-                value: value.into(),
-            },
-        );
-    }
-
-    pub fn insert_implicit<K, V>(&mut self, key: K, value: V)
+    pub fn insert<K, V>(&mut self, key: K, value: V)
     where
         K: Into<Atom>,
         V: Into<ValueKind>,
@@ -532,10 +519,8 @@ impl From<Bytes> for Event {
             fields: HashMap::new(),
         });
 
-        event.as_mut_log().insert_implicit(MESSAGE.clone(), message);
-        event
-            .as_mut_log()
-            .insert_implicit(TIMESTAMP.clone(), Utc::now());
+        event.as_mut_log().insert(MESSAGE.clone(), message);
+        event.as_mut_log().insert(TIMESTAMP.clone(), Utc::now());
 
         event
     }
@@ -603,8 +588,8 @@ mod test {
     #[test]
     fn serialization() {
         let mut event = Event::from("raw log line");
-        event.as_mut_log().insert_explicit("foo", "bar");
-        event.as_mut_log().insert_explicit("bar", "baz");
+        event.as_mut_log().insert("foo", "bar");
+        event.as_mut_log().insert("bar", "baz");
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
@@ -625,12 +610,10 @@ mod test {
         use serde_json::json;
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert_explicit("int", 4);
-        event.as_mut_log().insert_explicit("float", 5.5);
-        event.as_mut_log().insert_explicit("bool", true);
-        event
-            .as_mut_log()
-            .insert_explicit("string", "thisisastring");
+        event.as_mut_log().insert("int", 4);
+        event.as_mut_log().insert("float", 5.5);
+        event.as_mut_log().insert("bool", true);
+        event.as_mut_log().insert("string", "thisisastring");
 
         let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(map["float"], json!(5.5));
@@ -645,10 +628,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert_explicit("Ke$ha", "It's going down, I'm yelling timber");
+            .insert("Ke$ha", "It's going down, I'm yelling timber");
         event
             .as_mut_log()
-            .insert_implicit("Pitbull", "The bigger they are, the harder they fall");
+            .insert("Pitbull", "The bigger they are, the harder they fall");
 
         let all = event
             .as_log()

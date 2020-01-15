@@ -87,7 +87,7 @@ impl Transform for GrokParser {
                     let name: Atom = name.into();
                     let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
-                        Ok(value) => event.insert_explicit(name, value),
+                        Ok(value) => event.insert(name, value),
                         Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
