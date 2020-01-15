@@ -1,34 +1,61 @@
 use super::Transform;
 use crate::{
+    dns::Resolver,
     event::{Event, ValueKind},
     runtime::TaskExecutor,
+    sinks::util::{
+        http::https_client,
+        tls::{TlsOptions, TlsSettings},
+    },
     sources::kubernetes::POD_UID,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use bytes::Bytes;
 use futures03::{compat::Future01CompatExt, stream::StreamExt};
-use k8s_openapi::api::core::v1::PodSpec;
-use kube::{
-    self,
-    api::{Api, WatchEvent},
-    client::APIClient,
+use http::{
+    header,
+    uri::{self, Scheme},
+    Request, Response, Uri,
 };
+use hyper::Body;
+use k8s_openapi::{self as k8s, api::core::v1 as api, api::core::v1::Pod, ListResponse};
+// use kube::{
+//     self,
+//     api::{Api, WatchEvent},
+//     client::APIClient,
+// };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::fs;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
+// use
 
+// ************************ Defined by Kubernetes *********************** //
+/// File in which Kubernetes stores service account token.
+const TOKEN_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+
+/// Enviroment variable which contains host to Kubernetes API.
+const HOST_ENV: &str = "KUBERNETES_SERVICE_HOST";
+
+/// Enviroment variable which contains port to Kubernetes API.
+const PORT_ENV: &str = "KUBERNETES_SERVICE_PORT";
+
+/// Path to certificate bundle
+const CRT_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+
+// *********************** Defined by Vector **************************** //
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
 /// Prefiks for all metadata fields
 const FIELD_PREFIX: &str = "pod.";
 
-type Pod = kube::api::Object<PodSpec, k8s_openapi::api::core::v1::PodStatus>;
+// type Pod = kube::api::Object<PodSpec, k8s_openapi::api::core::v1::PodStatus>;
 
 /// Shared HashMap of (key,value) fields for pods on this node.
 /// Joined on key - pod_uid field.
@@ -38,28 +65,46 @@ type JoinMap = Arc<RwLock<HashMap<Bytes, Vec<(Atom, ValueKind)>>>>;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub struct KubernetesPodMetadataConfig {
+pub struct KubePodMetadata {
     #[serde(default = "default_fields")]
     fields: Vec<String>,
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<KubernetesPodMetadataConfig>("kubernetes_pod_metadata")
+    TransformDescription::new_without_default::<KubePodMetadata>("kubernetes_pod_metadata")
 }
 
 #[typetag::serde(name = "kubernetes_pod_metadata")]
-impl TransformConfig for KubernetesPodMetadataConfig {
+impl TransformConfig for KubePodMetadata {
     fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         // Main idea is to have a background task which will premptively
         // acquire metadata for all pods on this node, and then maintaine that.
 
-        let client = MetadataClient::new(node_name()?, self)?;
+        // TODO: use real Resolver
+        let client = MetadataClient::new(
+            self,
+            Resolver::new(vec![], exec.clone()).unwrap(),
+            node_name()?,
+            account_token(),
+            kubernetes_host()?,
+            kubernetes_port()?,
+            tls_settings()?,
+        );
+        // Dry run
+        client.list_pods_request()?;
+
         let transform = KubernetesPodMetadata {
             metadata: client.metadata(),
         };
+
         exec.spawn_std(async move {
-            info!(message = "Running MetadataClient.");
-            client.run().await;
+            match client.run().await {
+                Ok(_) => unreachable!(),
+                Err(error) => error!(
+                    message = "Kubernetes background metadata client errored.",
+                    ?error
+                ),
+            }
         });
 
         Ok(Box::new(transform))
@@ -82,34 +127,91 @@ fn node_name() -> Result<String, BuildError> {
     std::env::var(NODE_NAME_ENV).map_err(|_| BuildError::MissingNodeName { env: NODE_NAME_ENV })
 }
 
+fn kubernetes_host() -> Result<String, BuildError> {
+    std::env::var(HOST_ENV).map_err(|_| BuildError::NoKubernetes {
+        reason: "Missing Kubernetes API host",
+    })
+}
+
+fn kubernetes_port() -> Result<String, BuildError> {
+    std::env::var(PORT_ENV).map_err(|_| BuildError::NoKubernetes {
+        reason: "Missing Kubernetes API port",
+    })
+}
+
+fn account_token() -> Option<String> {
+    fs::read(TOKEN_PATH)
+        .map_err(|error| {
+            warn!(
+                message = "Missing Kubernetes service account token file.",
+                ?error
+            )
+        })
+        .ok()
+        .and_then(|bytes| {
+            String::from_utf8(bytes)
+                .map_err(|error| {
+                    warn!(
+                        message = "Kubernetes service account token file is not a valid utf8.",
+                        ?error
+                    )
+                })
+                .ok()
+        })
+}
+
+fn tls_settings() -> Result<TlsSettings, BuildError> {
+    let mut options = TlsOptions::default();
+    options.crt_path = Some(CRT_PATH.into());
+    TlsSettings::from_options(&Some(options)).context(TlsError)
+}
+
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Kube errored: {}", source))]
-    KubeError { source: kube::Error },
+    #[snafu(display("{}, probably because Vector isn't in Kubernetes Pod.", reason))]
+    NoKubernetes { reason: &'static str },
+    #[snafu(display("TLS construction errored {}", source))]
+    TlsError { source: crate::Error },
+    #[snafu(display("Http client construction errored {}", source))]
+    HttpError { source: crate::Error },
     #[snafu(display(
         "Missing environment variable {:?} containing node name `spec.nodeName`.",
         env
     ))]
     MissingNodeName { env: &'static str },
+    #[snafu(display("Failed constructing request: {}", source))]
+    K8SOpenapiError { source: k8s::RequestError },
+    #[snafu(display("Uri gotten from Kubernetes is invalid: {}", source))]
+    InvalidUri { source: uri::InvalidUri },
+    #[snafu(display("Uri gotten from Kubernetes is invalid: {}", source))]
+    InvalidUriParts { source: uri::InvalidUriParts },
+    #[snafu(display("Authorization token gotten from Kubernetes is invalid: {}", source))]
+    InvalidToken { source: header::InvalidHeaderValue },
 }
 
 struct MetadataClient {
     fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>>,
     metadata: JoinMap,
     node_name: String,
-    kube: APIClient,
+    token: Option<String>,
+    host: String,
+    port: String,
+    tls_settings: TlsSettings,
+    resolver: Resolver,
 }
 
 impl MetadataClient {
     /// Stream of regets of list.
     fn new(
+        trans_config: &KubePodMetadata,
+        resolver: Resolver,
         node_name: String,
-        trans_config: &KubernetesPodMetadataConfig,
-    ) -> Result<Self, BuildError> {
-        let config = kube::config::incluster_config().context(KubeError)?;
-        let kube = APIClient::new(config);
-
-        Ok(Self {
+        token: Option<String>,
+        host: String,
+        port: String,
+        tls_settings: TlsSettings,
+    ) -> Self {
+        Self {
             fields: all_fields()
                 .into_iter()
                 .filter(|(key, _)| {
@@ -122,8 +224,12 @@ impl MetadataClient {
                 .collect(),
             metadata: Arc::default(),
             node_name,
-            kube,
-        })
+            token,
+            host,
+            port,
+            tls_settings,
+            resolver,
+        }
     }
 
     fn field_selector(&self) -> String {
@@ -134,90 +240,171 @@ impl MetadataClient {
         self.metadata.clone()
     }
 
-    async fn run(self) {
+    /// Errors only if it would always error
+    async fn run(self) -> Result<(), BuildError> {
         loop {
             // Initialize metadata
-            let list_version = self.fetch_pod_list().await;
+            let list_version = self.fetch_pod_list().await?;
 
             self.watch(list_version).await;
         }
     }
 
     /// list_version
-    async fn fetch_pod_list(&self) -> String {
+    ///  /// Ok(list_version)
+    async fn fetch_pod_list(&self) -> Result<String, BuildError> {
         loop {
             info!(message = "Fetching Pod list.");
-            let r_list = Api::v1Pod(self.kube.clone())
-                .list(&kube::api::ListParams {
-                    field_selector: Some(self.field_selector()),
-                    ..Default::default()
-                })
-                .await;
+            // Construct client
+            let client = https_client(self.resolver.clone(), self.tls_settings.clone())
+                .context(HttpError)?;
 
-            match r_list {
-                Ok(pod_list) => {
-                    for pod in pod_list.items {
-                        let _ = self.update(pod);
-                    }
+            match client.request(self.list_pods_request()?).compat().await {
+                Ok(response) => {
+                    match <ListResponse<Pod> as Response>::try_from_parts(
+                        response.status(),
+                        response.body(),
+                    ) {
+                        ListResponse::Ok(pod_list) => {
+                            for pod in pod_list.items {
+                                let _ = self.update(pod);
+                            }
 
-                    if let Some(version) = pod_list.metadata.resourceVersion {
-                        info!("Inital pod list fetched.");
-                        return version;
+                            if let Some(metadata) = pod_list.metadata {
+                                if let Some(version) = metadata.resource_version {
+                                    return Ok(version);
+                                }
+                                debug!(message = "Missing pod list resource_version.")
+                            } else {
+                                debug!(message = "Missing pod list metadata.")
+                            }
+                        }
+                        ListResponse::Other(Ok(_)) => {
+                            debug!(message = "Received wrong object from Kubernetes API.")
+                        }
+                        ListResponse::Other(Err(error)) => {
+                            debug!(message = "Failed parsing list of Pods.",error = ?error)
+                        }
                     }
-                    debug!(message = "Missing pod list resource_version.")
                 }
                 Err(error) => debug!(message = "Failed fetching list of Pods.",error = ?error),
             }
 
-            // Retry with delay
             info!(message = "Waiting.");
+            // Retry with delay
             Delay::new(Instant::now() + Duration::from_secs(1))
                 .compat()
                 .await
                 .expect("Timer not set.");
-
             info!(message = "Re fetching list of Pods.");
         }
     }
+    // async fn fetch_pod_list(&self) -> String {
+    //     loop {
+    //         info!(message = "Fetching Pod list.");
+    //         let r_list = Api::v1Pod(self.kube.clone())
+    //             .list(&kube::api::ListParams {
+    //                 field_selector: Some(self.field_selector()),
+    //                 ..Default::default()
+    //             })
+    //             .await;
+
+    //         match r_list {
+    //             Ok(pod_list) => {
+    //                 for pod in pod_list.items {
+    //                     let _ = self.update(pod);
+    //                 }
+
+    //                 if let Some(version) = pod_list.metadata.resourceVersion {
+    //                     info!("Inital pod list fetched.");
+    //                     return version;
+    //                 }
+    //                 debug!(message = "Missing pod list resource_version.")
+    //             }
+    //             Err(error) => debug!(message = "Failed fetching list of Pods.",error = ?error),
+    //         }
+
+    //         // Retry with delay
+    //         info!(message = "Waiting.");
+    //         Delay::new(Instant::now() + Duration::from_secs(1))
+    //             .compat()
+    //             .await
+    //             .expect("Timer not set.");
+
+    //         info!(message = "Re fetching list of Pods.");
+    //     }
+    // }
 
     async fn watch(&self, version: String) {
         // Watch
-        let informer = kube::api::Informer::new(Api::v1Pod(self.kube.clone()))
-            .fields(&self.field_selector())
-            .init_from(version);
+        // let informer = kube::api::Informer::new(Api::v1Pod(self.kube.clone()))
+        //     .fields(&self.field_selector())
+        //     .init_from(version);
+        // .compat();
 
-        info!("Watching pod list.");
-        loop {
-            let polled = informer.poll().await;
-            match polled {
-                Ok(stream) => {
-                    for event in stream.collect::<Vec<_>>().await {
-                        match event {
-                            Ok(WatchEvent::Added(pod)) | Ok(WatchEvent::Modified(pod)) => {
-                                let _ = self.update(pod);
-                            }
-                            // We do nothing, as there could still exist unprocessed logs from that pod.
-                            Ok(WatchEvent::Deleted(_)) => (),
-                            Ok(WatchEvent::Error(error)) => {
-                                // 410 Gone, restart with new list.
-                                if error.code == 410 {
-                                    warn!("Reseting metadata because: {:?}", error);
-                                    return;
-                                }
-                                debug!(?error)
-                            }
-                            Err(error) => debug!(?error),
-                        }
-                    }
-                }
-                Err(error) => debug!(?error),
-            }
+        // info!("Watching pod list.");
+        // loop {
+        //     let polled = informer.await;
+        //     match polled {
+        //         Ok(stream) => {
+        //             for event in stream.collect::<Vec<_>>().await {
+        //                 match event {
+        //                     Ok(WatchEvent::Added(pod)) | Ok(WatchEvent::Modified(pod)) => {
+        //                         let _ = self.update(pod);
+        //                     }
+        //                     // We do nothing, as there could still exist unprocessed logs from that pod.
+        //                     Ok(WatchEvent::Deleted(_)) => (),
+        //                     Ok(WatchEvent::Error(error)) => {
+        //                         // 410 Gone, restart with new list.
+        //                         if error.code == 410 {
+        //                             warn!("Reseting metadata because: {:?}", error);
+        //                             return;
+        //                         }
+        //                         debug!(?error)
+        //                     }
+        //                     Err(error) => debug!(?error),
+        //                 }
+        //             }
+        //         }
+        //         Err(error) => debug!(?error),
+        //     }
+        // }
+    }
+
+    fn list_pods_request(&self) -> Result<Request<Body>, BuildError> {
+        // Prepare request
+        let (mut request, _) = api::Pod::list_pod_for_all_namespaces(k8s::ListOptional {
+            field_selector: Some(self.field_selector().as_str()),
+            ..Default::default()
+        })
+        .context(K8SOpenapiError)?;
+
+        // Authorize
+        if let Some(token) = self.token.as_ref() {
+            request.headers_mut().insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
+                    .context(InvalidToken)?,
+            );
         }
+
+        // Fill Uri
+        let mut uri = request.uri().clone().into_parts();
+        uri.scheme = Some(Scheme::HTTPS);
+        uri.authority = Some(
+            format!("{}:{}", self.host, self.port)
+                .parse()
+                .context(InvalidUri)?,
+        );
+        *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
+
+        let (parts, body) = request.into_parts();
+        Ok(Request::from_parts(parts, body.into()))
     }
 
     fn update(&self, pod: Pod) -> Option<()> {
         trace!(message = "Trying to update Pod metadata.");
-        let uid: Bytes = pod.metadata.uid.as_ref()?.as_str().into();
+        let uid: Bytes = pod.metadata.as_ref()?.uid.as_ref()?.as_str().into();
 
         let fields = self.fields(pod);
 
@@ -272,27 +459,29 @@ fn all_fields() -> Vec<(
 )> {
     vec![
         // ------------------------ ObjectMeta ------------------------ //
-        field("name", |pod| Some(pod.metadata.name.clone())),
-        field("namespace", |pod| pod.metadata.namespace.clone()),
-        field("creation_timestamp", |pod| {
-            pod.metadata.creation_timestamp.clone().map(|time| time.0)
+        field("name", |pod| pod.metadata.as_ref()?.name.clone()),
+        field("namespace", |pod| pod.metadata.as_ref()?.namespace.clone()),
+        // field("creation_timestamp", |pod| {
+        //     pod.metadata.creation_timestamp.clone().map(|time| time.0)
+        // }),
+        // field("deletion_timestamp", |pod| {
+        //     pod.metadata.deletion_timestamp.clone().map(|time| time.0)
+        // }),
+        collection_field("labels", |pod| pod.metadata.as_ref()?.labels.as_ref()),
+        collection_field("annotations", |pod| {
+            pod.metadata.as_ref()?.annotations.as_ref()
         }),
-        field("deletion_timestamp", |pod| {
-            pod.metadata.deletion_timestamp.clone().map(|time| time.0)
-        }),
-        collection_field("labels", |pod| &pod.metadata.labels),
-        collection_field("annotations", |pod| &pod.metadata.annotations),
         // ------------------------ PodSpec ------------------------ //
-        field("node_name", |pod| pod.spec.node_name.clone()),
-        field("hostname", |pod| pod.spec.hostname.clone()),
-        field("priority", |pod| pod.spec.priority),
+        field("node_name", |pod| pod.spec.as_ref()?.node_name.clone()),
+        field("hostname", |pod| pod.spec.as_ref()?.hostname.clone()),
+        field("priority", |pod| pod.spec.as_ref()?.priority),
         field("priority_class_name", |pod| {
-            pod.spec.priority_class_name.clone()
+            pod.spec.as_ref()?.priority_class_name.clone()
         }),
         field("service_account_name", |pod| {
-            pod.spec.service_account_name.clone()
+            pod.spec.as_ref()?.service_account_name.clone()
         }),
-        field("subdomain", |pod| pod.spec.subdomain.clone()),
+        field("subdomain", |pod| pod.spec.as_ref()?.subdomain.clone()),
         // ------------------------ PodStatus ------------------------ //
         field("host_ip", |pod| pod.status.as_ref()?.host_ip.clone()),
         field("ip", |pod| pod.status.as_ref()?.pod_ip.clone()),
@@ -317,7 +506,7 @@ fn field<T: Into<ValueKind>>(
 
 fn collection_field(
     name: &'static str,
-    fun: impl Fn(&Pod) -> &BTreeMap<String, String> + Send + Sync + 'static,
+    fun: impl Fn(&Pod) -> Option<&BTreeMap<String, String>> + Send + Sync + 'static,
 ) -> (
     &'static str,
     Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
@@ -325,9 +514,12 @@ fn collection_field(
     let prefix_key = with_prefix(name) + ".";
     let fun = move |pod: &Pod| {
         fun(pod)
-            .iter()
-            .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
-            .collect()
+            .map(|map| {
+                map.iter()
+                    .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
+                    .collect()
+            })
+            .unwrap_or_default()
     };
     (name, Box::new(fun) as Box<_>)
 }
