@@ -98,10 +98,6 @@ impl LogEvent {
         self.fields.contains_key(key)
     }
 
-    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
-        self.fields.remove(key).map(|v| v.value)
-    }
-
     pub fn insert_explicit<K, V>(&mut self, key: K, value: V)
     where
         K: Into<Atom>,
@@ -536,7 +532,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .into_value(&MESSAGE)
+            .remove(&MESSAGE)
             .unwrap()
             .as_bytes()
             .to_vec()
