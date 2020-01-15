@@ -7,7 +7,7 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -19,16 +19,15 @@ pub struct MergeConfig {
     pub partial_event_marker: Atom,
     /// Fields to merge. The values of these fields will be merged into the
     /// first partial event. Fields not specified here will be ignored.
-    /// Merging process takes the first buffered partial event, then loops over
-    /// the rest of them and merges in the fields from each buffered partial
-    /// event.
-    /// Finally, the non-partial event fields are merged in, producing the
-    /// resulting merged event.
+    /// Merging process takes the first partial event and the base, then it
+    /// merges in the fields from each successive partial event, until a
+    /// non-partial event arrives. Finally, the non-partial event fields are
+    /// merged in, producing the resulting merged event.
     pub merge_fields: Vec<Atom>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
-    /// separate partial event queue. Should be used to prevent events from
-    /// unrelated sources from mixing together, as this affects partial message
-    /// processing.
+    /// separate partial event merging state. Should be used to prevent events
+    /// from unrelated sources from mixing together, as this affects partial
+    /// event processing.
     pub stream_discriminant_fields: Vec<Atom>,
 }
 
@@ -70,7 +69,7 @@ pub struct Merge {
     partial_event_marker: Atom,
     merge_fields: Vec<Atom>,
     stream_discriminant_fields: Vec<Atom>,
-    partial_event_queues: HashMap<Discriminant, Vec<Event>>,
+    partial_event_merge_states: HashMap<Discriminant, PartialEventMergeState>,
 }
 
 impl From<MergeConfig> for Merge {
@@ -79,7 +78,7 @@ impl From<MergeConfig> for Merge {
             partial_event_marker: config.partial_event_marker,
             merge_fields: config.merge_fields,
             stream_discriminant_fields: config.stream_discriminant_fields,
-            partial_event_queues: HashMap::new(),
+            partial_event_merge_states: HashMap::new(),
         }
     }
 }
@@ -105,47 +104,78 @@ impl Transform for Merge {
             .remove(&self.partial_event_marker)
             .is_some()
         {
-            let partial_event_queue = self.partial_event_queues.entry(discriminant).or_default();
-            partial_event_queue.push(event);
+            // We got a perial event. Initialize a partial event merging state
+            // if there's none available yet, or extend the existing one by
+            // merging the incoming partial event in.
+            match self.partial_event_merge_states.entry(discriminant) {
+                hash_map::Entry::Vacant(entry) => {
+                    entry.insert(PartialEventMergeState::new(event));
+                }
+                hash_map::Entry::Occupied(mut entry) => {
+                    entry
+                        .get_mut()
+                        .merge_in_next_partial_event(event, &self.merge_fields);
+                }
+            }
+
+            // Do not emit the event yet.
             return None;
         }
 
-        // Prepare a partial event queue if avaialbe (that is guaranteed to be
-        // non-empty if available), or short circut to returning the event,
-        // since there are no pending events if there's no queue.
-        let mut partial_event_queue = match self.partial_event_queues.remove(&discriminant) {
-            Some(partial_event_queue) => partial_event_queue,
+        // We got non-partial event. Attempt to get a partial event merge
+        // state. If it's empty then we don't have a backlog of partail events
+        // so we just return the event as is. Otherwise we proceed to merge in
+        // the final non-partial event to the partial event merge state - and
+        // then return the merged event.
+        let partial_event_merge_state = match self.partial_event_merge_states.remove(&discriminant)
+        {
+            Some(partial_event_merge_state) => partial_event_merge_state,
             None => return Some(event),
         };
 
-        // Prepare a convenience alias for `self.merge_fields`.
-        let merge_fields = self.merge_fields.as_slice();
-
-        // Merge all partial events.
-        let mut drain = partial_event_queue.drain(..);
-
-        // Take the first partial event. We know this won't fail cause the
-        // partial event queue is guaranteed to be non-empty here.
-        let mut merged_event = drain.next().unwrap();
-
-        // Merge all partial events into the merge event.
-        for partial_event in drain {
-            merge_log_event(
-                &mut merged_event.as_mut_log(),
-                partial_event.into_log(),
-                merge_fields,
-            );
-        }
-
-        // Merge the current event last.
-        merge_log_event(
-            &mut merged_event.as_mut_log(),
-            event.into_log(),
-            merge_fields,
-        );
+        // Merge in the final non-partial event and consume the merge state in
+        // exchange for the merged event.
+        let merged_event =
+            partial_event_merge_state.merge_in_non_partial_event(event, &self.merge_fields);
 
         // Return the merged event.
         Some(merged_event)
+    }
+}
+
+/// Encapsulates the inductive events merging algorithm.
+///
+/// In the future, this might be extended by various counters (the number of
+/// events that contributed to the current merge event for instance, or the
+/// event size) to support curcut breaker logic.
+#[derive(Debug)]
+struct PartialEventMergeState {
+    /// Intermediate event we merge into.
+    intermediate_merged_event: Event,
+}
+
+impl PartialEventMergeState {
+    /// Initialize the algorithm with a first partial event.
+    pub fn new(first_partial_event: Event) -> Self {
+        Self {
+            intermediate_merged_event: first_partial_event,
+        }
+    }
+
+    /// Merge the incoming partial event in.
+    pub fn merge_in_next_partial_event(&mut self, incoming: Event, merge_fields: &[Atom]) {
+        merge_log_event(
+            &mut self.intermediate_merged_event.as_mut_log(),
+            incoming.into_log(),
+            merge_fields,
+        );
+    }
+
+    /// Merge the final, non-partial event in and return the resulting (merged)
+    /// event.
+    pub fn merge_in_non_partial_event(mut self, incoming: Event, merge_fields: &[Atom]) -> Event {
+        self.merge_in_next_partial_event(incoming, merge_fields);
+        self.intermediate_merged_event
     }
 }
 
