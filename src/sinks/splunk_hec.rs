@@ -381,9 +381,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        event
-            .as_mut_log()
-            .insert("host", "example.com:1234");
+        event.as_mut_log().insert("host", "example.com:1234");
 
         let pump = sink.send(event);
 
@@ -423,12 +421,8 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        event
-            .as_mut_log()
-            .insert("host", "example.com:1234");
-        event
-            .as_mut_log()
-            .insert("roast", "beef.example.com:1234");
+        event.as_mut_log().insert("host", "example.com:1234");
+        event.as_mut_log().insert("roast", "beef.example.com:1234");
 
         let pump = sink.send(event);
 

@@ -177,9 +177,7 @@ impl Transform for Concat {
         }
 
         let content = content_vec.join(self.joiner.as_bytes());
-        event
-            .as_mut_log()
-            .insert(self.target.clone(), content);
+        event.as_mut_log().insert(self.target.clone(), content);
 
         Some(event)
     }
@@ -194,9 +192,7 @@ mod tests {
     #[test]
     fn concat_to_from() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert("first", "Hello vector users");
+        event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
@@ -215,9 +211,7 @@ mod tests {
     #[test]
     fn concat_full() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert("first", "Hello vector users");
+        event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
@@ -235,9 +229,7 @@ mod tests {
     #[test]
     fn concat_mixed() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert("first", "Hello vector users");
+        event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
@@ -259,9 +251,7 @@ mod tests {
     #[test]
     fn concat_start_gt_end() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert("only", "Hello vector users");
+        event.as_mut_log().insert("only", "Hello vector users");
 
         let mut transform = Concat::new(
             "out".into(),

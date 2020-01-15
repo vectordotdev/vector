@@ -305,9 +305,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_custom_partition_key_limit() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert("key", random_string(300));
+        event.as_mut_log().insert("key", random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());

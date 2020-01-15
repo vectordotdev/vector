@@ -132,9 +132,7 @@ impl Conversion {
                 let s = String::from_utf8_lossy(&bytes);
                 Value::Float(s.parse::<f64>().with_context(|| FloatParseError { s })?)
             }
-            Conversion::Boolean => {
-                Value::Boolean(parse_bool(&String::from_utf8_lossy(&bytes))?)
-            }
+            Conversion::Boolean => Value::Boolean(parse_bool(&String::from_utf8_lossy(&bytes))?),
 
             Conversion::Timestamp => {
                 Value::Timestamp(parse_timestamp(&String::from_utf8_lossy(&bytes))?)

@@ -361,9 +361,7 @@ mod test {
         event.as_mut_log().insert("foo", "not ignored");
         assert_eq!(cond.check(&event), true);
 
-        event
-            .as_mut_log()
-            .insert("bar", "also not ignored");
+        event.as_mut_log().insert("bar", "also not ignored");
         assert_eq!(cond.check(&event), false);
     }
 }

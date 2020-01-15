@@ -336,9 +336,7 @@ fn create_event(
     }
 
     if let Some(hostname) = &hostname {
-        event
-            .as_mut_log()
-            .insert(host_key, hostname.clone());
+        event.as_mut_log().insert(host_key, hostname.clone());
     }
 
     event
