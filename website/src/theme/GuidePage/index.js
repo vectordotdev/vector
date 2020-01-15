@@ -25,7 +25,7 @@ function GuidePage(props) {
   }
 
   return (
-    <Layout title={metadata.title} description={metadata.description}>
+    <Layout title={metadata.title} description={metadata.description} keywords={metadata.keywords}>
       <article className={styles.blogPost}>
         <header className={classnames('hero', 'domain-bg', styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
