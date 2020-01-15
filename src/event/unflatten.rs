@@ -1,4 +1,4 @@
-use super::{Value, ValueKind};
+use super::Value;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Serialize, Serializer};
@@ -12,7 +12,7 @@ lazy_static! {
 
 #[derive(Debug, Clone, PartialEq)]
 enum MapValue {
-    Value(ValueKind),
+    Value(Value),
     Map(HashMap<Atom, MapValue>),
     Array(Vec<MapValue>),
     Null,
@@ -25,10 +25,7 @@ pub struct Unflatten {
 
 impl From<HashMap<Atom, Value>> for Unflatten {
     fn from(log: HashMap<Atom, Value>) -> Self {
-        let log = log
-            .into_iter()
-            .map(|(k, v)| (k, v.value))
-            .collect::<HashMap<_, _>>();
+        let log = log.into_iter().collect::<HashMap<_, _>>();
 
         // We must wrap the outter map in a MapValue to support
         // the recursive merge.
@@ -207,10 +204,10 @@ pub type ShallowMatch<V> = Option<Vec<(TestMapValue, V)>>;
 impl TestMapValue {
     pub fn equals<V>(&self, theirs: V) -> bool
     where
-        ValueKind: From<V>,
+        Value: From<V>,
     {
         match &self.value {
-            MapValue::Value(ours) => *ours == ValueKind::from(theirs),
+            MapValue::Value(ours) => *ours == Value::from(theirs),
             _ => false,
         }
     }

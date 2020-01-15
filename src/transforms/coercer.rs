@@ -68,7 +68,7 @@ impl Transform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::CoercerConfig;
-    use crate::event::{LogEvent, ValueKind};
+    use crate::event::{LogEvent, Value};
     use crate::{topology::config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
@@ -101,14 +101,14 @@ mod tests {
     #[test]
     fn coercer_converts_valid_fields() {
         let log = parse_it();
-        assert_eq!(log[&"number".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"bool".into()], ValueKind::Boolean(true));
+        assert_eq!(log[&"number".into()], Value::Integer(1234));
+        assert_eq!(log[&"bool".into()], Value::Boolean(true));
     }
 
     #[test]
     fn coercer_leaves_unnamed_fields_as_is() {
         let log = parse_it();
-        assert_eq!(log[&"other".into()], ValueKind::Bytes("no".into()));
+        assert_eq!(log[&"other".into()], Value::Bytes("no".into()));
     }
 
     #[test]

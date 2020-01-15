@@ -2,7 +2,7 @@ mod request;
 
 use crate::{
     dns::Resolver,
-    event::{self, Event, LogEvent, ValueKind},
+    event::{self, Event, LogEvent, Value},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -246,7 +246,7 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
             ts.timestamp_millis()
         } else {
             chrono::Utc::now().timestamp_millis()
@@ -568,7 +568,7 @@ mod tests {
     use super::*;
     use crate::{
         dns::Resolver,
-        event::{self, Event, ValueKind},
+        event::{self, Event, Value},
         region::RegionOrEndpoint,
         test_util::runtime,
     };
@@ -680,7 +680,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(Default::default()).encode_log(event.clone());
 
-        let ts = if let ValueKind::Timestamp(ts) = event[&event::TIMESTAMP] {
+        let ts = if let Value::Timestamp(ts) = event[&event::TIMESTAMP] {
             ts.timestamp_millis()
         } else {
             panic!()

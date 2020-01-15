@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
-    event::{self, ValueKind},
+    event::{self, Value},
     runtime::TaskExecutor,
     template::Template,
     topology::config::{DataType, TransformConfig, TransformDescription},
@@ -142,7 +142,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
     let timestamp = log
         .get(&event::TIMESTAMP)
-        .and_then(ValueKind::as_timestamp)
+        .and_then(Value::as_timestamp)
         .cloned();
 
     match config {

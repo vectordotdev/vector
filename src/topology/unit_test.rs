@@ -1,6 +1,6 @@
 use crate::{
     conditions::Condition,
-    event::{Event, ValueKind},
+    event::{Event, Value},
     runtime::Runtime,
     topology::config::{TestCondition, TestDefinition, TestInputValue},
     transforms::Transform,
@@ -169,7 +169,7 @@ fn build_unit_test(
             if let Some(log_fields) = &definition.input.log_fields {
                 let mut event = Event::from("");
                 for (path, value) in log_fields {
-                    let value: ValueKind = match value {
+                    let value: Value = match value {
                         TestInputValue::String(s) => s.as_bytes().into(),
                         TestInputValue::Boolean(b) => (*b).into(),
                         TestInputValue::Integer(i) => (*i).into(),

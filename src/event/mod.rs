@@ -86,37 +86,28 @@ impl Event {
 }
 
 impl LogEvent {
-    pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
-        self.fields.get(key).map(|v| &v.value)
+    pub fn get(&self, key: &Atom) -> Option<&Value> {
+        self.fields.get(key)
     }
 
-    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut ValueKind> {
-        self.fields.get_mut(key).map(|v| &mut v.value)
+    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
+        self.fields.get_mut(key)
     }
 
     pub fn contains(&self, key: &Atom) -> bool {
         self.fields.contains_key(key)
     }
 
-    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
-        self.fields.remove(key).map(|v| v.value)
-    }
-
     pub fn insert<K, V>(&mut self, key: K, value: V)
     where
         K: Into<Atom>,
-        V: Into<ValueKind>,
+        V: Into<Value>,
     {
-        self.fields.insert(
-            key.into(),
-            Value {
-                value: value.into(),
-            },
-        );
+        self.fields.insert(key.into(), value.into());
     }
 
-    pub fn remove(&mut self, key: &Atom) -> Option<ValueKind> {
-        self.fields.remove(key).map(|v| v.value)
+    pub fn remove(&mut self, key: &Atom) -> Option<Value> {
+        self.fields.remove(key)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
@@ -135,48 +126,27 @@ impl LogEvent {
 }
 
 impl std::ops::Index<&Atom> for LogEvent {
-    type Output = ValueKind;
+    type Output = Value;
 
-    fn index(&self, key: &Atom) -> &ValueKind {
-        &self.fields[key].value
+    fn index(&self, key: &Atom) -> &Value {
+        &self.fields[key]
     }
 }
 
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
-impl<K: Into<Atom>, V: Into<ValueKind>> FromIterator<(K, V)> for LogEvent {
+impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         Self {
             fields: iter
                 .into_iter()
-                .map(|(key, value)| {
-                    (
-                        key.into(),
-                        Value {
-                            value: value.into(),
-                        },
-                    )
-                })
+                .map(|(key, value)| (key.into(), value.into()))
                 .collect(),
         }
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct Value {
-    value: ValueKind,
-}
-
-impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.value.serialize(serializer)
-    }
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum ValueKind {
+pub enum Value {
     Bytes(Bytes),
     Integer(i64),
     Float(f64),
@@ -184,73 +154,73 @@ pub enum ValueKind {
     Timestamp(DateTime<Utc>),
 }
 
-impl Serialize for ValueKind {
+impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match &self {
-            ValueKind::Integer(i) => serializer.serialize_i64(*i),
-            ValueKind::Float(f) => serializer.serialize_f64(*f),
-            ValueKind::Boolean(b) => serializer.serialize_bool(*b),
+            Value::Integer(i) => serializer.serialize_i64(*i),
+            Value::Float(f) => serializer.serialize_f64(*f),
+            Value::Boolean(b) => serializer.serialize_bool(*b),
             _ => serializer.serialize_str(&self.to_string_lossy()),
         }
     }
 }
 
-impl From<Bytes> for ValueKind {
+impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
-        ValueKind::Bytes(bytes)
+        Value::Bytes(bytes)
     }
 }
 
-impl From<Vec<u8>> for ValueKind {
+impl From<Vec<u8>> for Value {
     fn from(bytes: Vec<u8>) -> Self {
-        ValueKind::Bytes(bytes.into())
+        Value::Bytes(bytes.into())
     }
 }
 
-impl From<&[u8]> for ValueKind {
+impl From<&[u8]> for Value {
     fn from(bytes: &[u8]) -> Self {
-        ValueKind::Bytes(bytes.into())
+        Value::Bytes(bytes.into())
     }
 }
 
-impl From<String> for ValueKind {
+impl From<String> for Value {
     fn from(string: String) -> Self {
-        ValueKind::Bytes(string.into())
+        Value::Bytes(string.into())
     }
 }
 
-impl From<&str> for ValueKind {
+impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        ValueKind::Bytes(s.into())
+        Value::Bytes(s.into())
     }
 }
 
-impl From<DateTime<Utc>> for ValueKind {
+impl From<DateTime<Utc>> for Value {
     fn from(timestamp: DateTime<Utc>) -> Self {
-        ValueKind::Timestamp(timestamp)
+        Value::Timestamp(timestamp)
     }
 }
 
-impl From<f32> for ValueKind {
+impl From<f32> for Value {
     fn from(value: f32) -> Self {
-        ValueKind::Float(f64::from(value))
+        Value::Float(f64::from(value))
     }
 }
 
-impl From<f64> for ValueKind {
+impl From<f64> for Value {
     fn from(value: f64) -> Self {
-        ValueKind::Float(value)
+        Value::Float(value)
     }
 }
 
 macro_rules! impl_valuekind_from_integer {
     ($t:ty) => {
-        impl From<$t> for ValueKind {
+        impl From<$t> for Value {
             fn from(value: $t) -> Self {
-                ValueKind::Integer(value as i64)
+                Value::Integer(value as i64)
             }
         }
     };
@@ -262,31 +232,31 @@ impl_valuekind_from_integer!(i16);
 impl_valuekind_from_integer!(i8);
 impl_valuekind_from_integer!(isize);
 
-impl From<bool> for ValueKind {
+impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        ValueKind::Boolean(value)
+        Value::Boolean(value)
     }
 }
 
-impl ValueKind {
+impl Value {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
-            ValueKind::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-            ValueKind::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            ValueKind::Integer(num) => format!("{}", num),
-            ValueKind::Float(num) => format!("{}", num),
-            ValueKind::Boolean(b) => format!("{}", b),
+            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
+            Value::Integer(num) => format!("{}", num),
+            Value::Float(num) => format!("{}", num),
+            Value::Boolean(b) => format!("{}", b),
         }
     }
 
     pub fn as_bytes(&self) -> Bytes {
         match self {
-            ValueKind::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            ValueKind::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            ValueKind::Integer(num) => Bytes::from(format!("{}", num)),
-            ValueKind::Float(num) => Bytes::from(format!("{}", num)),
-            ValueKind::Boolean(b) => Bytes::from(format!("{}", b)),
+            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
+            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
+            Value::Integer(num) => Bytes::from(format!("{}", num)),
+            Value::Float(num) => Bytes::from(format!("{}", num)),
+            Value::Boolean(b) => Bytes::from(format!("{}", b)),
         }
     }
 
@@ -296,7 +266,7 @@ impl ValueKind {
 
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
-            ValueKind::Timestamp(ts) => Some(ts),
+            Value::Timestamp(ts) => Some(ts),
             _ => None,
         }
     }
@@ -307,20 +277,19 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 }
 
 fn decode_value(input: proto::Value) -> Option<Value> {
-    let value = match input.kind {
-        Some(proto::value::Kind::RawBytes(data)) => Some(ValueKind::Bytes(data.into())),
-        Some(proto::value::Kind::Timestamp(ts)) => Some(ValueKind::Timestamp(
+    match input.kind {
+        Some(proto::value::Kind::RawBytes(data)) => Some(Value::Bytes(data.into())),
+        Some(proto::value::Kind::Timestamp(ts)) => Some(Value::Timestamp(
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),
-        Some(proto::value::Kind::Integer(value)) => Some(ValueKind::Integer(value)),
-        Some(proto::value::Kind::Float(value)) => Some(ValueKind::Float(value)),
-        Some(proto::value::Kind::Boolean(value)) => Some(ValueKind::Boolean(value)),
+        Some(proto::value::Kind::Integer(value)) => Some(Value::Integer(value)),
+        Some(proto::value::Kind::Float(value)) => Some(Value::Float(value)),
+        Some(proto::value::Kind::Boolean(value)) => Some(Value::Boolean(value)),
         None => {
             error!("encoded event contains unknown value kind");
             None
         }
-    };
-    value.map(|decoded| Value { value: decoded })
+    }
 }
 
 impl From<proto::EventWrapper> for Event {
@@ -401,23 +370,17 @@ impl From<Event> for proto::EventWrapper {
                     .into_iter()
                     .map(|(k, v)| {
                         let value = proto::Value {
-                            kind: match v.value {
-                                ValueKind::Bytes(b) => {
-                                    Some(proto::value::Kind::RawBytes(b.to_vec()))
-                                }
-                                ValueKind::Timestamp(ts) => {
+                            kind: match v {
+                                Value::Bytes(b) => Some(proto::value::Kind::RawBytes(b.to_vec())),
+                                Value::Timestamp(ts) => {
                                     Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
                                         seconds: ts.timestamp(),
                                         nanos: ts.timestamp_subsec_nanos() as i32,
                                     }))
                                 }
-                                ValueKind::Integer(value) => {
-                                    Some(proto::value::Kind::Integer(value))
-                                }
-                                ValueKind::Float(value) => Some(proto::value::Kind::Float(value)),
-                                ValueKind::Boolean(value) => {
-                                    Some(proto::value::Kind::Boolean(value))
-                                }
+                                Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
+                                Value::Float(value) => Some(proto::value::Kind::Float(value)),
+                                Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
                             },
                         };
                         (k.to_string(), value)
@@ -506,7 +469,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .into_value(&MESSAGE)
+            .remove(&MESSAGE)
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -556,7 +519,7 @@ pub struct FieldsIter<'a> {
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (&'a Atom, &'a ValueKind);
+    type Item = (&'a Atom, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -565,7 +528,7 @@ impl<'a> Iterator for FieldsIter<'a> {
                 None => return None,
             };
 
-            return Some((key, &value.value));
+            return Some((key, &value));
         }
     }
 }

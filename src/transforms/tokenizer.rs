@@ -154,7 +154,7 @@ pub fn parse(input: &str) -> Vec<&str> {
 mod tests {
     use super::parse;
     use super::TokenizerConfig;
-    use crate::event::{LogEvent, ValueKind};
+    use crate::event::{LogEvent, Value};
     use crate::{topology::config::TransformConfig, Event};
     use string_cache::DefaultAtom as Atom;
 
@@ -309,10 +309,10 @@ mod tests {
             &[("flag", "bool"), ("code", "integer"), ("number", "float")],
         );
 
-        assert_eq!(log[&"number".into()], ValueKind::Float(42.3));
-        assert_eq!(log[&"flag".into()], ValueKind::Boolean(true));
-        assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"rest".into()], ValueKind::Bytes("word".into()));
+        assert_eq!(log[&"number".into()], Value::Float(42.3));
+        assert_eq!(log[&"flag".into()], Value::Boolean(true));
+        assert_eq!(log[&"code".into()], Value::Integer(1234));
+        assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
     }
 
     #[test]
@@ -324,8 +324,8 @@ mod tests {
             false,
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         );
-        assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"who".into()], ValueKind::Bytes("-".into()));
-        assert_eq!(log[&"why".into()], ValueKind::Bytes("foo".into()));
+        assert_eq!(log[&"code".into()], Value::Integer(1234));
+        assert_eq!(log[&"who".into()], Value::Bytes("-".into()));
+        assert_eq!(log[&"why".into()], Value::Bytes("foo".into()));
     }
 }

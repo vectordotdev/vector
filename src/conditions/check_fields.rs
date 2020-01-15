@@ -4,7 +4,7 @@ use string_cache::DefaultAtom as Atom;
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::ValueKind,
+    event::Value,
     Event,
 };
 
@@ -47,17 +47,17 @@ impl CheckFieldsPredicate for EqualsPredicate {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| match &self.arg {
                 CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                 CheckFieldsPredicateArg::Integer(i) => match v {
-                    ValueKind::Integer(vi) => *i == *vi,
-                    ValueKind::Float(vf) => *i == *vf as i64,
+                    Value::Integer(vi) => *i == *vi,
+                    Value::Float(vf) => *i == *vf as i64,
                     _ => false,
                 },
                 CheckFieldsPredicateArg::Float(f) => match v {
-                    ValueKind::Float(vf) => *f == *vf,
-                    ValueKind::Integer(vi) => *f == *vi as f64,
+                    Value::Float(vf) => *f == *vf,
+                    Value::Integer(vi) => *f == *vi as f64,
                     _ => false,
                 },
                 CheckFieldsPredicateArg::Boolean(b) => match v {
-                    ValueKind::Boolean(vb) => *b == *vb,
+                    Value::Boolean(vb) => *b == *vb,
                     _ => false,
                 },
             }),

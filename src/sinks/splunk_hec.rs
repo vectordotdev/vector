@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
@@ -180,7 +180,7 @@ fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
-    let timestamp = if let Some(ValueKind::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
+    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
         ts.timestamp()
     } else {
         chrono::Utc::now().timestamp()

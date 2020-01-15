@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, ValueKind},
+    event::{self, Value},
     Event,
 };
 use bytes::Bytes;
@@ -114,7 +114,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
-        Event::Log(log) => log.get(&event::TIMESTAMP).and_then(ValueKind::as_timestamp),
+        Event::Log(log) => log.get(&event::TIMESTAMP).and_then(Value::as_timestamp),
         _ => None,
     };
     if let Some(ts) = timestamp {

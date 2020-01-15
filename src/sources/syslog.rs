@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -278,7 +278,7 @@ fn insert_fields_from_rfc5424(event: &mut Event, parsed: SyslogMessage) {
         log.insert("msgid", msg_id);
     }
     if let Some(proc_id) = parsed.procid {
-        let value: ValueKind = match proc_id {
+        let value: Value = match proc_id {
             PID(pid) => pid.into(),
             Name(name) => name.into(),
         };

@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
@@ -767,11 +767,11 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(Atom, ValueKind)>,
+    labels: Vec<(Atom, Value)>,
     /// name -> String
-    name: ValueKind,
+    name: Value,
     /// image -> String
-    image: ValueKind,
+    image: Value,
     /// created_at
     created_at: DateTime<Utc>,
 }

@@ -2,7 +2,7 @@
 mod test;
 
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     sources::{
         file::{FileConfig, FingerprintingConfig},
         Source,
@@ -92,7 +92,7 @@ impl TimeFilter {
 
     fn filter(&self, event: Event) -> Option<Event> {
         // Only logs created at, or after now are logged.
-        if let Some(ValueKind::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
+        if let Some(Value::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
             if ts < &self.start {
                 trace!(message = "Recieved older log.", from = %ts.to_rfc3339());
                 return None;
@@ -159,7 +159,7 @@ fn parse_message() -> crate::Result<ApplicableTransform> {
 }
 
 fn remove_ending_newline(mut event: Event) -> Event {
-    if let Some(ValueKind::Bytes(msg)) = event.as_mut_log().get_mut(&event::MESSAGE) {
+    if let Some(Value::Bytes(msg)) = event.as_mut_log().get_mut(&event::MESSAGE) {
         if msg.ends_with(&['\n' as u8]) {
             msg.truncate(msg.len() - 1);
         }
@@ -182,7 +182,7 @@ impl Transform for DockerMessageTransformer {
         let log = event.as_mut_log();
 
         // time -> timestamp
-        if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&self.atom_time) {
+        if let Some(Value::Bytes(timestamp_bytes)) = log.remove(&self.atom_time) {
             match DateTime::parse_from_rfc3339(
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
@@ -364,7 +364,7 @@ impl Transform for ApplicableTransform {
 mod tests {
     use super::*;
 
-    fn has<V: Into<ValueKind>>(event: &Event, field: &str, data: V) {
+    fn has<V: Into<Value>>(event: &Event, field: &str, data: V) {
         assert_eq!(
             event
                 .as_log()

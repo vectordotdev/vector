@@ -183,7 +183,7 @@ mod tests {
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
-            event::ValueKind::from("help i'm stuck in an http server"),
+            event::Value::from("help i'm stuck in an http server"),
             event[&event::MESSAGE]
         );
         assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
@@ -228,7 +228,7 @@ mod tests {
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
-            event::ValueKind::from("i am the only field"),
+            event::Value::from("i am the only field"),
             event[&event::MESSAGE]
         );
         assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
