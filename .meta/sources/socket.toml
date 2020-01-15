@@ -15,17 +15,28 @@ required = true
 description = "The type of socket to use."
 
 [sources.socket.options.mode.enum]
-tcp = "The TCP protocol."
-udp = "The UDP protocol."
+tcp = "TCP Socket."
+udp = "UDP Socket."
+unix = "Unix Domain Socket."
 
 [sources.socket.options.address]
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#3"]
+null = false
+relevant_when = {mode = ["tcp", "udp"]}
 required = true
 description = """The address to listen for connections on, \
-or "systemd#N" to use the Nth socket passed by systemd socket activation. \
-Valid for "tcp" and "udp" sockets.\
+or "systemd#N" to use the Nth socket passed by systemd socket activation.\
+"""
+
+[sources.socket.options.path]
+type = "string"
+common = true
+examples = ["/path/to/socket"]
+null = false
+relevant_when = {mode = "unix"}
+description = """The unix socket path. *This should be absolute path*.\
 """
 
 [sources.socket.options.host_key]
@@ -36,8 +47,7 @@ required = true
 default = "host"
 section = "context"
 description = """\
-The key name added to each event representing the current host. \
-Valid for "tcp" and "udp" sockets.\
+The key name added to each event representing the current host.\
 """
 
 [sources.socket.options.max_length]
@@ -45,8 +55,7 @@ type = "int"
 default = 102400
 unit = "bytes"
 description = """\
-The maximum bytes size of incoming messages before they are discarded. \
-Valid for "tcp" and "udp" sockets.\
+The maximum bytes size of incoming messages before they are discarded.\
 """
 
 [sources.socket.options.shutdown_timeout_secs]
@@ -54,9 +63,9 @@ type = "int"
 default = 30
 required = true
 unit = "seconds"
+relevant_when = {mode = "tcp"}
 description = """\
-The timeout before a connection is forcefully closed during shutdown. \
-Valid only for "tcp" sockets.\
+The timeout before a connection is forcefully closed during shutdown.\
 """
 
 [[sources.socket.output.log.examples]]

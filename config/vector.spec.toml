@@ -409,10 +409,11 @@ dns_servers = ["0.0.0.0:53"]
   type = "socket"
 
   # The address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
+  # socket passed by systemd socket activation.
   #
   # * required
   # * type: string
+  # * relevant when mode = "tcp" or mode = "udp"
   address = "0.0.0.0:9000"
   address = "systemd"
   address = "systemd#3"
@@ -421,21 +422,21 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  # * enum: "tcp" or "udp"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
   mode = "udp"
+  mode = "unix"
 
-  # The timeout before a connection is forcefully closed during shutdown. Valid
-  # only for "tcp" sockets.
+  # The timeout before a connection is forcefully closed during shutdown.
   #
   # * required
   # * default: 30
   # * type: int
   # * unit: seconds
+  # * relevant when mode = "tcp"
   shutdown_timeout_secs = 30
 
-  # The maximum bytes size of incoming messages before they are discarded. Valid
-  # for "tcp" and "udp" sockets.
+  # The maximum bytes size of incoming messages before they are discarded.
   #
   # * optional
   # * default: 102400
@@ -443,12 +444,19 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_length = 102400
 
+  # The unix socket path. *This should be absolute path*.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when mode = "unix"
+  path = "/path/to/socket"
+
   #
   # Context
   #
 
-  # The key name added to each event representing the current host. Valid for
-  # "tcp" and "udp" sockets.
+  # The key name added to each event representing the current host.
   #
   # * required
   # * default: "host"
