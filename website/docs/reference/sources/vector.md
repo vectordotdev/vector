@@ -23,35 +23,9 @@ The Vector `vector` source ingests data through another upstream [`vector` sink]
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[sources.my_source_id]
-  type = "vector" # must be: "vector"
-  address = "0.0.0.0:9000" # example
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sources.my_source_id]
@@ -62,10 +36,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL
   shutdown_timeout_secs = 30 # default, seconds
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -82,7 +52,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#1"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -100,15 +69,14 @@ The TCP address to listen for connections on, or "systemd#N" to use the Nth sock
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
   name={"shutdown_timeout_secs"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}

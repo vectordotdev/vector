@@ -52,10 +52,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["0.0.0.0:8088"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -75,7 +74,6 @@ The address to accept connections on.
   enumValues={null}
   examples={["A94A8FE5CCB19BA61C4C08"]}
   name={"token"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}

@@ -31,15 +31,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
   name={"DOCKER_HOST"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -54,15 +53,14 @@ The docker host to connect to.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
   name={"DOCKER_VERIFY_TLS"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -77,15 +75,14 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["debug"]}
   name={"LOG"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -100,15 +97,14 @@ Sets Vector's log level. See the [log section in the monitoring guide][docs.moni
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[true,false]}
   name={"RUST_BACKTRACE"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}

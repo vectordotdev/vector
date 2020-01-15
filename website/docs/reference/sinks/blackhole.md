@@ -84,7 +84,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -107,7 +106,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={null}
   examples={[1000]}
   name={"print_amount"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

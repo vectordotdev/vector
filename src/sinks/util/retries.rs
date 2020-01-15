@@ -1,7 +1,10 @@
 use crate::Error;
 use futures::{try_ready, Async, Future, Poll};
-use std::borrow::Cow;
-use std::time::{Duration, Instant};
+use std::{
+    borrow::Cow,
+    cmp,
+    time::{Duration, Instant},
+};
 use tokio::timer::Delay;
 use tower::{retry::Policy, timeout::error::Elapsed};
 
@@ -19,7 +22,9 @@ pub trait RetryLogic: Clone {
 #[derive(Debug, Clone)]
 pub struct FixedRetryPolicy<L> {
     remaining_attempts: usize,
-    backoff: Duration,
+    previous_duration: Duration,
+    current_duration: Duration,
+    max_duration: Duration,
     logic: L,
 }
 
@@ -29,24 +34,43 @@ pub struct RetryPolicyFuture<L: RetryLogic> {
 }
 
 impl<L: RetryLogic> FixedRetryPolicy<L> {
-    pub fn new(remaining_attempts: usize, backoff: Duration, logic: L) -> Self {
+    pub fn new(
+        remaining_attempts: usize,
+        initial_backoff: Duration,
+        max_duration: Duration,
+        logic: L,
+    ) -> Self {
         FixedRetryPolicy {
             remaining_attempts,
-            backoff,
+            previous_duration: Duration::from_secs(0),
+            current_duration: initial_backoff,
+            max_duration,
             logic,
         }
     }
 
+    fn advance(&self) -> FixedRetryPolicy<L> {
+        let next_duration: Duration = self.previous_duration + self.current_duration;
+
+        FixedRetryPolicy {
+            remaining_attempts: self.remaining_attempts - 1,
+            previous_duration: self.current_duration,
+            current_duration: cmp::min(next_duration, self.max_duration),
+            max_duration: self.max_duration,
+            logic: self.logic.clone(),
+        }
+    }
+
+    fn backoff(&self) -> Duration {
+        self.current_duration
+    }
+
     fn build_retry(&self) -> RetryPolicyFuture<L> {
-        let policy = FixedRetryPolicy::new(
-            self.remaining_attempts - 1,
-            self.backoff,
-            self.logic.clone(),
-        );
-        let next = Instant::now() + self.backoff;
+        let policy = self.advance();
+        let next = Instant::now() + policy.backoff();
         let delay = Delay::new(next);
 
-        debug!(message = "retrying request.", delay_ms = %self.backoff.as_millis());
+        debug!(message = "retrying request.", delay_ms = %self.backoff().as_millis());
         RetryPolicyFuture { delay, policy }
     }
 }
@@ -131,7 +155,12 @@ mod tests {
         clock::mock(|clock| {
             trace_init();
 
-            let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), SvcRetryLogic);
+            let policy = FixedRetryPolicy::new(
+                5,
+                Duration::from_secs(1),
+                Duration::from_secs(10),
+                SvcRetryLogic,
+            );
 
             let (service, mut handle) = mock::pair();
             let mut svc = Retry::new(policy, service);
@@ -154,7 +183,12 @@ mod tests {
     fn service_error_no_retry() {
         trace_init();
 
-        let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), SvcRetryLogic);
+        let policy = FixedRetryPolicy::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            SvcRetryLogic,
+        );
 
         let (service, mut handle) = mock::pair();
         let mut svc = Retry::new(policy, service);
@@ -171,7 +205,12 @@ mod tests {
         clock::mock(|clock| {
             trace_init();
 
-            let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), SvcRetryLogic);
+            let policy = FixedRetryPolicy::new(
+                5,
+                Duration::from_secs(1),
+                Duration::from_secs(10),
+                SvcRetryLogic,
+            );
 
             let (service, mut handle) = mock::pair();
             let mut svc = Retry::new(policy, service);
@@ -188,6 +227,38 @@ mod tests {
             assert_request_eq!(handle, "hello").send_response("world");
             assert_eq!(fut.wait().unwrap(), "world");
         });
+    }
+
+    #[test]
+    fn backoff_grows_to_max() {
+        let mut policy = FixedRetryPolicy::new(
+            10,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            SvcRetryLogic,
+        );
+        assert_eq!(Duration::from_secs(1), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(1), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(2), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(3), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(5), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(8), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(10), policy.backoff());
+
+        policy = policy.advance();
+        assert_eq!(Duration::from_secs(10), policy.backoff());
     }
 
     #[derive(Debug, Clone)]

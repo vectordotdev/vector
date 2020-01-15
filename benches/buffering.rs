@@ -36,7 +36,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         ),
                     );
                     config.sinks["out"].buffer = BufferConfig::Memory {
-                        num_items: 100,
+                        max_events: 100,
                         when_full: Default::default(),
                     };
 

@@ -49,8 +49,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   include = ["/var/log/nginx/*.log"] # example
 
   # OPTIONAL - General
-  ignore_older = 86400 # example, no default, seconds
+  glob_minimum_cooldown = 1000 # default, milliseconds
   start_at_beginning = false # default
+  ignore_older = 86400 # example, no default, seconds
+
+  # OPTIONAL - Context
+  file_key = "file" # default
+  host_key = "host" # default
 
   # OPTIONAL - Priority
   oldest_first = false # default
@@ -68,12 +73,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   include = ["/var/log/nginx/*.log"] # example
 
   # OPTIONAL - General
+  glob_minimum_cooldown = 1000 # default, milliseconds
+  start_at_beginning = false # default
   data_dir = "/var/lib/vector" # example, no default
   exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
-  glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # example, no default, seconds
   max_line_bytes = 102400 # default, bytes
-  start_at_beginning = false # default
 
   # OPTIONAL - Context
   file_key = "file" # default
@@ -89,9 +94,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
-    strategy = "checksum" # default, enum
     fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
     ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
+    strategy = "checksum" # default, enum
 ```
 
 </TabItem>
@@ -113,7 +118,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["/var/lib/vector"]}
   name={"data_dir"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -136,7 +140,6 @@ The directory used to persist file checkpoint positions. By default, the [global
   enumValues={null}
   examples={[["/var/log/nginx/*.[0-9]*.log"]]}
   name={"exclude"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -154,15 +157,14 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes pre
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"file"}
   enumValues={null}
   examples={["file"]}
   name={"file_key"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -182,7 +184,6 @@ The key name added to each event with the full path of the file. See [Context](#
   enumValues={null}
   examples={[]}
   name={"fingerprinting"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -199,15 +200,14 @@ Configuration for how the file source should identify files.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={256}
   enumValues={null}
   examples={[256]}
   name={"fingerprint_bytes"}
-  nullable={false}
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -222,15 +222,14 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={0}
   enumValues={null}
   examples={[0]}
   name={"ignored_header_bytes"}
-  nullable={false}
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -250,7 +249,6 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
   enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
   examples={["checksum","device_and_inode"]}
   name={"strategy"}
-  nullable={true}
   path={"fingerprinting"}
   relevantWhen={null}
   required={false}
@@ -273,15 +271,14 @@ The strategy used to uniquely identify files. This is important for [checkpointi
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
   name={"glob_minimum_cooldown"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
@@ -296,15 +293,14 @@ Delay between file discovery calls. This controls the interval at which Vector s
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
   name={"host_key"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -324,7 +320,6 @@ The key name added to each event representing the current host. See [Context](#c
   enumValues={null}
   examples={[86400]}
   name={"ignore_older"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -347,7 +342,6 @@ Ignore files with a data modification date that does not exceed this age.
   enumValues={null}
   examples={[["/var/log/nginx/*.log"]]}
   name={"include"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -370,7 +364,6 @@ Array of file patterns to include. [Globbing](#globbing) is supported. See [File
   enumValues={null}
   examples={[102400]}
   name={"max_line_bytes"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -393,7 +386,6 @@ The maximum number of a bytes a line can contain before being discarded. This pr
   enumValues={null}
   examples={[2048]}
   name={"max_read_bytes"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -416,7 +408,6 @@ An approximate limit on the amount of data read from a single file at a given ti
   enumValues={null}
   examples={["^(INFO|ERROR)"]}
   name={"message_start_indicator"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -439,7 +430,6 @@ When present, Vector will aggregate multiple lines into a single event, using th
   enumValues={null}
   examples={[1000]}
   name={"multi_line_timeout"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -462,7 +452,6 @@ When [`message_start_indicator`](#message_start_indicator) is present, this sets
   enumValues={null}
   examples={[false,true]}
   name={"oldest_first"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -485,10 +474,9 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
   enumValues={null}
   examples={[false,true]}
   name={"start_at_beginning"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -496,7 +484,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
 
 ### start_at_beginning
 
-When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
+For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint.  See [Read Position](#read-position) for more info.
 
 
 </Field>

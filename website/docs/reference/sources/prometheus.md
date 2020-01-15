@@ -49,7 +49,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["http://localhost:9090"]]}
   name={"hosts"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -72,7 +71,6 @@ Host addresses to scrape metrics from.
   enumValues={null}
   examples={[1]}
   name={"scrape_interval_secs"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

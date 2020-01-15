@@ -102,11 +102,14 @@ const sinks = [
 ]
 
 function Diagram({className, height, width}) {
-  let shuffledSources = sources.sort(() => 0.5 - Math.random());
-  let selectedSources = shuffledSources.slice(0, 3);
+  // let shuffledSources = sources.sort(() => 0.5 - Math.random());
+  // let selectedSources = shuffledSources.slice(0, 3);
 
-  let shuffledSinks = sinks.sort(() => 0.5 - Math.random());
-  let selectedSinks = shuffledSinks.slice(0, 3);
+  // let shuffledSinks = sinks.sort(() => 0.5 - Math.random());
+  // let selectedSinks = shuffledSinks.slice(0, 3);
+
+  let selectedSources = [sources[1], sources[3], sources[5]];
+  let selectedSinks = [sinks[0], sinks[1], sinks[6]];
 
   const [_, updateState] = useState();
   const defaultXPosition = 7;

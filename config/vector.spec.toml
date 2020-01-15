@@ -67,6 +67,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"]
 
+  # A list of image names to match against. If not provided, all images will be
+  # included.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  include_images = ["my_image_name", "httpd", "redis"]
+
   # A list of container object labels to match against when filtering running
   # containers. This should follow the described label's synatx in docker object
   # labels docs.
@@ -90,11 +98,30 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "file"
   type = "file"
 
+  # Delay between file discovery calls. This controls the interval at which
+  # Vector searches for files.
+  #
+  # * required
+  # * default: 1000
+  # * type: int
+  # * unit: milliseconds
+  glob_minimum_cooldown = 1000
+
   # Array of file patterns to include. Globbing is supported.
   #
   # * required
   # * type: [string]
   include = ["/var/log/nginx/*.log"]
+
+  # For files with a stored checkpoint at startup, setting this option to `true`
+  # will tell Vector to read from the beginning of the file instead of the stored
+  # checkpoint.
+  #
+  # * required
+  # * default: false
+  # * type: bool
+  start_at_beginning = false
+  start_at_beginning = true
 
   # The directory used to persist file checkpoint positions. By default, the
   # global `data_dir` option is used. Please make sure the Vector project has
@@ -113,15 +140,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   exclude = ["/var/log/nginx/*.[0-9]*.log"]
 
-  # Delay between file discovery calls. This controls the interval at which
-  # Vector searches for files.
-  #
-  # * optional
-  # * default: 1000
-  # * type: int
-  # * unit: milliseconds
-  glob_minimum_cooldown = 1000
-
   # Ignore files with a data modification date that does not exceed this age.
   #
   # * optional
@@ -139,29 +157,20 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_line_bytes = 102400
 
-  # When `true` Vector will read from the beginning of new files, when `false`
-  # Vector will only read new data added to the file.
-  #
-  # * optional
-  # * default: false
-  # * type: bool
-  start_at_beginning = false
-  start_at_beginning = true
-
   #
   # Context
   #
 
   # The key name added to each event with the full path of the file.
   #
-  # * optional
+  # * required
   # * default: "file"
   # * type: string
   file_key = "file"
 
   # The key name added to each event representing the current host.
   #
-  # * optional
+  # * required
   # * default: "host"
   # * type: string
   host_key = "host"
@@ -218,20 +227,10 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.file.fingerprinting]
-    # The strategy used to uniquely identify files. This is important for
-    # checkpointing when file rotation is used.
-    #
-    # * optional
-    # * default: "checksum"
-    # * type: string
-    # * enum: "checksum" or "device_and_inode"
-    strategy = "checksum"
-    strategy = "device_and_inode"
-
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     #
-    # * optional
+    # * required
     # * default: 256
     # * type: int
     # * unit: bytes
@@ -241,12 +240,22 @@ dns_servers = ["0.0.0.0:53"]
     # The number of bytes to skip ahead (or ignore) when generating a unique
     # fingerprint. This is helpful if all files share a common header.
     #
-    # * optional
+    # * required
     # * default: 0
     # * type: int
     # * unit: bytes
     # * relevant when strategy = "checksum"
     ignored_header_bytes = 0
+
+    # The strategy used to uniquely identify files. This is important for
+    # checkpointing when file rotation is used.
+    #
+    # * optional
+    # * default: "checksum"
+    # * type: string
+    # * enum: "checksum" or "device_and_inode"
+    strategy = "checksum"
+    strategy = "device_and_inode"
 
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
@@ -418,12 +427,14 @@ dns_servers = ["0.0.0.0:53"]
   mode = "udp"
   mode = "unix"
 
-  # The unix socket path. *This should be absolute path*.
+  # The timeout before a connection is forcefully closed during shutdown.
   #
   # * required
-  # * type: string
-  # * relevant when mode = "unix"
-  path = "/path/to/socket"
+  # * default: 30
+  # * type: int
+  # * unit: seconds
+  # * relevant when mode = "tcp"
+  shutdown_timeout_secs = 30
 
   # The maximum bytes size of incoming messages before they are discarded.
   #
@@ -433,14 +444,13 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_length = 102400
 
-  # The timeout before a connection is forcefully closed during shutdown.
+  # The unix socket path. *This should be absolute path*.
   #
   # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  # * relevant when mode = "tcp"
-  shutdown_timeout_secs = 30
+  # * no default
+  # * type: string
+  # * relevant when mode = "unix"
+  path = "/path/to/socket"
 
   #
   # Context
@@ -448,7 +458,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The key name added to each event representing the current host.
   #
-  # * optional
+  # * required
   # * default: "host"
   # * type: string
   host_key = "host"
@@ -465,7 +475,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The address to accept connections on.
   #
-  # * optional
+  # * required
   # * default: "0.0.0.0:8088"
   # * type: string
   address = "0.0.0.0:8088"
@@ -524,7 +534,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The key name added to each event representing the current host.
   #
-  # * optional
+  # * required
   # * default: "host"
   # * type: string
   host_key = "host"
@@ -585,7 +595,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The key name added to each event representing the current host.
   #
-  # * optional
+  # * required
   # * default: "host"
   # * type: string
   host_key = "host"
@@ -611,7 +621,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The timeout before a connection is forcefully closed during shutdown.
   #
-  # * optional
+  # * required
   # * default: 30
   # * type: int
   # * unit: seconds
@@ -713,7 +723,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The target field to strip ANSI characters from.
   #
-  # * optional
+  # * required
   # * default: "message"
   # * type: string
   field = "message"
@@ -791,7 +801,8 @@ dns_servers = ["0.0.0.0:53"]
     # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     #
-    # * required
+    # * optional
+    # * no default
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
     status = "int"
@@ -825,21 +836,21 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   items = ["fist[..3]", "second[-5..]", "third[3..6]"]
 
-  # The name for the new label.
-  #
-  # * required
-  # * type: string
-  target = "dest_field_name"
-
   # The string that is used to join all items.
   #
-  # * optional
+  # * required
   # * default: " "
   # * type: string
   joiner = " "
   joiner = ","
   joiner = "_"
   joiner = "+"
+
+  # The name for the new label.
+  #
+  # * required
+  # * type: string
+  target = "dest_field_name"
 
 # Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]
@@ -905,7 +916,7 @@ dns_servers = ["0.0.0.0:53"]
   # The default field to insert the resulting GeoIP data into. See output for
   # more info.
   #
-  # * optional
+  # * required
   # * default: "geoip"
   # * type: string
   target = "geoip"
@@ -930,15 +941,9 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The Grok pattern
-  #
-  # * required
-  # * type: string
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
   # If `true` will drop the specified `field` after parsing.
   #
-  # * optional
+  # * required
   # * default: true
   # * type: bool
   drop_field = true
@@ -946,10 +951,16 @@ dns_servers = ["0.0.0.0:53"]
 
   # The log field to execute the `pattern` against. Must be a `string` value.
   #
-  # * optional
+  # * required
   # * default: "message"
   # * type: string
   field = "message"
+
+  # The Grok pattern
+  #
+  # * required
+  # * type: string
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
   #
   # Types
@@ -960,7 +971,8 @@ dns_servers = ["0.0.0.0:53"]
     # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     #
-    # * required
+    # * optional
+    # * no default
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
     status = "int"
@@ -987,6 +999,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # If the specified `field` should be dropped (removed) after parsing.
+  #
+  # * required
+  # * default: true
+  # * type: bool
+  drop_field = true
+  drop_field = false
+
   # If `true` events with invalid JSON will be dropped, otherwise the event will
   # be kept and passed through.
   #
@@ -994,17 +1014,9 @@ dns_servers = ["0.0.0.0:53"]
   # * type: bool
   drop_invalid = true
 
-  # If the specified `field` should be dropped (removed) after parsing.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  drop_field = true
-  drop_field = false
-
   # The log field to decode as JSON. Must be a `string` value type.
   #
-  # * optional
+  # * required
   # * default: "message"
   # * type: string
   field = "message"
@@ -1068,22 +1080,22 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     field = "duration"
 
+    # If `true` the metric will be incremented by the `field` value. If `false` the
+    # metric will be incremented by 1 regardless of the `field` value.
+    #
+    # * required
+    # * default: false
+    # * type: bool
+    # * relevant when type = "counter"
+    increment_by_value = false
+    increment_by_value = true
+
     # The name of the metric. Defaults to `<field>_total` for `counter` and
     # `<field>` for `gauge`.
     #
     # * required
     # * type: string
     name = "duration_total"
-
-    # If `true` the metric will be incremented by the `field` value. If `false` the
-    # metric will be incremented by 1 regardless of the `field` value.
-    #
-    # * optional
-    # * default: false
-    # * type: bool
-    # * relevant when type = "counter"
-    increment_by_value = false
-    increment_by_value = true
 
     [transforms.log_to_metric.metrics.tags]
       # Key/value pairs representing metric tags. Environment variables and field
@@ -1155,15 +1167,9 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The Regular Expression to apply. Do not include the leading or trailing `/`.
-  #
-  # * required
-  # * type: string
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
-
   # If the specified `field` should be dropped (removed) after parsing.
   #
-  # * optional
+  # * required
   # * default: true
   # * type: bool
   drop_field = true
@@ -1171,10 +1177,16 @@ end
 
   # The log field to parse.
   #
-  # * optional
+  # * required
   # * default: "message"
   # * type: string
   field = "message"
+
+  # The Regular Expression to apply. Do not include the leading or trailing `/`.
+  #
+  # * required
+  # * type: string
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
   #
   # Types
@@ -1185,7 +1197,8 @@ end
     # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     #
-    # * required
+    # * optional
+    # * no default
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
     status = "int"
@@ -1293,15 +1306,9 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The field names assigned to the resulting tokens, in order.
-  #
-  # * required
-  # * type: [string]
-  field_names = ["timestamp", "level", "message"]
-
   # If `true` the `field` will be dropped after parsing.
   #
-  # * optional
+  # * required
   # * default: true
   # * type: bool
   drop_field = true
@@ -1309,15 +1316,21 @@ end
 
   # The field to apply the split on.
   #
-  # * optional
+  # * required
   # * default: "message"
   # * type: string
   field = "message"
 
+  # The field names assigned to the resulting tokens, in order.
+  #
+  # * required
+  # * type: [string]
+  field_names = ["timestamp", "level", "message"]
+
   # The separator to split the field on. If no separator is given, it will split
   # on whitespace.
   #
-  # * optional
+  # * required
   # * default: "whitespace"
   # * type: [string]
   separator = ","
@@ -1331,7 +1344,8 @@ end
     # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     #
-    # * required
+    # * optional
+    # * no default
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
     status = "int"
@@ -1362,15 +1376,9 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The log field names assigned to the resulting tokens, in order.
-  #
-  # * required
-  # * type: [string]
-  field_names = ["timestamp", "level", "message"]
-
   # If `true` the `field` will be dropped after parsing.
   #
-  # * optional
+  # * required
   # * default: true
   # * type: bool
   drop_field = true
@@ -1378,10 +1386,16 @@ end
 
   # The log field to tokenize.
   #
-  # * optional
+  # * required
   # * default: "message"
   # * type: string
   field = "message"
+
+  # The log field names assigned to the resulting tokens, in order.
+  #
+  # * required
+  # * type: [string]
+  field_names = ["timestamp", "level", "message"]
 
   #
   # Types
@@ -1392,7 +1406,8 @@ end
     # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.
     #
-    # * required
+    # * optional
+    # * no default
     # * type: string
     # * enum: "bool", "float", "int", "string", and "timestamp"
     status = "int"
@@ -1483,84 +1498,33 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
+  [sinks.aws_cloudwatch_logs.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_events = 1049000
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -1577,6 +1541,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1586,15 +1559,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -1603,6 +1567,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.aws_cloudwatch_logs.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
 # Streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
@@ -1686,84 +1714,33 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
+  [sinks.aws_kinesis_firehose.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: bytes
+    max_events = 500
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -1780,6 +1757,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1789,15 +1775,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -1806,6 +1783,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.aws_kinesis_firehose.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
 # Batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
@@ -1860,84 +1901,33 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
+  [sinks.aws_kinesis_streams.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: bytes
+    max_events = 500
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -1954,6 +1944,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -1963,15 +1962,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -1980,6 +1970,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.aws_kinesis_streams.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
 # Batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint.
 [sinks.aws_s3]
@@ -2015,11 +2069,13 @@ end
   compression = "gzip"
   compression = "none"
 
-  # The AWS region of the target S3 bucket.
+  # The endpoint of the target S3 bucket. Either "endpoint" or "region" must be
+  # specified.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
-  region = "us-east-1"
+  endpoint = "https://s3.us-east-1.amazonaws.com"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2029,37 +2085,13 @@ end
   healthcheck = true
   healthcheck = false
 
+  # The AWS region of the target S3 bucket. Either "region" or "endpoint" must be
+  # specified.
   #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
+  # * optional
+  # * no default
   # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 10490000
-  # * type: int
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 300
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 300
+  region = "us-east-1"
 
   #
   # Object Names
@@ -2068,7 +2100,7 @@ end
   # Whether or not to append a UUID v4 token to the end of the file. This ensures
   # there are no name collisions high volume use cases.
   #
-  # * optional
+  # * required
   # * default: true
   # * type: bool
   filename_append_uuid = true
@@ -2076,7 +2108,7 @@ end
 
   # The extension to use in the object name.
   #
-  # * optional
+  # * required
   # * default: "log"
   # * type: string
   filename_extension = "log"
@@ -2084,7 +2116,7 @@ end
   # The format of the resulting object file name. `strftime` specifiers are
   # supported.
   #
-  # * optional
+  # * required
   # * default: "%s"
   # * type: string
   filename_time_format = "%s"
@@ -2102,57 +2134,38 @@ end
   key_prefix = "application_id={{ application_id }}/date=%F/"
 
   #
-  # Requests
+  # requests
   #
 
-  # The maximum number of in-flight requests allowed at any given time.
+  # The encoding format used to serialize the events before outputting.
   #
   # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
+  # * no default
+  # * type: string
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
 
-  # The window used for the `request_rate_limit_num` option
   #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
+  # Batch
+  #
 
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
+  [sinks.aws_s3.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
 
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 300
 
   #
   # Buffer
@@ -2169,6 +2182,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2178,15 +2200,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -2195,6 +2208,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.aws_s3.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
 # Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
@@ -2275,79 +2352,6 @@ end
   healthcheck = false
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 9223372036854775807
-  # * type: int
-  request_retry_attempts = 9223372036854775807
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  #
   # requests
   #
 
@@ -2361,14 +2365,22 @@ end
   compression = "gzip"
 
   #
-  # Basic auth
+  # Auth
   #
 
-  [sinks.clickhouse.basic_auth]
+  [sinks.clickhouse.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
+
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -2376,8 +2388,30 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.clickhouse.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -2394,6 +2428,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2403,15 +2446,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -2420,6 +2454,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.clickhouse.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 9223372036854775807
+    # * type: int
+    retry_attempts = 9223372036854775807
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
   #
   # Tls
@@ -2499,6 +2597,15 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The standard stream to write to.
+  #
+  # * required
+  # * default: "stdout"
+  # * type: string
+  # * enum: "stdout" or "stderr"
+  target = "stdout"
+  target = "stderr"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -2507,22 +2614,14 @@ end
   healthcheck = true
   healthcheck = false
 
-  # The standard stream to write to.
-  #
-  # * optional
-  # * default: "stdout"
-  # * type: string
-  # * enum: "stdout" or "stderr"
-  target = "stdout"
-  target = "stderr"
-
   #
   # requests
   #
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -2577,77 +2676,89 @@ end
   host = "https://api.datadoghq.eu"
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 20
-  # * type: int
-  # * unit: bytes
-  batch_size = 20
+  [sinks.datadog_metrics.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 20
+    # * type: int
+    # * unit: bytes
+    max_events = 20
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
-  # Requests
+  # Request
   #
 
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
+  [sinks.datadog_metrics.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
 
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
 
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
 
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
 
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
 
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 60
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 60
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
 
 # Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 [sinks.elasticsearch]
@@ -2673,10 +2784,18 @@ end
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
   # Elasticsearch has removed it.
   #
-  # * optional
+  # * required
   # * default: "_doc"
   # * type: string
   doc_type = "_doc"
+
+  # Index name to write events to.
+  #
+  # * required
+  # * default: "vector-%F"
+  # * type: string
+  index = "application-{{ application_id }}-%Y-%m-%d"
+  index = "vector-%Y-%m-%d"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2693,14 +2812,6 @@ end
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
-
-  # Index name to write events to.
-  #
-  # * optional
-  # * default: "vector-%F"
-  # * type: string
-  index = "application-{{ application_id }}-%Y-%m-%d"
-  index = "vector-%Y-%m-%d"
 
   # The provider of the Elasticsearch service. This is used to properly
   # authenticate with the Elasticsearch cluster. For example, authentication for
@@ -2723,87 +2834,23 @@ end
   region = "us-east-1"
 
   #
-  # Batching
+  # Auth
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 10490000
-  # * type: int
-  # * unit: bytes
-  batch_size = 10490000
+  [sinks.elasticsearch.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * enum: "aws" or "basic"
+    strategy = "aws"
+    strategy = "basic"
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_rate_limit_num = 5
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 60
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 60
-
-  #
-  # Basic auth
-  #
-
-  [sinks.elasticsearch.basic_auth]
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -2811,8 +2858,30 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.elasticsearch.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -2829,6 +2898,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -2837,15 +2915,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -2878,6 +2947,70 @@ end
     # * required
     # * type: string
     X-Powered-By = "Vector"
+
+  #
+  # Request
+  #
+
+  [sinks.elasticsearch.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
 
   #
   # Tls
@@ -2986,7 +3119,8 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
@@ -3048,77 +3182,25 @@ end
   healthcheck = false
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 10485760
-  # * type: int
-  # * unit: bytes
-  batch_size = 10485760
+  [sinks.gcp_pubsub.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 10485760
+    # * type: int
+    # * unit: bytes
+    max_size = 10485760
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_in_flight_limit = 5
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 100
-  # * type: int
-  request_rate_limit_num = 100
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 9223372036854775807
-  # * type: int
-  request_retry_attempts = 9223372036854775807
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 60
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 60
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -3135,6 +3217,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3144,15 +3235,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -3161,6 +3243,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.gcp_pubsub.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 100
+    # * type: int
+    rate_limit_num = 100
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 9223372036854775807
+    # * type: int
+    retry_attempts = 9223372036854775807
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
 
   #
   # Tls
@@ -3268,7 +3414,8 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "ndjson", "json", and "text"
   encoding = "ndjson"
@@ -3276,87 +3423,22 @@ end
   encoding = "text"
 
   #
-  # Batching
+  # Auth
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
+  [sinks.http.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 10
-  # * type: int
-  request_in_flight_limit = 10
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 10
-  # * type: int
-  request_rate_limit_num = 10
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 10
-  # * type: int
-  request_retry_attempts = 10
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  #
-  # Basic auth
-  #
-
-  [sinks.http.basic_auth]
     # The basic authentication password.
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -3364,8 +3446,30 @@ end
     #
     # * required
     # * type: string
+    # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.http.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -3382,6 +3486,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3390,15 +3503,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3420,6 +3524,70 @@ end
     # * type: string
     Authorization = "${TOKEN_ENV_VAR}"
     X-Powered-By = "Vector"
+
+  #
+  # Request
+  #
+
+  [sinks.http.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    in_flight_limit = 10
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    rate_limit_num = 10
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    retry_attempts = 10
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
   #
   # Tls
@@ -3499,12 +3667,12 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # A list of host and port pairs that the Kafka client should contact to
-  # bootstrap its cluster metadata.
+  # A comma delimited list of host and port pairs that the Kafka client should
+  # contact to bootstrap its cluster metadata.
   #
   # * required
-  # * type: [string]
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
+  # * type: string
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value
@@ -3534,7 +3702,8 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -3555,6 +3724,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3563,15 +3741,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -3682,77 +3851,25 @@ end
   region = "eu"
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 524000
-  # * type: int
-  # * unit: bytes
-  batch_size = 524000
+  [sinks.new_relic_logs.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 524000
+    # * type: int
+    # * unit: bytes
+    max_size = 524000
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 100
-  # * type: int
-  request_in_flight_limit = 100
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 100
-  # * type: int
-  request_rate_limit_num = 100
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 10
-  # * type: int
-  request_retry_attempts = 10
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 30
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -3769,6 +3886,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3778,15 +3904,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -3795,6 +3912,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.new_relic_logs.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 100
+    # * type: int
+    in_flight_limit = 100
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 100
+    # * type: int
+    rate_limit_num = 100
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    retry_attempts = 10
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 30
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 30
 
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
@@ -3818,16 +3999,9 @@ end
   # * type: string
   address = "0.0.0.0:9598"
 
-  # A prefix that will be added to all metric names.
-  # It should follow Prometheus naming conventions.
-  #
-  # * required
-  # * type: string
-  namespace = "service"
-
   # Default buckets to use for aggregating distribution metrics into histograms.
   #
-  # * optional
+  # * required
   # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
   # * type: [float]
   # * unit: seconds
@@ -3835,11 +4009,18 @@ end
 
   # Time interval between set values are reset.
   #
-  # * optional
+  # * required
   # * default: 60
   # * type: int
   # * unit: seconds
   flush_period_secs = 60
+
+  # A prefix that will be added to all metric names.
+  # It should follow Prometheus naming conventions.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3896,7 +4077,8 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -3917,6 +4099,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -3925,15 +4116,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #
@@ -4057,84 +4239,33 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * required
+  # * optional
+  # * no default
   # * type: string
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
   #
-  # Batching
+  # Batch
   #
 
-  # The maximum size of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1049000
-  # * type: int
-  # * unit: bytes
-  batch_size = 1049000
+  [sinks.splunk_hec.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
 
-  # The maximum age of a batch before it is flushed.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The maximum number of in-flight requests allowed at any given time.
-  #
-  # * optional
-  # * default: 10
-  # * type: int
-  request_in_flight_limit = 10
-
-  # The window used for the `request_rate_limit_num` option
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_rate_limit_duration_secs = 1
-
-  # The maximum number of requests allowed within the
-  # `request_rate_limit_duration_secs` window.
-  #
-  # * optional
-  # * default: 10
-  # * type: int
-  request_rate_limit_num = 10
-
-  # The maximum number of retries to make for failed requests.
-  #
-  # * optional
-  # * default: 5
-  # * type: int
-  request_retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  #
-  # * optional
-  # * default: 1
-  # * type: int
-  # * unit: seconds
-  request_retry_backoff_secs = 1
-
-  # The maximum time a request can take before being aborted. It is highly
-  # recommended that you do not lower value below the service's internal timeout,
-  # as this could create orphaned requests, pile on retries, and result in
-  # deuplicate data downstream.
-  #
-  # * optional
-  # * default: 60
-  # * type: int
-  # * unit: seconds
-  request_timeout_secs = 60
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
@@ -4151,6 +4282,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -4160,15 +4300,6 @@ end
     # * relevant when type = "disk"
     max_size = 104900000
 
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
-
     # The behavior when the buffer becomes full.
     #
     # * optional
@@ -4177,6 +4308,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.splunk_hec.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    in_flight_limit = 10
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    rate_limit_num = 10
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # deuplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
 
   #
   # Tls
@@ -4322,6 +4517,15 @@ end
     type = "memory"
     type = "disk"
 
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
     # The maximum size of the buffer on the disk.
     #
     # * optional
@@ -4330,15 +4534,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    #
-    # * optional
-    # * default: 500
-    # * type: int
-    # * unit: events
-    # * relevant when type = "memory"
-    num_items = 500
 
     # The behavior when the buffer becomes full.
     #

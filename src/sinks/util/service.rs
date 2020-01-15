@@ -52,42 +52,41 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig {
-    pub request_in_flight_limit: Option<usize>,        // 5
-    pub request_timeout_secs: Option<u64>,             // 60
-    pub request_rate_limit_duration_secs: Option<u64>, // 1
-    pub request_rate_limit_num: Option<u64>,           // 5
-    pub request_retry_attempts: Option<usize>,         // max_value()
-    pub request_retry_backoff_secs: Option<u64>,       // 1
+    pub in_flight_limit: Option<usize>,        // 5
+    pub timeout_secs: Option<u64>,             // 60
+    pub rate_limit_duration_secs: Option<u64>, // 1
+    pub rate_limit_num: Option<u64>,           // 5
+    pub retry_attempts: Option<usize>,         // max_value()
+    pub retry_max_duration_secs: Option<u64>,
+    pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
 impl TowerRequestConfig {
     pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
         TowerRequestSettings {
             in_flight_limit: self
-                .request_in_flight_limit
-                .or(defaults.request_in_flight_limit)
+                .in_flight_limit
+                .or(defaults.in_flight_limit)
                 .unwrap_or(5),
-            timeout: Duration::from_secs(
-                self.request_timeout_secs
-                    .or(defaults.request_timeout_secs)
-                    .unwrap_or(60),
-            ),
+            timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
-                self.request_rate_limit_duration_secs
-                    .or(defaults.request_rate_limit_duration_secs)
+                self.rate_limit_duration_secs
+                    .or(defaults.rate_limit_duration_secs)
                     .unwrap_or(1),
             ),
-            rate_limit_num: self
-                .request_rate_limit_num
-                .or(defaults.request_rate_limit_num)
-                .unwrap_or(5),
+            rate_limit_num: self.rate_limit_num.or(defaults.rate_limit_num).unwrap_or(5),
             retry_attempts: self
-                .request_retry_attempts
-                .or(defaults.request_retry_attempts)
+                .retry_attempts
+                .or(defaults.retry_attempts)
                 .unwrap_or(usize::max_value()),
-            retry_backoff: Duration::from_secs(
-                self.request_retry_backoff_secs
-                    .or(defaults.request_retry_backoff_secs)
+            retry_max_duration_secs: Duration::from_secs(
+                self.retry_max_duration_secs
+                    .or(defaults.retry_max_duration_secs)
+                    .unwrap_or(3600),
+            ),
+            retry_initial_backoff_secs: Duration::from_secs(
+                self.retry_initial_backoff_secs
+                    .or(defaults.retry_initial_backoff_secs)
                     .unwrap_or(1),
             ),
         }
@@ -101,12 +100,18 @@ pub struct TowerRequestSettings {
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
     pub retry_attempts: usize,
-    pub retry_backoff: Duration,
+    pub retry_max_duration_secs: Duration,
+    pub retry_initial_backoff_secs: Duration,
 }
 
 impl TowerRequestSettings {
     pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
-        FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
+        FixedRetryPolicy::new(
+            self.retry_attempts,
+            self.retry_initial_backoff_secs,
+            self.retry_max_duration_secs,
+            logic,
+        )
     }
 
     pub fn batch_sink<B, L, S, T>(

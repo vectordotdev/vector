@@ -10,5 +10,5 @@ output_types = ["log"]
 type = "[string]"
 common = true
 examples = [["field1", "field2"]]
-null = false
+required = true
 description = "The log field names to drop."

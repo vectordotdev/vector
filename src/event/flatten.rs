@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, ValueKind};
+use crate::event::{Atom, LogEvent, ValueKind};
 use serde_json::{Map, Value};
 
 /// Recursevly inserts json values to event
@@ -9,7 +9,7 @@ pub fn flatten(event: &mut LogEvent, map: Map<String, Value>) {
 }
 
 /// Recursevly inserts json values to event under given name
-pub fn insert(event: &mut LogEvent, name: String, value: Value) {
+pub fn insert<K: Into<Atom> + AsRef<str>>(event: &mut LogEvent, name: K, value: Value) {
     match value {
         Value::String(string) => {
             event.insert_explicit(name, string);
@@ -33,13 +33,13 @@ pub fn insert(event: &mut LogEvent, name: String, value: Value) {
         }
         Value::Array(array) => {
             for (i, element) in array.into_iter().enumerate() {
-                let element_name = format!("{}[{}]", name, i);
+                let element_name = format!("{}[{}]", name.as_ref(), i);
                 insert(event, element_name, element);
             }
         }
         Value::Object(object) => {
             for (key, value) in object.into_iter() {
-                let item_name = format!("{}.{}", name, key);
+                let item_name = format!("{}.{}", name.as_ref(), key);
                 insert(event, item_name, value);
             }
         }

@@ -37,13 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options
@@ -61,10 +54,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[true,false]}
   name={"drop_field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -84,10 +76,9 @@ If `true` will drop the specified [`field`](#field) after parsing.
   enumValues={null}
   examples={["message"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -107,7 +98,6 @@ The log field to execute the [`pattern`](#pattern) against. Must be a `string` v
   enumValues={null}
   examples={["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]}
   name={"pattern"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -130,7 +120,6 @@ The [Grok pattern][urls.grok_patterns]
   enumValues={null}
   examples={[]}
   name={"types"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -147,15 +136,14 @@ Key/Value pairs representing mapped log field types.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
   name={"`[field-name]`"}
-  nullable={false}
   path={"types"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

@@ -46,7 +46,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["tag1","tag2"]]}
   name={"tags"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

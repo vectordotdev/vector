@@ -231,7 +231,7 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
-fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, Error> {
+pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, Error> {
     for format in TIMESTAMP_FORMATS {
         if let Ok(result) = Local.datetime_from_str(s, format) {
             return Ok(datetime_to_utc(result));

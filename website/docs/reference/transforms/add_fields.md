@@ -57,7 +57,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"fields"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -79,7 +78,6 @@ A table of key/value pairs representing the keys to be added to the event.
   enumValues={null}
   examples={[{"string_field":"string value"},{"env_var_field":"${ENV_VAR}"},{"int_field":1},{"float_field":1.2},{"bool_field":true},{"timestamp_field":"1979-05-27 00:32:00 -0700"},{"parent":{"child":"child_value"}},{"list_field":["first","second","third"]}]}
   name={"`[field-name]`"}
-  nullable={false}
   path={"fields"}
   relevantWhen={null}
   required={true}

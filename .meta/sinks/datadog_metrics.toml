@@ -1,7 +1,7 @@
 [sinks.datadog_metrics]
 title = "Datadog Metrics"
-batch_size = 20
-batch_timeout = 1
+batch_max_events = 20
+batch_timeout_secs = 1
 beta = true
 buffer = false
 common = false
@@ -13,24 +13,24 @@ input_types = ["metric"]
 request_rate_limit_duration_secs = 1
 request_rate_limit_num =5
 request_retry_attempts = 5
-request_retry_backoff_secs = 1
+request_retry_initial_backoff_secs = 1
+request_retry_max_duration_secs = 10
 request_in_flight_limit = 5
 request_timeout_secs = 60
-service_provider = "Datadog"
+service_providers = ["Datadog"]
 write_to_description = "[Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)"
 
 [sinks.datadog_metrics.options.api_key]
 type = "string"
 common = true
 examples = ["3111111111111111aaaaaaaaaaaaaaaa"]
-null = false
+required = true
 description = "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
 
 [sinks.datadog_metrics.options.host]
 type = "string"
 common = true
 examples = ["https://api.datadoghq.com", "https://api.datadoghq.eu"]
-null = true
 default = "https://api.datadoghq.com"
 description = "Datadog endpoint to send metrics to."
 
@@ -38,5 +38,5 @@ description = "Datadog endpoint to send metrics to."
 type = "string"
 common = true
 examples = ["service"]
-null = false
+required = true
 description = "A prefix that will be added to all metric names."

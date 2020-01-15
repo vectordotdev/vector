@@ -44,15 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 ```
 
 </TabItem>
@@ -65,21 +61,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"] # example
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
 
+  # OPTIONAL - requests
+  encoding = "json" # example, no default, enum
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum
+    max_events = 500 # default, events, relevant when type = "memory"
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 
   # OPTIONAL - Tls
@@ -108,20 +104,19 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["10.14.22.123:9092","10.14.23.332:9092"]]}
+  examples={["10.14.22.123:9092,10.14.23.332:9092"]}
   name={"bootstrap_servers"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
   templateable={false}
-  type={"[string]"}
+  type={"string"}
   unit={null}
   >
 
 ### bootstrap_servers
 
-A list of host and port pairs that the Kafka client should contact to bootstrap its cluster metadata.
+A comma delimited list of host and port pairs that the Kafka client should contact to bootstrap its cluster metadata.
 
 
 </Field>
@@ -133,7 +128,6 @@ A list of host and port pairs that the Kafka client should contact to bootstrap 
   enumValues={null}
   examples={[]}
   name={"buffer"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -144,9 +138,31 @@ A list of host and port pairs that the Kafka client should contact to bootstrap 
 
 ### buffer
 
-Configures the sink specific buffer.
+Configures the sink buffer behavior.
 
 <Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model#event] allowed in the buffer.
+
+
+</Field>
 
 
 <Field
@@ -155,7 +171,6 @@ Configures the sink specific buffer.
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
-  nullable={true}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
   required={false}
@@ -174,34 +189,10 @@ The maximum size of the buffer on the disk.
 
 <Field
   common={false}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  name={"num_items"}
-  nullable={true}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### num_items
-
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -224,7 +215,6 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
   name={"when_full"}
-  nullable={false}
   path={"buffer"}
   relevantWhen={null}
   required={false}
@@ -247,15 +237,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   name={"encoding"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -275,7 +264,6 @@ The encoding format used to serialize the events before outputting.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -298,7 +286,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={null}
   examples={["user_id"]}
   name={"key_field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -321,7 +308,6 @@ The log field name to use for the topic key. If unspecified, the key will be ran
   enumValues={null}
   examples={[]}
   name={"tls"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -343,7 +329,6 @@ Configures the TLS options for connections from this sink.
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
   name={"ca_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -366,7 +351,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
   name={"crt_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -389,7 +373,6 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   enumValues={null}
   examples={[false,true]}
   name={"enabled"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -412,7 +395,6 @@ Enable TLS during connections to the remote.
   enumValues={null}
   examples={["PassWord1"]}
   name={"key_pass"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -435,7 +417,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
   name={"key_path"}
-  nullable={true}
   path={"tls"}
   relevantWhen={null}
   required={false}
@@ -463,7 +444,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
   enumValues={null}
   examples={["topic-1234"]}
   name={"topic"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

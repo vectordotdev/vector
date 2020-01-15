@@ -5,11 +5,11 @@ description: Install Vector On Raspbian
 ---
 
 Vector can be installed on Raspbian, which is generally used on Raspberry Pis,
-through the following methods:
+through the following method:
 
-import InstallChoices from '@site/src/components/InstallChoices';
+import {ArchChoices} from '@site/src/components/InstallChoices';
 
-<InstallChoices docker={true} os="Linux" packageManager="DPKG" />
+<ArchChoices arch="ARMv7" docker={true} os="Linux" packageManager="DPKG" />
 
 
 

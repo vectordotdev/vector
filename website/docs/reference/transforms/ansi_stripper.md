@@ -49,10 +49,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["message"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

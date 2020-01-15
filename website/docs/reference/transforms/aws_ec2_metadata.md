@@ -52,7 +52,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]]}
   name={"fields"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -75,7 +74,6 @@ A list of fields to include in each event.
   enumValues={null}
   examples={["http://169.254.169.254"]}
   name={"host"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -98,7 +96,6 @@ Override the default EC2 Metadata host.
   enumValues={null}
   examples={[""]}
   name={"namespace"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -121,7 +118,6 @@ Prepend a namespace to each field's key.
   enumValues={null}
   examples={[10]}
   name={"refresh_interval_secs"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
