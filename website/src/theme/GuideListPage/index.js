@@ -22,10 +22,10 @@ function GuideListPage(props) {
 
   const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
 
-  let items_filtered = items.slice(0);
+  let itemsFiltered = items.slice(0);
 
   let seen = {};
-  items_filtered = items_filtered.filter(item => {
+  itemsFiltered = itemsFiltered.filter(item => {
     let title = item.content.metadata.title;
     let dupe = seen[title] == true
     seen[title] = true;
@@ -35,6 +35,8 @@ function GuideListPage(props) {
     return !dupe;
   });
 
+  itemsFiltered.sort((a, b) => (b.content.metadata.featured === true && 1) || -1);
+
   //
   // State
   //
@@ -43,12 +45,21 @@ function GuideListPage(props) {
   const [searchTerm, setSearchTerm] = useState(null);
   const [searchLimit, setSearchLimit] = useState(20);
 
+  let filteredCap = itemsFiltered.length;
+  let increaseSearchLimit = function() {
+    if ( searchLimit > filteredCap ) {
+      return
+    }
+    let newLimit = searchLimit + 10;
+    setSearchLimit(newLimit);
+  };
+
   //
   // Filtering
   //
 
   if (searchTerm) {
-    items_filtered = items_filtered.filter(item => {
+    itemsFiltered = itemsFiltered.filter(item => {
       let searchTerms = searchTerm.split(" ");
       let content = `${item.content.metadata.title.toLowerCase()}`; // ${item.content.metadata.description.toLowerCase()}`;
       return searchTerms.every(term => {
@@ -63,10 +74,11 @@ function GuideListPage(props) {
   }
 
   if (onlyFeatured) {
-    items_filtered = items_filtered.filter(item => item.content.metadata.featured == true);
+    itemsFiltered = itemsFiltered.filter(item => item.content.metadata.featured == true);
   }
 
-  items_filtered = items_filtered.slice(0, searchLimit);
+  filteredCap = itemsFiltered.length;
+  itemsFiltered = itemsFiltered.slice(0, searchLimit);
 
   return (
     <Layout title="Guides" description="Vector Guides">
@@ -101,7 +113,7 @@ function GuideListPage(props) {
           </div>
         </div>
         <div className="guide-list--items">
-          {items_filtered.map(({content: GuideContent}) => (
+          {itemsFiltered.map(({content: GuideContent}) => (
             <GuideItem
               key={GuideContent.metadata.permalink}
               frontMatter={GuideContent.frontMatter}
@@ -110,7 +122,7 @@ function GuideListPage(props) {
               <GuideContent />
             </GuideItem>
           ))}
-          <button className="button button--secondary guide-show-more" onClick={() => setSearchLimit(searchLimit+10)}>Show more</button>
+          <button className="button button--secondary guide-show-more" onClick={() => increaseSearchLimit()}>Show more</button>
         </div>
       </div>
     </Layout>
