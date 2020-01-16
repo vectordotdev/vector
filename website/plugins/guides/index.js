@@ -9,6 +9,7 @@ const fs = require('fs-extra');
 const _ = require('lodash');
 const path = require('path');
 const {normalizeUrl, docuHash, aliasedSitePath} = require('@docusaurus/utils');
+const rightToc = require('@docusaurus/mdx-loader/src/remark/rightToc');
 
 const {generateGuidePosts} = require('./guideUtils');
 

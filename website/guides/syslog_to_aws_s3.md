@@ -18,7 +18,7 @@ Vector is a log, metrics and events router that is great for this task as it's
       To make changes please edit the template located at: scripts/generate/templates/guides/guide.md.erb
 -->
 
-## Setup
+## 1. Setup
 
 If you haven't already, install Vector. Here's a script for the lazy:
 
@@ -28,7 +28,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or [choose your preferred installation method][docs.installation].
 
-## Configure a Source
+## 2. Configure a Source
 
 Next, create a config file in a local directory (called `config.toml`) and add a
 `syslog` source by pasting in this snippet:
@@ -47,7 +47,7 @@ Next, create a config file in a local directory (called `config.toml`) and add a
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
-## Configure a Sink
+## 3. Configure a Sink
 
 Now configure your sink, making sure to set the input to `my-source-id`:
 
@@ -69,7 +69,7 @@ Now configure your sink, making sure to set the input to `my-source-id`:
   region = "us-east-1" # example, no default
 ```
 
-## Run It
+## 4. Run It
 
 That's it! You're ready to execute the pipeline. You can run it locally with:
 
@@ -82,7 +82,7 @@ environment. For guidance check out our [deployment documentation][docs.deployme
 
 ## Optional Extras
 
-### Parse Events
+### 5. Parse Events
 
 If our logs consumed from Syslog are structured then we should
 parse them out before writing them to AWS S3. We can do that with a
@@ -111,7 +111,7 @@ In order to have the parsed events from this transform reach our
 `aws_s3` sink we need the sink to consume events from the new
 transform by updating the field `inputs` to `["parser"]`.
 
-### Enrich Events
+### 6. Enrich Events
 
 We can also choose to enrich our events with [transforms][docs.transforms]. In
 this example we're going to add a

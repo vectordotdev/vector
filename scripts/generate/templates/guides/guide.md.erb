@@ -12,7 +12,9 @@ Vector is a log, metrics and events router that is great for this task as it's
 
 <!--truncate-->
 
-## Setup
+<%- next_step = 1 -%>
+## <%= next_step %>. Setup
+<%- next_step += 1 -%>
 
 If you haven't already, install Vector. Here's a script for the lazy:
 
@@ -22,7 +24,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or [choose your preferred installation method][docs.installation].
 
-## Configure a Source
+## <%= next_step %>. Configure a Source
+<%- next_step += 1 -%>
 
 Next, create a config file in a local directory (called `config.toml`) and add a
 `<%= source.name %>` source by pasting in this snippet:
@@ -33,7 +36,8 @@ Next, create a config file in a local directory (called `config.toml`) and add a
 <%- next_input = "my-source-id" -%>
 
 <%- if needs_conversion -%>
-## Transform Events
+## <%= next_step %>. Transform Events
+<%- next_step += 1 -%>
 
 <%- converter = with_input(event_converter(), next_input) -%>
 We will need to convert the <%= event_from %> events consumed from our
@@ -51,7 +55,8 @@ its name `my-source-id`.
 <%- end -%>
 <%- next_input = "converter" -%>
 <%- end -%>
-## Configure a Sink
+## <%= next_step %>. Configure a Sink
+<%- next_step += 1 -%>
 
 Now configure your sink, making sure to set the input to `<%= next_input %>`:
 
@@ -60,7 +65,8 @@ Now configure your sink, making sure to set the input to `<%= next_input %>`:
 <%= config_example(sink_example.options_list, path: "#{sink_example.type.pluralize}.my-sink-id", common: true) %>
 ```
 
-## Run It
+## <%= next_step %>. Run It
+<%- next_step += 1 -%>
 
 That's it! You're ready to execute the pipeline. You can run it locally with:
 
@@ -74,7 +80,8 @@ environment. For guidance check out our [deployment documentation][docs.deployme
 ## Optional Extras
 
 <%- if supports_parsing -%>
-### Parse Events
+### <%= next_step %>. Parse Events
+<%- next_step += 1 -%>
 
 <%- parser = with_input(event_parser(), next_input) -%>
 If our logs consumed from <%= source.title %> are structured then we should
@@ -104,7 +111,8 @@ transform we must update the `inputs` field of `<%= next_input %>` to
 <%- end -%>
 
 <%- end -%>
-### Enrich Events
+### <%= next_step %>. Enrich Events
+<%- next_step += 1 -%>
 
 We can also choose to enrich our events with [transforms][docs.transforms]. In
 this example we're going to add a
