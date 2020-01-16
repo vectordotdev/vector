@@ -292,6 +292,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   data_dir = "/var/lib/vector"
 
+  # The full path of the `journalctl` executable. If not set, Vector will search
+  # the path for `journalctl`.
+  #
+  # * optional
+  # * default: "journalctl"
+  # * type: string
+  journalctl_path = "/usr/local/bin/journalctl"
+
   # The list of units names to monitor. If empty or not present, all units are
   # accepted. Unit names lacking a `"."` will have `".service"` appended to make
   # them a valid service unit name.

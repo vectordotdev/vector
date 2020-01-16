@@ -28,6 +28,7 @@ lazy_static! {
     static ref MESSAGE: Atom = Atom::from("MESSAGE");
     static ref SYSTEMD_UNIT: Atom = Atom::from("_SYSTEMD_UNIT");
     static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref JOURNALCTL: PathBuf = "journalctl".into();
 }
 
 #[derive(Debug, Snafu)]
@@ -43,6 +44,7 @@ pub struct JournaldConfig {
     pub units: Vec<String>,
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
+    pub journalctl_path: Option<PathBuf>,
 }
 
 inventory::submit! {
@@ -185,7 +187,8 @@ struct Journalctl {
 
 impl JournalSource for Journalctl {
     fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self> {
-        let mut command = Command::new("journalctl");
+        let journalctl = config.journalctl_path.as_ref().unwrap_or(&JOURNALCTL);
+        let mut command = Command::new(journalctl);
         command.stdout(Stdio::piped());
         command.arg("--follow");
         command.arg("--all");
