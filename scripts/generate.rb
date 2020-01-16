@@ -219,6 +219,10 @@ templates = Templates.new(ROOT_DIR, metadata)
 # Generate Guides
 #
 
+guides_whitelist = [
+  'syslog_to_aws_s3',
+]
+
 guide_sources = metadata.components.select do |component|
   component.type == 'source' && !([ "vector", "stdin" ].include? component.name)
 end
@@ -228,8 +232,11 @@ end
 guide_sources.each do |source|
   guide_sinks.each do |sink|
     name = "#{source.name}_to_#{sink.name}"
-    title = "Writing #{source.title} Events to #{sink.title}"
-    description = "Learn how to send #{source.title} events to #{sink.title} with optional enrichments."
+    if !guides_whitelist.include?(name)
+      next
+    end
+
+    guide = Guide.new(ROOT_DIR, source, sink, metadata)
 
     target_path = "#{ROOT_DIR}/website/guides/#{name}.md"
     template_path = "scripts/generate/templates/guides/guide.md.erb"
@@ -238,7 +245,6 @@ guide_sources.each do |source|
       template_path = override_path
     end
 
-    guide = Guide.new(ROOT_DIR, title, description, source, sink, metadata)
     if ! (metadata.components.any? { |tform| tform.name == guide.event_converter_type })
       say("Skipping guide #{target_path} until #{guide.event_converter_type} transform is available")
       next

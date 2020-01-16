@@ -1,12 +1,14 @@
 ---
 id: syslog_to_aws_s3
-title: Writing Syslog Events to AWS S3
-description: Learn how to send Syslog events to AWS S3 with optional enrichments.
+title: Archiving Syslog Events to AWS S3
+description: Learn how to archive Syslog events to AWS S3.
 keywords: ["syslog","aws s3"]
 ---
 
-In this guide we'll be consuming `syslog` logs and
-writing them to a `aws_s3` sink.
+In this guide you'll learn how to read events from Syslog and archive them to AWS S3 using Vector.
+Vector is a log, metrics and events router that is great for this task as it's
+[extremely performant][pages.index#performance] and easy to deploy in a
+[variety of ways][docs.deployment].
 
 <!--truncate-->
 
@@ -45,64 +47,15 @@ Next, create a config file in a local directory (called `config.toml`) and add a
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
-## (Optional) Parse Events
-
-If our logs consumed from Syslog are structured then we should
-parse them. We can do that with a range of [transforms][docs.transforms], in
-this example we will use the `json_parser` transform:
-
-```toml
-[transforms.parser]
-  # REQUIRED
-  type = "json_parser" # must be: "json_parser"
-  inputs = ["my-source-id"] # example
-  drop_invalid = true # example
-
-  # OPTIONAL
-  drop_field = true # default
-  field = "message" # default
-```
-
-Note that for the `inputs` field we specify our `syslog` source by
-its name `my-source-id`.
-
-This step is optional, if you choose to skip it then remember to set the
-`inputs` of the next component to the previous component in the topology
-(`my-source-id`).
-
-## (Optional) Enrich Events
-
-We can also choose to enrich our events with [transforms][docs.transforms]. In
-this example we're going to add a `aws_ec2_metadata` transform:
-
-```toml
-[transforms.enricher]
-  # REQUIRED
-  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
-  inputs = ["parser"] # example
-
-  # OPTIONAL
-  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
-  host = "http://169.254.169.254" # default
-  namespace = "" # default
-  refresh_interval_secs = 10 # default
-```
-
-Note that for the `inputs` field we specify `parser`.
-
-This step is optional, if you choose to skip it then remember to set the
-`inputs` of the next component to the previous component in the topology
-(`parser`).
-
 ## Configure a Sink
 
-Now we configure our sink, making sure to set the input to `enricher`:
+Now configure your sink, making sure to set the input to `my-source-id`:
 
 ```toml
 [sinks.my-sink-id]
   # REQUIRED - General
   type = "aws_s3" # must be: "aws_s3"
-  inputs = ["enricher"] # example
+  inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
 
@@ -118,7 +71,7 @@ Now we configure our sink, making sure to set the input to `enricher`:
 
 ## Run It
 
-That's it, we're ready to execute our pipeline. You can run it locally with:
+That's it! You're ready to execute the pipeline. You can run it locally with:
 
 ```sh
 vector -c ./config.toml
@@ -127,7 +80,68 @@ vector -c ./config.toml
 Vector is very flexible and can be deployed in a way that suits your target
 environment. For guidance check out our [deployment documentation][docs.deployment].
 
+## Optional Extras
+
+### Parse Events
+
+If our logs consumed from Syslog are structured then we should
+parse them out before writing them to AWS S3. We can do that with a
+range of [transforms][docs.transforms], in this example we will use
+[`json_parser`][docs.transforms.json_parser].
+
+Paste the following transform into your config:
+
+```toml
+[transforms.parser]
+  # REQUIRED
+  type = "json_parser" # must be: "json_parser"
+  inputs = ["my-source-id"] # example
+  drop_invalid = true # example
+
+  # OPTIONAL
+  drop_field = true # default
+  field = "message" # default
+```
+
+Note that we wish to parse events as they are consumed from our
+`syslog` source, therefore we set the field `inputs` to
+`["my-source-id"]`.
+
+In order to have the parsed events from this transform reach our
+`aws_s3` sink we need the sink to consume events from the new
+transform by updating the field `inputs` to `["parser"]`.
+
+### Enrich Events
+
+We can also choose to enrich our events with [transforms][docs.transforms]. In
+this example we're going to add a
+[`aws_ec2_metadata`][docs.transforms.aws_ec2_metadata]
+transform:
+
+```toml
+[transforms.enricher]
+  # REQUIRED
+  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
+  inputs = ["parser"] # example
+
+  # OPTIONAL
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
+  host = "http://169.254.169.254" # default
+  namespace = "" # default
+  refresh_interval_secs = 10 # default
+```
+
+Note that for the `inputs` field we've specified `parser` so that
+this enrichment is executed afterwards.
+
+In order to have the enriched events from this transform reach our
+`aws_s3` sink we need the sink to consume events from the new
+transform by updating the field `inputs` to `["enricher"]`.
+
 
 [docs.deployment]: /docs/setup/deployment/
 [docs.installation]: /docs/setup/installation/
+[docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/
+[docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
 [docs.transforms]: /docs/reference/transforms/
+[pages.index#performance]: /#performance

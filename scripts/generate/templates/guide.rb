@@ -3,19 +3,33 @@ require_relative "../templates"
 class Guide < Templates
   attr_reader :title,
     :description,
+    :goal,
     :source,
     :sink,
     :keywords,
     :metadata,
     :event_from,
     :event_to,
-    :needs_parsing,
+    :supports_parsing,
     :needs_conversion
 
-  def initialize(root_dir, title, description, source, sink, metadata)
+  ARCHIVE_SINKS = [
+    "aws_s3",
+  ]
+
+  def initialize(root_dir, source, sink, metadata)
     super(root_dir, metadata)
-    @title = title
-    @description = description
+
+    if ARCHIVE_SINKS.include?(sink.name)
+      @title = "Archiving #{source.title} Events to #{sink.title}"
+      @description = "Learn how to archive #{source.title} events to #{sink.title}."
+      @goal = "read events from #{source.title} and archive them to #{sink.title}"
+    else
+      @title = "Writing #{source.title} Events to #{sink.title}"
+      @description = "Learn how to send #{source.title} events to #{sink.title}."
+      @goal = "read events from #{source.title} and write them to #{sink.title}"
+    end
+
     @source = source
     @sink = sink
     @keywords = [ source.title.downcase, sink.title.downcase ]
@@ -23,7 +37,7 @@ class Guide < Templates
     @event_from = source.event_types[0]
     @event_to = @event_from
     @needs_conversion = false
-    @needs_parsing = @event_from == 'log'
+    @supports_parsing = @event_from == 'log'
    
     if ! (sink.event_types.include? @event_from)
       @event_to = sink.event_types[0]
