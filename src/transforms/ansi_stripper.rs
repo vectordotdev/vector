@@ -97,7 +97,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().into_value(&MESSAGE).unwrap(),
+                    event.into_log().remove(&MESSAGE).unwrap(),
                     ValueKind::from("foo bar")
                 );
             )+
