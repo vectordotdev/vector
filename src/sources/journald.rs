@@ -57,7 +57,6 @@ impl SourceConfig for JournaldConfig {
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let current_boot = self.current_boot_only.unwrap_or(true);
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 
@@ -78,7 +77,7 @@ impl SourceConfig for JournaldConfig {
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
 
-        journald_source::<Journalctl>(current_boot, out, checkpointer, units, batch_size)
+        journald_source::<Journalctl>(self, out, checkpointer, units, batch_size)
     }
 
     fn output_type(&self) -> DataType {
@@ -93,7 +92,7 @@ impl SourceConfig for JournaldConfig {
 type Record = HashMap<Atom, String>;
 
 fn journald_source<J>(
-    current_boot: bool,
+    config: &JournaldConfig,
     out: mpsc::Sender<Event>,
     mut checkpointer: Checkpointer,
     units: HashSet<String>,
@@ -120,7 +119,7 @@ where
         }
     };
 
-    let journal = J::new(current_boot, cursor)?;
+    let journal = J::new(config, cursor)?;
 
     Ok(Box::new(future::lazy(move || {
         info!(message = "Starting journald server.",);
@@ -175,7 +174,7 @@ fn create_event(record: Record) -> Event {
 /// trait functions is an addition to the standard iteration methods for
 /// initializing the source.
 trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
-    fn new(current_boot: bool, cursor: Option<String>) -> crate::Result<Self>;
+    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self>;
 }
 
 struct Journalctl {
@@ -185,7 +184,7 @@ struct Journalctl {
 }
 
 impl JournalSource for Journalctl {
-    fn new(current_boot: bool, cursor: Option<String>) -> crate::Result<Self> {
+    fn new(config: &JournaldConfig, cursor: Option<String>) -> crate::Result<Self> {
         let mut command = Command::new("journalctl");
         command.stdout(Stdio::piped());
         command.arg("--follow");
@@ -193,6 +192,7 @@ impl JournalSource for Journalctl {
         command.arg("--show-cursor");
         command.arg("--output=json");
 
+        let current_boot = config.current_boot_only.unwrap_or(true);
         if current_boot {
             command.arg("--boot");
         }
@@ -436,7 +436,7 @@ mod tests {
     }
 
     impl JournalSource for FakeJournal {
-        fn new(_: bool, checkpoint: Option<String>) -> crate::Result<Self> {
+        fn new(_: &JournaldConfig, checkpoint: Option<String>) -> crate::Result<Self> {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -465,8 +465,9 @@ mod tests {
             checkpointer.set(cursor).expect("Could not set checkpoint");
         }
 
+        let config = JournaldConfig::default();
         let source =
-            journald_source::<FakeJournal>(false, tx, checkpointer, units, DEFAULT_BATCH_SIZE)
+            journald_source::<FakeJournal>(&config, tx, checkpointer, units, DEFAULT_BATCH_SIZE)
                 .expect("Creating journald source failed");
         let mut rt = runtime();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
