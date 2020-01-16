@@ -16,6 +16,7 @@ message Log {
 }
 
 message Value {
+  reserved 3;
   oneof kind {
     bytes raw_bytes = 1;
     google.protobuf.Timestamp timestamp = 2;
