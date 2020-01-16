@@ -51,6 +51,8 @@ inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
 }
 
+type Record = HashMap<Atom, String>;
+
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     fn build(
@@ -79,7 +81,7 @@ impl SourceConfig for JournaldConfig {
         let checkpointer = Checkpointer::new(data_dir)
             .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
 
-        journald_source::<Journalctl>(self, out, checkpointer, units, batch_size)
+        self.source::<Journalctl>(out, checkpointer, units, batch_size)
     }
 
     fn output_type(&self) -> DataType {
@@ -91,60 +93,60 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
-type Record = HashMap<Atom, String>;
+impl JournaldConfig {
+    fn source<J>(
+        &self,
+        out: mpsc::Sender<Event>,
+        mut checkpointer: Checkpointer,
+        units: HashSet<String>,
+        batch_size: usize,
+    ) -> crate::Result<super::Source>
+    where
+        J: JournalSource + Send + 'static,
+    {
+        let (shutdown_tx, shutdown_rx) = channel();
 
-fn journald_source<J>(
-    config: &JournaldConfig,
-    out: mpsc::Sender<Event>,
-    mut checkpointer: Checkpointer,
-    units: HashSet<String>,
-    batch_size: usize,
-) -> crate::Result<super::Source>
-where
-    J: JournalSource + Send + 'static,
-{
-    let (shutdown_tx, shutdown_rx) = channel();
+        let out = out
+            .sink_map_err(|_| ())
+            .with(|record: Record| future::ok(create_event(record)));
 
-    let out = out
-        .sink_map_err(|_| ())
-        .with(|record: Record| future::ok(create_event(record)));
-
-    // Retrieve the saved checkpoint, and use it to seek forward in the journald log
-    let cursor = match checkpointer.get() {
-        Ok(cursor) => cursor,
-        Err(err) => {
-            error!(
-                message = "Could not retrieve saved journald checkpoint",
-                error = field::display(&err)
-            );
-            None
-        }
-    };
-
-    let journal = J::new(config, cursor)?;
-
-    Ok(Box::new(future::lazy(move || {
-        info!(message = "Starting journald server.",);
-
-        let journald_server = JournaldServer {
-            journal,
-            units,
-            channel: out,
-            shutdown: shutdown_rx,
-            checkpointer,
-            batch_size,
+        // Retrieve the saved checkpoint, and use it to seek forward in the journald log
+        let cursor = match checkpointer.get() {
+            Ok(cursor) => cursor,
+            Err(err) => {
+                error!(
+                    message = "Could not retrieve saved journald checkpoint",
+                    error = field::display(&err)
+                );
+                None
+            }
         };
-        let span = info_span!("journald-server");
-        let dispatcher = dispatcher::get_default(|d| d.clone());
-        thread::spawn(move || {
-            dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()));
-        });
 
-        // Dropping shutdown_tx is how we signal to the journald server
-        // that it's time to shut down, so it needs to be held onto
-        // until the future we return is dropped.
-        future::empty().inspect(|_| drop(shutdown_tx))
-    })))
+        let journal = J::new(self, cursor)?;
+
+        Ok(Box::new(future::lazy(move || {
+            info!(message = "Starting journald server.",);
+
+            let journald_server = JournaldServer {
+                journal,
+                units,
+                channel: out,
+                shutdown: shutdown_rx,
+                checkpointer,
+                batch_size,
+            };
+            let span = info_span!("journald-server");
+            let dispatcher = dispatcher::get_default(|d| d.clone());
+            thread::spawn(move || {
+                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()));
+            });
+
+            // Dropping shutdown_tx is how we signal to the journald server
+            // that it's time to shut down, so it needs to be held onto
+            // until the future we return is dropped.
+            future::empty().inspect(|_| drop(shutdown_tx))
+        })))
+    }
 }
 
 fn create_event(record: Record) -> Event {
@@ -469,9 +471,9 @@ mod tests {
         }
 
         let config = JournaldConfig::default();
-        let source =
-            journald_source::<FakeJournal>(&config, tx, checkpointer, units, DEFAULT_BATCH_SIZE)
-                .expect("Creating journald source failed");
+        let source = config
+            .source::<FakeJournal>(tx, checkpointer, units, DEFAULT_BATCH_SIZE)
+            .expect("Creating journald source failed");
         let mut rt = runtime();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
