@@ -7,6 +7,7 @@
   display: block;
   margin-bottom: var(--ifm-spacing-vertical);
   padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 2 );
+  min-height: 300px;
 }
 
 .guide-post-item h2 {

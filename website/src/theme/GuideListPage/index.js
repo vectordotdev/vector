@@ -89,7 +89,7 @@ function GuideListPage(props) {
         </div>
       </header>
       <div className="guide-list container">
-        <div className={classnames('vector-components', {'vector-components--cols': true})}>
+        <div className={classnames('vector-guides', {'vector-guides--cols': true})}>
           <div className="filters">
             <div className="search">
               <input
@@ -112,17 +112,30 @@ function GuideListPage(props) {
             </div>
           </div>
         </div>
-        <div className="guide-list--items">
-          {itemsFiltered.map(({content: GuideContent}) => (
-            <GuideItem
-              key={GuideContent.metadata.permalink}
-              frontMatter={GuideContent.frontMatter}
-              metadata={GuideContent.metadata}
-              truncated>
-              <GuideContent />
-            </GuideItem>
-          ))}
-          <button className="button button--secondary guide-show-more" onClick={() => increaseSearchLimit()}>Show more</button>
+        <div className="guide-list--items container">
+          <div className="row">
+            {itemsFiltered.map(({content: GuideContent}) => (
+              <GuideItem
+                key={GuideContent.metadata.permalink}
+                frontMatter={GuideContent.frontMatter}
+                metadata={GuideContent.metadata}
+                truncated>
+                <GuideContent />
+              </GuideItem>
+            ))}
+          </div>
+          {itemsFiltered.length > 0 &&
+            <div className="row">
+              <div className="col col--2">
+                <button className="button button--secondary guide-show-more" onClick={() => increaseSearchLimit()}>Show more</button>
+              </div>
+            </div>}
+          {itemsFiltered.length == 0 &&
+            <div className="row">
+              <div className="col col--12">
+                <p>Whoops, looks like your search hasn't got any results. If the guide you want doesn't exist please <a href="https://github.com/timberio/vector/issues/new?labels=domain%3A+docs">ask for it</a>.</p>
+              </div>
+            </div>}
         </div>
       </div>
     </Layout>

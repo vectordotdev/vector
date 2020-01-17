@@ -22,13 +22,15 @@ function GuideItem(props) {
   const date = new Date(Date.parse(dateString));
 
   return (
-    <Link to={permalink + '/'} className={classnames('guide-post-item', 'domain-bg', 'domain-bg--hover')}>
-      <article>
-        <h2>{title}</h2>
-        <div className="guide-post-item--subtitle">{description}</div>
-        <><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>
-      </article>
-    </Link>
+    <div className='col col--4'>
+      <Link to={permalink + '/'} className={classnames('guide-post-item', 'domain-bg', 'domain-bg--hover')}>
+        <article>
+          <h2>{title}</h2>
+          <div className="guide-post-item--subtitle">{description}</div>
+          <><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>
+        </article>
+      </Link>
+    </div>
   );
 }
 
