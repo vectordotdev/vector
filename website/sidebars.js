@@ -122,6 +122,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/logplex",
+            
               "reference/sources/prometheus",
             
               "reference/sources/socket",

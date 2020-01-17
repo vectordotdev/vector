@@ -372,6 +372,21 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
+[sources.logplex]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `logplex`.
+  #
+  # * required
+  # * type: string
+  # * must be: "logplex"
+  type = "logplex"
+
+  # The address to accept connections on.
+  #
+  # * required
+  # * type: string
+
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
   # The component type. This is a required field that tells Vector which

@@ -18277,6 +18277,28 @@ module.exports = {
 
       ]
     },
+    "logplex": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Ingests data through the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol] and outputs log events.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "logplex_source",
+      "name": "logplex",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",
