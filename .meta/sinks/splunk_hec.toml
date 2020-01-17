@@ -39,5 +39,6 @@ description = "Your Splunk HEC token."
 type = "[string]"
 common = true
 examples = [["field1", "field2"]]
+relevant_when = {encoding = "json"}
 required = false
-description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]. Applicable only to `json` encoding."
+description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."

@@ -51,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   token = "${TOKEN_ENV_VAR}" # example
 
   # OPTIONAL
-  indexed_fields = ["field1", "field2"] # example, no default
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 ```
 
 </TabItem>
@@ -69,7 +69,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   healthcheck = true # default
-  indexed_fields = ["field1", "field2"] # example, no default
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 
   # OPTIONAL - requests
   encoding = "ndjson" # example, no default, enum
@@ -376,7 +376,7 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
   examples={[["field1","field2"]]}
   name={"indexed_fields"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"encoding":"json"}}
   required={false}
   templateable={false}
   type={"[string]"}
@@ -385,7 +385,7 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
 
 ### indexed_fields
 
-Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]. Applicable only to `json` encoding.
+Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
 
 
 </Field>
