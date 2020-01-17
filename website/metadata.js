@@ -18708,6 +18708,26 @@ module.exports = {
 
       ]
     },
+    "logfmt": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "parse",
+      "id": "logfmt_transform",
+      "name": "logfmt",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "lua": {
       "beta": true,
       "delivery_guarantee": null,

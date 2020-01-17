@@ -166,6 +166,8 @@ module.exports = {
             
               "reference/transforms/log_to_metric",
             
+              "reference/transforms/logfmt",
+            
               "reference/transforms/lua",
             
               "reference/transforms/regex_parser",
