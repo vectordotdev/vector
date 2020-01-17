@@ -46,6 +46,7 @@ impl From<HashMap<Atom, Value>> for Unflatten {
 /// This produces one path down the tree for each key that has
 /// previously been flattened. The goal here is that the return value
 /// of this function will be merged into the overall tree.
+/// h
 fn unflatten(k: Atom, v: MapValue) -> MapValue {
     // Maps are delimited via `.`.
     let mut s = k.rsplit('.').peekable();
