@@ -385,7 +385,7 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
 
 ### indexed_fields
 
-Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
+Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]. Applicable only to `json` encoding.
 
 
 </Field>

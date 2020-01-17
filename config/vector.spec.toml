@@ -4233,7 +4233,7 @@ end
   healthcheck = true
   healthcheck = false
 
-  # Fields to be added to Splunk index.
+  # Fields to be added to Splunk index. Applicable only to `json` encoding.
   #
   # * optional
   # * no default
