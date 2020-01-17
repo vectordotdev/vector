@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 
@@ -193,11 +193,11 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
             if let Some(host) = &parsed.hostname {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key, host.clone());
+                    .insert(host_key, host.clone());
             } else if let Some(default_host) = default_host {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key, default_host);
+                    .insert(host_key, default_host);
             }
 
             let timestamp = parsed
@@ -206,7 +206,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
                 .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
-                .insert_implicit(event::TIMESTAMP.clone(), timestamp);
+                .insert(event::TIMESTAMP.clone(), timestamp);
 
             insert_fields_from_rfc5424(&mut event, parsed);
 
@@ -224,28 +224,28 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
 fn insert_fields_from_rfc5424(event: &mut Event, parsed: SyslogMessage) {
     let log = event.as_mut_log();
 
-    log.insert_implicit("severity", parsed.severity.as_str());
-    log.insert_implicit("facility", parsed.facility.as_str());
-    log.insert_implicit("version", parsed.version);
+    log.insert("severity", parsed.severity.as_str());
+    log.insert("facility", parsed.facility.as_str());
+    log.insert("version", parsed.version);
 
     if let Some(app_name) = parsed.appname {
-        log.insert_implicit("appname", app_name);
+        log.insert("appname", app_name);
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert_implicit("msgid", msg_id);
+        log.insert("msgid", msg_id);
     }
     if let Some(proc_id) = parsed.procid {
-        let value: ValueKind = match proc_id {
+        let value: Value = match proc_id {
             PID(pid) => pid.into(),
             Name(name) => name.into(),
         };
-        log.insert_implicit("procid", value);
+        log.insert("procid", value);
     }
 
     for (id, data) in parsed.sd.iter() {
         for (name, value) in data.iter() {
             let key = format!("{}.{}", id, name);
-            log.insert_explicit(key, value.clone());
+            log.insert(key, value.clone());
         }
     }
 }
@@ -309,23 +309,23 @@ mod test {
 
         {
             let expected = expected.as_mut_log();
-            expected.insert_implicit(
+            expected.insert(
                 event::TIMESTAMP.clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert_implicit("host", "74794bfb6795");
+            expected.insert("host", "74794bfb6795");
 
-            expected.insert_explicit("meta.sequenceId", "1");
-            expected.insert_explicit("meta.sysUpTime", "37");
-            expected.insert_explicit("meta.language", "EN");
-            expected.insert_explicit("origin.software", "test");
-            expected.insert_explicit("origin.ip", "192.168.0.1");
+            expected.insert("meta.sequenceId", "1");
+            expected.insert("meta.sysUpTime", "37");
+            expected.insert("meta.language", "EN");
+            expected.insert("origin.software", "test");
+            expected.insert("origin.ip", "192.168.0.1");
 
-            expected.insert_implicit("severity", "notice");
-            expected.insert_implicit("facility", "user");
-            expected.insert_implicit("version", 1);
-            expected.insert_implicit("appname", "root");
-            expected.insert_implicit("procid", 8449);
+            expected.insert("severity", "notice");
+            expected.insert("facility", "user");
+            expected.insert("version", 1);
+            expected.insert("appname", "root");
+            expected.insert("procid", 8449);
         }
 
         assert_eq!(
@@ -416,13 +416,11 @@ mod test {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
 
         let mut expected = Event::from(raw);
-        expected.as_mut_log().insert_implicit(
+        expected.as_mut_log().insert(
             event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
         );
-        expected
-            .as_mut_log()
-            .insert_implicit("host", "74794bfb6795");
+        expected.as_mut_log().insert("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),
@@ -436,13 +434,11 @@ mod test {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
 
         let mut expected = Event::from(raw);
-        expected.as_mut_log().insert_implicit(
+        expected.as_mut_log().insert(
             event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
         );
-        expected
-            .as_mut_log()
-            .insert_implicit("host", "74794bfb6795");
+        expected.as_mut_log().insert("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),
@@ -456,13 +452,11 @@ mod test {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
 
         let mut expected = Event::from(raw);
-        expected.as_mut_log().insert_implicit(
+        expected.as_mut_log().insert(
             event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
         );
-        expected
-            .as_mut_log()
-            .insert_implicit("host", "74794bfb6795");
+        expected.as_mut_log().insert("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),

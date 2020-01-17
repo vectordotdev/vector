@@ -36,7 +36,7 @@ impl UnixConfig {
 fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
     let mut event = Event::from(line);
     if let Some(host) = received_from {
-        event.as_mut_log().insert_implicit(host_key, host);
+        event.as_mut_log().insert(host_key, host);
     }
     trace!(message = "Received one event.", ?event);
     Some(event)

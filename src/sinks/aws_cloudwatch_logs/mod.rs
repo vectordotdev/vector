@@ -2,7 +2,7 @@ mod request;
 
 use crate::{
     dns::Resolver,
-    event::{self, Event, LogEvent, ValueKind},
+    event::{self, Event, LogEvent, Value},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -246,7 +246,7 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
             ts.timestamp_millis()
         } else {
             chrono::Utc::now().timestamp_millis()
@@ -568,7 +568,7 @@ mod tests {
     use super::*;
     use crate::{
         dns::Resolver,
-        event::{self, Event, ValueKind},
+        event::{self, Event, Value},
         region::RegionOrEndpoint,
         test_util::runtime,
     };
@@ -595,7 +595,7 @@ mod tests {
     fn partition_event() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert_implicit("log_stream", "stream");
+        event.as_mut_log().insert("log_stream", "stream");
 
         let stream = Template::from("{{log_stream}}");
         let group = "group".into();
@@ -614,7 +614,7 @@ mod tests {
     fn partition_event_with_prefix() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert_implicit("log_stream", "stream");
+        event.as_mut_log().insert("log_stream", "stream");
 
         let stream = Template::from("abcd-{{log_stream}}");
         let group = "group".into();
@@ -633,7 +633,7 @@ mod tests {
     fn partition_event_with_postfix() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert_implicit("log_stream", "stream");
+        event.as_mut_log().insert("log_stream", "stream");
 
         let stream = Template::from("{{log_stream}}-abcd");
         let group = "group".into();
@@ -677,10 +677,10 @@ mod tests {
     #[test]
     fn cloudwatch_encoded_event_retains_timestamp() {
         let mut event = Event::from("hello world").into_log();
-        event.insert_explicit("key", "value");
+        event.insert("key", "value");
         let encoded = svc(Default::default()).encode_log(event.clone());
 
-        let ts = if let ValueKind::Timestamp(ts) = event[&event::TIMESTAMP] {
+        let ts = if let Value::Timestamp(ts) = event[&event::TIMESTAMP] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -696,7 +696,7 @@ mod tests {
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();
-        event.insert_implicit("key", "value");
+        event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
         assert!(map.get(&event::TIMESTAMP).is_none());
@@ -709,7 +709,7 @@ mod tests {
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();
-        event.insert_explicit("key", "value");
+        event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
         assert_eq!(encoded.message, "hello world");
     }
@@ -922,7 +922,7 @@ mod integration_tests {
             .map(|(i, e)| {
                 let mut event = Event::from(e);
                 let stream = format!("{}", (i % 2));
-                event.as_mut_log().insert_implicit("key", stream);
+                event.as_mut_log().insert("key", stream);
                 event
             })
             .collect::<Vec<_>>();

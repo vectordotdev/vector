@@ -16,6 +16,7 @@ message Log {
 }
 
 message Value {
+  reserved 3;
   oneof kind {
     bytes raw_bytes = 1;
     google.protobuf.Timestamp timestamp = 2;
@@ -23,7 +24,6 @@ message Value {
     double float = 5;
     bool boolean = 6;
   }
-  bool explicit = 3;
 }
 
 message Metric {

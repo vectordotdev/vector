@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, flatten::flatten, Event, LogEvent, ValueKind},
+    event::{self, flatten::flatten, Event, LogEvent, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
@@ -9,7 +9,7 @@ use futures::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
-use serde_json::{de::IoRead, json, Deserializer, Value};
+use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use std::{
@@ -283,7 +283,7 @@ struct EventStream<R: Read> {
     /// Count of sended events
     events: usize,
     /// Optinal channel from headers
-    channel: Option<ValueKind>,
+    channel: Option<Value>,
     /// Default time
     time: Time,
     /// Remaining extracted default values
@@ -332,7 +332,7 @@ impl<R: Read> Stream for EventStream<R> {
     type Error = Rejection;
     fn poll(&mut self) -> Result<Async<Option<Event>>, Rejection> {
         // Parse JSON object
-        let mut json = match self.from_reader_take::<Value>() {
+        let mut json = match self.from_reader_take::<JsonValue>() {
             Ok(Some(json)) => json,
             Ok(None) => {
                 return if self.events == 0 {
@@ -354,13 +354,13 @@ impl<R: Read> Stream for EventStream<R> {
         // Process event field
         match json.get_mut("event") {
             Some(event) => match event.take() {
-                Value::String(string) => {
+                JsonValue::String(string) => {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert_explicit(event::MESSAGE.clone(), string)
+                    log.insert(event::MESSAGE.clone(), string)
                 }
-                Value::Object(mut object) => {
+                JsonValue::Object(mut object) => {
                     if object.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
@@ -369,7 +369,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if let Some(line) = object.remove("line") {
                         match line {
                             // This don't quite fit the meaning of a event::MESSAGE
-                            Value::Array(_) | Value::Object(_) => {
+                            JsonValue::Array(_) | JsonValue::Object(_) => {
                                 event::flatten::insert(log, "line", line)
                             }
                             _ => {
@@ -386,21 +386,21 @@ impl<R: Read> Stream for EventStream<R> {
         }
 
         // Process channel field
-        if let Some(Value::String(guid)) = json.get_mut("channel").map(Value::take) {
-            log.insert_explicit(CHANNEL.clone(), guid);
+        if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
+            log.insert(CHANNEL.clone(), guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert_explicit(CHANNEL.clone(), guid.clone());
+            log.insert(CHANNEL.clone(), guid.clone());
         }
 
         // Process fields field
-        if let Some(Value::Object(object)) = json.get_mut("fields").map(Value::take) {
+        if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
             flatten(log, object);
         }
 
         // Process time field
-        let parsed_time = match json.get_mut("time").map(Value::take) {
-            Some(Value::Number(time)) => Some(Some(time)),
-            Some(Value::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
+        let parsed_time = match json.get_mut("time").map(JsonValue::take) {
+            Some(JsonValue::Number(time)) => Some(Some(time)),
+            Some(JsonValue::String(time)) => Some(time.parse::<serde_json::Number>().ok()),
             _ => None,
         };
         match parsed_time {
@@ -422,8 +422,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert_explicit(event::TIMESTAMP.clone(), time),
-            Time::Now(time) => log.insert_implicit(event::TIMESTAMP.clone(), time),
+            Time::Provided(time) => log.insert(event::TIMESTAMP.clone(), time),
+            Time::Now(time) => log.insert(event::TIMESTAMP.clone(), time),
         }
 
         // Extract default extracted fields
@@ -441,7 +441,7 @@ impl<R: Read> Stream for EventStream<R> {
 struct DefaultExtractor {
     field: &'static str,
     to_field: &'static Atom,
-    value: Option<ValueKind>,
+    value: Option<Value>,
 }
 
 impl DefaultExtractor {
@@ -456,7 +456,7 @@ impl DefaultExtractor {
     fn new_with(
         field: &'static str,
         to_field: &'static Atom,
-        value: impl Into<Option<ValueKind>>,
+        value: impl Into<Option<Value>>,
     ) -> Self {
         DefaultExtractor {
             field,
@@ -465,15 +465,15 @@ impl DefaultExtractor {
         }
     }
 
-    fn extract(&mut self, log: &mut LogEvent, value: &mut Value) {
+    fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue) {
         // Process json_field
-        if let Some(Value::String(new_value)) = value.get_mut(self.field).map(Value::take) {
+        if let Some(JsonValue::String(new_value)) = value.get_mut(self.field).map(JsonValue::take) {
             self.value = Some(new_value.into());
         }
 
         // Add data field
         if let Some(index) = self.value.as_ref() {
-            log.insert_explicit(self.to_field.clone(), index.clone());
+            log.insert(self.to_field.clone(), index.clone());
         }
     }
 }
@@ -495,7 +495,7 @@ fn raw_event(
     host: Option<String>,
 ) -> Result<Event, Rejection> {
     // Process gzip
-    let message: ValueKind = if gzip {
+    let message: Value = if gzip {
         let mut data = Vec::new();
         match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
@@ -514,18 +514,18 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert_explicit(event::MESSAGE.clone(), message);
+    log.insert(event::MESSAGE.clone(), message);
 
     // Add channel
-    log.insert_explicit(CHANNEL.clone(), channel.as_bytes());
+    log.insert(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert_explicit(event::HOST.clone(), host.as_bytes());
+        log.insert(event::HOST.clone(), host.as_bytes());
     }
 
     // Add timestamp
-    log.insert_implicit(event::TIMESTAMP.clone(), Utc::now());
+    log.insert(event::TIMESTAMP.clone(), Utc::now());
 
     Ok(event)
 }
@@ -830,8 +830,8 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("greeting", "hello");
-        event.as_mut_log().insert_explicit("name", "bob");
+        event.as_mut_log().insert("greeting", "hello");
+        event.as_mut_log().insert("name", "bob");
 
         let pump = sink.send(event);
         let _ = rt.block_on(pump).unwrap();
@@ -847,7 +847,7 @@ mod tests {
         let (mut rt, sink, source) = start(Encoding::Json, Compression::Gzip);
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("line", "hello");
+        event.as_mut_log().insert("line", "hello");
 
         let pump = sink.send(event);
         let _ = rt.block_on(pump).unwrap();

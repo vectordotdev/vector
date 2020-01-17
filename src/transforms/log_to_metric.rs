@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
-    event::{self, ValueKind},
+    event::{self, Value},
     runtime::TaskExecutor,
     template::Template,
     topology::config::{DataType, TransformConfig, TransformDescription},
@@ -142,7 +142,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
     let timestamp = log
         .get(&event::TIMESTAMP)
-        .and_then(ValueKind::as_timestamp)
+        .and_then(Value::as_timestamp)
         .cloned();
 
     match config {
@@ -283,9 +283,8 @@ mod tests {
 
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
-        log.as_mut_log().insert_explicit(key, value);
-        log.as_mut_log()
-            .insert_implicit(event::TIMESTAMP.clone(), ts());
+        log.as_mut_log().insert(key, value);
+        log.as_mut_log().insert(event::TIMESTAMP.clone(), ts());
         log
     }
 
@@ -328,8 +327,8 @@ mod tests {
         );
 
         let mut event = create_event("message", "i am log");
-        event.as_mut_log().insert_explicit("method", "post");
-        event.as_mut_log().insert_explicit("code", "200");
+        event.as_mut_log().insert("method", "post");
+        event.as_mut_log().insert("code", "200");
 
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
@@ -505,11 +504,9 @@ mod tests {
         );
 
         let mut event = Event::from("i am a log");
-        event
-            .as_mut_log()
-            .insert_implicit(event::TIMESTAMP.clone(), ts());
-        event.as_mut_log().insert_explicit("status", "42");
-        event.as_mut_log().insert_explicit("backtrace", "message");
+        event.as_mut_log().insert(event::TIMESTAMP.clone(), ts());
+        event.as_mut_log().insert("status", "42");
+        event.as_mut_log().insert("backtrace", "message");
 
         let mut transform = LogToMetric::new(config);
 
@@ -555,14 +552,12 @@ mod tests {
         );
 
         let mut event = Event::from("i am a log");
-        event
-            .as_mut_log()
-            .insert_implicit(event::TIMESTAMP.clone(), ts());
-        event.as_mut_log().insert_explicit("status", "42");
-        event.as_mut_log().insert_explicit("backtrace", "message");
-        event.as_mut_log().insert_implicit("host", "local");
-        event.as_mut_log().insert_implicit("worker", "abc");
-        event.as_mut_log().insert_implicit("service", "xyz");
+        event.as_mut_log().insert(event::TIMESTAMP.clone(), ts());
+        event.as_mut_log().insert("status", "42");
+        event.as_mut_log().insert("backtrace", "message");
+        event.as_mut_log().insert("host", "local");
+        event.as_mut_log().insert("worker", "abc");
+        event.as_mut_log().insert("service", "xyz");
 
         let mut transform = LogToMetric::new(config);
 

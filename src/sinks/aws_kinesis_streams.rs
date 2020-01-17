@@ -283,7 +283,7 @@ mod tests {
     fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("key", "value");
+        event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &None, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_custom_partition_key() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert_implicit("key", "some_key");
+        event.as_mut_log().insert("key", "some_key");
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
@@ -305,9 +305,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_custom_partition_key_limit() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("key", random_string(300));
+        event.as_mut_log().insert("key", random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());

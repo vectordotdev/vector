@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::{self, ValueKind},
+    event::{self, Value},
     runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
@@ -54,7 +54,7 @@ impl Transform for AnsiStripper {
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
             ),
-            Some(ValueKind::Bytes(ref mut bytes)) => {
+            Some(Value::Bytes(ref mut bytes)) => {
                 *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
                     Ok(b) => b.into(),
                     Err(error) => {
@@ -82,7 +82,7 @@ impl Transform for AnsiStripper {
 mod tests {
     use super::AnsiStripper;
     use crate::{
-        event::{Event, ValueKind, MESSAGE},
+        event::{Event, Value, MESSAGE},
         transforms::Transform,
     };
 
@@ -98,7 +98,7 @@ mod tests {
 
                 assert_eq!(
                     event.into_log().remove(&MESSAGE).unwrap(),
-                    ValueKind::from("foo bar")
+                    Value::from("foo bar")
                 );
             )+
         };

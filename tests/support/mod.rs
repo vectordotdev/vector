@@ -7,7 +7,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
-use vector::event::{metric::MetricValue, Event, ValueKind, MESSAGE};
+use vector::event::{metric::MetricValue, Event, Value, MESSAGE};
 use vector::runtime::TaskExecutor;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
@@ -93,7 +93,7 @@ impl Transform for MockTransform {
             Event::Log(log) => {
                 let mut v = log.get(&MESSAGE).unwrap().to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
+                log.insert(MESSAGE.clone(), Value::from(v));
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {

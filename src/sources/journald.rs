@@ -1,6 +1,6 @@
 use crate::{
     event,
-    event::{Event, LogEvent, ValueKind},
+    event::{Event, LogEvent, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
@@ -143,20 +143,20 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert_explicit(event::MESSAGE.clone(), message);
+        log.insert(event::MESSAGE.clone(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert_explicit(event::HOST.clone(), host);
+        log.insert(event::HOST.clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log.get(&TIMESTAMP) {
-        if let ValueKind::Bytes(timestamp) = timestamp {
+        if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
                 let timestamp = chrono::Utc.timestamp(
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert_explicit(event::TIMESTAMP.clone(), ValueKind::Timestamp(timestamp));
+                log.insert(event::TIMESTAMP.clone(), Value::Timestamp(timestamp));
             }
         }
     }
@@ -463,11 +463,11 @@ mod tests {
         assert_eq!(received.len(), 2);
         assert_eq!(
             received[0].as_log()[&event::MESSAGE],
-            ValueKind::Bytes("System Initialization".into())
+            Value::Bytes("System Initialization".into())
         );
         assert_eq!(
             received[1].as_log()[&event::MESSAGE],
-            ValueKind::Bytes("unit message".into())
+            Value::Bytes("unit message".into())
         );
     }
 
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(received.len(), 1);
         assert_eq!(
             received[0].as_log()[&event::MESSAGE],
-            ValueKind::Bytes("unit message".into())
+            Value::Bytes("unit message".into())
         );
     }
 
@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(received.len(), 1);
         assert_eq!(
             received[0].as_log()[&event::MESSAGE],
-            ValueKind::Bytes("unit message".into())
+            Value::Bytes("unit message".into())
         );
     }
 }

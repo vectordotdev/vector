@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
@@ -691,7 +691,7 @@ impl ContainerLogInfo {
             StreamType::StdOut => STDOUT.clone(),
             _ => return None,
         };
-        log_event.insert_implicit(STREAM.clone(), stream);
+        log_event.insert(STREAM.clone(), stream);
 
         let mut bytes_message = BytesMut::from(message.data);
 
@@ -720,7 +720,7 @@ impl ContainerLogInfo {
                     }
                 }
                 // Supply timestamp
-                log_event.insert_explicit(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc));
+                log_event.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc));
 
                 self.last_log = Some((timestamp, self.generation));
 
@@ -746,18 +746,18 @@ impl ContainerLogInfo {
         }
 
         // Supply message
-        log_event.insert_explicit(event::MESSAGE.clone(), bytes_message.freeze());
+        log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
 
         // Supply container
-        log_event.insert_implicit(CONTAINER.clone(), self.id.0.clone());
+        log_event.insert(CONTAINER.clone(), self.id.0.clone());
 
         // Add Metadata
         for (key, value) in self.metadata.labels.iter() {
-            log_event.insert_implicit(key.clone(), value.clone());
+            log_event.insert(key.clone(), value.clone());
         }
-        log_event.insert_implicit(NAME.clone(), self.metadata.name.clone());
-        log_event.insert_implicit(IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert_implicit(CREATED_AT.clone(), self.metadata.created_at.clone());
+        log_event.insert(NAME.clone(), self.metadata.name.clone());
+        log_event.insert(IMAGE.clone(), self.metadata.image.clone());
+        log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
 
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
@@ -767,11 +767,11 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(Atom, ValueKind)>,
+    labels: Vec<(Atom, Value)>,
     /// name -> String
-    name: ValueKind,
+    name: Value,
     /// image -> String
-    image: ValueKind,
+    image: Value,
     /// created_at
     created_at: DateTime<Utc>,
 }
