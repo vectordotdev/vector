@@ -176,7 +176,7 @@ mod tests {
 
         assert_eq!(
             log[&event::MESSAGE],
-r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
         );
         assert_eq!(
             log[&event::TIMESTAMP],
@@ -185,6 +185,6 @@ r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&event::HOST], "lumberjack-store.timber.io".into());
+        assert_eq!(log[&event::HOST], "host".into());
     }
 }
