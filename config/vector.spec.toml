@@ -1108,18 +1108,18 @@ dns_servers = ["0.0.0.0:53"]
       status = "{{status}}"
 
 # Accepts `log` events and allows you to extract data from a logfmt-formatted log field.
-[transforms.logfmt]
+[transforms.logfmt_parser]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `logfmt`.
+  # component to use. The value _must_ be `logfmt_parser`.
   #
   # * required
   # * type: string
-  # * must be: "logfmt"
-  type = "logfmt"
+  # * must be: "logfmt_parser"
+  type = "logfmt_parser"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -1146,7 +1146,7 @@ dns_servers = ["0.0.0.0:53"]
   # Types
   #
 
-  [transforms.logfmt.types]
+  [transforms.logfmt_parser.types]
     # A definition of log field type conversions. They key is the log field name
     # and the value is the type. `strptime` specifiers are supported for the
     # `timestamp` type.

@@ -18708,7 +18708,7 @@ module.exports = {
 
       ]
     },
-    "logfmt": {
+    "logfmt_parser": {
       "beta": false,
       "delivery_guarantee": null,
       "description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
@@ -18716,8 +18716,8 @@ module.exports = {
         "log"
       ],
       "function_category": "parse",
-      "id": "logfmt_transform",
-      "name": "logfmt",
+      "id": "logfmt_parser_transform",
+      "name": "logfmt_parser",
       "operating_systems": [
 
       ],

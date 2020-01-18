@@ -19,10 +19,10 @@ pub struct LogfmtConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<LogfmtConfig>("logfmt")
+    TransformDescription::new::<LogfmtConfig>("logfmt_parser")
 }
 
-#[typetag::serde(name = "logfmt")]
+#[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
@@ -44,7 +44,7 @@ impl TransformConfig for LogfmtConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "logfmt"
+        "logfmt_parser"
     }
 }
 

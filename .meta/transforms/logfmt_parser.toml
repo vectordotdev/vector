@@ -1,4 +1,4 @@
-[transforms.logfmt]
+[transforms.logfmt_parser]
 title = "Logfmt Parser"
 allow_you_to_description = """\
 extract data from a logfmt-formatted log field\
@@ -11,14 +11,14 @@ output_types = ["log"]
 resources = []
 types_coercion = true
 
-[transforms.logfmt.options.field]
+[transforms.logfmt_parser.options.field]
 type = "string"
 common = true
 default = "message"
 required = true
 description = "The log field to parse."
 
-[transforms.logfmt.options.drop_field]
+[transforms.logfmt_parser.options.drop_field]
 type = "bool"
 common = true
 default = true
