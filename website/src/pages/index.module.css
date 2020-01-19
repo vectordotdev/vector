@@ -65,6 +65,7 @@
 .indexHeroDiagram {
   margin: calc( var(--ifm-spacing-vertical) * 4 ) 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
   max-height: 325px;
+  height: auto;
   width: 100%;
 }
 
@@ -81,8 +82,12 @@ html[data-theme="dark"] .hero {
   }
 
   .indexHeroDiagram {
-    display: none;
+    margin: var(--ifm-spacing-vertical) 0 0 0;
   }
+
+/*  .indexHeroDiagram {
+    display: none;
+  }*/
 }
 
 /*

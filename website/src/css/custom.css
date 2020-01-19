@@ -515,6 +515,15 @@ table.comparison tr td.bar.vector .bar {
 }
 
 /**
+ * github-badge
+ *
+ * Github star count badge in the header
+ */
+
+.github-badge {
+}
+
+/**
  * h*
  *
  * Global headings with anchor links that appear on mouse over.
@@ -570,9 +579,6 @@ header h1 {
     background-size: 300% 300%;
   }
 }
-header.hero h1 {
-  font-size: 2.5rem;
-}
 .hero {
   display: block;
   align-items: center;
@@ -580,6 +586,9 @@ header.hero h1 {
   padding: 3em 0;
   position: relative;
   text-align: center;
+}
+.hero h1 {
+  font-size: 2.5rem;
 }
 .hero .hero__subtitle {
   color: var(--ifm-color-emphasis-600);
@@ -622,9 +631,18 @@ header.hero h1 {
   }
 }
 @media (max-width: 480px) {
+  .hero {
+    text-align: left;
+  }
+  .hero h1 {
+    font-size: 2em;
+  }
+  .hero .hero__subtitle {
+    font-size: 1em;
+  }
   .hero .hero__buttons .button {
     display: block;
-    border-radius: 2rem;
+    border-radius: 0.5rem;
     margin: 0 0 1rem 0;
     min-width: auto;
     width: 100%;
@@ -824,6 +842,7 @@ input[type="text"]:focus {
 .navbar .search-icon-hidden {
   display: none;
 }
+
 @media (max-width: 996px) {
   .navbar .navbar__search {
     flex-grow: 1;

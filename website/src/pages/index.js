@@ -451,11 +451,11 @@ function Home() {
           )}
           <h1>Take Control Of Your Observability Data</h1>
           <p className="hero__subtitle">
-            Vector is an <a href={repoUrl()}>open-source</a> utility for building <a href="#topologies">end-to-end</a>, <a href="#performance">high performance</a> observability pipelines.
+            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
           </p>
           <div className="hero__buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
-            <Link to="/download" className="button button--primary">Download v{latest_release.version}</Link>
+            <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
         </div>
