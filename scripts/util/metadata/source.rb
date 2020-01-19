@@ -42,6 +42,15 @@ class Source < Component
     end
   end
 
+  def can_receive_from?(component)
+    false
+  end
+
+  def can_send_to?(component)
+    component.respond_to?(:input_types) &&
+      component.input_types.intersection(output_types).any?
+  end
+
   def description
     @description ||= "Ingests data through #{through_description} and outputs #{output_types.to_sentence} events."
   end

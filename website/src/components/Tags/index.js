@@ -6,7 +6,7 @@ import classnames from 'classnames';
 import {enrichTags} from '@site/src/exports/tags';
 import styles from './styles.module.css';
 
-function BlogPostTags({tags, valuesOnly}) {
+function Tags({tags, valuesOnly}) {
   const enrichedTags = enrichTags(tags);
 
   return (
@@ -18,4 +18,4 @@ function BlogPostTags({tags, valuesOnly}) {
   );
 }
 
-export default BlogPostTags;
+export default Tags;

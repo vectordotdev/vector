@@ -12,22 +12,22 @@ service_limits_short_link = "aws_kinesis_firehose_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)"
 
-<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_firehose.env_vars") %>
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_firehose.env_vars") %>
 
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_kinesis_firehose.options") %>
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_kinesis_firehose.options") %>
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "aws_kinesis_firehose") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "aws_kinesis_firehose") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_kinesis_firehose.options", common: false, max_events: 500, max_size: nil, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_kinesis_firehose.options", common: false, max_events: 500, max_size: nil, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.aws_kinesis_firehose.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.aws_kinesis_firehose.options",
   common: false,
   in_flight_limit: 5,
@@ -39,7 +39,7 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
   timeout_secs: 30
 ) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_kinesis_firehose.options",
   encodings: ["json", "text"]
 ) %>

@@ -1,0 +1,40 @@
+[tutorials.setup.sources.docker]
+description = """\
+This tutorial works by deploying Vector as a dedicated logging container to \
+collect, transform, and route Docker logs with ease. Vector is a lightweight, \
+high-performance tool for building observability pipelines, and is very well \
+suited for this use case. The diagram below demonstrates how this tutorial \
+works:
+
+<SVG src="/img/tutorials/sources/docker.svg" />
+"""
+
+[[tutorials.setup.sources.docker.steps]]
+type = "text"
+title = "Collect Docker logs"
+
+<%= render("_partials/tutorials/setup/sources/_docker_steps.toml", namespace: "tutorials.setup.sources.docker.steps.steps") %>
+
+[[tutorials.setup.sources.docker.steps]]
+id = "sink"
+type = "choice"
+title = "Send your Docker logs to your destination"
+placeholder = "Select your destination..."
+description = """\
+Now that Vector is hooked up and receiving our Docker lets, let's send them to \
+one or more destinations.\
+"""
+
+[tutorials.setup.sources.docker.steps.choices.aws_cloudwatch]
+type = "text"
+title = "AWS CloudWatch"
+description = "Now it's time to send your logs to AWS cloudwatch."
+
+<%= render("_partials/tutorials/setup/sinks/_aws_s3_steps.toml", namespace: "tutorials.setup.sources.docker.steps.choices.aws_cloudwatch.steps") %>
+
+[tutorials.setup.sources.docker.steps.choices.aws_s3]
+type = "text"
+title = "AWS S3"
+description = "Now it's time to send your logs to AWS s3."
+
+<%= render("_partials/tutorials/setup/sinks/_aws_s3_steps.toml", namespace: "tutorials.setup.sources.docker.steps.choices.aws_s3.steps") %>

@@ -13,6 +13,7 @@ require_relative "metadata/release"
 require_relative "metadata/source"
 require_relative "metadata/streaming_sink"
 require_relative "metadata/transform"
+require_relative "metadata/tutorial"
 
 # Object representation of the /.meta directory
 #
@@ -38,11 +39,11 @@ class Metadata
   end
 
   class << self
-    def load!(meta_dir, docs_root, pages_root)
+    def load!(meta_dir, docs_root, guides_root, pages_root)
       metadata = load_metadata!(meta_dir)
       json_schema = load_json_schema!(meta_dir)
       validate_schema!(json_schema, metadata)
-      new(metadata, docs_root, pages_root)
+      new(metadata, docs_root, guides_root, pages_root)
     end
 
     private
@@ -137,9 +138,10 @@ class Metadata
     :sinks,
     :sources,
     :team,
-    :transforms
+    :transforms,
+    :tutorials
 
-  def initialize(hash, docs_root, pages_root)
+  def initialize(hash, docs_root, guides_root, pages_root)
     @data_model = DataModel.new(hash.fetch("data_model"))
     @installation = OpenStruct.new()
     @options = hash.fetch("options").to_struct_with_name(Field)
@@ -148,6 +150,7 @@ class Metadata
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
     @tests = Field.new(hash.fetch("tests").merge({"name" => "tests"}))
+    @tutorials = hash.fetch("tutorials").to_struct_with_name(Tutorial, should_have_keys: ["steps"])
 
     # domains
 
@@ -236,7 +239,7 @@ class Metadata
 
     # links
 
-    @links = Links.new(hash.fetch("links"), docs_root, pages_root)
+    @links = Links.new(hash.fetch("links"), docs_root, guides_root, pages_root)
 
     # env vars
 

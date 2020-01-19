@@ -6,9 +6,9 @@ description: Install Vector on MacOS
 
 Vector can be installed on MacOS through the following methods:
 
-import InstallChoices from '@site/src/components/InstallChoices';
+import InstallationPlatformChoices from '@site/src/components/InstallationPlatformChoices';
 
-<InstallChoices docker={true} os="MacOS" packageManager="Homebrew" />
+<InstallationPlatformChoices docker={true} os="MacOS" packageManager="Homebrew" />
 
 
 

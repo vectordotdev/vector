@@ -9,7 +9,7 @@ requirements = {}
 through_description = "a socket, such as a TCP, UDP, or Unix socket"
 
 <%= render(
-  "_partials/_component_options.toml",
+  "_partials/fields/_component_options.toml",
   type: "source",
   name: "socket",
   groups: ["tcp", "udp", "unix"]
@@ -82,7 +82,7 @@ The timeout before a connection is forcefully closed during shutdown.\
 """
 
 <%= render(
-  "_partials/_tls_acceptor_options.toml",
+  "_partials/fields/_tls_acceptor_options.toml",
   namespace: "sources.socket.options",
   relevant: "relevant_when = {mode = \"tcp\"}",
   groups: ["tcp"]

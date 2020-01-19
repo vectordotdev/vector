@@ -8,7 +8,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements.network = true
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "aws_ec2_metadata") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "aws_ec2_metadata") %>
 
 [transforms.aws_ec2_metadata.options.namespace]
 type = "string"

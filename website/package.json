@@ -13,6 +13,8 @@
     "@docusaurus/core": "^2.0.0-alpha.48",
     "@docusaurus/preset-classic": "^2.0.0-alpha.48",
     "@docusaurus/utils": "^2.0.0-alpha.48",
+    "@types/fs-extra": "^8.1.0",
+    "@types/lodash": "^4.14.149",
     "axios": "^0.18.1",
     "cash-dom": "^4.1.5",
     "classnames": "^2.2.6",

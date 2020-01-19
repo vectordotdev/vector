@@ -8,7 +8,7 @@ output_types = ["log", "metric"]
 requirements = {}
 through_description = "another upstream [`vector` sink][docs.sinks.vector]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "vector") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "vector") %>
 
 [sources.vector.options.address]
 type = "string"
@@ -29,4 +29,4 @@ description = """\
 The timeout before a connection is forcefully closed during shutdown.\
 """
 
-<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.vector.options", relevant: "") %>
+<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.vector.options", relevant: "") %>

@@ -12,22 +12,22 @@ service_limits_short_link = "aws_cw_logs_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
 
-<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_logs.env_vars") %>
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_logs.env_vars") %>
 
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "aws_cloudwatch_logs") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "aws_cloudwatch_logs") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_cloudwatch_logs.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_cloudwatch_logs.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
   common: false,
   in_flight_limit: 5,
@@ -39,7 +39,7 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
   timeout_secs: 30
 ) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
   encodings: ["json", "text"]
 ) %>

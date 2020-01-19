@@ -12,22 +12,22 @@ service_limits_short_link = "aws_kinesis_streams_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
 
-<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_streams.env_vars") %>
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_streams.env_vars") %>
 
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_kinesis_streams.options") %>
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_kinesis_streams.options") %>
 
-<%= render("_partials/_component_options.toml", type: "sinks", name: "aws_kinesis_streams") %>
+<%= render("_partials/fields/_component_options.toml", type: "sinks", name: "aws_kinesis_streams") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_kinesis_streams.options", common: false, max_events: 500, max_size: nil, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_kinesis_streams.options", common: false, max_events: 500, max_size: nil, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.aws_kinesis_streams.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.aws_kinesis_streams.options",
   common: false,
   in_flight_limit: 5,
@@ -39,7 +39,7 @@ write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.
   timeout_secs: 30
 ) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_kinesis_streams.options",
   encodings: ["json", "text"]
 ) %>

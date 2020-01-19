@@ -13,14 +13,14 @@ service_providers = ["InfluxData"]
 write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API"
 
 <%= render(
-  "_partials/_component_options.toml",
+  "_partials/fields/_component_options.toml",
   groups: ["v1", "v2"],
   name: "influxdb_metrics",
   type: "sink"
 ) %>
 
 <%= render(
-  "_partials/_batch_options.toml",
+  "_partials/fields/_batch_options.toml",
   common: false,
   groups: ["v1", "v2"],
   max_events: 20,
@@ -30,7 +30,7 @@ write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.influxdb_metrics.options",
   common: false,
   groups: ["v1", "v2"],

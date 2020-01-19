@@ -11,18 +11,18 @@ requirements = {}
 service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_stackdriver_logging") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "gcp_stackdriver_logging") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.gcp_stackdriver_logging.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.gcp_stackdriver_logging.options",
   common: false,
   in_flight_limit: 5,
@@ -34,7 +34,7 @@ write_to_description = "[Google Cloud Platform's Stackdriver Logging service][ur
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_stackdriver_logging", access: "Stackdriver Logging API", required: true) %>
+<%= render("_partials/fields/_gcp.toml", namespace: "sinks.gcp_stackdriver_logging", access: "Stackdriver Logging API", required: true) %>
 
 [sinks.gcp_stackdriver_logging.options.project_id]
 type = "string"
@@ -125,9 +125,9 @@ For example, Compute Engine VM instances use the labels `projectId`, \
 `instanceId`, and `zone`.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.gcp_stackdriver_logging.options",
   encodings: []
 ) %>

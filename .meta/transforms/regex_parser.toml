@@ -10,7 +10,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "regex_parser") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "regex_parser") %>
 
 [transforms.regex_parser.options.drop_field]
 type = "bool"
@@ -39,4 +39,4 @@ description = """\
 The Regular Expression to apply. Do not include the leading or trailing `/`.\
 """
 
-<%= render("_partials/_types.toml", namespace: "transforms.regex_parser", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.regex_parser.options", common: true) %>

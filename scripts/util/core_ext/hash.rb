@@ -21,23 +21,27 @@ class Hash
     to_param(*args).gsub("[]", "").gsub("%5B%5D", "")
   end
 
-  def to_struct(&block)
+  def to_struct(should_have_keys: [], &block)
     new_hash = {}
 
     each do |key, val|
       new_hash[key] =
-        if block_given?
-          yield(key, val)
+        if val.is_a?(Hash) && (should_have_keys.empty? || (should_have_keys - val.keys).empty?)
+          if block_given?
+            yield(key, val)
+          else
+            val
+          end
         else
-          val
+          val.to_struct(should_have_keys: should_have_keys, &block)
         end
     end
 
     AccessibleHash.new(new_hash)
   end
 
-  def to_struct_with_name(constructor)
-    to_struct do |key, hash|
+  def to_struct_with_name(constructor, should_have_keys: [])
+    to_struct(should_have_keys: should_have_keys) do |key, hash|
       constructor.new(hash.merge({"name" => key}))
     end
   end

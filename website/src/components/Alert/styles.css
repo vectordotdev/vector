@@ -12,6 +12,11 @@
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 
+.alert.alert--fill {
+  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
+  color: var(--ifm-color-primary) !important;
+}
+
 .alert > i.feather {
   float: left;
   font-size: 2em !important;

@@ -6,9 +6,9 @@ description: Install Vector on the Debian operating system
 
 Vector can be installed on Debian through the following methods:
 
-import InstallChoices from '@site/src/components/InstallChoices';
+import InstallationPlatformChoices from '@site/src/components/InstallationPlatformChoices';
 
-<InstallChoices docker={true} os="Linux" packageManager="DPKG" />
+<InstallationPlatformChoices docker={true} os="Linux" packageManager="DPKG" />
 
 
 

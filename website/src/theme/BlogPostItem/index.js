@@ -1,10 +1,10 @@
 import React from 'react';
 
 import Avatar from '@site/src/components/Avatar';
-import BlogPostTags from '@site/src/components/BlogPostTags';
 import Link from '@docusaurus/Link';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
+import Tags from '@site/src/components/Tags';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
@@ -34,7 +34,7 @@ function BlogPostItem(props) {
         <h2>{title}</h2>
         <div className="blog-post-item--subtitle">{description}</div>
         <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
-        <BlogPostTags tags={tags} />
+        <Tags tags={tags} />
       </article>
     </Link>
   );

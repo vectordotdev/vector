@@ -8,6 +8,9 @@ Vector can be installed through the [Nix package manager][urls.nix] via
 [Vector's Nix package][urls.vector_nix_package]. This package manager is
 generally used on [NixOS][urls.nixos].
 
+import Alert from '@site/src/components/Alert';
+import CodeExplanation from '@site/src/components/CodeExplanation';
+
 <Alert type="warning">
 
 Because Vector must be manually updated on Nix, new Vector releases will be
@@ -23,13 +26,13 @@ delayed. Generally new Vector releases are made available within a few days.
     nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
     ```
 
-    <Alert icon={false} type="info">
+    <CodeExplanation>
 
     * The `--file` flag ensures that you're installing the latest stable version
       of Vector (<%= metadata.latest_version %>).
     * The `--attr` improves installation speed.
 
-    </Alert>
+    </CodeExplanation>
 
 2.  Start Vector
 
@@ -37,13 +40,13 @@ delayed. Generally new Vector releases are made available within a few days.
     vector --config /path/to/vector.toml
     ```
 
-    <Alert icon={false} type="info">
+    <CodeExplanation>
 
     * `vector` is placed in your `$PATH`.
     * You must create a [Vector configuration file][docs.configuration] to
       successfully start Vector.
 
-    </Alert>
+    </CodeExplanation>
 
 ### Previous Versions
 

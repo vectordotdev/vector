@@ -11,18 +11,18 @@ requirements = {}
 service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview)"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_cloud_storage") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "gcp_cloud_storage") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_cloud_storage.options", common: false, max_events: nil, max_size: 10485760, timeout_secs: 300) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.gcp_cloud_storage.options", common: false, max_events: nil, max_size: 10485760, timeout_secs: 300) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.gcp_cloud_storage.options",
   common: true
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.gcp_cloud_storage.options",
   common: false,
   in_flight_limit: 5,
@@ -34,7 +34,7 @@ write_to_description = "[Google Cloud Platform's Cloud Storage service](https://
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_cloud_storage", access: "Cloud Storage API", required: true) %>
+<%= render("_partials/fields/_gcp.toml", namespace: "sinks.gcp_cloud_storage", access: "Cloud Storage API", required: true) %>
 
 [sinks.gcp_cloud_storage.options.bucket]
 type = "string"
@@ -117,7 +117,7 @@ category = "Object Names"
 default = "log"
 description = "The filename extension to use in the object name."
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.gcp_cloud_storage.options",
   encodings: ["ndjson", "text"]
 ) %>
@@ -132,4 +132,4 @@ description = "The compression mechanism to use."
 gzip = "GZIP compression"
 none = "No compression"
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_cloud_storage.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>
+<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sinks.gcp_cloud_storage.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>

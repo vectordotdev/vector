@@ -293,10 +293,10 @@ For example:
   "container_id": "9b6247364a03",
   "container_name": "evil_ptolemy",
   "image": "ubuntu:latest",
-  "com.example.vendor": "Timber Inc.",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "stream": "stdout",
-  "timestamp": "2019-11-01T21:15:47+00:00"
+  "timestamp": "2019-11-01T21:15:47+00:00",
+  "com.example.vendor": "Timber Inc."
 }
 ```
 
@@ -409,32 +409,6 @@ The image name that the container is based on.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
-  groups={[]}
-  name={"`[label-key]`"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### `[label-key]`
-
-[Docker object labels][urls.docker_object_labels]. Each label is inserted with
-it's exact key/value pair.
-
-
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   groups={[]}
   name={"message"}
@@ -499,6 +473,32 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 ### timestamp
 
 The UTC timestamp extracted from the Docker log event.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
+  groups={[]}
+  name={"`[label-key]`"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### `[label-key]`
+
+[Docker object labels][urls.docker_object_labels]. Each label is inserted with
+it's exact key/value pair.
 
 
 

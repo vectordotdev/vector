@@ -138,7 +138,7 @@ title("Generating files...")
 # Setup
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 
 #
@@ -227,7 +227,7 @@ end
 # Render templates
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 
 erb_paths.

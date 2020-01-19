@@ -11,7 +11,7 @@ input_types = ["metric"]
 output_types = ["metric"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "tag_cardinality_limit") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "tag_cardinality_limit") %>
 
 [transforms.tag_cardinality_limit.options.value_limit]
 type = "int"

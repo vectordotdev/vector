@@ -7,9 +7,9 @@
 
 import React, { useState, useEffect } from 'react';
 
-import CodeBlock from '@theme/CodeBlock';
 import Diagram from '@site/src/components/Diagram';
 import Heading from '@theme/Heading';
+import InstallationCommand from '@site/src/components/InstallationCommand';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
@@ -351,7 +351,7 @@ function Topologies() {
   )
 }
 
-function Installation() {
+function InstallationSection() {
   return (
     <section className={styles.installation}>
       <div className="container">
@@ -383,25 +383,7 @@ function Installation() {
 
         <h3 className={styles.installSubTitle}>Install with a one-liner:</h3>
 
-        <Tabs
-          className="mini"
-          defaultValue="humans"
-          values={[
-            { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
-            { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
-          ]
-        }>
-          <TabItem value="humans">
-            <CodeBlock className="language-bash">
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
-            </CodeBlock>
-          </TabItem>
-          <TabItem value="machines">
-            <CodeBlock className="language-bash">
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y
-            </CodeBlock>
-          </TabItem>
-        </Tabs>
+        <InstallationCommand />
 
         <h3 className={styles.installSubTitle}>Or choose your preferred method:</h3>
 
@@ -472,7 +454,7 @@ function Home() {
         <Configuration />
         <Integrations />
         <Topologies />
-        <Installation />
+        <InstallationSection />
       </main>
     </Layout>
   );

@@ -1,0 +1,41 @@
+[[<%= namespace %>]]
+type = "text"
+title = "Ensure Vector has write permission to your S3 bucket"
+description = """\
+In order for Vector to successfully write data to your S3 bucket, you'll need \
+to make sure Vector is using the appropriate AWS IAM credentials that grant \
+it access. If you've been using AWS, you'll likely know how to do this, but if \
+you're new to AWS you'll want to checkout our [AWS authentication guide]().\
+"""
+
+[[<%= namespace %>]]
+type = "text"
+title = "Add the `aws_s3` sink to your `vector.toml` file"
+description = """\
+```bash
+echo '
+[sinks.aws_s3]
+  inputs = ["in"]
+  type = "aws_s3"
+  bucket = "my-bucket-name"
+  compression = "gzip"
+  region = "us-east-1"
+  key_prefix = "date=%F/"
+  batch.max_size = 10490000
+  batch.timeout_secs = 300
+  encoding.codec = "ndjson"
+' >> vector.toml
+```
+
+<CodeExplanation>
+
+* The above command _appends_ to your previously created `vector.toml` file.
+* The `compression` option gzips the contents to save on storage costs.
+* The `key_prefix` option partitions your data by date.
+* The `batch.*` options control the file size and age on S3.
+* The `encoding.codec` tells Vector how to encode the data before writing it.
+
+</CodeExplanation>
+
+That's it! Let's start Vector:
+"""

@@ -35,21 +35,21 @@ function ListSwitcher({block, centered, className, style, values, selectedValue,
     </div>
   );
 }
-function SelectSwitcher({selectedValue, setSelectedValue, values}) {
+function SelectSwitcher({placeholder, selectedValue, setSelectedValue, values}) {
   return (
     <Select
       className='react-select-container'
       classNamePrefix='react-select'
       options={values}
       isClearable={false}
-      placeholder="Select a version..."
+      placeholder={placeholder}
       value={values.find(option => option.value == selectedValue)}
       onChange={(selectedOption) => setSelectedValue(selectedOption ? selectedOption.value : null)} />
   );
 }
 
 function Tabs(props) {
-  const {block, centered, children, defaultValue, select, style, values, urlKey} = props;
+  const {block, centered, children, defaultValue, placeholder, select, style, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -62,18 +62,19 @@ function Tabs(props) {
   }, []);
 
   return (
-    <div>
-      {values.length > 1 && (select ?
-        <SelectSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
-        <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
+    <>
       <div className="margin-vert--md">
-        {
-          Children.toArray(children).filter(
-            child => child.props.value === selectedValue,
-          )[0]
-        }
+        {values.length > 1 && (select ?
+          <SelectSwitcher placeholder={placeholder} selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
+          <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
       </div>
-    </div>
+
+      {
+        Children.toArray(children).filter(
+          child => child.props.value === selectedValue,
+        )[0]
+      }
+    </>
   );
 }
 

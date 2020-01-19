@@ -10,10 +10,10 @@ input_types = ["log"]
 requirements = {}
 write_to_description = "another downstream [`vector` source][docs.sources.vector]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "vector") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "vector") %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.vector.options",
   common: false
 ) %>
@@ -27,4 +27,4 @@ description = """\
 The downstream Vector address to connect to. The address _must_ include a port.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.vector.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: true) %>
+<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sinks.vector.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: true) %>

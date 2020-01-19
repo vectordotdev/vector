@@ -10,11 +10,11 @@ input_types = ["log"]
 requirements = {}
 write_to_description = "[Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages)"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "papertrail") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "papertrail") %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.papertrail.options") %>
+<%= render("_partials/fields/_buffer_options.toml", namespace: "sinks.papertrail.options") %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.papertrail.options",
   encodings: ["json", "text"],
 ) %>

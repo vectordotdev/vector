@@ -39,6 +39,15 @@ class Sink < Component
     egress_method == "batching"
   end
 
+  def can_receive_from?(component)
+    component.respond_to?(:output_types) &&
+      component.output_types.intersection(input_types).any?
+  end
+
+  def can_send_to?(component)
+    false
+  end
+
   def description
     @description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
   end

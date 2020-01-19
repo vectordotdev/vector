@@ -34,12 +34,18 @@ class Links
 
   attr_reader :values
 
-  def initialize(links, docs_root, pages_root)
+  def initialize(links, docs_root, guides_root, pages_root)
     @links = links
     @values = {}
 
     @docs =
       Dir.glob("#{docs_root}/**/*.md").
+      to_a.
+      reject { |p| File.directory?(p) }.
+      collect { |f| f.gsub(docs_root, "").split(".").first }
+
+    @guides =
+      Dir.glob("#{guides_root}/**/*.md").
       to_a.
       reject { |p| File.directory?(p) }.
       collect { |f| f.gsub(docs_root, "").split(".").first }
@@ -86,6 +92,8 @@ class Links
         fetch_asset_path(name)
       when "docs"
         fetch_doc_path(name)
+      when "guides"
+        fetch_guide_path(name)
       when "pages"
         fetch_page_path(name)
       when "urls"
@@ -97,7 +105,7 @@ class Links
 
             #{category.inspect}
 
-          Links must start with `docs.`, `assets.`, `.pages`, or `urls.`
+          Links must start with `assets.`, `docs.`, `guides.`, `.pages`, or `urls.`
           EOF
         )
       end
@@ -176,6 +184,21 @@ class Links
         end
 
       DOCS_BASE_PATH + fetch!("docs", available_docs, name) + "/"
+    end
+
+    def fetch_guide_path(name)
+      if name == "index"
+        return GUIDES_BASE_PATH
+      end
+
+      available_guides =
+        if name.end_with?(".readme")
+          @guides
+        else
+          @guides.select { |guide| !guide.end_with?("/README.md") }
+        end
+
+      GUIDES_BASE_PATH + fetch!("guides", available_guides, name) + "/"
     end
 
     def fetch_page_path(name)

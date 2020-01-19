@@ -1,0 +1,4 @@
+[tutorials.setup.sinks.aws_s3]
+image = "..."
+
+<%= render("_partials/tutorials/setup/sinks/_aws_s3_steps.toml", namespace: "tutorials.setup.sinks.aws_s3.steps") %>

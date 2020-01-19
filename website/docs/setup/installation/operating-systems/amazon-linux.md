@@ -6,9 +6,9 @@ description: Install Vector on Amazon Linux
 
 Vector can be installed on Amazon Linux through the following methods:
 
-import InstallChoices from '@site/src/components/InstallChoices';
+import InstallationPlatformChoices from '@site/src/components/InstallationPlatformChoices';
 
-<InstallChoices docker={true} os="Linux" packageManager="RPM" />
+<InstallationPlatformChoices docker={true} os="Linux" packageManager="RPM" />
 
 
 

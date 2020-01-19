@@ -15,7 +15,7 @@ require_relative "util/metadata"
 require_relative "util/printer"
 
 # load metadata
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 
 # the base directory with GPG keyrings
 gpg_base_dir = "#{ROOT_DIR}/target/gpg/github"

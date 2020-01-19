@@ -19,7 +19,7 @@ SHA1 = ENV.fetch("CIRCLE_SHA1")
 # Setup
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 release = metadata.releases.to_h.fetch(:"#{VERSION}")
 
 #

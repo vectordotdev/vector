@@ -16,7 +16,7 @@ section for more info.\
 """
 through_description = "log records from journald"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "journald") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "journald") %>
 
 [sources.journald.options.current_boot_only]
 type = "bool"

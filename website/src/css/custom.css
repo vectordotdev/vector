@@ -60,6 +60,7 @@
   --ifm-contents-padding-left: var(--ifm-spacing-horizontal);
   --ifm-font-family-base: -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   --ifm-font-family-monospace: "Source Code Pro", Menlo, monospace;
+  --ifm-font-family-serif: "Source Serif Pro", Constantia, Lucida Bright, Lucidabright, "Lucida Serif", Lucida, "DejaVu Serif", "Bitstream Vera Serif", "Liberation Serif", Georgia, serif;
   --ifm-font-size-base: 16px;
   --ifm-footer-background-color: var(--ifm-background-color);
   --ifm-footer-padding-vertical: calc(var(--ifm-spacing-vertical) * 4);
@@ -215,13 +216,59 @@ a.badge:hover {
 }
 
 /**
+ * align-text-edges
+ */
+
+.align-text-edges {
+  --bleed-padding: calc( var(--ifm-spacing-horizontal) * 1.5 );
+  --bleed-margin: calc( var(--bleed-padding) * -1 );
+  padding: 0 var(--bleed-padding);
+}
+
+.align-text-edges > blockquote {
+  margin-left: var(--bleed-margin);
+  margin-right: var(--bleed-margin);
+  padding-left: var(--bleed-padding);
+  padding-right: var(--bleed-padding);
+}
+
+.align-text-edges > div[class^='mdxCodeBlock_'] {
+  margin-left: var(--bleed-margin);
+  margin-right: var(--bleed-margin);
+}
+
+.align-text-edges > div[class^='mdxCodeBlock_'] code {
+  padding-left: var(--bleed-padding);
+  padding-right: var(--bleed-padding);
+}
+
+/**
  * blockquote
  */
 
 blockquote {
-  border-left: 4px solid var(--ifm-hr-border-color);
-  color: var(--ifm-color-emphasis-400);
-  padding: 0 0 0 1.5rem;
+  background: var(--ifm-color-emphasis-50);
+  border-left: 5px solid var(--ifm-hr-border-color);
+  color: var(--ifm-heading-color);
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  padding: 1.5em;
+}
+
+blockquote.blockquote--primary {
+  background: rgba(var(--ifm-color-primary-rgb), 0.25);
+  border-left-color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+blockquote > p {
+  margin-bottom: 0;
+}
+
+blockquote > footer {
+  font-style: italic;
+  font-weight: normal;
 }
 
 /**
@@ -236,20 +283,6 @@ blockquote {
   background-image: var(--ifm-highlight-gradient);
   background-size: 150% 150%;
   color: var(--ifm-background-color);
-}
-
-/**
- * checks
- *
- * Generic list with checkmarks as list styles.
- */
-
-ul.checks {
-  list-style: none;
-}
-ul.checks li > i.feather:first-child {
-  margin-left: -1.8em;
-  margin-right: 0.5em;
 }
 
 /**
@@ -371,6 +404,36 @@ table.comparison tr td.bar.vector .bar {
 }
 
 /**
+ * component-icons
+ *
+ * Component icons used in the hero for each component page and it's
+ * combination.
+ */
+
+.component-icons {
+  display: flex;
+  margin: 0 auto var(--ifm-spacing-vertical) auto;
+  max-height: 135px;
+  max-width: 300px;
+}
+.component-icons > * {
+  background-color: rgba(var(--ifm-panel-background-rgb), 0.75) !important;
+  border-radius: 2rem !important;
+  flex: 1 1;
+  margin-right: var(--ifm-spacing-vertical);
+  padding: 1.5em;
+}
+.component-icons > *:last-child {
+  margin-right: 0;
+}
+.component-icons > a {
+  font-size: 2.5em;
+}
+.component-icons .icon img {
+  height: 100%;
+}
+
+/**
  * container
  */
 
@@ -382,27 +445,6 @@ table.comparison tr td.bar.vector .bar {
 .container--narrow {
   box-sizing: border-box;
   max-width: 760px;
-}
-
-.container--bleed > .bleed,
-.container--bleed > section > p > img,
-.container--bleed > section > .code-header,
-.container--bleed > section > pre {
-  position: relative;
-  left: calc( -1 * ( ( ( var(--ifm-container-width) - 760px ) / 2 ) + var(--ifm-spacing-vertical)) );
-  max-width: none;
-  width: var(--ifm-container-width);
-}
-
-@media (max-width: 996px) {
-  .container--bleed > .bleed,
-  .container--bleed > section > p > img,
-  .container--bleed > section > .code-header,
-  .container--bleed > section > pre {
-    position: static;
-    max-width: 100%;
-    width: auto;
-  }
 }
 
 /**
@@ -426,6 +468,19 @@ table.comparison tr td.bar.vector .bar {
 }
 .domain-bg--hover:not(:hover) {
   background-image: none !important;
+}
+
+/**
+ * dropcap
+ *
+ * The first letter is large and multiple lines. Used to creat a more formal
+ * style.
+ */
+
+.dropcap p:first-of-type::first-letter {
+  float: left;
+  font-size: 3.25em;
+  padding: 0.2em 0.2em 0 0;
 }
 
 /**
@@ -590,7 +645,7 @@ header h1 {
   display: block;
   align-items: center;
   min-height: 200px;
-  padding: 3em 0;
+  padding: 4em 0;
   position: relative;
   text-align: center;
 }
@@ -614,6 +669,19 @@ header h1 {
   font-size: 0.9rem;
   margin-top: 0.3rem;
 }
+.hero .hero--component-icons {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+.hero .hero--component-icons .icon {
+  border-radius: 1.5em;
+  margin: 0 auto;
+  padding: 1.5em;
+  width: 135px;
+  height: 135px;
+}
+.hero .hero--component-icons .icon img {
+  width: 100%;
+}
 .hero .hero--buttons {
   --ifm-button-padding-vertical: 0.5rem;
   --ifm-button-padding-horizontal: 4rem;
@@ -632,6 +700,15 @@ header h1 {
   flex-direction: column;
   justify-content: center;
   min-height: calc( 100vh - var(--ifm-navbar-height) );
+}
+.hero.hero--animated-graph {
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+.hero.hero--animated-graph .overlay {
+  margin-top: -15.25em;
+  margin-bottom: 4em;
 }
 @media (max-width: 996px) {
   .hero {
@@ -760,6 +837,50 @@ div.list--warnings > ul > li,
 ul.list--warnings > li {
   margin: 0 0 1em 0;
   padding: 0;
+}
+
+/*
+ * list
+ */
+
+ol.list--flush {
+  padding-left: 0;
+}
+ol.list--lg {
+  font-size: 1.2em;
+}
+ol.list--primary {
+  color: var(--ifm-color-primary);
+}
+ol.list--semi-bold {
+  font-weight: 500;
+}
+
+/**
+ * list--checks
+ *
+ * A simple list that uses check marks as bullets.
+ */
+
+ol.list--checks {
+  list-style: none;
+}
+ol.list--checks li:before {
+  content: '✓';
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+/**
+ * list--li
+ */
+
+ol li.list--li--arrow:before {
+  content: "→";
+}
+ol li.list--li--pink:before,
+ol li.list--li--pink {
+  color: var(--ifm-color-pink);
 }
 
 /**
@@ -914,10 +1035,13 @@ ul.list--warnings > li {
   }
 }
 .navbar .navbar__items--right {
-  flex: 0 0 40%;
+  flex: 0 0 45%;
 }
 .navbar .navbar__items--right .react-toggle {
   margin-left: var(--ifm-navbar-item-padding-horizontal);
+}
+.navbar .navbar__item {
+  white-space: nowrap;
 }
 .navbar .navbar__item .badge {
   border-color: var(--ifm-background-color) !important;
@@ -1006,6 +1130,12 @@ ul.list--warnings > li {
 .panel .panel--description {
   font-size: 0.95em;
   opacity: 0.5;
+}
+a.panel:hover {
+  background: var(--ifm-panel-background-active);
+  border-color: var(--ifm-color-primary);
+  box-shadow: var(--ifm-panel-box-shadow-active);
+  text-decoration: none;
 }
 
 /**
@@ -1103,49 +1233,49 @@ header + section.shade {
  * headings. This is used for options, fields, or step-by-step guides.
  */
 
-.section-list {
+div.section-list {
   border-left: 1px solid var(--ifm-hr-border-color);
   margin-left: 0.25em;
 }
-.section-list > .section {
+div.section-list > .section {
   border-radius: 5px;
   font-size: 0.95em;
   padding-bottom: calc( var(--ifm-spacing-vertical) / 1.5 );
   padding-left: var(--ifm-spacing-horizontal);
 }
-.section-list > .section:last-child {
+div.section-list > .section:last-child {
   padding-bottom: 0
 }
-.section-list > .section > .badges {
+div.section-list > .section > .badges {
   float: right;
   margin-top: -0.25em;
   text-align: right;
 }
-.section-list > .section > .badges .badge {
+div.section-list > .section > .badges .badge {
   font-size: 0.7em;
   margin-left: 3px;
 }
-.section-list > .section > .badges .badge:first-child {
+div.section-list > .section > .badges .badge:first-child {
   margin-left: 0;
 }
-.section-list > .section > h3,
-.section-list > .section > h4,
-.section-list > .section > h5,
-.section-list > .section > h6 {
+div.section-list > .section > h3,
+div.section-list > .section > h4,
+div.section-list > .section > h5,
+div.section-list > .section > h6 {
   margin-bottom: 1em;
 }
-.section-list > .section > h3 .hash-link,
-.section-list > .section > h4 .hash-link,
-.section-list > .section > h5 .hash-link,
-.section-list > .section > h6 .hash-link {
+div.section-list > .section > h3 .hash-link,
+div.section-list > .section > h4 .hash-link,
+div.section-list > .section > h5 .hash-link,
+div.section-list > .section > h6 .hash-link {
   margin-left: calc((var(--ifm-spacing-horizontal) * -1.75) - var(--ifm-spacing-horizontal)) !important;
   padding-right: 3em;
 }
-.section-list:not(.section-list--no-bullet) > .section > h3::before,
-.section-list:not(.section-list--no-bullet) > .section > h4::before,
-.section-list:not(.section-list--no-bullet) > .section > h5::before,
-.section-list:not(.section-list--no-bullet) > .section > h6::before,
-.section-list > .section > .section--bullet {
+div.section-list:not(.section-list--no-bullet) > .section > h3::before,
+div.section-list:not(.section-list--no-bullet) > .section > h4::before,
+div.section-list:not(.section-list--no-bullet) > .section > h5::before,
+div.section-list:not(.section-list--no-bullet) > .section > h6::before,
+div.section-list > .section > .section--bullet {
   content: "• ";
   float: left;
   display: block;
@@ -1153,17 +1283,17 @@ header + section.shade {
   margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
   text-align: center;
 }
-.section-list > .section:hover > h3 > .hash-link,
-.section-list > .section:hover > h4 > .hash-link,
-.section-list > .section:hover > h5 > .hash-link,
-.section-list > .section:hover > h6 > .hash-link {
+div.section-list > .section:hover > h3 > .hash-link,
+div.section-list > .section:hover > h4 > .hash-link,
+div.section-list > .section:hover > h5 > .hash-link,
+div.section-list > .section:hover > h6 > .hash-link {
   opacity: 1;
 }
-.section-list > .section > .sub__title {
+div.section-list > .section > .sub__title {
   margin-top: -0.4em;
   margin-bottom: 0.25em;
 }
-.section-list > .section .info {
+div.section-list > .section .info {
   border-left: 1px solid var(--ifm-hr-border-color);
   color: var(--ifm-color-content-secondary);
   font-size: 0.9em;
@@ -1172,7 +1302,7 @@ header + section.shade {
   margin-left: 0.25em;
   padding-left: var(--ifm-spacing-horizontal);
 }
-.section-list > .section .info > div:before {
+div.section-list > .section .info > div:before {
   content: "• ";
   float: left;
   display: block;
@@ -1180,32 +1310,94 @@ header + section.shade {
   margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
   text-align: center;
 }
-.section-list > .section .info .show-more {
+div.section-list > .section .info .show-more {
   color: var(--ifm-color-primary);
   cursor: pointer;
 }
-.section-list > .section .info .examples {
+div.section-list > .section .info .examples {
   margin-top: 0.5em;
 }
-.section-list.section-list--lg > .section {
+div.section-list.section-list--lg > .section {
   margin-top: calc( var(--ifm-spacing-vertical) * 2 );
 }
-.section-list.section-list--compact > .section {
+div.section-list.section-list--compact > .section {
   padding-top: calc( var(--ifm-spacing-vertical) / 4 );
   padding-bottom: calc( var(--ifm-spacing-vertical) / 4 );
 }
-.section-list.section-list--compact > .section > h4 {
+div.section-list.section-list--compact > .section > h4 {
   font-weight: normal;
   margin: 0;
 }
-.section-list.section-list--compact > .section > h4 .badge {
+div.section-list.section-list--compact > .section > h4 .badge {
 
 }
-.section-list.section-list--compact > .section:last-child > h4 {
+div.section-list.section-list--compact > .section:last-child > h4 {
   margin-bottom: var(--ifm-spacing-vertical);
 }
-.section-list.section-list--hover > .section:hover {
+div.section-list.section-list--hover > .section:hover {
   background: var(--ifm-panel-background);
+}
+
+/**
+ * steps
+ *
+ * Like .section-list above but intended to be used with child ol and ul
+ * elements. This is the precursor to .section-list and will hopefully replace
+ * it.
+ */
+
+.steps > ol {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  counter-reset: sections-counter;
+  list-style: none;
+  margin-left: 0.75em;
+  padding-left: 1.75em;
+}
+.steps > ol > li {
+  counter-increment: sections-counter;
+  margin-bottom: 0;
+}
+.steps > ol > li > *:last-child {
+  margin-bottom: calc(var(--ifm-spacing-vertical) * 3 );
+}
+.steps > ol > li:before {
+  background: var(--ifm-heading-color);
+  border-radius: 100%;
+  color: var(--ifm-background-color);
+  content: counter(sections-counter);
+  float: left;
+  min-width: 0.75em;
+  padding: 0.2em 0.35em;
+  text-align: center;
+}
+.steps > ol > li a.hash-link {
+  padding-right: 3em;
+}
+.steps > ol > li > ol {
+  font-size: 0.95em;
+  margin-top: calc(var(--ifm-spacing-vertical) * 2 );
+}
+.steps.steps--h3 > ol > li:before {
+  font-size: var(--ifm-h3-font-size);
+  font-weight: var(--ifm-heading-font-weight);
+  line-height: var(--ifm-heading-line-height);
+  margin: -0.2em 0 0 -2.25em;
+}
+.steps.steps--h3 > ol > li a.hash-link {
+  margin-left: -3.5em;
+}
+.steps.steps--h3 > ol > li > h3 {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+.steps.steps--h3 > ol > li > ol > li:before {
+  background: none;
+  color: var(--ifm-heading-color);
+  content: "•";
+  font-size: var(--ifm-h4-font-size);
+  margin: -0.6em 0 0 -2.45em;
+}
+.steps.steps--h3 > ol > li > ol > li > h4 {
+  margin-bottom: var(--ifm-spacing-vertical);
 }
 
 /**
@@ -1518,7 +1710,6 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 .markdown > h1,
 .markdown > h2 {
   border-top: 1px solid var(--ifm-hr-border-color);
-  font-size: 1.5rem;
   margin-top: calc( var(--ifm-h1-h2-vertical-rhythm-top) * var(--ifm-leading) );
   margin-bottom: calc( var(--ifm-h1-h2-vertical-rhythm-bottom) * var(--ifm-leading) );
   padding-top: calc( var(--ifm-h1-h2-vertical-rhythm-top) * var(--ifm-leading) );
@@ -1607,6 +1798,10 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   background: var(--ifm-color-emphasis-25);
 }
 
+.markdown > :last-child {
+  margin-bottom: var(--ifm-spacing-vertical) !important;
+}
+
 /******************************************************************************
  * Docs
  *
@@ -1626,6 +1821,10 @@ div[class^='docPage_'] div[class^='docItemContainer_'] {
 div[class^='docPage_'] h1[class^='docTitle_'] {
   font-size: 2em;
   margin-bottom: 0.5rem;
+}
+
+div[class^='docPage_'] .markdown > h2 {
+  font-size: 1.5rem;
 }
 
 div[class^='docPage_'] main[class^='docMainContainer_'] div.container div.row div.col.col--3 {

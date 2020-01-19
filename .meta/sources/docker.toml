@@ -15,8 +15,14 @@ for more info.
 """
 service_name = "Docker API"
 through_description = "the [Docker engine daemon][urls.docker_daemon]"
+features = [
+  "Collect Docker container logs.",
+  "Filter which containers you collect them from.",
+  "Automatically merge logs that Docker splits.",
+  "Enrich your logs with useful Docker context."
+]
 
-<%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "docker") %>
 
 [sources.docker.env_vars.DOCKER_HOST]
 type = "string"

@@ -95,6 +95,10 @@ class Templates
     attr_reader :array, :block, :fields, :key_path, :table_path
 
     def initialize(fields, array: false, key_path: [], table_path: [], &block)
+      if !fields.is_a?(Array)
+        raise ArgumentError.new("fields must be an array")
+      end
+
       if block_given?
         fields = fields.select(&block)
       end

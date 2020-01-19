@@ -1,0 +1,38 @@
+---
+id: <%= id.to_json %>
+title: "Collect Docker logs & send them anywhere"
+description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
+keywords: ["docker"]
+---
+
+> "I just wanna, like, collect my Docker logs and grep them -- why is all of this so complicated?"
+>
+> — developers
+
+So you want to collect your Docker logs and send them somewhere? Sounds simple!
+Sadly, it is not. First, there are many different opinionated ways on how to
+"properly" collect your Docker logs. Second, there are many caveats, such as
+parsing, enriching, handling split log messages, and more. Fear not! This guide
+will get you up and running in minutes, all without becoming a Docker logging
+expert.
+
+## What We'll Accomplish In This Guide
+
+<ol className="list--checks list--lg list--semi-bold list--primary">
+  <%- features.each do |feature| -%>
+  <li><%= feature %></li>
+  <%- end -%>
+  <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
+</ol>
+
+<%- if tutorial.description -%>
+## How It Works
+
+<%= tutorial.description %>
+
+<%- end -%>
+## A Step-By-Step Tutorial
+
+<%= tutorial_steps(tutorial.steps) %>
+
+## Next Steps

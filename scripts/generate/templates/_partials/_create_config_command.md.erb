@@ -1,0 +1,32 @@
+<%- if sink.nil? -%>
+**Where would you like to send your data?**
+
+<Tabs
+  block={true}
+  select={true}
+  defaultValue="aws_s3"
+  values={<%= sinks.collect { |sink| {label: sink.title, value: sink.name } }.to_json %>}>
+<%- sinks.each do |sink| -%>
+<TabItem value=<%= sink.name.to_json %>>
+
+```bash
+echo '
+<%= config_pipeline_example(metadata.sources.docker, sink) %>
+' > vector.toml
+```
+
+<CodeExplanation>
+
+* The `vector.toml` file is the Vector configuration file that we'll pass in
+ the next step.
+* The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+ logs.
+* The the [`console` sink][docs.sinks.console] simply prints the collected
+ logs so that we can manually verify everything is working.
+
+</CodeExplanation>
+
+</TabItem>
+<%- end -%>
+</Tabs>
+<%- end -%>

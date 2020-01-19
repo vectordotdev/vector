@@ -12,13 +12,13 @@ service_limits_short_link = "aws_cw_metrics_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
 
-<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_metrics.env_vars") %>
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_metrics.env_vars") %>
 
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options") %>
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options", common: false, max_events: 20, max_size: nil, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options", common: false, max_events: 20, max_size: nil, timeout_secs: 1) %>
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "aws_cloudwatch_metrics") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "aws_cloudwatch_metrics") %>
 
 [sinks.aws_cloudwatch_metrics.options.namespace]
 type = "string"

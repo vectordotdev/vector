@@ -8,7 +8,7 @@ output_types = ["metric"]
 requirements = {}
 through_description = "the StatsD UDP protocol"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "statsd") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "statsd") %>
 
 [sources.statsd.options.address]
 type = "string"

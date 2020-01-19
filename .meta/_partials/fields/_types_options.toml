@@ -1,4 +1,4 @@
-[<%= namespace %>.options.types]
+[<%= namespace %>.types]
 type = "table"
 common = <%= common %>
 description = """\
@@ -6,7 +6,7 @@ Key/value pairs representing mapped log field names and types. This is used to \
 coerce log fields into their proper types.\
 """
 
-[<%= namespace %>.options.types.children."`[field-name]`"]
+[<%= namespace %>.types.children."`[field-name]`"]
 type = "string"
 common = true
 examples = [
@@ -24,7 +24,7 @@ the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are \
 supported for the `timestamp` type.\
 """
 
-[<%= namespace %>.options.types.children."`[field-name]`".enum]
+[<%= namespace %>.types.children."`[field-name]`".enum]
 bool = "Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean."
 float = "Coerce to a 64 bit float."
 int = "Coerce to a 64 bit integer."

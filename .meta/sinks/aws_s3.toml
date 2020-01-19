@@ -12,14 +12,14 @@ service_limits_short_link = "aws_s3_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
 
-<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_s3.env_vars") %>
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_s3.env_vars") %>
 
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_s3.options") %>
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_s3.options") %>
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "aws_s3") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "aws_s3") %>
 
 <%= render(
-  "_partials/_batch_options.toml",
+  "_partials/fields/_batch_options.toml",
   namespace: "sinks.aws_s3.options",
   common: true,
   max_events: nil,
@@ -28,13 +28,13 @@ write_to_description = "[Amazon Web Service's S3 service][urls.aws_s3] via the [
 ) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.aws_s3.options",
   common: true
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.aws_s3.options",
   common: false,
   in_flight_limit: 5,
@@ -53,7 +53,7 @@ examples = ["my-bucket"]
 required = true
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_s3.options",
   encodings: ["ndjson", "text"]
 ) %>

@@ -102,6 +102,20 @@ class Templates
     example.to_toml
   end
 
+  def config_pipeline_example(source, sink)
+    source_example =
+      ConfigExampleWriter.new(source.options_list, table_path: ["sources", "in"]) do |option|
+        option.required?
+      end
+
+    sink_example =
+      ConfigExampleWriter.new(sink.options_list, table_path: ["sinks", "out"]) do |option|
+        option.required?
+      end
+
+    source_example.to_toml + "\n\n" + sink_example.to_toml
+  end
+
   def config_schema(options, opts = {})
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
@@ -130,6 +144,31 @@ class Templates
     else
       content.gsub("\n  ", "\n")
     end
+  end
+
+  def create_config_command(source: nil, sink: nil)
+    if source.nil? && sink.nil?
+      raise ArgumentError.new("You must supply at least one source or sink")
+    end
+
+    sources = []
+    sinks = []
+
+    if source.nil?
+      sources =
+        metadata.sources_list.select do |source|
+          source.can_send_to?(sink)
+        end
+    end
+
+    if sink.nil?
+      sinks =
+        metadata.sinks_list.select do |sink|
+          sink.can_receive_from?(source)
+        end
+    end
+
+    render("#{partials_path}/_create_config_command.md", binding)
   end
 
   def docker_docs
@@ -394,6 +433,28 @@ class Templates
     content
   end
 
+  def setup_guide(id, tutorial, source: nil, sink: nil)
+    if source.nil? && sink.nil?
+      raise ArgumentError.new("You must supply at least a source or a sink")
+    end
+
+    features = []
+
+    if source
+      features += source.features
+    else
+      features << "Collect your logs from one or more sources"
+    end
+
+    if sink
+      features += sink.features
+    else
+      features << "Send your logs to one or more destinations"
+    end
+
+    render("#{partials_path}/_setup_guide.md", binding).strip
+  end
+
   def sink_description(sink)
     strip <<~EOF
     #{write_verb_link(sink)} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
@@ -437,6 +498,10 @@ class Templates
 
   def tags(tags)
     tags.collect { |tag| "`#{tag}`" }.join(" ")
+  end
+
+  def tutorial_steps(steps, heading_depth: 3)
+    render("#{partials_path}/_tutorial_steps.md", binding).strip
   end
 
   def transform_description(transform)

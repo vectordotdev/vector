@@ -1,4 +1,4 @@
-[<%= namespace %>.options.bootstrap_servers]
+[<%= namespace %>.bootstrap_servers]
 type = "string"
 common = true
 examples = ["10.14.22.123:9092,10.14.23.332:9092"]
@@ -9,14 +9,14 @@ Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects \
 to initially to bootstrap itself.\
 """
 
-[<%= namespace %>.options.librdkafka_options]
+[<%= namespace %>.librdkafka_options]
 type = "table"
 category = "Advanced"
 description = """\
 Advanced options. See [the `librdkafka` documentation][urls.lib_rdkafka_config] for details.
 """
 
-[<%= namespace %>.options.librdkafka_options.children."`[field-name]`"]
+[<%= namespace %>.librdkafka_options.children."`[field-name]`"]
 type = "string"
 examples = [
   {"client.id" = "${ENV_VAR}"},

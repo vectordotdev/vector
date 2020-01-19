@@ -8,7 +8,7 @@ output_types = ["log"]
 requirements = {}
 through_description = "standard input (STDIN)"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "stdin") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "stdin") %>
 
 [sources.stdin.options.max_length]
 type = "int"

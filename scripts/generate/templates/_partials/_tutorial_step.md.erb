@@ -1,0 +1,33 @@
+<li>
+
+<%= "#" * heading_depth %> <%= step.title %>
+
+<%- if step.description -%>
+<%= step.description %>
+
+<%- end -%>
+<%- if step.choices.any? -%>
+<Tabs
+  block={true}
+  select={true}
+  defaultValue="aws_s3"
+  values={<%= step.choices.collect { |id, step| {label: step.title, value: id } }.to_json %>}>
+
+<%- step.choices.each do |id, step| -%>
+<TabItem value={<%= id.to_json %>}>
+
+<%= step.title %>
+
+if step.steps.any? -%>
+<%= tutorial_steps(step.steps, heading_depth: heading_depth + 1) %>
+<%- end -%>
+
+</TabItem>
+<%- end -%>
+
+</Tabs>
+<%- elsif step.steps.any? -%>
+<%= tutorial_steps(step.steps, heading_depth: heading_depth + 1) %>
+<%- end -%>
+
+</li>

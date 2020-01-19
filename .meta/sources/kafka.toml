@@ -9,11 +9,11 @@ output_types = ["log"]
 requirements = {}
 through_description = "Kafka 0.9 or later"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "kafka") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "kafka") %>
 
-<%= render("_partials/_kafka_common.toml", namespace: "sources.kafka") %>
+<%= render("_partials/fields/_kafka_options.toml", namespace: "sources.kafka.options") %>
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sources.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
+<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sources.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
 
 [sources.kafka.options.topics]
 type = "[string]"

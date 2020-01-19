@@ -44,6 +44,11 @@ function navLinkAttributes(label, right) {
       attrs.icon = 'message-circle';
       return attrs;
 
+    case 'community':
+      attrs.hideText = right == true;
+      attrs.icon = 'users';
+      return attrs;
+
     case 'download':
       const newRelease = fetchNewRelease();
 

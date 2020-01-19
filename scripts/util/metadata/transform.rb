@@ -38,6 +38,32 @@ class Transform < Component
     end
   end
 
+  def can_receive_from?(component)
+    case component
+    when Source
+      component.output_types.intersection(input_types).any?
+    when Transform
+      component.output_types.intersection(input_types).any?
+    when Sink
+      false
+    else
+      raise ArgumentError.new("Uknown component type: #{component.class.name}")
+    end
+  end
+
+  def can_send_to?(component)
+    case component
+    when Source
+      false
+    when Transform
+      component.input_types.intersection(output_types).any?
+    when Sink
+      component.input_types.intersection(output_types).any?
+    else
+      raise ArgumentError.new("Uknown component type: #{component.class.name}")
+    end
+  end
+
   def description
     @desription ||= "Accepts #{input_types.to_sentence} events and allows you to #{allow_you_to_description}."
   end

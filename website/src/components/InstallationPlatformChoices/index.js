@@ -56,7 +56,7 @@ function ArchChoices({arch, docker, os, packageManager}) {
   );
 }
 
-function InstallChoices({docker, os, packageManager}) {
+function InstallationPlatformChoices({docker, os, packageManager}) {
   const {downloads} = getInstallation();
   const archiveDownloads = downloads.filter(download => (download.os.toLowerCase() == os.toLowerCase() && download.type == "archive"));
   const archs = archiveDownloads.map(download => download.arch);
@@ -80,5 +80,5 @@ function InstallChoices({docker, os, packageManager}) {
 }
 
 
-export default InstallChoices;
+export default InstallationPlatformChoices;
 export {ArchChoices};

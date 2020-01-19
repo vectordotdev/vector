@@ -373,6 +373,13 @@
           "$ref": "#/definitions/operating_systems",
           "description": "A blacklist of operating systems not supported by this source."
         },
+        "features": {
+          "type": "array",
+          "description": "A list of human readable features.",
+          "items": {
+            "type": "string"
+          }
+        },
         "function_category": {
           "type": "string",
           "description": "The source's function category, used for filtering.",

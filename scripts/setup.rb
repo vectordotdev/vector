@@ -35,6 +35,7 @@ include Printer
 
 HOST = "https://vector.dev".freeze
 DOCS_BASE_PATH = "/docs".freeze
+GUIDES_BASE_PATH = "/guides".freeze
 
 ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath.to_s.freeze
 WEBSITE_ROOT = File.join(ROOT_DIR, "website").freeze
@@ -42,6 +43,7 @@ ASSETS_ROOT = File.join(ROOT_DIR, "website", "static").freeze
 BLOG_HOST = "#{HOST}/blog".freeze
 DOCS_ROOT = File.join(ROOT_DIR, "website", "docs").freeze
 DOCS_HOST = "#{HOST}#{DOCS_BASE_PATH}".freeze
+GUIDES_ROOT = File.join(ROOT_DIR, "website", "guides").freeze
 META_ROOT = File.join(ROOT_DIR, ".meta").freeze
 PAGES_ROOT = File.join(ROOT_DIR, "website", "src", "pages").freeze
 POSTS_ROOT = File.join(ROOT_DIR, "website", "blog").freeze

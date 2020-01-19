@@ -8,7 +8,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "coercer") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "coercer") %>
 
 [transforms.coercer.options.drop_unspecified]
 type = "bool"
@@ -21,7 +21,7 @@ as their absense will cause the original message data to be dropped along \
 with other extraneous fields.\
 """
 
-<%= render("_partials/_types.toml", namespace: "transforms.coercer", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.coercer.options", common: true) %>
 
 [[transforms.coercer.output.log.examples]]
 label = "Generic"

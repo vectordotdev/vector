@@ -1,13 +1,13 @@
 import React from 'react';
 
 import Avatar from '@site/src/components/Avatar';
-import BlogPostTags from '@site/src/components/BlogPostTags';
 import Layout from '@theme/Layout';
 import BlogPostItem from '@theme/BlogPostItem';
 import BlogPostPaginator from '@theme/BlogPostPaginator';
 import MailingListForm from '@site/src/components/MailingListForm';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
+import Tags from '@site/src/components/Tags';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
@@ -39,15 +39,15 @@ function BlogPostPage(props) {
             <Avatar github={author_github} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
             <h1>{title}</h1>
             <div className={styles.headerTags}>
-              <BlogPostTags tags={tags} />
+              <Tags tags={tags} />
             </div>
           </div>
         </header>
-        <div className="container container--narrow container--bleed margin-vert--xl">
-          <section className="markdown">
+        <div className="container container--narrow margin-vert--xl">
+          <section className="markdown align-text-edges dropcap">
             <MDXProvider components={MDXComponents}><BlogPostContents /></MDXProvider>
           </section>
-          <section className={classnames('panel', 'bleed', styles.mailingList)} style={{textAlign: 'center'}}>
+          <section className={classnames('panel', styles.mailingList)} style={{textAlign: 'center'}}>
             <div className={styles.mailingListTitle}>
               <i className="feather icon-mail"></i> Vector In Your Inbox!
             </div>
@@ -57,7 +57,7 @@ function BlogPostPage(props) {
             <MailingListForm center={true} description={false} size="lg" />
           </section>
           {(metadata.nextItem || metadata.prevItem) && (
-            <div className="bleed margin-vert--xl">
+            <div className="margin-vert--xl">
               <BlogPostPaginator
                 nextItem={metadata.nextItem}
                 prevItem={metadata.prevItem}

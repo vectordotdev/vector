@@ -8,7 +8,7 @@ output_types = ["metric"]
 requirements = {}
 through_description = "the Prometheus text exposition format"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "prometheus") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "prometheus") %>
 
 [sources.prometheus.options.hosts]
 type = "[string]"
