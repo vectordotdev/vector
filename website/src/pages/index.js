@@ -33,13 +33,12 @@ const AnchoredH2 = Heading('h2');
 
 const features = [
   {
-    title: 'Blistering Fast',
+    title: 'Modern & Fast',
     icon: 'zap',
     description: (
       <>
-        Built in Rust, Vector is <a href="#performance">blistering fast and
-        memory efficient</a>. It's designed to handle the most demanding
-        environments.
+        Built in <a href="https://www.rust-lang.org/">Rust</a>, Vector is <a href="#performance">blistering fast and
+        memory efficient</a>. It's designed to handle the most demanding environments.
       </>
     ),
   },
