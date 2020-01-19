@@ -451,7 +451,7 @@ function Home() {
           )}
           <h1>Take Control Of Your Observability Data</h1>
           <p className="hero__subtitle">
-            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
+            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data, for <i>free</i>, with <i>one</i> simple tool.
           </p>
           <div className="hero__buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
