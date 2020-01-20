@@ -193,7 +193,7 @@ function TableOfContents({release}) {
                 <ul>
                   {posts.map((post, idx) =>
                     <li key={idx}>
-                      <a href={`#${post.id}`} className="contents__link">{post.title}</a>
+                      <a href={`#${post.id}`} className="contents__link" title={post.title}>{post.title}</a>
                     </li>
                   )}
                 </ul>
@@ -205,7 +205,7 @@ function TableOfContents({release}) {
                 <ul>
                   {release.upgrade_guides.map((upgradeGuide, idx) =>
                     <li key={idx}>
-                      <a href={`#${upgradeGuide.id}`} className="contents__link">{upgradeGuide.title}</a>
+                      <a href={`#${upgradeGuide.id}`} className="contents__link" title={upgradeGuide.title}>{upgradeGuide.title}</a>
                     </li>
                   )}
                 </ul>
