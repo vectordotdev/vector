@@ -796,7 +796,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let response = rt.block_on(client.get_log_events(request)).unwrap();
 
@@ -846,7 +846,7 @@ mod integration_tests {
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let response = rt.block_on(client.get_log_events(request)).unwrap();
 
@@ -901,7 +901,7 @@ mod integration_tests {
         request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client(region, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let response = rt.block_on(client.get_log_events(request)).unwrap();
 
@@ -1028,7 +1028,7 @@ mod integration_tests {
         let mut rt = Runtime::single_threaded().unwrap();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let client = create_client(region, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let req = CreateLogGroupRequest {
             log_group_name: GROUP_NAME.into(),
