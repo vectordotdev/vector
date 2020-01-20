@@ -622,6 +622,26 @@ module.exports = {
         "type": "feat"
       },
       {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2019-12-13 11:34:33 +0000",
+        "deletions_count": 123,
+        "description": "Add internal DNS to http based sinks",
+        "files_count": 8,
+        "group": "feat",
+        "insertions_count": 157,
+        "message": "feat(networking): Add internal DNS to http based sinks (#1362)",
+        "pr_number": 1362,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "networking"
+        },
+        "sha": "6eab2fce86fe548ea9c2f1558d10bdec42a987cb",
+        "type": "feat"
+      },
+      {
         "author": "binarylogic",
         "breaking_change": false,
         "date": "2019-12-13 15:34:00 +0000",
@@ -3300,12 +3320,152 @@ module.exports = {
         },
         "sha": "fff92728c9490824ff9d0ae76669adc901bb5499",
         "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": true,
+        "date": "2020-01-17 14:59:29 +0000",
+        "deletions_count": 453,
+        "description": "Switch from libsystemd to piping journalctl",
+        "files_count": 8,
+        "group": "breaking change",
+        "insertions_count": 200,
+        "message": "feat(journald source)!: Switch from libsystemd to piping journalctl (#1526)",
+        "pr_number": 1526,
+        "scope": {
+          "category": "source",
+          "component_name": "journald",
+          "component_type": "source",
+          "name": "journald source"
+        },
+        "sha": "41be43d7ce8ac4d665525bd15bda044d4822c779",
+        "type": "feat"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-19 14:09:14 +0000",
+        "deletions_count": 258,
+        "description": "Homepage language cleanup",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 103,
+        "message": "chore(website): Homepage language cleanup",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "b2cdcdabd4535e4d3c40fd656a1fcbcc37ef8804",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-19 14:11:53 +0000",
+        "deletions_count": 0,
+        "description": "Customize toggle button",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 189,
+        "message": "chore(website): Customize toggle button",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "34735be2dd5f51d94cccca5b7d57219f24e6de11",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-19 15:37:06 +0000",
+        "deletions_count": 1,
+        "description": "Add free language",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(website): Add free language",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "6758f6a7ff7809c2f2c50137e2db9a005355ac26",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-19 17:34:24 +0000",
+        "deletions_count": 4,
+        "description": "Add modern language",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 3,
+        "message": "chore(website): Add modern language",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "b29e72cebcbb4314e4c82e03b88a9f7d2c007d25",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": true,
+        "date": "2020-01-20 14:36:34 +0000",
+        "deletions_count": 22,
+        "description": "Add a new option for specifying indexed fields to `splunk_hec` sink",
+        "files_count": 5,
+        "group": "breaking change",
+        "insertions_count": 87,
+        "message": "enhancement(splunk_hec sink)!: Add a new option for specifying indexed fields to `splunk_hec` sink (#1537)",
+        "pr_number": 1537,
+        "scope": {
+          "category": "sink",
+          "component_name": "splunk_hec",
+          "component_type": "sink",
+          "name": "splunk_hec sink"
+        },
+        "sha": "d0aba1b3f4166c490785d50f12674a19277a471a",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-20 12:20:56 +0000",
+        "deletions_count": 1,
+        "description": "Remove trailing spaces to fix `check-fmt`",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(operations): Remove trailing spaces to fix `check-fmt`",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "60c18c26e75ad5397a3cd1ef1779534069118181",
+        "type": "fix"
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
     "date": "2020-01-20",
-    "deletions_count": 11075,
-    "insertions_count": 22889,
+    "deletions_count": 11937,
+    "insertions_count": 23630,
     "last_version": "0.6.0",
     "posts": [
 
@@ -3344,6 +3504,14 @@ module.exports = {
         ],
         "id": "kafka-sink-comma-list",
         "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
+      },
+      {
+        "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n",
+        "commits": [
+
+        ],
+        "id": "journald-source-switch",
+        "title": "The `journald` source now pipes from journalctl"
       },
       {
         "body": "<p>\nWhen consuming JSON events the `splunk_hec` source now moves a parsed `line`\nfield of the consumed event to `message` in order to be consistent with other\nsources.\n</p>\n",
@@ -16259,6 +16427,26 @@ module.exports = {
           "type": "feat"
         },
         {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2019-12-13 11:34:33 +0000",
+          "deletions_count": 123,
+          "description": "Add internal DNS to http based sinks",
+          "files_count": 8,
+          "group": "feat",
+          "insertions_count": 157,
+          "message": "feat(networking): Add internal DNS to http based sinks (#1362)",
+          "pr_number": 1362,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "networking"
+          },
+          "sha": "6eab2fce86fe548ea9c2f1558d10bdec42a987cb",
+          "type": "feat"
+        },
+        {
           "author": "binarylogic",
           "breaking_change": false,
           "date": "2019-12-13 15:34:00 +0000",
@@ -18937,12 +19125,152 @@ module.exports = {
           },
           "sha": "fff92728c9490824ff9d0ae76669adc901bb5499",
           "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": true,
+          "date": "2020-01-17 14:59:29 +0000",
+          "deletions_count": 453,
+          "description": "Switch from libsystemd to piping journalctl",
+          "files_count": 8,
+          "group": "breaking change",
+          "insertions_count": 200,
+          "message": "feat(journald source)!: Switch from libsystemd to piping journalctl (#1526)",
+          "pr_number": 1526,
+          "scope": {
+            "category": "source",
+            "component_name": "journald",
+            "component_type": "source",
+            "name": "journald source"
+          },
+          "sha": "41be43d7ce8ac4d665525bd15bda044d4822c779",
+          "type": "feat"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-19 14:09:14 +0000",
+          "deletions_count": 258,
+          "description": "Homepage language cleanup",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 103,
+          "message": "chore(website): Homepage language cleanup",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "b2cdcdabd4535e4d3c40fd656a1fcbcc37ef8804",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-19 14:11:53 +0000",
+          "deletions_count": 0,
+          "description": "Customize toggle button",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 189,
+          "message": "chore(website): Customize toggle button",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "34735be2dd5f51d94cccca5b7d57219f24e6de11",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-19 15:37:06 +0000",
+          "deletions_count": 1,
+          "description": "Add free language",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(website): Add free language",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "6758f6a7ff7809c2f2c50137e2db9a005355ac26",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-19 17:34:24 +0000",
+          "deletions_count": 4,
+          "description": "Add modern language",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 3,
+          "message": "chore(website): Add modern language",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "b29e72cebcbb4314e4c82e03b88a9f7d2c007d25",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": true,
+          "date": "2020-01-20 14:36:34 +0000",
+          "deletions_count": 22,
+          "description": "Add a new option for specifying indexed fields to `splunk_hec` sink",
+          "files_count": 5,
+          "group": "breaking change",
+          "insertions_count": 87,
+          "message": "enhancement(splunk_hec sink)!: Add a new option for specifying indexed fields to `splunk_hec` sink (#1537)",
+          "pr_number": 1537,
+          "scope": {
+            "category": "sink",
+            "component_name": "splunk_hec",
+            "component_type": "sink",
+            "name": "splunk_hec sink"
+          },
+          "sha": "d0aba1b3f4166c490785d50f12674a19277a471a",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-20 12:20:56 +0000",
+          "deletions_count": 1,
+          "description": "Remove trailing spaces to fix `check-fmt`",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(operations): Remove trailing spaces to fix `check-fmt`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "60c18c26e75ad5397a3cd1ef1779534069118181",
+          "type": "fix"
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
       "date": "2020-01-20",
-      "deletions_count": 11075,
-      "insertions_count": 22889,
+      "deletions_count": 11937,
+      "insertions_count": 23630,
       "last_version": "0.6.0",
       "posts": [
 
@@ -18981,6 +19309,14 @@ module.exports = {
           ],
           "id": "kafka-sink-comma-list",
           "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
+        },
+        {
+          "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n",
+          "commits": [
+
+          ],
+          "id": "journald-source-switch",
+          "title": "The `journald` source now pipes from journalctl"
         },
         {
           "body": "<p>\nWhen consuming JSON events the `splunk_hec` source now moves a parsed `line`\nfield of the consumed event to `message` in order to be consistent with other\nsources.\n</p>\n",

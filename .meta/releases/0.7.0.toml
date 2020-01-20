@@ -20,6 +20,7 @@ commits = [
 {sha = "46a792408a6e2f82e26c8adfa606e62918552f61", message = "fix(regex_parser transform): make truncation utf8-aware (#1361)", author = "Luke Steensen", date = 2019-12-13T09:01:25Z, files_count = 1, insertions_count = 13, deletions_count = 1},
 {sha = "1496c1cf219ff3d1f2a84909d19e43afad4852c5", message = "docs: Fix bool default values in spec", author = "Ashley Jeffs", date = 2019-12-13T15:48:28Z, files_count = 10, insertions_count = 33, deletions_count = 31},
 {sha = "4c2c85363197ccb5f95d59bb7adce23a14c7a2ab", message = "feat(networking): Add internal DNS to http based sinks (#1362)", author = "Lucio Franco", date = 2019-12-13T11:34:33Z, files_count = 8, insertions_count = 157, deletions_count = 123},
+{sha = "6eab2fce86fe548ea9c2f1558d10bdec42a987cb", message = "feat(networking): Add internal DNS to http based sinks (#1362)", author = "Lucio Franco", date = 2019-12-13T11:34:33Z, files_count = 8, insertions_count = 157, deletions_count = 123},
 {sha = "5ab0e260a5f0dd8d8d46795b64683563d0e81c87", message = "chore(website): Improve blog markup", author = "binarylogic", date = 2019-12-13T15:34:00Z, files_count = 8, insertions_count = 59, deletions_count = 32},
 {sha = "8859769a4b48311c2511c8b255ad44c44f4b17bb", message = "chore: updated version in Cargo.lock", author = "Luke Steensen", date = 2019-12-13T16:56:05Z, files_count = 1, insertions_count = 1, deletions_count = 1},
 {sha = "2de0b0677319a9e04fe80aa39ebfe7bd8de84053", message = "docs: Remove columnar formats section in aws_s3 sink", author = "binarylogic", date = 2019-12-13T22:45:21Z, files_count = 2, deletions_count = 11},
@@ -153,7 +154,14 @@ commits = [
 {sha = "f11fedd726b4da2f20e834e24d33e084fd00e7e5", message = "feat(socket source): Add unix domain socket support to the 'socket` source (#1489)", author = "Spencer T Brody", date = 2020-01-15T16:04:11Z, files_count = 8, insertions_count = 335, deletions_count = 101},
 {sha = "e11ba357543b67841b3c38aab214aa29f7d34f49", message = "chore(log data model): Deprecate `LogEvent::into_value` in favor of `LogEvent::remove` (#1528)", author = "Alexander Rodin", date = 2020-01-16T13:38:07Z, files_count = 2, insertions_count = 2, deletions_count = 6},
 {sha = "fe0e43a60b0ccb4dc7980b8b1edfa5e7b074b189", message = "chore(testing): Use `.iter()` instead of `.into_iter()` for arrays (#1529)", author = "Alexander Rodin", date = 2020-01-16T13:38:21Z, files_count = 1, insertions_count = 3, deletions_count = 3},
-{sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574}
+{sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574},
+{sha = "41be43d7ce8ac4d665525bd15bda044d4822c779", message = "feat(journald source)!: Switch from libsystemd to piping journalctl (#1526)", author = "Bruce Guenter", date = 2020-01-17T14:59:29Z, files_count = 8, insertions_count = 200, deletions_count = 453},
+{sha = "b2cdcdabd4535e4d3c40fd656a1fcbcc37ef8804", message = "chore(website): Homepage language cleanup", author = "binarylogic", date = 2020-01-19T14:09:14Z, files_count = 9, insertions_count = 103, deletions_count = 258},
+{sha = "34735be2dd5f51d94cccca5b7d57219f24e6de11", message = "chore(website): Customize toggle button", author = "binarylogic", date = 2020-01-19T14:11:53Z, files_count = 2, insertions_count = 189},
+{sha = "6758f6a7ff7809c2f2c50137e2db9a005355ac26", message = "chore(website): Add free language", author = "binarylogic", date = 2020-01-19T15:37:06Z, files_count = 1, insertions_count = 1, deletions_count = 1},
+{sha = "b29e72cebcbb4314e4c82e03b88a9f7d2c007d25", message = "chore(website): Add modern language", author = "binarylogic", date = 2020-01-19T17:34:24Z, files_count = 1, insertions_count = 3, deletions_count = 4},
+{sha = "d0aba1b3f4166c490785d50f12674a19277a471a", message = "enhancement(splunk_hec sink)!: Add a new option for specifying indexed fields to `splunk_hec` sink (#1537)", author = "Alexander Rodin", date = 2020-01-20T14:36:34Z, files_count = 5, insertions_count = 87, deletions_count = 22},
+{sha = "60c18c26e75ad5397a3cd1ef1779534069118181", message = "fix(operations): Remove trailing spaces to fix `check-fmt`", author = "Alexander Rodin", date = 2020-01-20T12:20:56Z, files_count = 1, insertions_count = 1, deletions_count = 1},
 ]
 
 [[releases."0.7.0".upgrade_guides]]
@@ -308,6 +316,18 @@ string, expecting a comma separated list of bootstrap servers similar to the
 -  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
 +  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 </pre>
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "journald-source-switch"
+commits = []
+title = "The `journald` source now pipes from journalctl"
+body = """\
+<p>
+The `journald` source originally used libsystemd in order to consume logs from
+Journald. Since this was causing issues for some distributions of Vector it has
+now been changed to pipe logs from journalctl.
+</p>
 """
 
 [[releases."0.7.0".upgrade_guides]]
