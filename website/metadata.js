@@ -3354,12 +3354,12 @@ module.exports = {
         "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
       },
       {
-        "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nIn order to reduce the number of indexed fields you can use the optional field\n`indexed_fields` to whitelist them:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
+        "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill <i>not</i> index any fields by default.\n</p>\n<p>\nIn order to mark desired fields as indexed you can use the optional configuration\noption `indexed_fields`:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
         "commits": [
 
         ],
         "id": "splunk-hec-sink-explicit",
-        "title": "The `splunk_hec` sink sends all event fields"
+        "title": "The `splunk_hec` sink does not index any fields by default"
       }
     ],
     "version": "0.7.0"
@@ -18991,12 +18991,12 @@ module.exports = {
           "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
         },
         {
-          "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nIn order to reduce the number of indexed fields you can use the optional field\n`indexed_fields` to whitelist them:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
+          "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill <i>not</i> index any fields by default.\n</p>\n<p>\nIn order to mark desired fields as indexed you can use the optional configuration\noption `indexed_fields`:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
           "commits": [
 
           ],
           "id": "splunk-hec-sink-explicit",
-          "title": "The `splunk_hec` sink sends all event fields"
+          "title": "The `splunk_hec` sink does not index any fields by default"
         }
       ],
       "version": "0.7.0"

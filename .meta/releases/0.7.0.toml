@@ -325,16 +325,16 @@ sources.
 [[releases."0.7.0".upgrade_guides]]
 id = "splunk-hec-sink-explicit"
 commits = []
-title = "The `splunk_hec` sink sends all event fields"
+title = "The `splunk_hec` sink does not index any fields by default"
 body = """\
 <p>
 There is no longer a distinction within Vector between explicit and implicit
-event fields. Therefore the `splunk_hec` sink will always send <i>all</i> event
-fields.
+event fields. All fields are now implicit and therefore the `splunk_hec` sink
+will <i>not</i> index any fields by default.
 </p>
 <p>
-In order to reduce the number of indexed fields you can use the optional field
-`indexed_fields` to whitelist them:
+In order to mark desired fields as indexed you can use the optional configuration
+option `indexed_fields`:
 </p>
 <pre>
  [sinks.my_sink_id]
