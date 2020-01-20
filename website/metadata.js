@@ -3354,12 +3354,12 @@ module.exports = {
         "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
       },
       {
-        "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nThis will most likely not affect typical Vector pipelines. However, in the case\nwhere unwanted fields are being sent the `remove_fields` transform can be used\nto remove them:\n</p>\n<pre>\n+[transforms.remove-fields]\n+  type = \"remove_fields\"\n+  inputs = [\"my-source-id\"]\n+  fields = [\"field1\", \"field2\"]\n\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n-  inputs = [\"my-source-id\"]\n+  inputs = [\"remove-fields\"]\n</pre>\n",
+        "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nIn order to reduce the number of indexed fields you can use the optional field\n`indexed_fields` to whitelist them:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
         "commits": [
 
         ],
         "id": "splunk-hec-sink-explicit",
-        "title": "The `splunk_hec` sink  when consuming JSON now moves the `line` field to `message`"
+        "title": "The `splunk_hec` sink sends all event fields"
       }
     ],
     "version": "0.7.0"
@@ -18991,12 +18991,12 @@ module.exports = {
           "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
         },
         {
-          "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nThis will most likely not affect typical Vector pipelines. However, in the case\nwhere unwanted fields are being sent the `remove_fields` transform can be used\nto remove them:\n</p>\n<pre>\n+[transforms.remove-fields]\n+  type = \"remove_fields\"\n+  inputs = [\"my-source-id\"]\n+  fields = [\"field1\", \"field2\"]\n\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n-  inputs = [\"my-source-id\"]\n+  inputs = [\"remove-fields\"]\n</pre>\n",
+          "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nIn order to reduce the number of indexed fields you can use the optional field\n`indexed_fields` to whitelist them:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
           "commits": [
 
           ],
           "id": "splunk-hec-sink-explicit",
-          "title": "The `splunk_hec` sink  when consuming JSON now moves the `line` field to `message`"
+          "title": "The `splunk_hec` sink sends all event fields"
         }
       ],
       "version": "0.7.0"

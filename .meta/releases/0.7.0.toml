@@ -156,10 +156,6 @@ commits = [
 {sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574}
 ]
 
-comment = """\
-{sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574}
-"""
-
 [[releases."0.7.0".upgrade_guides]]
 id = "tcp-udp-to-socket-guide"
 commits = []
@@ -329,7 +325,7 @@ sources.
 [[releases."0.7.0".upgrade_guides]]
 id = "splunk-hec-sink-explicit"
 commits = []
-title = "The `splunk_hec` sink  when consuming JSON now moves the `line` field to `message`"
+title = "The `splunk_hec` sink sends all event fields"
 body = """\
 <p>
 There is no longer a distinction within Vector between explicit and implicit
@@ -337,19 +333,13 @@ event fields. Therefore the `splunk_hec` sink will always send <i>all</i> event
 fields.
 </p>
 <p>
-This will most likely not affect typical Vector pipelines. However, in the case
-where unwanted fields are being sent the `remove_fields` transform can be used
-to remove them:
+In order to reduce the number of indexed fields you can use the optional field
+`indexed_fields` to whitelist them:
 </p>
 <pre>
-+[transforms.remove-fields]
-+  type = "remove_fields"
-+  inputs = ["my-source-id"]
-+  fields = ["field1", "field2"]
-
  [sinks.my_sink_id]
    type = "splunk_hec"
--  inputs = ["my-source-id"]
-+  inputs = ["remove-fields"]
+   inputs = ["my-source-id"]
++  indexed_fields = ["foo", "bar"]
 </pre>
 """
