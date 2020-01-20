@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn router_log() {
+    fn logplex_handles_router_log() {
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
         let mut rt = test_util::runtime();
@@ -178,6 +178,50 @@ mod tests {
             log[&event::MESSAGE],
             r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
         );
+        assert_eq!(
+            log[&event::TIMESTAMP],
+            "2020-01-08T22:33:57.353034+00:00"
+                .parse::<DateTime<Utc>>()
+                .unwrap()
+                .into()
+        );
+        assert_eq!(log[&event::HOST], "host".into());
+    }
+
+    #[test]
+    fn logplex_handles_normal_lines() {
+        let body = "267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - foo bar baz";
+        let event = super::line_to_event(body.into());
+        let log = event.as_log();
+
+        assert_eq!(log[&event::MESSAGE], "foo bar baz".into());
+        assert_eq!(
+            log[&event::TIMESTAMP],
+            "2020-01-08T22:33:57.353034+00:00"
+                .parse::<DateTime<Utc>>()
+                .unwrap()
+                .into()
+        );
+        assert_eq!(log[&event::HOST], "host".into());
+    }
+
+    #[test]
+    fn logplex_handles_malformed_lines() {
+        let body = "what am i doing here";
+        let event = super::line_to_event(body.into());
+        let log = event.as_log();
+
+        assert_eq!(log[&event::MESSAGE], "what am i doing here".into());
+        assert!(log.get(&event::TIMESTAMP).is_some());
+    }
+
+    #[test]
+    fn logplex_doesnt_blow_up_on_bad_framing() {
+        let body = "1000000 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - i'm not that long";
+        let event = super::line_to_event(body.into());
+        let log = event.as_log();
+
+        assert_eq!(log[&event::MESSAGE], "i'm not that long".into());
         assert_eq!(
             log[&event::TIMESTAMP],
             "2020-01-08T22:33:57.353034+00:00"
