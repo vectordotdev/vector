@@ -3313,7 +3313,54 @@ module.exports = {
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
+      {
+        "body": "<p>\nThe `tcp` and `udp` sources no longer exist and have been merged into a new\n`socket` type. Likewise, the `tcp` sink has been merged into the `socket` sink.\n\nMigration is straight forward, simply change the `type` to `socket` and add the\nfield `mode` to match the socket type (`tcp` or `udp`):\n</p>\n\n<pre>\n [sources.my_tcp_source]\n-  type = \"tcp\"\n+  type = \"socket\"\n   address = \"0.0.0.0:9000\"\n+  mode = \"tcp\"\n\n [sources.my_tcp_sink]\n-  type = \"tcp\"\n+  type = \"socket\"\n   address = \"92.12.333.224:5000\"\n+  mode = \"tcp\"\n</pre>\n",
+        "commits": [
 
+        ],
+        "id": "tcp-udp-to-socket-guide",
+        "title": "The `tcp` and `udp` sources & sinks have been merged into `socket`"
+      },
+      {
+        "body": "<p>\nRequest based sinks have had their request fields nested under the table\n`request` and no longer use fixed retry intervals, instead using a fibonacci\nsequence for backing off retry attempts.\n</p>\n\n<p>\nBatching fields are now nested under the table `batch`, with the field `size`\nreplaced with either `max_events` or `max_size` in order to clarify its purpose\n(capping discrete events or bytes respectively).\n</p>\n\n<p>\nFinally, authentication fields have been moved from the table `basic_auth` into\na general purpose `auth` table complemented with a `strategy` field.\n</p>\n\n<p>\nThese changes effect the following sinks:\n</p>\n\n<ul>\n  <li> `aws_cloudwatch_logs` </li>\n  <li> `aws_kinesis_firehose` </li>\n  <li> `aws_kinesis_streams` </li>\n  <li> `aws_s3` </li>\n  <li> `clickhouse` </li>\n  <li> `datadog_metrics` </li>\n  <li> `elasticsearch` </li>\n  <li> `gcp_pubsub` </li>\n  <li> `http` </li>\n  <li> `new_relic_logs` </li>\n  <li> `splunk_hec` </li>\n</ul>\n\n<p>\nIn order to migrate all fields prefixed with `request_` must be placed within a\n`request` table with the prefix removed.\n\nThe config field `retry_backoff_secs` must also be replaced with two new fields\n`retry_initial_backoff_secs` and `retry_max_duration_secs`.\n\nFields prefixed with `batch_` must be placed within a `batch` table with the\nprefix removed. Instances of `batch_size` should be renamed `max_size` or\n`max_events` (refer to the relevant sink docs for the correct variant).\n\nFinally, the table `basic_auth` should renamed `auth` with a field `strategy`\nadded:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"http\"\n   inputs = [\"my-source-id\"]\n   uri = \"https://10.22.212.22:9000/endpoint\"\n\n-  batch_size = 1049000\n+  [sinks.my_sink_id.batch]\n+    max_size = 1049000\n\n-  [sinks.my_sink_id.basic_auth]\n+  [sinks.my_sink_id.auth]\n+    strategy = \"basic\"\n     user = \"${USERNAME_ENV_VAR}\"\n     password = \"${PASSWORD_ENV_VAR}\"\n\n-  request_in_flight_limit = 5\n-  request_retry_backoff_secs = 1\n+  [sinks.my_sink_id.request]\n+    in_flight_limit = 5\n+    retry_initial_backoff_secs = 1\n+    retry_max_duration_secs = 10\n</pre>\n",
+        "commits": [
+
+        ],
+        "id": "request-changed-guide",
+        "title": "Request, batching and auth fields refactored for sink components"
+      },
+      {
+        "body": "<p>\nThe buffer field `num_items` has been renamed to `max_events` in order to clarify\nits purpose.\n\nMigration involves simply changing all occurrences of `buffer.num_items` to\n`buffer.max_events`:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"aws_s3\"\n   inputs = [\"my-source-id\"]\n   bucket = \"my-bucket\"\n\n   [sinks.my_sink_id.buffer]\n     type = \"memory\"\n-    num_items = 500\n+    max_events = 500\n</pre>\n",
+        "commits": [
+
+        ],
+        "id": "buffer-num-items-changed",
+        "title": "The buffer field `num_items` has been renamed to `max_events`"
+      },
+      {
+        "body": "<p>\nThe `kafka` sink field `bootstrap_servers` has been changed from an array to a\nstring, expecting a comma separated list of bootstrap servers similar to the\n`kafka` source:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"kafka\"\n   inputs = [\"my-source-id\"]\n-  bootstrap_servers = [\"10.14.22.123:9092\", \"10.14.23.332:9092\"]\n+  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\"\n</pre>\n",
+        "commits": [
+
+        ],
+        "id": "kafka-sink-comma-list",
+        "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
+      },
+      {
+        "body": "<p>\nWhen consuming JSON events the `splunk_hec` source now moves a parsed `line`\nfield of the consumed event to `message` in order to be consistent with other\nsources.\n</p>\n",
+        "commits": [
+
+        ],
+        "id": "splunk-hec-source-message",
+        "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
+      },
+      {
+        "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nThis will most likely not affect typical Vector pipelines. However, in the case\nwhere unwanted fields are being sent the `remove_fields` transform can be used\nto remove them:\n</p>\n<pre>\n+[transforms.remove-fields]\n+  type = \"remove_fields\"\n+  inputs = [\"my-source-id\"]\n+  fields = [\"field1\", \"field2\"]\n\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n-  inputs = [\"my-source-id\"]\n+  inputs = [\"remove-fields\"]\n</pre>\n",
+        "commits": [
+
+        ],
+        "id": "splunk-hec-sink-explicit",
+        "title": "The `splunk_hec` sink  when consuming JSON now moves the `line` field to `message`"
+      }
     ],
     "version": "0.7.0"
   },
@@ -18903,7 +18950,54 @@ module.exports = {
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
+        {
+          "body": "<p>\nThe `tcp` and `udp` sources no longer exist and have been merged into a new\n`socket` type. Likewise, the `tcp` sink has been merged into the `socket` sink.\n\nMigration is straight forward, simply change the `type` to `socket` and add the\nfield `mode` to match the socket type (`tcp` or `udp`):\n</p>\n\n<pre>\n [sources.my_tcp_source]\n-  type = \"tcp\"\n+  type = \"socket\"\n   address = \"0.0.0.0:9000\"\n+  mode = \"tcp\"\n\n [sources.my_tcp_sink]\n-  type = \"tcp\"\n+  type = \"socket\"\n   address = \"92.12.333.224:5000\"\n+  mode = \"tcp\"\n</pre>\n",
+          "commits": [
 
+          ],
+          "id": "tcp-udp-to-socket-guide",
+          "title": "The `tcp` and `udp` sources & sinks have been merged into `socket`"
+        },
+        {
+          "body": "<p>\nRequest based sinks have had their request fields nested under the table\n`request` and no longer use fixed retry intervals, instead using a fibonacci\nsequence for backing off retry attempts.\n</p>\n\n<p>\nBatching fields are now nested under the table `batch`, with the field `size`\nreplaced with either `max_events` or `max_size` in order to clarify its purpose\n(capping discrete events or bytes respectively).\n</p>\n\n<p>\nFinally, authentication fields have been moved from the table `basic_auth` into\na general purpose `auth` table complemented with a `strategy` field.\n</p>\n\n<p>\nThese changes effect the following sinks:\n</p>\n\n<ul>\n  <li> `aws_cloudwatch_logs` </li>\n  <li> `aws_kinesis_firehose` </li>\n  <li> `aws_kinesis_streams` </li>\n  <li> `aws_s3` </li>\n  <li> `clickhouse` </li>\n  <li> `datadog_metrics` </li>\n  <li> `elasticsearch` </li>\n  <li> `gcp_pubsub` </li>\n  <li> `http` </li>\n  <li> `new_relic_logs` </li>\n  <li> `splunk_hec` </li>\n</ul>\n\n<p>\nIn order to migrate all fields prefixed with `request_` must be placed within a\n`request` table with the prefix removed.\n\nThe config field `retry_backoff_secs` must also be replaced with two new fields\n`retry_initial_backoff_secs` and `retry_max_duration_secs`.\n\nFields prefixed with `batch_` must be placed within a `batch` table with the\nprefix removed. Instances of `batch_size` should be renamed `max_size` or\n`max_events` (refer to the relevant sink docs for the correct variant).\n\nFinally, the table `basic_auth` should renamed `auth` with a field `strategy`\nadded:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"http\"\n   inputs = [\"my-source-id\"]\n   uri = \"https://10.22.212.22:9000/endpoint\"\n\n-  batch_size = 1049000\n+  [sinks.my_sink_id.batch]\n+    max_size = 1049000\n\n-  [sinks.my_sink_id.basic_auth]\n+  [sinks.my_sink_id.auth]\n+    strategy = \"basic\"\n     user = \"${USERNAME_ENV_VAR}\"\n     password = \"${PASSWORD_ENV_VAR}\"\n\n-  request_in_flight_limit = 5\n-  request_retry_backoff_secs = 1\n+  [sinks.my_sink_id.request]\n+    in_flight_limit = 5\n+    retry_initial_backoff_secs = 1\n+    retry_max_duration_secs = 10\n</pre>\n",
+          "commits": [
+
+          ],
+          "id": "request-changed-guide",
+          "title": "Request, batching and auth fields refactored for sink components"
+        },
+        {
+          "body": "<p>\nThe buffer field `num_items` has been renamed to `max_events` in order to clarify\nits purpose.\n\nMigration involves simply changing all occurrences of `buffer.num_items` to\n`buffer.max_events`:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"aws_s3\"\n   inputs = [\"my-source-id\"]\n   bucket = \"my-bucket\"\n\n   [sinks.my_sink_id.buffer]\n     type = \"memory\"\n-    num_items = 500\n+    max_events = 500\n</pre>\n",
+          "commits": [
+
+          ],
+          "id": "buffer-num-items-changed",
+          "title": "The buffer field `num_items` has been renamed to `max_events`"
+        },
+        {
+          "body": "<p>\nThe `kafka` sink field `bootstrap_servers` has been changed from an array to a\nstring, expecting a comma separated list of bootstrap servers similar to the\n`kafka` source:\n</p>\n\n<pre>\n [sinks.my_sink_id]\n   type = \"kafka\"\n   inputs = [\"my-source-id\"]\n-  bootstrap_servers = [\"10.14.22.123:9092\", \"10.14.23.332:9092\"]\n+  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\"\n</pre>\n",
+          "commits": [
+
+          ],
+          "id": "kafka-sink-comma-list",
+          "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
+        },
+        {
+          "body": "<p>\nWhen consuming JSON events the `splunk_hec` source now moves a parsed `line`\nfield of the consumed event to `message` in order to be consistent with other\nsources.\n</p>\n",
+          "commits": [
+
+          ],
+          "id": "splunk-hec-source-message",
+          "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
+        },
+        {
+          "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. Therefore the `splunk_hec` sink will always send <i>all</i> event\nfields.\n</p>\n<p>\nThis will most likely not affect typical Vector pipelines. However, in the case\nwhere unwanted fields are being sent the `remove_fields` transform can be used\nto remove them:\n</p>\n<pre>\n+[transforms.remove-fields]\n+  type = \"remove_fields\"\n+  inputs = [\"my-source-id\"]\n+  fields = [\"field1\", \"field2\"]\n\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n-  inputs = [\"my-source-id\"]\n+  inputs = [\"remove-fields\"]\n</pre>\n",
+          "commits": [
+
+          ],
+          "id": "splunk-hec-sink-explicit",
+          "title": "The `splunk_hec` sink  when consuming JSON now moves the `line` field to `message`"
+        }
       ],
       "version": "0.7.0"
     }

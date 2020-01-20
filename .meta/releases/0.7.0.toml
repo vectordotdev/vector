@@ -155,3 +155,201 @@ commits = [
 {sha = "fe0e43a60b0ccb4dc7980b8b1edfa5e7b074b189", message = "chore(testing): Use `.iter()` instead of `.into_iter()` for arrays (#1529)", author = "Alexander Rodin", date = 2020-01-16T13:38:21Z, files_count = 1, insertions_count = 3, deletions_count = 3},
 {sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574}
 ]
+
+comment = """\
+{sha = "fff92728c9490824ff9d0ae76669adc901bb5499", message = "chore(log data model)!: Remove distinction between explicit and implicit fields (#1530)", author = "Alexander Rodin", date = 2020-01-17T14:32:43Z, files_count = 49, insertions_count = 426, deletions_count = 574}
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "tcp-udp-to-socket-guide"
+commits = []
+title = "The `tcp` and `udp` sources & sinks have been merged into `socket`"
+body = """\
+<p>
+The `tcp` and `udp` sources no longer exist and have been merged into a new
+`socket` type. Likewise, the `tcp` sink has been merged into the `socket` sink.
+
+Migration is straight forward, simply change the `type` to `socket` and add the
+field `mode` to match the socket type (`tcp` or `udp`):
+</p>
+
+<pre>
+ [sources.my_tcp_source]
+-  type = "tcp"
++  type = "socket"
+   address = "0.0.0.0:9000"
++  mode = "tcp"
+
+ [sources.my_tcp_sink]
+-  type = "tcp"
++  type = "socket"
+   address = "92.12.333.224:5000"
++  mode = "tcp"
+</pre>
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "request-changed-guide"
+commits = []
+title = "Request, batching and auth fields refactored for sink components"
+body = """\
+<p>
+Request based sinks have had their request fields nested under the table
+`request` and no longer use fixed retry intervals, instead using a fibonacci
+sequence for backing off retry attempts.
+</p>
+
+<p>
+Batching fields are now nested under the table `batch`, with the field `size`
+replaced with either `max_events` or `max_size` in order to clarify its purpose
+(capping discrete events or bytes respectively).
+</p>
+
+<p>
+Finally, authentication fields have been moved from the table `basic_auth` into
+a general purpose `auth` table complemented with a `strategy` field.
+</p>
+
+<p>
+These changes effect the following sinks:
+</p>
+
+<ul>
+  <li> `aws_cloudwatch_logs` </li>
+  <li> `aws_kinesis_firehose` </li>
+  <li> `aws_kinesis_streams` </li>
+  <li> `aws_s3` </li>
+  <li> `clickhouse` </li>
+  <li> `datadog_metrics` </li>
+  <li> `elasticsearch` </li>
+  <li> `gcp_pubsub` </li>
+  <li> `http` </li>
+  <li> `new_relic_logs` </li>
+  <li> `splunk_hec` </li>
+</ul>
+
+<p>
+In order to migrate all fields prefixed with `request_` must be placed within a
+`request` table with the prefix removed.
+
+The config field `retry_backoff_secs` must also be replaced with two new fields
+`retry_initial_backoff_secs` and `retry_max_duration_secs`.
+
+Fields prefixed with `batch_` must be placed within a `batch` table with the
+prefix removed. Instances of `batch_size` should be renamed `max_size` or
+`max_events` (refer to the relevant sink docs for the correct variant).
+
+Finally, the table `basic_auth` should renamed `auth` with a field `strategy`
+added:
+</p>
+
+<pre>
+ [sinks.my_sink_id]
+   type = "http"
+   inputs = ["my-source-id"]
+   uri = "https://10.22.212.22:9000/endpoint"
+
+-  batch_size = 1049000
++  [sinks.my_sink_id.batch]
++    max_size = 1049000
+
+-  [sinks.my_sink_id.basic_auth]
++  [sinks.my_sink_id.auth]
++    strategy = "basic"
+     user = "${USERNAME_ENV_VAR}"
+     password = "${PASSWORD_ENV_VAR}"
+
+-  request_in_flight_limit = 5
+-  request_retry_backoff_secs = 1
++  [sinks.my_sink_id.request]
++    in_flight_limit = 5
++    retry_initial_backoff_secs = 1
++    retry_max_duration_secs = 10
+</pre>
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "buffer-num-items-changed"
+commits = []
+title = "The buffer field `num_items` has been renamed to `max_events`"
+body = """\
+<p>
+The buffer field `num_items` has been renamed to `max_events` in order to clarify
+its purpose.
+
+Migration involves simply changing all occurrences of `buffer.num_items` to
+`buffer.max_events`:
+</p>
+
+<pre>
+ [sinks.my_sink_id]
+   type = "aws_s3"
+   inputs = ["my-source-id"]
+   bucket = "my-bucket"
+
+   [sinks.my_sink_id.buffer]
+     type = "memory"
+-    num_items = 500
++    max_events = 500
+</pre>
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "kafka-sink-comma-list"
+commits = []
+title = "The `kafka` sink now takes a comma separated list of bootstrap servers"
+body = """\
+<p>
+The `kafka` sink field `bootstrap_servers` has been changed from an array to a
+string, expecting a comma separated list of bootstrap servers similar to the
+`kafka` source:
+</p>
+
+<pre>
+ [sinks.my_sink_id]
+   type = "kafka"
+   inputs = ["my-source-id"]
+-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
++  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+</pre>
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "splunk-hec-source-message"
+commits = []
+title = "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
+body = """\
+<p>
+When consuming JSON events the `splunk_hec` source now moves a parsed `line`
+field of the consumed event to `message` in order to be consistent with other
+sources.
+</p>
+"""
+
+[[releases."0.7.0".upgrade_guides]]
+id = "splunk-hec-sink-explicit"
+commits = []
+title = "The `splunk_hec` sink  when consuming JSON now moves the `line` field to `message`"
+body = """\
+<p>
+There is no longer a distinction within Vector between explicit and implicit
+event fields. Therefore the `splunk_hec` sink will always send <i>all</i> event
+fields.
+</p>
+<p>
+This will most likely not affect typical Vector pipelines. However, in the case
+where unwanted fields are being sent the `remove_fields` transform can be used
+to remove them:
+</p>
+<pre>
++[transforms.remove-fields]
++  type = "remove_fields"
++  inputs = ["my-source-id"]
++  fields = ["field1", "field2"]
+
+ [sinks.my_sink_id]
+   type = "splunk_hec"
+-  inputs = ["my-source-id"]
++  inputs = ["remove-fields"]
+</pre>
+"""
