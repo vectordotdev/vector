@@ -189,4 +189,21 @@ mod tests {
         assert_eq!(log[&"bytes".into()], Value::Integer(656));
         assert_eq!(log[&"protocol".into()], "http".into());
     }
+
+    #[test]
+    fn logfmt_handles_herokus_weird_octothorpes() {
+        let log = parse_log("source=web.1 dyno=heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456 sample#memory_total=21.00MB sample#memory_rss=21.22MB sample#memory_cache=0.00MB sample#memory_swap=0.00MB sample#memory_pgpgin=348836pages sample#memory_pgpgout=343403pages", true, &[]);
+
+        assert_eq!(log[&"source".into()], "web.1".into());
+        assert_eq!(
+            log[&"dyno".into()],
+            "heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456".into()
+        );
+        assert_eq!(log[&"sample#memory_total".into()], "21.00MB".into());
+        assert_eq!(log[&"sample#memory_rss".into()], "21.22MB".into());
+        assert_eq!(log[&"sample#memory_cache".into()], "0.00MB".into());
+        assert_eq!(log[&"sample#memory_swap".into()], "0.00MB".into());
+        assert_eq!(log[&"sample#memory_pgpgin".into()], "348836pages".into());
+        assert_eq!(log[&"sample#memory_pgpgout".into()], "343403pages".into());
+    }
 }
