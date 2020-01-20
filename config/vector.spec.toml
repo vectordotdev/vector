@@ -4233,6 +4233,14 @@ end
   healthcheck = true
   healthcheck = false
 
+  # Fields to be added to Splunk index.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  # * relevant when encoding = "json"
+  indexed_fields = ["field1", "field2"]
+
   #
   # requests
   #

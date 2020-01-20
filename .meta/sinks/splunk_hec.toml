@@ -34,3 +34,11 @@ common = true
 examples = ["${TOKEN_ENV_VAR}", "A94A8FE5CCB19BA61C4C08"]
 required = true
 description = "Your Splunk HEC token."
+
+[sinks.splunk_hec.options.indexed_fields]
+type = "[string]"
+common = true
+examples = [["field1", "field2"]]
+relevant_when = {encoding = "json"}
+required = false
+description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."
