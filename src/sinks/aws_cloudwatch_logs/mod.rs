@@ -927,7 +927,7 @@ mod integration_tests {
             endpoint: "http://localhost:6000".into(),
         };
 
-        let client = create_client(region.clone(), resolver).unwrap();
+        let client = create_client(region.clone(), None, resolver).unwrap();
         ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
