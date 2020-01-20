@@ -139,6 +139,7 @@ strip-ansi-escapes = "0.1.0"
 colored = "1.9"
 warp = "0.1.20"
 evmap = { version = "7", features = ["bytes"] }
+logfmt = "0.0.2"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
