@@ -13,6 +13,7 @@ pub mod metric;
 mod unflatten;
 
 pub use metric::Metric;
+pub use unflatten::Unflatten;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
