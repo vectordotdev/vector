@@ -21,6 +21,7 @@ use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
+use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryInto, fmt};
@@ -61,6 +62,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub assume_role: Option<String>,
 }
 
 lazy_static! {
@@ -225,7 +227,7 @@ impl CloudwatchLogsSvc {
         resolver: Resolver,
     ) -> crate::Result<Self> {
         let region = config.region.clone().try_into()?;
-        let client = create_client(region, resolver)?;
+        let client = create_client(region, config.assume_role.clone(), resolver)?;
 
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
@@ -388,7 +390,11 @@ fn healthcheck(
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
 
-    let client = create_client(config.region.clone().try_into()?, resolver)?;
+    let client = create_client(
+        config.region.clone().try_into()?,
+        config.assume_role,
+        resolver,
+    )?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -431,11 +437,33 @@ fn healthcheck(
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region, resolver: Resolver) -> crate::Result<CloudWatchLogsClient> {
+fn create_client(
+    region: Region,
+    assume_role: Option<String>,
+    resolver: Resolver,
+) -> crate::Result<CloudWatchLogsClient> {
     let http = rusoto::client(resolver)?;
-    let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
 
-    Ok(CloudWatchLogsClient::new_with(http, creds, region))
+    if let Some(role) = assume_role {
+        let sts = StsClient::new(region.clone());
+
+        let provider = StsAssumeRoleSessionCredentialsProvider::new(
+            sts,
+            role,
+            "default".to_owned(),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let creds = rusoto_credential::AutoRefreshingProvider::new(provider)
+            .context(InvalidCloudwatchCredentials)?;
+        Ok(CloudWatchLogsClient::new_with(http, creds, region))
+    } else {
+        let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
+        Ok(CloudWatchLogsClient::new_with(http, creds, region))
+    }
 }
 
 #[derive(Debug, Clone)]

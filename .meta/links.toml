@@ -24,6 +24,7 @@ aws_cw_metrics_service_limits = "https://docs.aws.amazon.com/en_pv/AmazonCloudWa
 aws_cw_metrics_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region"
 aws_elasticsearch = "https://aws.amazon.com/elasticsearch-service/"
 aws_elasticsearch_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions"
+aws_iam_role = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html"
 aws_kinesis_data_streams = "https://aws.amazon.com/kinesis/data-streams/"
 aws_kinesis_data_firehose = "https://aws.amazon.com/kinesis/data-firehose/"
 aws_kinesis_partition_key = "https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey"
