@@ -328,17 +328,10 @@ The `journald` source originally used libsystemd in order to consume logs from
 Journald. Since this was causing issues for some distributions of Vector it has
 now been changed to pipe logs from journalctl.
 </p>
-"""
-
-[[releases."0.7.0".upgrade_guides]]
-id = "splunk-hec-source-message"
-commits = []
-title = "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
-body = """\
 <p>
-When consuming JSON events the `splunk_hec` source now moves a parsed `line`
-field of the consumed event to `message` in order to be consistent with other
-sources.
+Therefore, when using a `journald` source users must now ensure that the
+`journalctl` binary is available. The field `local_only` has also been removed
+as it is no longer applicable.
 </p>
 """
 

@@ -3506,7 +3506,7 @@ module.exports = {
         "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
       },
       {
-        "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n",
+        "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n<p>\nTherefore, when using a `journald` source users must now ensure that the\n`journalctl` binary is available. The field `local_only` has also been removed\nas it is no longer applicable.\n</p>\n",
         "commits": [
 
         ],
@@ -19311,7 +19311,7 @@ module.exports = {
           "title": "The `kafka` sink now takes a comma separated list of bootstrap servers"
         },
         {
-          "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n",
+          "body": "<p>\nThe `journald` source originally used libsystemd in order to consume logs from\nJournald. Since this was causing issues for some distributions of Vector it has\nnow been changed to pipe logs from journalctl.\n</p>\n<p>\nTherefore, when using a `journald` source users must now ensure that the\n`journalctl` binary is available. The field `local_only` has also been removed\nas it is no longer applicable.\n</p>\n",
           "commits": [
 
           ],
