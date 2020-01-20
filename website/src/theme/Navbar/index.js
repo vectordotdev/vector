@@ -35,7 +35,7 @@ function navLinkAttributes(label, right) {
         attrs.badge = 'new';
         attrs.badgeStyle = 'primary';
       }
-      
+
       return attrs;
 
     case 'chat':
