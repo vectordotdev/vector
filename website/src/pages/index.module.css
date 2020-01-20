@@ -63,7 +63,7 @@
 }
 
 .indexHeroDiagram {
-  margin: calc( var(--ifm-spacing-vertical) * 4 ) 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
   max-height: 325px;
   height: auto;
   width: 100%;

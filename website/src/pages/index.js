@@ -33,7 +33,7 @@ const AnchoredH2 = Heading('h2');
 
 const features = [
   {
-    title: 'Modern & Fast',
+    title: 'Fast. Really.',
     icon: 'zap',
     description: (
       <>
@@ -65,7 +65,7 @@ const features = [
     icon: 'shuffle',
     description: (
       <>
-        Vector unifies <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link> at the source, making it easy to collect and ship all observability data.
+        Vector supports <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link>, making it easy to collect and process <i>all</i> observability data.
       </>
     ),
   },
@@ -449,14 +449,17 @@ function Home() {
             </Link>
           )}
           <h1>Take Control Of Your Observability Data</h1>
-          <p className="hero__subtitle">
-            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data, for <i>free</i>, with <i>one</i> simple tool.
+          <p className="hero--subtitle">
+            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
           </p>
-          <div className="hero__buttons">
+          <div className="hero--buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
             <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
+          <p className="hero--subsubtitle">
+            Vector is free and <a href="https://github.com/timberio/vector">open source</a>
+          </p>
         </div>
       </header>
       <main>

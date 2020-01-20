@@ -590,28 +590,35 @@ header h1 {
 .hero h1 {
   font-size: 2.5rem;
 }
-.hero .hero__subtitle {
+.hero .hero--subtitle {
   color: var(--ifm-color-emphasis-600);
   font-size: 1.1rem;
   margin-top: 0.3rem;
+  margin-bottom: var(--ifm-spacing-vertical);
 }
-.hero .hero__subtitle a {
+.hero .hero--subtitle a {
   color: var(--ifm-color-content);
   text-decoration: underline;
 }
-.hero .hero__subtitle a:hover {
+.hero .hero--subtitle a:hover {
   color: var(--ifm-link-color);
 }
-.hero .hero__buttons {
+.hero .hero--subsubtitle {
+  color: var(--ifm-color-emphasis-600);
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+}
+.hero .hero--buttons {
   --ifm-button-padding-vertical: 0.5rem;
   --ifm-button-padding-horizontal: 4rem;
+  margin-bottom: var(--ifm-spacing-vertical);
 }
-.hero .hero__buttons .button {
+.hero .hero--buttons .button {
   border-radius: 2rem;
   margin-right: 1rem;
   min-width: 240px;
 }
-.hero .hero__buttons .button:last-child {
+.hero .hero--buttons .button:last-child {
   margin-right: 0;
 }
 .hero.hero--full-height {
@@ -625,22 +632,22 @@ header h1 {
     min-height: 100px;
     padding: 2em 0;
   }
-  .hero .hero__buttons .button {
+  .hero .hero--buttons .button {
     --ifm-button-padding-horizontal: 2rem;
     min-width: 180px;
   }
 }
 @media (max-width: 480px) {
-  .hero {
-    text-align: left;
+  .hero.hero--full-height {
+    min-height: auto;
   }
   .hero h1 {
     font-size: 2em;
   }
-  .hero .hero__subtitle {
+  .hero .hero--subtitle {
     font-size: 1em;
   }
-  .hero .hero__buttons .button {
+  .hero .hero--buttons .button {
     display: block;
     border-radius: 0.5rem;
     margin: 0 0 1rem 0;
