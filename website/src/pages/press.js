@@ -20,7 +20,7 @@ function Contact() {
       <header className="hero">
         <div className="container container--fluid">
           <h1>Logos & Press Kit</h1>
-          <div className="hero__subtitle">
+          <div className="hero--subtitle">
             Offical Vector resources for digital and printed materials.
           </div>
         </div>

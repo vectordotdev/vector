@@ -23,50 +23,22 @@ The Vector `docker` source ingests data through the docker engine daemon and out
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
-  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
-  include_images = ["my_image_name", "httpd", "redis"] # example, no default
-  include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
-```
+  # REQUIRED
+  type = "docker" # must be: "docker"
 
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sources.my_source_id]
-  type = "docker" # no default, must be: "docker" (if supplied)
+  # OPTIONAL
   include_containers = ["my_container_name", "container_prefix", "9b6247364a03"] # example, no default
   include_images = ["my_image_name", "httpd", "redis"] # example, no default
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"] # example, no default
   no_auto_partial_merge = false # default
   partial_event_marker = "_partial" # default
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

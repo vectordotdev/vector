@@ -74,9 +74,7 @@ fn field_filter(c: &mut Criterion) {
                     let num = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();
-                            event
-                                .as_mut_log()
-                                .insert_explicit("the_field", (i % 10).to_string());
+                            event.as_mut_log().insert("the_field", (i % 10).to_string());
                             event
                         })
                         .filter_map(|r| transform.transform(r))
@@ -99,9 +97,7 @@ fn field_filter(c: &mut Criterion) {
                     let num = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();
-                            event
-                                .as_mut_log()
-                                .insert_explicit("the_field", (i % 10).to_string());
+                            event.as_mut_log().insert("the_field", (i % 10).to_string());
                             event
                         })
                         .filter_map(|r| transform.transform(r))

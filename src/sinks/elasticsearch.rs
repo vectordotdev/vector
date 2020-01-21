@@ -404,7 +404,7 @@ mod tests {
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
-        event.as_mut_log().insert_explicit("foo", "bar");
+        event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &event);
@@ -416,7 +416,7 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
-        event.as_mut_log().insert_explicit("not_foo", "bar");
+        event.as_mut_log().insert("not_foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &event);
@@ -428,7 +428,7 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
         let mut event = Event::from("butts");
-        event.as_mut_log().insert_explicit("foo", "bar");
+        event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &event);
@@ -538,8 +538,8 @@ mod integration_tests {
         let (sink, _hc) = config.build(cx.clone()).unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert_explicit("my_id", "42");
-        input_event.as_mut_log().insert_explicit("foo", "bar");
+        input_event.as_mut_log().insert("my_id", "42");
+        input_event.as_mut_log().insert("foo", "bar");
 
         let pump = sink.send(input_event.clone());
         rt.block_on(pump).unwrap();

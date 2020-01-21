@@ -49,6 +49,7 @@ scopes:
   - file source
   - journald source
   - kafka source
+  - logplex source
   - prometheus source
   - socket source
   - splunk_hec source
@@ -69,6 +70,7 @@ scopes:
   - grok_parser transform
   - json_parser transform
   - log_to_metric transform
+  - logfmt_parser transform
   - lua transform
   - merge transform
   - regex_parser transform

@@ -44,13 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
+  # REQUIRED - General
+  type = "file" # must be: "file"
+  include = ["/var/log/nginx/*.log"] # example
+
   # OPTIONAL - General
   glob_minimum_cooldown = 1000 # default, milliseconds
   start_at_beginning = false # default
   ignore_older = 86400 # example, no default, seconds
-
-  # REQUIRED - General
-  include = ["/var/log/nginx/*.log"] # example
 
   # OPTIONAL - Context
   file_key = "file" # default
@@ -67,17 +68,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
+  # REQUIRED - General
+  type = "file" # must be: "file"
+  include = ["/var/log/nginx/*.log"] # example
+
   # OPTIONAL - General
   glob_minimum_cooldown = 1000 # default, milliseconds
   start_at_beginning = false # default
-  type = "file" # no default, must be: "file" (if supplied)
   data_dir = "/var/lib/vector" # example, no default
   exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
   ignore_older = 86400 # example, no default, seconds
   max_line_bytes = 102400 # default, bytes
-
-  # REQUIRED - General
-  include = ["/var/log/nginx/*.log"] # example
 
   # OPTIONAL - Context
   file_key = "file" # default
@@ -483,7 +484,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
 
 ### start_at_beginning
 
-When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
+For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint.  See [Read Position](#read-position) for more info.
 
 
 </Field>

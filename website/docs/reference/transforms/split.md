@@ -20,70 +20,25 @@ The Vector `split` transform accepts [`log`][docs.data-model.log] events and all
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED - General
+  type = "split" # must be: "split"
+  inputs = ["my-source-id"] # example
+  field_names = ["timestamp", "level", "message"] # example
+
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
   separator = "whitespace" # default
 
-  # REQUIRED - General
-  field_names = ["timestamp", "level", "message"] # example
-
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-  separator = "whitespace" # default
-  type = "split" # no default, must be: "split" (if supplied)
-  inputs = ["my-source-id"] # example, no default
-
-  # REQUIRED - General
-  field_names = ["timestamp", "level", "message"] # example
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

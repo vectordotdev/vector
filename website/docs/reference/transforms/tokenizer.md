@@ -20,68 +20,24 @@ The Vector `tokenizer` transform accepts [`log`][docs.data-model.log] events and
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED - General
+  type = "tokenizer" # must be: "tokenizer"
+  inputs = ["my-source-id"] # example
+  field_names = ["timestamp", "level", "message"] # example
+
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
 
-  # REQUIRED - General
-  field_names = ["timestamp", "level", "message"] # example
-
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-  type = "tokenizer" # no default, must be: "tokenizer" (if supplied)
-  inputs = ["my-source-id"] # example, no default
-
-  # REQUIRED - General
-  field_names = ["timestamp", "level", "message"] # example
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

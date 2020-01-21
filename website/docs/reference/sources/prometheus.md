@@ -23,49 +23,16 @@ The Vector `prometheus` source ingests data through the Prometheus text expositi
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
+  type = "prometheus" # must be: "prometheus"
   hosts = ["http://localhost:9090"] # example
   scrape_interval_secs = 1 # example
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sources.my_source_id]
-  # REQUIRED
-  hosts = ["http://localhost:9090"] # example
-  scrape_interval_secs = 1 # example
-
-  # OPTIONAL
-  type = "prometheus" # no default, must be: "prometheus" (if supplied)
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -128,10 +95,14 @@ The `prometheus` source ingests data through the Prometheus text exposition form
 For example:
 
 
+import Tabs from '@theme/Tabs';
+
 <Tabs
   block={true}
   defaultValue="counter"
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"}]}>
+
+import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 

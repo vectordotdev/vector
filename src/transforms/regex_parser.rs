@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
@@ -139,9 +139,9 @@ impl Transform for RegexParser {
             {
                 for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
-                        let capture: ValueKind = value[start..end].into();
+                        let capture: Value = value[start..end].into();
                         match conversion.convert(capture) {
-                            Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
+                            Ok(value) => event.as_mut_log().insert(name.clone(), value),
                             Err(error) => {
                                 debug!(
                                     message = "Could not convert types.",
@@ -196,7 +196,7 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
-    use crate::event::{LogEvent, ValueKind};
+    use crate::event::{LogEvent, Value};
     use crate::{topology::config::TransformConfig, Event};
 
     fn do_transform(
@@ -338,9 +338,9 @@ mod tests {
             &[("status", "int"), ("time", "float"), ("check", "boolean")],
         )
         .expect("Failed to parse log");
-        assert_eq!(log[&"check".into()], ValueKind::Boolean(false));
-        assert_eq!(log[&"status".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"time".into()], ValueKind::Float(6789.01));
+        assert_eq!(log[&"check".into()], Value::Boolean(false));
+        assert_eq!(log[&"status".into()], Value::Integer(1234));
+        assert_eq!(log[&"time".into()], Value::Float(6789.01));
     }
 
     #[test]

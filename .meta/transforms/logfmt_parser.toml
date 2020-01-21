@@ -1,0 +1,26 @@
+[transforms.logfmt_parser]
+title = "Logfmt Parser"
+allow_you_to_description = """\
+extract data from a logfmt-formatted log field\
+"""
+common = true
+function_category = "parse"
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+types_coercion = true
+
+[transforms.logfmt_parser.options.field]
+type = "string"
+common = true
+default = "message"
+required = true
+description = "The log field to parse."
+
+[transforms.logfmt_parser.options.drop_field]
+type = "bool"
+common = true
+default = true
+required = true
+description = "If the specified `field` should be dropped (removed) after parsing."

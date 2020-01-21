@@ -108,7 +108,7 @@ pub fn random_nested_events_with_stream(
 
         let tree = random_pseudonested_map(len, breadth, depth);
         for (k, v) in tree.into_iter() {
-            log.insert_explicit(k, v)
+            log.insert(k, v)
         }
 
         Event::Log(log)

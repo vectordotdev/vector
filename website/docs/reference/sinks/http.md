@@ -44,6 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  type = "http" # must be: "http"
+  inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 ```
 
@@ -55,11 +57,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "http" # must be: "http"
+  inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 
   # OPTIONAL - General
-  type = "http" # no default, must be: "http" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
 
@@ -95,7 +97,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 10 # default
     retry_attempts = 10 # default
-    retry_backoff_secs = 1 # default, seconds
+    retry_initial_backoff_secs = 1 # default, seconds
+    retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 30 # default, seconds
 
   # OPTIONAL - Tls
@@ -625,7 +628,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"retry_backoff_secs"}
+  name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
   required={false}
@@ -634,9 +637,31 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   unit={"seconds"}
   >
 
-#### retry_backoff_secs
+#### retry_initial_backoff_secs
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time to wait between retries.
 
 
 </Field>

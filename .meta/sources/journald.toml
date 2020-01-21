@@ -33,10 +33,14 @@ default, the global `data_dir` is used. Please make sure the Vector \
 project has write permissions to this dir.\
 """
 
-[sources.journald.options.local_only]
-type = "bool"
-default = true
-description = "Include only entries from the local system"
+[sources.journald.options.journalctl_path]
+type = "string"
+examples = ["/usr/local/bin/journalctl"]
+default = "journalctl"
+description = """\
+The full path of the `journalctl` executable. \
+If not set, Vector will search the path for `journalctl`.\
+"""
 
 [sources.journald.options.units]
 type = "[string]"

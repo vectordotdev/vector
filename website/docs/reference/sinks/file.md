@@ -44,6 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  type = "file" # must be: "file"
+  inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 ```
 
@@ -55,11 +57,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "file" # must be: "file"
+  inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 
   # OPTIONAL - General
-  type = "file" # no default, must be: "file" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
   idle_timeout_secs = "30" # default
 

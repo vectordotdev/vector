@@ -178,63 +178,30 @@ jobs:
 
 
   test-stable:
-    resource_class: xlarge
-    docker:
-      - image: rust:latest
-        environment:
-          RUST_BACKTRACE: full
-          AWS_ACCESS_KEY_ID: "fake-aws-key"
-          AWS_SECRET_ACCESS_KEY: "fake-aws-key"
-      - image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-        environment:
-          DATA_DIR: /tmp/localstack/data
-          DEBUG: 1
-          PORT_WEB_UI: 8888
-          SERVICES: kinesis,cloudwatch,elasticsearch,firehose
-      - image: minio/minio
-        environment:
-          MINIO_ACCESS_KEY: "test-access-key"
-          MINIO_SECRET_KEY: "test-secret-key"
-        command: server /tmp
-      - image: luciofranco/mockwatchlogs:latest
-      - image: wurstmeister/zookeeper:3.4.6
-      - image: timberiodev/kafka-test:2.12-2.3.0-2
-        environment:
-          KAFKA_BROKER_ID: 1
-          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
-          KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
-          KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
-          KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
-          KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
-          KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
-          KAFKA_SSL_KEY_PASSWORD: NOPASS
-          KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
-      - image: timberiodev/splunk-hec-test:latest
-      - image: elasticsearch:6.6.2
-        environment:
-          - discovery.type=single-node
-      - image: timberiodev/elasticsearch-test-https:6.6.2-1
-        environment:
-          - discovery.type=single-node
-          - xpack.security.enabled=true
-          - xpack.security.http.ssl.enabled=true
-          - xpack.security.transport.ssl.enabled=true
-          - xpack.ssl.certificate=certs/localhost.crt
-          - xpack.ssl.key=certs/localhost.key
-      - image: yandex/clickhouse-server:19
-      - image: timberiodev/mock-ec2-metadata:latest
-      - image: messagebird/gcloud-pubsub-emulator
-        environment:
-          - PUBSUB_PROJECT1=testproject,topic1:subscription1
+    <<: *docker-machine
+    environment:
+      RUST_BACKTRACE: full
+      AWS_ACCESS_KEY_ID: fake-aws-key
+      AWS_SECRET_ACCESS_KEY: fake-aws-key
+      TARGET: x86_64-unknown-linux-musl
     steps:
       - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
       - run:
-          name: Test
-          no_output_timeout: 30m
-          command: cargo test --all --features docker --jobs 4
+          name: Build tests
+          command: |
+            rm rust-toolchain
+            ./scripts/docker-run.sh builder-$TARGET cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
+      - run:
+          name: Start dependencies
+          command: |
+            docker-compose up -d splunk
+            sleep 30 # Splunk crashes when started simultaneously with other services
+            docker-compose up -d
+            sleep 180
+      - run:
+          name: Run tests
+          command: |
+            find ./target/$TARGET -maxdepth 2 -type f -executable -name '*-*' | sh -e
       - store_test_results:
           path: ./test-results
 

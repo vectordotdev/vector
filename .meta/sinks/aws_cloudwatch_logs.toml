@@ -14,7 +14,8 @@ input_types = ["log"]
 request_rate_limit_duration_secs = 1
 request_rate_limit_num =5
 request_retry_attempts = 5
-request_retry_backoff_secs = 1
+request_retry_initial_backoff_secs = 1
+request_retry_max_duration_secs = 10
 request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_cw_logs_service_limits"
@@ -68,6 +69,13 @@ type = "bool"
 common = true
 default = true
 description = "Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist."
+
+[sinks.aws_cloudwatch_logs.options.assume_role]
+type = "string"
+common = false
+examples = ["arn:aws:iam::123456789098:role/my_role"]
+required = false
+description = "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
 
 [[sinks.aws_cloudwatch_logs.output.examples]]
 label = "Generic"

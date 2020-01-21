@@ -4,7 +4,7 @@ use string_cache::DefaultAtom as Atom;
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::ValueKind,
+    event::Value,
     Event,
 };
 
@@ -47,17 +47,17 @@ impl CheckFieldsPredicate for EqualsPredicate {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| match &self.arg {
                 CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                 CheckFieldsPredicateArg::Integer(i) => match v {
-                    ValueKind::Integer(vi) => *i == *vi,
-                    ValueKind::Float(vf) => *i == *vf as i64,
+                    Value::Integer(vi) => *i == *vi,
+                    Value::Float(vf) => *i == *vf as i64,
                     _ => false,
                 },
                 CheckFieldsPredicateArg::Float(f) => match v {
-                    ValueKind::Float(vf) => *f == *vf,
-                    ValueKind::Integer(vi) => *f == *vi as f64,
+                    Value::Float(vf) => *f == *vf,
+                    Value::Integer(vi) => *f == *vi as f64,
                     _ => false,
                 },
                 CheckFieldsPredicateArg::Boolean(b) => match v {
-                    ValueKind::Boolean(vb) => *b == *vb,
+                    Value::Boolean(vb) => *b == *vb,
                     _ => false,
                 },
             }),
@@ -313,10 +313,10 @@ mod test {
         let mut event = Event::from("foo");
         assert_eq!(cond.check(&event), false);
 
-        event.as_mut_log().insert_implicit("other_thing", "bar");
+        event.as_mut_log().insert("other_thing", "bar");
         assert_eq!(cond.check(&event), true);
 
-        event.as_mut_log().insert_implicit("message", "not foo");
+        event.as_mut_log().insert("message", "not foo");
         assert_eq!(cond.check(&event), false);
     }
 
@@ -337,13 +337,13 @@ mod test {
         let mut event = Event::from("not foo");
         assert_eq!(cond.check(&event), false);
 
-        event.as_mut_log().insert_implicit("other_thing", "not bar");
+        event.as_mut_log().insert("other_thing", "not bar");
         assert_eq!(cond.check(&event), true);
 
-        event.as_mut_log().insert_implicit("other_thing", "bar");
+        event.as_mut_log().insert("other_thing", "bar");
         assert_eq!(cond.check(&event), false);
 
-        event.as_mut_log().insert_implicit("message", "foo");
+        event.as_mut_log().insert("message", "foo");
         assert_eq!(cond.check(&event), false);
     }
 
@@ -358,12 +358,10 @@ mod test {
         let mut event = Event::from("ignored field");
         assert_eq!(cond.check(&event), false);
 
-        event.as_mut_log().insert_implicit("foo", "not ignored");
+        event.as_mut_log().insert("foo", "not ignored");
         assert_eq!(cond.check(&event), true);
 
-        event
-            .as_mut_log()
-            .insert_implicit("bar", "also not ignored");
+        event.as_mut_log().insert("bar", "also not ignored");
         assert_eq!(cond.check(&event), false);
     }
 }

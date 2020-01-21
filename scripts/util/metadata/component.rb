@@ -62,7 +62,7 @@ class Component
         "enum" => {
           name => "The name of this component"
         },
-        "null" => false,
+        "required" => true,
         "type" => "string"
       })
 
@@ -72,7 +72,7 @@ class Component
           "name" => "inputs",
           "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
           "examples" => [["my-source-id"]],
-          "null" => false,
+          "required" => true,
           "type" => "[string]"
         })
     end

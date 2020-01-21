@@ -41,12 +41,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED
+  type = "json_parser" # must be: "json_parser"
+  inputs = ["my-source-id"] # example
+  drop_invalid = true # example
+
   # OPTIONAL
   drop_field = true # default
   field = "message" # default
-
-  # REQUIRED
-  drop_invalid = true # example
 ```
 
 </TabItem>
@@ -56,16 +58,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
+  # REQUIRED
+  type = "json_parser" # must be: "json_parser"
+  inputs = ["my-source-id"] # example
+  drop_invalid = true # example
+
   # OPTIONAL
   drop_field = true # default
   field = "message" # default
-  type = "json_parser" # no default, must be: "json_parser" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   overwrite_target = false # default
   target_field = "target" # example, no default
-
-  # REQUIRED
-  drop_invalid = true # example
 ```
 
 </TabItem>

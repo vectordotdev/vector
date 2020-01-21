@@ -1,5 +1,7 @@
 mod tcp;
 mod udp;
+#[cfg(unix)]
+mod unix;
 
 use super::util::TcpSource;
 use crate::{
@@ -23,6 +25,8 @@ pub struct SocketConfig {
 pub enum Mode {
     Tcp(tcp::TcpConfig),
     Udp(udp::UdpConfig),
+    #[cfg(unix)]
+    Unix(unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -43,6 +47,15 @@ impl From<udp::UdpConfig> for SocketConfig {
     fn from(config: udp::UdpConfig) -> Self {
         SocketConfig {
             mode: Mode::Udp(config),
+        }
+    }
+}
+
+#[cfg(unix)]
+impl From<unix::UnixConfig> for SocketConfig {
+    fn from(config: unix::UnixConfig) -> Self {
+        SocketConfig {
+            mode: Mode::Unix(config),
         }
     }
 }
@@ -70,6 +83,11 @@ impl SourceConfig for SocketConfig {
                 let host_key = config.host_key.clone().unwrap_or(event::HOST.clone());
                 Ok(udp::udp(config.address, host_key, out))
             }
+            #[cfg(unix)]
+            Mode::Unix(config) => {
+                let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+                Ok(unix::unix(config.path, config.max_length, host_key, out))
+            }
         }
     }
 
@@ -86,18 +104,24 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::tcp::TcpConfig;
     use super::udp::UdpConfig;
+    #[cfg(unix)]
+    use super::unix::UnixConfig;
     use super::SocketConfig;
     use crate::event;
     use crate::runtime;
     use crate::test_util::{block_on, collect_n, next_addr, send_lines, wait_for_tcp};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
-    use futures::Stream;
+    use futures::{Future, Sink, Stream};
     use std::{
         net::{SocketAddr, UdpSocket},
+        path::PathBuf,
         thread,
         time::Duration,
     };
+    use tokio::codec::{FramedWrite, LinesCodec};
+    #[cfg(unix)]
+    use tokio_uds::UnixStream;
 
     //////// TCP TESTS ////////
     #[test]
@@ -249,5 +273,93 @@ mod test {
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(events[0].as_log()[&event::HOST], format!("{}", from).into());
+    }
+
+    ////////////// UNIX TESTS //////////////
+    #[cfg(unix)]
+    fn init_unix(sender: mpsc::Sender<event::Event>) -> (PathBuf, runtime::Runtime) {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+
+        let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
+            .build("default", &GlobalOptions::default(), sender)
+            .unwrap();
+
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+
+        // Wait for server to accept traffic
+        while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
+
+        (in_path, rt)
+    }
+
+    #[cfg(unix)]
+    fn send_lines_unix<'a>(path: PathBuf, lines: Vec<&'a str>) {
+        let input_stream =
+            futures::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
+
+        UnixStream::connect(&path)
+            .map_err(|e| panic!("{:}", e))
+            .and_then(|socket| {
+                let out =
+                    FramedWrite::new(socket, LinesCodec::new()).sink_map_err(|e| panic!("{:?}", e));
+
+                input_stream
+                    .forward(out)
+                    .map(|(_source, sink)| sink)
+                    .and_then(|sink| {
+                        let socket = sink.into_inner().into_inner();
+                        tokio::io::shutdown(socket)
+                            .map(|_| ())
+                            .map_err(|e| panic!("{:}", e))
+                    })
+            })
+            .wait()
+            .unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_message() {
+        let (tx, rx) = mpsc::channel(2);
+
+        let (path, mut rt) = init_unix(tx);
+
+        send_lines_unix(path, vec!["test"]);
+
+        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+
+        assert_eq!(1, events.len());
+        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_multiple_messages() {
+        let (tx, rx) = mpsc::channel(10);
+
+        let (path, mut rt) = init_unix(tx);
+
+        send_lines_unix(path, vec!["test\ntest2"]);
+        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+
+        assert_eq!(2, events.len());
+        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_multiple_packets() {
+        let (tx, rx) = mpsc::channel(10);
+
+        let (path, mut rt) = init_unix(tx);
+
+        send_lines_unix(path, vec!["test", "test2"]);
+        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+
+        assert_eq!(2, events.len());
+        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
     }
 }

@@ -45,6 +45,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "prometheus" # must be: "prometheus"
+  inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
 
@@ -61,14 +63,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
+  type = "prometheus" # must be: "prometheus"
+  inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
 
   # OPTIONAL
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
   flush_period_secs = 60 # default, seconds
-  type = "prometheus" # no default, must be: "prometheus" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
 ```
 

@@ -44,8 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
+  type = "splunk_hec" # must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 ```
 
 </TabItem>
@@ -56,13 +62,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "splunk_hec" # must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
   # OPTIONAL - General
-  type = "splunk_hec" # no default, must be: "splunk_hec" (if supplied)
-  inputs = ["my-source-id"] # example, no default
   healthcheck = true # default
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 
   # OPTIONAL - requests
   encoding = "ndjson" # example, no default, enum
@@ -85,7 +92,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 10 # default
     retry_attempts = 5 # default
-    retry_backoff_secs = 1 # default, seconds
+    retry_initial_backoff_secs = 1 # default, seconds
+    retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 60 # default, seconds
 
   # OPTIONAL - Tls
@@ -362,6 +370,28 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
 
 
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["field1","field2"]]}
+  name={"indexed_fields"}
+  path={null}
+  relevantWhen={{"encoding":"json"}}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+### indexed_fields
+
+Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
+
+
+</Field>
+
+
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -475,7 +505,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  name={"retry_backoff_secs"}
+  name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
   required={false}
@@ -484,9 +514,31 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   unit={"seconds"}
   >
 
-#### retry_backoff_secs
+#### retry_initial_backoff_secs
 
-The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time to wait between retries.
 
 
 </Field>
@@ -788,4 +840,5 @@ should supply to the [`host`](#host) and [`token`](#token) options.
 [docs.guarantees]: /docs/about/guarantees/
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.splunk_hec_indexed_fields]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

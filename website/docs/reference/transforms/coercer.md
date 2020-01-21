@@ -20,55 +20,19 @@ The Vector `coercer` transform accepts [`log`][docs.data-model.log] events and a
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  [transforms.my_transform_id.types]
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  # OPTIONAL - General
-  type = "coercer" # no default, must be: "coercer" (if supplied)
-  inputs = ["my-source-id"] # example, no default
+  # REQUIRED - General
+  type = "coercer" # must be: "coercer"
+  inputs = ["my-source-id"] # example
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%s" # example
-    timestamp = "timestamp|%+" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 

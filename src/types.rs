@@ -1,4 +1,4 @@
-use crate::event::ValueKind;
+use crate::event::Value;
 use chrono::{DateTime, Local, ParseError as ChronoParseError, TimeZone, Utc};
 use lazy_static::lazy_static;
 use snafu::{ResultExt, Snafu};
@@ -19,8 +19,8 @@ pub enum ConversionError {
 }
 
 /// `Conversion` is a place-holder for a type conversion operation, to
-/// convert from a plain (`Bytes`) `ValueKind` into another type. Every
-/// variant of `ValueKind` is represented here.
+/// convert from a plain (`Bytes`) `Value` into another type. Every
+/// variant of `Value` is represented here.
 #[derive(Clone)]
 pub enum Conversion {
     Bytes,
@@ -118,30 +118,28 @@ pub enum Error {
 
 impl Conversion {
     /// Use this `Conversion` variant to turn the given `value` into a
-    /// new `ValueKind`. This will fail in unexpected ways if the
-    /// `value` is not currently a `ValueKind::Bytes`.
-    pub fn convert(&self, value: ValueKind) -> Result<ValueKind, Error> {
+    /// new `Value`. This will fail in unexpected ways if the
+    /// `value` is not currently a `Value::Bytes`.
+    pub fn convert(&self, value: Value) -> Result<Value, Error> {
         let bytes = value.as_bytes();
         Ok(match self {
             Conversion::Bytes => value,
             Conversion::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
-                ValueKind::Integer(s.parse::<i64>().with_context(|| IntParseError { s })?)
+                Value::Integer(s.parse::<i64>().with_context(|| IntParseError { s })?)
             }
             Conversion::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                ValueKind::Float(s.parse::<f64>().with_context(|| FloatParseError { s })?)
+                Value::Float(s.parse::<f64>().with_context(|| FloatParseError { s })?)
             }
-            Conversion::Boolean => {
-                ValueKind::Boolean(parse_bool(&String::from_utf8_lossy(&bytes))?)
-            }
+            Conversion::Boolean => Value::Boolean(parse_bool(&String::from_utf8_lossy(&bytes))?),
 
             Conversion::Timestamp => {
-                ValueKind::Timestamp(parse_timestamp(&String::from_utf8_lossy(&bytes))?)
+                Value::Timestamp(parse_timestamp(&String::from_utf8_lossy(&bytes))?)
             }
             Conversion::TimestampFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                ValueKind::Timestamp(datetime_to_utc(
+                Value::Timestamp(datetime_to_utc(
                     Local
                         .datetime_from_str(&s, &format)
                         .with_context(|| TimestampParseError { s })?,
@@ -149,7 +147,7 @@ impl Conversion {
             }
             Conversion::TimestampTZFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                ValueKind::Timestamp(datetime_to_utc(
+                Value::Timestamp(datetime_to_utc(
                     DateTime::parse_from_str(&s, &format)
                         .with_context(|| TimestampParseError { s })?,
                 ))
@@ -259,7 +257,7 @@ pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, Error> {
 #[cfg(test)]
 mod tests {
     use super::{parse_bool, parse_timestamp, Conversion, Error};
-    use crate::event::ValueKind;
+    use crate::event::Value;
     use chrono::prelude::*;
 
     const TIMEZONE: &str = "Australia/Brisbane";
@@ -268,7 +266,7 @@ mod tests {
         Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
     }
 
-    fn convert(fmt: &str, value: &str) -> Result<ValueKind, Error> {
+    fn convert(fmt: &str, value: &str) -> Result<Value, Error> {
         std::env::set_var("TZ", TIMEZONE);
         fmt.parse::<Conversion>()
             .expect(&format!("Invalid conversion {:?}", fmt))

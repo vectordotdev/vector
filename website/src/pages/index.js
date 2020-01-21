@@ -33,13 +33,12 @@ const AnchoredH2 = Heading('h2');
 
 const features = [
   {
-    title: 'Blistering Fast',
+    title: 'Fast. Really.',
     icon: 'zap',
     description: (
       <>
-        Built in Rust, Vector is <a href="#performance">blistering fast and
-        memory efficient</a>. It's designed to handle the most demanding
-        environments.
+        Built in <a href="https://www.rust-lang.org/">Rust</a>, Vector is <a href="#performance">blistering fast and
+        memory efficient</a>. It's designed to handle the most demanding environments.
       </>
     ),
   },
@@ -66,7 +65,7 @@ const features = [
     icon: 'shuffle',
     description: (
       <>
-        Vector unifies <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link> at the source, making it easy to collect and ship all observability data.
+        Vector supports <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link>, making it easy to collect and process <i>all</i> observability data.
       </>
     ),
   },
@@ -450,14 +449,17 @@ function Home() {
             </Link>
           )}
           <h1>Take Control Of Your Observability Data</h1>
-          <p className="hero__subtitle">
-            Vector is an <a href={repoUrl()}>open-source</a> utility for building <a href="#topologies">end-to-end</a>, <a href="#performance">high performance</a> observability pipelines.
+          <p className="hero--subtitle">
+            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
           </p>
-          <div className="hero__buttons">
+          <div className="hero--buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
-            <Link to="/download" className="button button--primary">Download v{latest_release.version}</Link>
+            <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
+          <p className="hero--subsubtitle">
+            Vector is free and <a href="https://github.com/timberio/vector">open source</a>
+          </p>
         </div>
       </header>
       <main>

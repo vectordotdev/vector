@@ -102,9 +102,7 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
     let mut event = Event::from(line);
 
     if let Some(hostname) = &hostname {
-        event
-            .as_mut_log()
-            .insert_implicit(host_key, hostname.clone());
+        event.as_mut_log().insert(host_key, hostname.clone());
     }
 
     event

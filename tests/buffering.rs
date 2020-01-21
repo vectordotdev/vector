@@ -110,7 +110,7 @@ fn test_max_size() {
         .take(num_lines / 2)
         .map(|line| {
             let mut e = Event::from(line);
-            e.as_mut_log().insert_implicit("host", "127.0.0.1");
+            e.as_mut_log().insert("host", "127.0.0.1");
             event::proto::EventWrapper::from(e)
         })
         .map(|ew| ew.encoded_len())
@@ -282,7 +282,7 @@ fn test_reclaim_disk_space() {
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_millis(10000));
 
     rt.shutdown_now().wait().unwrap();
     drop(topology);

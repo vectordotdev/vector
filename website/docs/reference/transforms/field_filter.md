@@ -20,50 +20,17 @@ The Vector `field_filter` transform accepts [`log`][docs.data-model.log] and [`m
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
+  type = "field_filter" # must be: "field_filter"
+  inputs = ["my-source-id"] # example
   field = "file" # example
   value = "/var/log/nginx.log" # example
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[transforms.my_transform_id]
-  # REQUIRED
-  field = "file" # example
-  value = "/var/log/nginx.log" # example
-
-  # OPTIONAL
-  type = "field_filter" # no default, must be: "field_filter" (if supplied)
-  inputs = ["my-source-id"] # example, no default
-```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
