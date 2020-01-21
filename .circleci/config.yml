@@ -767,6 +767,11 @@ jobs:
 # Workflow Macros
 #
 
+prerelease-filters: &prerelease-filters
+  filters:
+    branches:
+      only: /prepare-.*/
+
 release-filters: &release-filters
   filters:
     branches:
@@ -826,22 +831,31 @@ workflows:
           <<: *master-filters
       - test-stable
       - test-stable-kubernetes
-      - test-x86_64-pc-windows-msvc
+      - test-x86_64-pc-windows-msvc:
+          <<: *prerelease-filters
 
       # Build & verify
 
-      - build-x86_64-unknown-linux-musl-archive-and-deb-package
-      - build-aarch64-unknown-linux-musl-archive-and-deb-package
-      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive-and-msi-package
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package:
+          <<: *prerelease-filters
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package:
+          <<: *prerelease-filters
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
+          <<: *prerelease-filters
+      - build-x86_64-apple-darwin-archive:
+          <<: *prerelease-filters
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package:
+          <<: *prerelease-filters
       - package-rpm-x86_64-unknown-linux-musl:
+          <<: *prerelease-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - package-rpm-aarch64-unknown-linux-musl:
+          <<: *prerelease-filters
           requires:
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - package-rpm-armv7-unknown-linux-musleabihf:
+          <<: *prerelease-filters
           requires:
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
@@ -873,11 +887,11 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos
+      - verify-nixos:
+          <<: *prerelease-filters
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
-
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
@@ -1081,18 +1095,30 @@ workflows:
 
   install-script:
     jobs:
-      - test-install-script-on-amazon-linux-1
-      - test-install-script-on-amazon-linux-2
-      - test-install-script-on-centos-7
-      - test-install-script-on-deb-8
-      - test-install-script-on-deb-9
-      - test-install-script-on-deb-10
-      - test-install-script-on-mac-archive
-      - test-install-script-on-mac-homebrew
-      - test-install-script-on-unbuntu-16-04
-      - test-install-script-on-unbuntu-18-04
-      - test-install-script-on-unbuntu-19-04
-      - test-install-script-without-sudo
+      - test-install-script-on-amazon-linux-1:
+          <<: *prerelease-filters
+      - test-install-script-on-amazon-linux-2:
+          <<: *prerelease-filters
+      - test-install-script-on-centos-7:
+          <<: *prerelease-filters
+      - test-install-script-on-deb-8:
+          <<: *prerelease-filters
+      - test-install-script-on-deb-9:
+          <<: *prerelease-filters
+      - test-install-script-on-deb-10:
+          <<: *prerelease-filters
+      - test-install-script-on-mac-archive:
+          <<: *prerelease-filters
+      - test-install-script-on-mac-homebrew:
+          <<: *prerelease-filters
+      - test-install-script-on-unbuntu-16-04:
+          <<: *prerelease-filters
+      - test-install-script-on-unbuntu-18-04:
+          <<: *prerelease-filters
+      - test-install-script-on-unbuntu-19-04:
+          <<: *prerelease-filters
+      - test-install-script-without-sudo:
+          <<: *prerelease-filters
 
       - sync-install:
           <<: *master-filters
