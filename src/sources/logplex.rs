@@ -42,8 +42,11 @@ impl SourceConfig for LogplexConfig {
                 let events = body_to_events(body);
 
                 if events.len() != msg_count {
-                    error!(message = "Parsed event count does not match message count header", event_count = events.len(), %msg_count);
-                    debug_assert!(false, "Parsed event count does not match message count header");
+                    if cfg!(test) {
+                        panic!("Parsed event count does not match message count header");
+                    } else {
+                        error!(message = "Parsed event count does not match message count header", event_count = events.len(), %msg_count);
+                    }
                 }
 
                 let out = out.clone();
