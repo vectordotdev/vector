@@ -70,6 +70,13 @@ common = true
 default = true
 description = "Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist."
 
+[sinks.aws_cloudwatch_logs.options.assume_role]
+type = "string"
+common = false
+examples = ["arn:aws:iam::123456789098:role/my_role"]
+required = false
+description = "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
+
 [[sinks.aws_cloudwatch_logs.output.examples]]
 label = "Generic"
 body = """\

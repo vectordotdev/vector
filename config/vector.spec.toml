@@ -1522,6 +1522,13 @@ end
   stream_name = "%Y-%m-%d"
   stream_name = "stream-name"
 
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
   # first stream.

@@ -69,6 +69,7 @@ rusoto_cloudwatch = "0.41.0"
 rusoto_kinesis = "0.41.0"
 rusoto_credential = "0.41.1"
 rusoto_firehose = "0.41.0"
+rusoto_sts = "0.41.0"
 
 # Tower
 tower = "0.1.1"
