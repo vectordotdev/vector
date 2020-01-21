@@ -66,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   batch_size = 16 # default
   current_boot_only = true # default
   data_dir = "/var/lib/vector" # example, no default
-  local_only = true # default
+  journalctl_path = "journalctl" # default
   units = [] # default
 ```
 
@@ -151,21 +151,21 @@ The directory used to persist the journal checkpoint position. By default, the g
 
 <Field
   common={false}
-  defaultValue={true}
+  defaultValue={"journalctl"}
   enumValues={null}
-  examples={[true,false]}
-  name={"local_only"}
+  examples={["/usr/local/bin/journalctl"]}
+  name={"journalctl_path"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"bool"}
+  type={"string"}
   unit={null}
   >
 
-### local_only
+### journalctl_path
 
-Include only entries from the local system
+The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search the path for [`journalctl`](#journalctl).
 
 
 </Field>

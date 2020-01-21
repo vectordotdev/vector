@@ -122,6 +122,8 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/logplex",
+            
               "reference/sources/prometheus",
             
               "reference/sources/socket",
@@ -165,6 +167,8 @@ module.exports = {
               "reference/transforms/json_parser",
             
               "reference/transforms/log_to_metric",
+            
+              "reference/transforms/logfmt_parser",
             
               "reference/transforms/lua",
             

@@ -46,11 +46,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED - General
   type = "socket" # must be: "socket"
-  address = "0.0.0.0:9000" # example
+  address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
 
   # OPTIONAL - General
-  shutdown_timeout_secs = 30 # default, seconds
+  shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
+  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -65,12 +66,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # REQUIRED - General
   type = "socket" # must be: "socket"
-  address = "0.0.0.0:9000" # example
+  address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
 
   # OPTIONAL - General
-  shutdown_timeout_secs = 30 # default, seconds
+  shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
   max_length = 102400 # default, bytes
+  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -96,7 +98,7 @@ import Field from '@site/src/components/Field';
   examples={["0.0.0.0:9000","systemd","systemd#3"]}
   name={"address"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"mode":["tcp","udp"]}}
   required={true}
   templateable={false}
   type={"string"}
@@ -105,7 +107,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation. Valid for "tcp" and "udp" sockets.
+The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 
 </Field>
@@ -127,7 +129,7 @@ The address to listen for connections on, or "systemd#N" to use the Nth socket p
 
 ### host_key
 
-The key name added to each event representing the current host. Valid for "tcp" and "udp" sockets. See [Context](#context) for more info.
+The key name added to each event representing the current host. See [Context](#context) for more info.
 
 
 </Field>
@@ -149,7 +151,7 @@ The key name added to each event representing the current host. Valid for "tcp" 
 
 ### max_length
 
-The maximum bytes size of incoming messages before they are discarded. Valid for "tcp" and "udp" sockets.
+The maximum bytes size of incoming messages before they are discarded.
 
 
 </Field>
@@ -158,8 +160,8 @@ The maximum bytes size of incoming messages before they are discarded. Valid for
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"tcp":"The TCP protocol.","udp":"The UDP protocol."}}
-  examples={["tcp","udp"]}
+  enumValues={{"tcp":"TCP Socket.","udp":"UDP Socket.","unix":"Unix Domain Socket."}}
+  examples={["tcp","udp","unix"]}
   name={"mode"}
   path={null}
   relevantWhen={null}
@@ -179,12 +181,34 @@ The type of socket to use.
 
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/socket"]}
+  name={"path"}
+  path={null}
+  relevantWhen={{"mode":"unix"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### path
+
+The unix socket path. *This should be absolute path*.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
   name={"shutdown_timeout_secs"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"mode":"tcp"}}
   required={true}
   templateable={false}
   type={"int"}
@@ -193,7 +217,7 @@ The type of socket to use.
 
 ### shutdown_timeout_secs
 
-The timeout before a connection is forcefully closed during shutdown. Valid only for "tcp" sockets.
+The timeout before a connection is forcefully closed during shutdown.
 
 
 </Field>

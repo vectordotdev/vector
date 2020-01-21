@@ -18277,6 +18277,28 @@ module.exports = {
 
       ]
     },
+    "logplex": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Ingests data through the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol] and outputs log events.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "logplex_source",
+      "name": "logplex",
+      "operating_systems": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "service_provider": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -18698,6 +18720,26 @@ module.exports = {
       "function_category": "convert",
       "id": "log_to_metric_transform",
       "name": "log_to_metric",
+      "operating_systems": [
+
+      ],
+      "service_provider": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "logfmt_parser": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "parse",
+      "id": "logfmt_parser_transform",
+      "name": "logfmt_parser",
       "operating_systems": [
 
       ],

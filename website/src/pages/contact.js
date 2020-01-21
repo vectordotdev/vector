@@ -15,7 +15,7 @@ function Contact() {
       <header className="hero">
         <div className="container container--fluid">
           <h1>Contact</h1>
-          <div className="hero__subtitle">
+          <div className="hero--subtitle">
             Vector is a <a href="https://timber.io">Timber.io</a> open-source product. You can contact the Vector &amp; Timber team using any of the options below.
           </div>
         </div>

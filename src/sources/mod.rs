@@ -7,6 +7,7 @@ pub mod journald;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;
+pub mod logplex;
 pub mod prometheus;
 pub mod socket;
 pub mod splunk_hec;

@@ -44,10 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 ```
 
 </TabItem>
@@ -65,6 +69,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   healthcheck = true # default
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 
   # OPTIONAL - requests
   encoding = "ndjson" # example, no default, enum
@@ -359,6 +364,28 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### host
 
 Your Splunk HEC host. See [Setup](#setup) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["field1","field2"]]}
+  name={"indexed_fields"}
+  path={null}
+  relevantWhen={{"encoding":"json"}}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+### indexed_fields
+
+Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
 
 
 </Field>
@@ -813,4 +840,5 @@ should supply to the [`host`](#host) and [`token`](#token) options.
 [docs.guarantees]: /docs/about/guarantees/
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.splunk_hec_indexed_fields]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
 [urls.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

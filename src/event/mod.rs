@@ -285,8 +285,6 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Integer(value)) => Some(Value::Integer(value)),
         Some(proto::value::Kind::Float(value)) => Some(Value::Float(value)),
         Some(proto::value::Kind::Boolean(value)) => Some(Value::Boolean(value)),
-        Some(proto::value::Kind::ValueMap(_)) => todo!(),
-        Some(proto::value::Kind::ValueArray(_)) => todo!(),
         None => {
             error!("encoded event contains unknown value kind");
             None

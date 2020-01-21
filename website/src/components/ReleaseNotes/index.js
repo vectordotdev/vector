@@ -110,7 +110,7 @@ function Notes({release, latest}) {
         <div className="container container--fluid">
           <div className={styles.componentsHeroOverlay}>
             <h1>Vector v{release.version} Release Notes</h1>
-            <div className="hero__subtitle">
+            <div className="hero--subtitle">
               <div className={styles.heroSubTitle}>
                 Released by <Link to="/community#team">Ben</Link> on <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
               </div>
