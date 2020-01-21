@@ -1,0 +1,18 @@
+[sources.logplex]
+title = "Heroku Logplex"
+beta = true
+common = false
+delivery_guarantee = "at_least_once"
+function_category = "receive"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol]"
+
+[sources.logplex.options.address]
+type = "string"
+common = true
+required = true
+description = """\
+The address to accept connections on.\
+"""
