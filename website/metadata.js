@@ -602,46 +602,6 @@ module.exports = {
         "type": "docs"
       },
       {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2019-12-13 11:34:33 +0000",
-        "deletions_count": 123,
-        "description": "Add internal DNS to http based sinks",
-        "files_count": 8,
-        "group": "feat",
-        "insertions_count": 157,
-        "message": "feat(networking): Add internal DNS to http based sinks (#1362)",
-        "pr_number": 1362,
-        "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "networking"
-        },
-        "sha": "4c2c85363197ccb5f95d59bb7adce23a14c7a2ab",
-        "type": "feat"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2019-12-13 11:34:33 +0000",
-        "deletions_count": 123,
-        "description": "Add internal DNS to http based sinks",
-        "files_count": 8,
-        "group": "feat",
-        "insertions_count": 157,
-        "message": "feat(networking): Add internal DNS to http based sinks (#1362)",
-        "pr_number": 1362,
-        "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "networking"
-        },
-        "sha": "6eab2fce86fe548ea9c2f1558d10bdec42a987cb",
-        "type": "feat"
-      },
-      {
         "author": "binarylogic",
         "breaking_change": false,
         "date": "2019-12-13 15:34:00 +0000",
@@ -1266,11 +1226,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2019-12-17 14:26:09 +0000",
         "deletions_count": 87,
-        "description": "Add custom DNS for `aws_*` sinks",
+        "description": "Add custom DNS for `aws_*`, http based, and `gcp_*` sinks",
         "files_count": 8,
         "group": "feat",
         "insertions_count": 185,
-        "message": "feat(networking): Add custom DNS for `aws_*` sinks (#1371)",
+        "message": "feat(networking): Add custom DNS for `aws_*`, http based, and `gcp_*` sinks (#1371)",
         "pr_number": 1371,
         "scope": {
           "category": "core",
@@ -2262,26 +2222,6 @@ module.exports = {
         "type": "fix"
       },
       {
-        "author": "Bruce Guenter",
-        "breaking_change": false,
-        "date": "2019-12-27 16:13:41 +0000",
-        "deletions_count": 7,
-        "description": "Use custom DNS resolver",
-        "files_count": 1,
-        "group": "feat",
-        "insertions_count": 10,
-        "message": "feat(gcp_pubsub sink): Use custom DNS resolver (#1451)",
-        "pr_number": 1451,
-        "scope": {
-          "category": "sink",
-          "component_name": "gcp_pubsub",
-          "component_type": "sink",
-          "name": "gcp_pubsub sink"
-        },
-        "sha": "379a76f0ebbb6e838008237a729b6c901b304c2c",
-        "type": "feat"
-      },
-      {
         "author": "binarylogic",
         "breaking_change": false,
         "date": "2019-12-28 10:59:44 +0000",
@@ -2526,11 +2466,11 @@ module.exports = {
         "breaking_change": true,
         "date": "2020-01-03 19:45:55 +0000",
         "deletions_count": 731,
-        "description": "Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1211)",
+        "description": "Merge existing 'tcp' and 'udp' sources into a single 'socket' source",
         "files_count": 27,
         "group": "breaking change",
         "insertions_count": 1013,
-        "message": "feat(new source)!: Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1211) (#1485)",
+        "message": "feat(new source)!: Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1485)",
         "pr_number": 1485,
         "scope": {
           "category": "source",
@@ -3464,8 +3404,8 @@ module.exports = {
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
     "date": "2020-01-20",
-    "deletions_count": 11937,
-    "insertions_count": 23630,
+    "deletions_count": 11684,
+    "insertions_count": 23306,
     "last_version": "0.6.0",
     "posts": [
 
@@ -3512,14 +3452,6 @@ module.exports = {
         ],
         "id": "journald-source-switch",
         "title": "The `journald` source now pipes from journalctl"
-      },
-      {
-        "body": "<p>\nWhen consuming JSON events the `splunk_hec` source now moves a parsed `line`\nfield of the consumed event to `message` in order to be consistent with other\nsources.\n</p>\n",
-        "commits": [
-
-        ],
-        "id": "splunk-hec-source-message",
-        "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
       },
       {
         "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill <i>not</i> index any fields by default.\n</p>\n<p>\nIn order to mark desired fields as indexed you can use the optional configuration\noption `indexed_fields`:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
@@ -16407,46 +16339,6 @@ module.exports = {
           "type": "docs"
         },
         {
-          "author": "Lucio Franco",
-          "breaking_change": false,
-          "date": "2019-12-13 11:34:33 +0000",
-          "deletions_count": 123,
-          "description": "Add internal DNS to http based sinks",
-          "files_count": 8,
-          "group": "feat",
-          "insertions_count": 157,
-          "message": "feat(networking): Add internal DNS to http based sinks (#1362)",
-          "pr_number": 1362,
-          "scope": {
-            "category": "core",
-            "component_name": null,
-            "component_type": null,
-            "name": "networking"
-          },
-          "sha": "4c2c85363197ccb5f95d59bb7adce23a14c7a2ab",
-          "type": "feat"
-        },
-        {
-          "author": "Lucio Franco",
-          "breaking_change": false,
-          "date": "2019-12-13 11:34:33 +0000",
-          "deletions_count": 123,
-          "description": "Add internal DNS to http based sinks",
-          "files_count": 8,
-          "group": "feat",
-          "insertions_count": 157,
-          "message": "feat(networking): Add internal DNS to http based sinks (#1362)",
-          "pr_number": 1362,
-          "scope": {
-            "category": "core",
-            "component_name": null,
-            "component_type": null,
-            "name": "networking"
-          },
-          "sha": "6eab2fce86fe548ea9c2f1558d10bdec42a987cb",
-          "type": "feat"
-        },
-        {
           "author": "binarylogic",
           "breaking_change": false,
           "date": "2019-12-13 15:34:00 +0000",
@@ -17071,11 +16963,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2019-12-17 14:26:09 +0000",
           "deletions_count": 87,
-          "description": "Add custom DNS for `aws_*` sinks",
+          "description": "Add custom DNS for `aws_*`, http based, and `gcp_*` sinks",
           "files_count": 8,
           "group": "feat",
           "insertions_count": 185,
-          "message": "feat(networking): Add custom DNS for `aws_*` sinks (#1371)",
+          "message": "feat(networking): Add custom DNS for `aws_*`, http based, and `gcp_*` sinks (#1371)",
           "pr_number": 1371,
           "scope": {
             "category": "core",
@@ -18067,26 +17959,6 @@ module.exports = {
           "type": "fix"
         },
         {
-          "author": "Bruce Guenter",
-          "breaking_change": false,
-          "date": "2019-12-27 16:13:41 +0000",
-          "deletions_count": 7,
-          "description": "Use custom DNS resolver",
-          "files_count": 1,
-          "group": "feat",
-          "insertions_count": 10,
-          "message": "feat(gcp_pubsub sink): Use custom DNS resolver (#1451)",
-          "pr_number": 1451,
-          "scope": {
-            "category": "sink",
-            "component_name": "gcp_pubsub",
-            "component_type": "sink",
-            "name": "gcp_pubsub sink"
-          },
-          "sha": "379a76f0ebbb6e838008237a729b6c901b304c2c",
-          "type": "feat"
-        },
-        {
           "author": "binarylogic",
           "breaking_change": false,
           "date": "2019-12-28 10:59:44 +0000",
@@ -18331,11 +18203,11 @@ module.exports = {
           "breaking_change": true,
           "date": "2020-01-03 19:45:55 +0000",
           "deletions_count": 731,
-          "description": "Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1211)",
+          "description": "Merge existing 'tcp' and 'udp' sources into a single 'socket' source",
           "files_count": 27,
           "group": "breaking change",
           "insertions_count": 1013,
-          "message": "feat(new source)!: Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1211) (#1485)",
+          "message": "feat(new source)!: Merge existing 'tcp' and 'udp' sources into a single 'socket' source (#1485)",
           "pr_number": 1485,
           "scope": {
             "category": "source",
@@ -19269,8 +19141,8 @@ module.exports = {
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
       "date": "2020-01-20",
-      "deletions_count": 11937,
-      "insertions_count": 23630,
+      "deletions_count": 11684,
+      "insertions_count": 23306,
       "last_version": "0.6.0",
       "posts": [
 
@@ -19317,14 +19189,6 @@ module.exports = {
           ],
           "id": "journald-source-switch",
           "title": "The `journald` source now pipes from journalctl"
-        },
-        {
-          "body": "<p>\nWhen consuming JSON events the `splunk_hec` source now moves a parsed `line`\nfield of the consumed event to `message` in order to be consistent with other\nsources.\n</p>\n",
-          "commits": [
-
-          ],
-          "id": "splunk-hec-source-message",
-          "title": "The `splunk_hec` source when consuming JSON now moves the `line` field to `message`"
         },
         {
           "body": "<p>\nThere is no longer a distinction within Vector between explicit and implicit\nevent fields. All fields are now implicit and therefore the `splunk_hec` sink\nwill <i>not</i> index any fields by default.\n</p>\n<p>\nIn order to mark desired fields as indexed you can use the optional configuration\noption `indexed_fields`:\n</p>\n<pre>\n [sinks.my_sink_id]\n   type = \"splunk_hec\"\n   inputs = [\"my-source-id\"]\n+  indexed_fields = [\"foo\", \"bar\"]\n</pre>\n",
