@@ -3,12 +3,11 @@
 //!
 //! In stdlib imported code, warnings are allowed.
 
+use std::fs::File;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
-use std::ptr;
-#[cfg(windows)]
-use std::{fs::File, mem::zeroed};
+use std::{mem::zeroed, ptr};
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]
@@ -18,21 +17,17 @@ use winapi::um::{
     winnt::FILE_ATTRIBUTE_REPARSE_POINT, winnt::MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
 };
 
-#[cfg(unix)]
-impl PortableMetadataExt for Metadata {
-    fn portable_dev(&self) -> u64 {
-        self.dev()
-    }
-    fn portable_ino(&self) -> u64 {
-        self.ino()
-    }
+#[cfg(not(windows))]
+pub trait PortableFileExt {
+    fn portable_dev(&self) -> std::io::Result<u64>;
+    fn portable_ino(&self) -> std::io::Result<u64>;
 }
 
+#[cfg(windows)]
 pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
     fn portable_dev(&self) -> std::io::Result<u64>;
     fn portable_ino(&self) -> std::io::Result<u64>;
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
-    #[cfg(windows)]
     #[allow(unused_assignments, unused_variables)]
     fn reparse_point<'a>(
         &self,
@@ -56,7 +51,6 @@ pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
         }
     }
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L326-L351
-    #[cfg(windows)]
     #[allow(unused_assignments, unused_variables)]
     fn get_file_info(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
         unsafe {
@@ -77,10 +71,10 @@ pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
 #[cfg(unix)]
 impl PortableFileExt for File {
     fn portable_dev(&self) -> std::io::Result<u64> {
-        Ok(self.metadata().dev())
+        Ok(self.metadata()?.dev())
     }
     fn portable_ino(&self) -> std::io::Result<u64> {
-        Ok(self.metadata().ino())
+        Ok(self.metadata()?.ino())
     }
 }
 
