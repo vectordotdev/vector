@@ -48,7 +48,7 @@ pub struct DockerConfig {
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
     partial_event_marker: Option<Atom>,
-    no_auto_partial_merge: bool,
+    auto_partial_merge: bool,
 }
 
 impl Default for DockerConfig {
@@ -58,7 +58,7 @@ impl Default for DockerConfig {
             include_labels: None,
             include_images: None,
             partial_event_marker: Some(event::PARTIAL.clone()),
-            no_auto_partial_merge: false,
+            auto_partial_merge: true,
         }
     }
 }
@@ -221,9 +221,7 @@ impl DockerSource {
         // If `None` or empty string, no merging is performed, allowing use to
         // effectively opt-out from the built-in automating partial message
         // merging.
-        let merge_transform_config = if config.no_auto_partial_merge {
-            None
-        } else {
+        let merge_transform_config = if config.auto_partial_merge {
             config
                 .partial_event_marker
                 .clone()
@@ -240,6 +238,8 @@ impl DockerSource {
                     merge_fields: vec![event::MESSAGE.clone()],
                     stream_discriminant_fields: vec![],
                 })
+        } else {
+            None
         };
 
         // Only logs created at, or after this moment are logged.
