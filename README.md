@@ -10,6 +10,15 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
+---
+
+<p align="center">
+  <strong>
+    New post! <a href="https://vector.dev/blog/prometheus-source">Prometheus Source</a>
+  </strong>
+</p>
+
+---
 
 Vector is an [open-source][urls.vector_repo] utility for building observability
 pipelines. [Collect][docs.sources], [transform][docs.transforms], and
@@ -120,10 +129,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Posts & Announcements
 
+* [Prometheus Source](https://vector.dev/blog/prometheus-source)
+* [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
+* [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
+* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
 * [Unit Testing Your Vector Config Files](https://vector.dev/blog/unit-testing-vector-config-files)
-* [Windows Support Is Here!](https://vector.dev/blog/windows-support)
-* [ARMv7 & ARM64 Support on Linux](https://vector.dev/blog/arm-support-on-linux)
-* [Introducing Vector](https://vector.dev/blog/introducing-vector)
 
 [view all...][urls.vector_blog]
 

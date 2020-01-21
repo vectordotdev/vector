@@ -228,16 +228,17 @@ module.exports = {
   },
   "latest_post": {
     "author_id": "ashley",
-    "date": "2019-11-25",
-    "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-    "id": "unit-testing-vector-config-files",
-    "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-    "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+    "date": "2020-01-07",
+    "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+    "id": "prometheus-source",
+    "path": "website/blog/2020-01-07-prometheus-source.md",
+    "permalink": "https://vector.dev/blog/prometheus-source",
     "tags": [
       "type: announcement",
-      "domain: config"
+      "domain: metrics",
+      "domain: sources"
     ],
-    "title": "Unit Testing Your Vector Config Files"
+    "title": "Prometheus Source"
   },
   "latest_release": {
     "commits": [
@@ -1224,21 +1225,21 @@ module.exports = {
       {
         "author": "Lucio Franco",
         "breaking_change": false,
-        "date": "2019-12-17 14:26:09 +0000",
-        "deletions_count": 87,
-        "description": "Add custom DNS for `aws_*`, http based, and `gcp_*` sinks",
+        "date": "2019-12-13 11:34:33 +0000",
+        "deletions_count": 123,
+        "description": "Add custom DNS option",
         "files_count": 8,
         "group": "feat",
-        "insertions_count": 185,
-        "message": "feat(networking): Add custom DNS for `aws_*`, http based, and `gcp_*` sinks (#1371)",
-        "pr_number": 1371,
+        "insertions_count": 157,
+        "message": "feat(networking): Add custom DNS option (#1362)",
+        "pr_number": 1362,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
           "name": "networking"
         },
-        "sha": "2c635462a706018a46514e318ea002cd62b55c52",
+        "sha": "4c2c85363197ccb5f95d59bb7adce23a14c7a2ab",
         "type": "feat"
       },
       {
@@ -2446,11 +2447,11 @@ module.exports = {
         "breaking_change": true,
         "date": "2020-01-03 19:42:26 +0000",
         "deletions_count": 263,
-        "description": "Move existing 'tcp' sink into 'socket' sink. (#1212)",
+        "description": "Move existing 'tcp' sink into 'socket' sink.",
         "files_count": 21,
         "group": "breaking change",
         "insertions_count": 915,
-        "message": "feat(new sink)!: Move existing 'tcp' sink into 'socket' sink. (#1212) (#1404)",
+        "message": "feat(new sink)!: Move existing 'tcp' sink into 'socket' sink. (#1404)",
         "pr_number": 1404,
         "scope": {
           "category": "sink",
@@ -3404,11 +3405,63 @@ module.exports = {
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
     "date": "2020-01-20",
-    "deletions_count": 11684,
-    "insertions_count": 23306,
+    "deletions_count": 11720,
+    "insertions_count": 23278,
     "last_version": "0.6.0",
     "posts": [
-
+      {
+        "author_id": "ashley",
+        "date": "2019-12-13",
+        "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+        "id": "custom-dns",
+        "path": "website/blog/2019-12-13-custom-dns.md",
+        "permalink": "https://vector.dev/blog/custom-dns",
+        "tags": [
+          "type: announcement",
+          "domain: networking"
+        ],
+        "title": "Use Custom DNS Servers"
+      },
+      {
+        "author_id": "ashley",
+        "date": "2019-12-13",
+        "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+        "id": "kubernetes-source-alpha",
+        "path": "website/blog/2019-12-13-kubernetes-source-alpha.md",
+        "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+        "tags": [
+          "type: announcement",
+          "domain: sources"
+        ],
+        "title": "Alpha Kubernetes Source"
+      },
+      {
+        "author_id": "ashley",
+        "date": "2019-12-16",
+        "description": "Are your events the laughing stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+        "id": "ec2-metadata",
+        "path": "website/blog/2019-12-16-ec2-metadata.md",
+        "permalink": "https://vector.dev/blog/ec2-metadata",
+        "tags": [
+          "type: announcement",
+          "domain: transforms"
+        ],
+        "title": "EC2 Metadata Enrichments"
+      },
+      {
+        "author_id": "ashley",
+        "date": "2020-01-07",
+        "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+        "id": "prometheus-source",
+        "path": "website/blog/2020-01-07-prometheus-source.md",
+        "permalink": "https://vector.dev/blog/prometheus-source",
+        "tags": [
+          "type: announcement",
+          "domain: metrics",
+          "domain: sources"
+        ],
+        "title": "Prometheus Source"
+      }
     ],
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
@@ -3469,7 +3522,11 @@ module.exports = {
     "domain: platforms",
     "platform: arm",
     "platform: windows",
-    "domain: config"
+    "domain: config",
+    "domain: networking",
+    "domain: sources",
+    "domain: transforms",
+    "domain: metrics"
   ],
   "posts": [
     {
@@ -3524,6 +3581,59 @@ module.exports = {
         "domain: config"
       ],
       "title": "Unit Testing Your Vector Config Files"
+    },
+    {
+      "author_id": "ashley",
+      "date": "2019-12-13",
+      "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+      "id": "custom-dns",
+      "path": "website/blog/2019-12-13-custom-dns.md",
+      "permalink": "https://vector.dev/blog/custom-dns",
+      "tags": [
+        "type: announcement",
+        "domain: networking"
+      ],
+      "title": "Use Custom DNS Servers"
+    },
+    {
+      "author_id": "ashley",
+      "date": "2019-12-13",
+      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+      "id": "kubernetes-source-alpha",
+      "path": "website/blog/2019-12-13-kubernetes-source-alpha.md",
+      "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+      "tags": [
+        "type: announcement",
+        "domain: sources"
+      ],
+      "title": "Alpha Kubernetes Source"
+    },
+    {
+      "author_id": "ashley",
+      "date": "2019-12-16",
+      "description": "Are your events the laughing stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+      "id": "ec2-metadata",
+      "path": "website/blog/2019-12-16-ec2-metadata.md",
+      "permalink": "https://vector.dev/blog/ec2-metadata",
+      "tags": [
+        "type: announcement",
+        "domain: transforms"
+      ],
+      "title": "EC2 Metadata Enrichments"
+    },
+    {
+      "author_id": "ashley",
+      "date": "2020-01-07",
+      "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+      "id": "prometheus-source",
+      "path": "website/blog/2020-01-07-prometheus-source.md",
+      "permalink": "https://vector.dev/blog/prometheus-source",
+      "tags": [
+        "type: announcement",
+        "domain: metrics",
+        "domain: sources"
+      ],
+      "title": "Prometheus Source"
     }
   ],
   "releases": {
@@ -16961,21 +17071,21 @@ module.exports = {
         {
           "author": "Lucio Franco",
           "breaking_change": false,
-          "date": "2019-12-17 14:26:09 +0000",
-          "deletions_count": 87,
-          "description": "Add custom DNS for `aws_*`, http based, and `gcp_*` sinks",
+          "date": "2019-12-13 11:34:33 +0000",
+          "deletions_count": 123,
+          "description": "Add custom DNS option",
           "files_count": 8,
           "group": "feat",
-          "insertions_count": 185,
-          "message": "feat(networking): Add custom DNS for `aws_*`, http based, and `gcp_*` sinks (#1371)",
-          "pr_number": 1371,
+          "insertions_count": 157,
+          "message": "feat(networking): Add custom DNS option (#1362)",
+          "pr_number": 1362,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
             "name": "networking"
           },
-          "sha": "2c635462a706018a46514e318ea002cd62b55c52",
+          "sha": "4c2c85363197ccb5f95d59bb7adce23a14c7a2ab",
           "type": "feat"
         },
         {
@@ -18183,11 +18293,11 @@ module.exports = {
           "breaking_change": true,
           "date": "2020-01-03 19:42:26 +0000",
           "deletions_count": 263,
-          "description": "Move existing 'tcp' sink into 'socket' sink. (#1212)",
+          "description": "Move existing 'tcp' sink into 'socket' sink.",
           "files_count": 21,
           "group": "breaking change",
           "insertions_count": 915,
-          "message": "feat(new sink)!: Move existing 'tcp' sink into 'socket' sink. (#1212) (#1404)",
+          "message": "feat(new sink)!: Move existing 'tcp' sink into 'socket' sink. (#1404)",
           "pr_number": 1404,
           "scope": {
             "category": "sink",
@@ -19141,11 +19251,63 @@ module.exports = {
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
       "date": "2020-01-20",
-      "deletions_count": 11684,
-      "insertions_count": 23306,
+      "deletions_count": 11720,
+      "insertions_count": 23278,
       "last_version": "0.6.0",
       "posts": [
-
+        {
+          "author_id": "ashley",
+          "date": "2019-12-13",
+          "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+          "id": "custom-dns",
+          "path": "website/blog/2019-12-13-custom-dns.md",
+          "permalink": "https://vector.dev/blog/custom-dns",
+          "tags": [
+            "type: announcement",
+            "domain: networking"
+          ],
+          "title": "Use Custom DNS Servers"
+        },
+        {
+          "author_id": "ashley",
+          "date": "2019-12-13",
+          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+          "id": "kubernetes-source-alpha",
+          "path": "website/blog/2019-12-13-kubernetes-source-alpha.md",
+          "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+          "tags": [
+            "type: announcement",
+            "domain: sources"
+          ],
+          "title": "Alpha Kubernetes Source"
+        },
+        {
+          "author_id": "ashley",
+          "date": "2019-12-16",
+          "description": "Are your events the laughing stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+          "id": "ec2-metadata",
+          "path": "website/blog/2019-12-16-ec2-metadata.md",
+          "permalink": "https://vector.dev/blog/ec2-metadata",
+          "tags": [
+            "type: announcement",
+            "domain: transforms"
+          ],
+          "title": "EC2 Metadata Enrichments"
+        },
+        {
+          "author_id": "ashley",
+          "date": "2020-01-07",
+          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+          "id": "prometheus-source",
+          "path": "website/blog/2020-01-07-prometheus-source.md",
+          "permalink": "https://vector.dev/blog/prometheus-source",
+          "tags": [
+            "type: announcement",
+            "domain: metrics",
+            "domain: sources"
+          ],
+          "title": "Prometheus Source"
+        }
       ],
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
