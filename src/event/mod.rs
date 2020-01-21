@@ -152,6 +152,8 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
+    Map(HashMap<Atom, Value>),
+    Array(Vec<Value>),
 }
 
 impl Serialize for Value {
@@ -247,6 +249,8 @@ impl Value {
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
             Value::Boolean(b) => format!("{}", b),
+            Value::Map(_) => todo!(),
+            Value::Array(_) => todo!(),
         }
     }
 
@@ -257,6 +261,8 @@ impl Value {
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
             Value::Boolean(b) => Bytes::from(format!("{}", b)),
+            Value::Map(_) => todo!(),
+            Value::Array(_) => todo!(),
         }
     }
 
@@ -276,6 +282,30 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
+fn decode_map(input: HashMap<String, proto::Value>) -> Option<Value> {
+    let mut accum: HashMap<Atom, Value> = HashMap::with_capacity(input.len());
+    for (key, value) in input {
+        match decode_value(value) {
+            Some(value) => {
+                accum.insert(Atom::from(key), value);
+            }
+            None => return None,
+        }
+    }
+    Some(Value::Map(accum))
+}
+
+fn decode_array(input: Vec<proto::Value>) -> Option<Value> {
+    let mut accum = Vec::with_capacity(input.len());
+    for item in input {
+        match decode_value(item) {
+            Some(value) => accum.push(value),
+            None => return None,
+        }
+    }
+    Some(Value::Array(accum))
+}
+
 fn decode_value(input: proto::Value) -> Option<Value> {
     match input.kind {
         Some(proto::value::Kind::RawBytes(data)) => Some(Value::Bytes(data.into())),
@@ -285,6 +315,8 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Integer(value)) => Some(Value::Integer(value)),
         Some(proto::value::Kind::Float(value)) => Some(Value::Float(value)),
         Some(proto::value::Kind::Boolean(value)) => Some(Value::Boolean(value)),
+        Some(proto::value::Kind::Map(map)) => decode_map(map.fields),
+        Some(proto::value::Kind::Array(array)) => decode_array(array.items),
         None => {
             error!("encoded event contains unknown value kind");
             None
@@ -381,6 +413,8 @@ impl From<Event> for proto::EventWrapper {
                                 Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
                                 Value::Float(value) => Some(proto::value::Kind::Float(value)),
                                 Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
+                                Value::Map(_) => todo!(),
+                                Value::Array(_) => todo!(),
                             },
                         };
                         (k.to_string(), value)
