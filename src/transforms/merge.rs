@@ -187,9 +187,7 @@ mod test {
     use string_cache::DefaultAtom as Atom;
 
     fn make_partial(mut event: Event) -> Event {
-        event
-            .as_mut_log()
-            .insert_explicit(event::PARTIAL.clone(), true);
+        event.as_mut_log().insert(event::PARTIAL.clone(), true);
         event
     }
 
@@ -246,7 +244,7 @@ mod test {
             let mut event = Event::from(message);
             event
                 .as_mut_log()
-                .insert_explicit(stream_discriminant_field.clone(), stream);
+                .insert(stream_discriminant_field.clone(), stream);
             event
         };
 

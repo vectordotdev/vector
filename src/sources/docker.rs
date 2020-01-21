@@ -814,7 +814,7 @@ impl ContainerLogInfo {
             // If message doesn't contain a newline at the end, consider it a partial event.
             // Add a partial event marker if we're requested to do so.
             if let Some(partial_event_marker) = partial_event_marker {
-                log_event.insert_implicit(partial_event_marker, true);
+                log_event.insert(partial_event_marker, true);
             }
         }
 

@@ -113,11 +113,6 @@ impl LogEvent {
         self.fields.remove(key)
     }
 
-    // TODO: remove this when we get rid of `explicit`.
-    pub fn remove_with_explicitness(&mut self, key: &Atom) -> Option<(ValueKind, bool)> {
-        self.fields.remove(key).map(|v| (v.value, v.explicit))
-    }
-
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
         self.fields.keys()
     }

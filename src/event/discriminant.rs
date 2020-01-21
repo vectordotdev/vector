@@ -1,11 +1,11 @@
-use super::{LogEvent, ValueKind};
+use super::{LogEvent, Value};
 use std::hash::{Hash, Hasher};
 use string_cache::DefaultAtom as Atom;
 
-// TODO: if we had `ValueKind` implement `Eq` and `Hash`, the implementation
-// here would be much easier. The issue is with `f64` type. We should consider
-// using newtype for `f64` there that'd implement `Eq` and `Hash` is it's safe,
-// for example `NormalF64`, and guard the values with `val.is_normal() == true`
+// TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
+// would be much easier. The issue is with `f64` type. We should consider using
+// a newtype for `f64` there that'd implement `Eq` and `Hash` is it's safe, for
+// example `NormalF64`, and guard the values with `val.is_normal() == true`
 // invariant.
 // See also: https://internals.rust-lang.org/t/f32-f64-should-implement-hash/5436/32
 
@@ -15,14 +15,14 @@ use string_cache::DefaultAtom as Atom;
 /// Implements `PartialEq`, `Eq` and `Hash` to enable use as a `HashMap` key.
 #[derive(Debug)]
 pub struct Discriminant {
-    values: Vec<Option<ValueKind>>,
+    values: Vec<Option<Value>>,
 }
 
 impl Discriminant {
     /// Create a new Discriminant from the `LogEvent` and an ordered slice of
     /// fields to include into a discriminant value.
     pub fn from_log_event(event: &LogEvent, discriminant_fields: &[Atom]) -> Self {
-        let values: Vec<Option<ValueKind>> = discriminant_fields
+        let values: Vec<Option<Value>> = discriminant_fields
             .iter()
             .map(|discriminant_field| event.get(discriminant_field).cloned())
             .collect();
@@ -46,15 +46,15 @@ impl PartialEq for Discriminant {
 impl Eq for Discriminant {}
 
 // Equality check for for discriminant purposes.
-fn value_eq(this: &ValueKind, other: &ValueKind) -> bool {
+fn value_eq(this: &Value, other: &Value) -> bool {
     match (this, other) {
         // Trivial.
-        (ValueKind::Bytes(this), ValueKind::Bytes(other)) => this.eq(other),
-        (ValueKind::Boolean(this), ValueKind::Boolean(other)) => this.eq(other),
-        (ValueKind::Integer(this), ValueKind::Integer(other)) => this.eq(other),
-        (ValueKind::Timestamp(this), ValueKind::Timestamp(other)) => this.eq(other),
+        (Value::Bytes(this), Value::Bytes(other)) => this.eq(other),
+        (Value::Boolean(this), Value::Boolean(other)) => this.eq(other),
+        (Value::Integer(this), Value::Integer(other)) => this.eq(other),
+        (Value::Timestamp(this), Value::Timestamp(other)) => this.eq(other),
         // Non-trivial.
-        (ValueKind::Float(this), ValueKind::Float(other)) => f64_eq(this, other),
+        (Value::Float(this), Value::Float(other)) => f64_eq(this, other),
         // Type mismatch.
         _ => false,
     }
@@ -91,15 +91,15 @@ impl Hash for Discriminant {
 }
 
 // Hashes value for discriminant purposes.
-fn hash_value<H: Hasher>(hasher: &mut H, value: &ValueKind) {
+fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
     match value {
         // Trivial.
-        ValueKind::Bytes(val) => val.hash(hasher),
-        ValueKind::Boolean(val) => val.hash(hasher),
-        ValueKind::Integer(val) => val.hash(hasher),
-        ValueKind::Timestamp(val) => val.hash(hasher),
+        Value::Bytes(val) => val.hash(hasher),
+        Value::Boolean(val) => val.hash(hasher),
+        Value::Integer(val) => val.hash(hasher),
+        Value::Timestamp(val) => val.hash(hasher),
         // Non-trivial.
-        ValueKind::Float(val) => hash_f64(hasher, val),
+        Value::Float(val) => hash_f64(hasher, val),
     }
 }
 
@@ -127,10 +127,10 @@ mod tests {
     #[test]
     fn equal() {
         let mut event_1 = new_log_event();
-        event_1.insert_explicit("hostname", "localhost");
-        event_1.insert_explicit("irrelevant", "not even used");
+        event_1.insert("hostname", "localhost");
+        event_1.insert("irrelevant", "not even used");
         let mut event_2 = event_1.clone();
-        event_2.insert_explicit("irrelevant", "does not matter if it's different");
+        event_2.insert("irrelevant", "does not matter if it's different");
 
         let discriminant_fields = vec![Atom::from("hostname"), Atom::from("container_id")];
 
@@ -144,10 +144,10 @@ mod tests {
     #[test]
     fn not_equal() {
         let mut event_1 = new_log_event();
-        event_1.insert_explicit("hostname", "localhost");
-        event_1.insert_explicit("container_id", "abc");
+        event_1.insert("hostname", "localhost");
+        event_1.insert("container_id", "abc");
         let mut event_2 = event_1.clone();
-        event_2.insert_explicit("container_id", "def");
+        event_2.insert("container_id", "def");
 
         let discriminant_fields = vec![Atom::from("hostname"), Atom::from("container_id")];
 
@@ -164,15 +164,15 @@ mod tests {
 
         let event_stream_1 = {
             let mut event = new_log_event();
-            event.insert_explicit("hostname", "a.test");
-            event.insert_explicit("container_id", "abc");
+            event.insert("hostname", "a.test");
+            event.insert("container_id", "abc");
             event
         };
 
         let event_stream_2 = {
             let mut event = new_log_event();
-            event.insert_explicit("hostname", "b.test");
-            event.insert_explicit("container_id", "def");
+            event.insert("hostname", "b.test");
+            event.insert("container_id", "def");
             event
         };
 
@@ -191,40 +191,40 @@ mod tests {
 
         {
             let mut event = event_stream_1.clone();
-            event.insert_explicit("message", "a");
+            event.insert("message", "a");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_1.clone();
-            event.insert_explicit("message", "b");
-            event.insert_explicit("irrelevant", "c");
+            event.insert("message", "b");
+            event.insert("irrelevant", "c");
             assert_eq!(process_event(event), 1);
         }
 
         {
             let mut event = event_stream_2.clone();
-            event.insert_explicit("message", "d");
+            event.insert("message", "d");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_2.clone();
-            event.insert_explicit("message", "e");
-            event.insert_explicit("irrelevant", "d");
+            event.insert("message", "e");
+            event.insert("irrelevant", "d");
             assert_eq!(process_event(event), 1);
         }
 
         {
             let mut event = event_stream_3.clone();
-            event.insert_explicit("message", "f");
+            event.insert("message", "f");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_3.clone();
-            event.insert_explicit("message", "g");
-            event.insert_explicit("irrelevant", "d");
+            event.insert("message", "g");
+            event.insert("irrelevant", "d");
             assert_eq!(process_event(event), 1);
         }
 
