@@ -71,6 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL - General
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   create_missing_group = true # default
   create_missing_stream = true # default
   healthcheck = true # default
@@ -112,6 +113,28 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+
+</Field>
 
 
 <Field
@@ -784,5 +807,6 @@ You can read more about the complete syntax in the
 [urls.aws_cw_logs_group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+[urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

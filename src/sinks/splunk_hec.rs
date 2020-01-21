@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    event::{self, Event, Value},
+    event::{self, Event, LogEvent, Value},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
@@ -14,7 +14,7 @@ use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, value::Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
 
@@ -31,6 +31,8 @@ pub struct HecSinkConfig {
     pub host: String,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+    #[serde(default)]
+    pub indexed_fields: Vec<Atom>,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
     #[serde(default)]
@@ -122,10 +124,12 @@ pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::Route
             builder.body(body).unwrap()
         });
 
+    let indexed_fields = config.indexed_fields.clone();
+
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
+        .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &indexed_fields, &encoding)));
 
     Ok(Box::new(sink))
 }
@@ -176,7 +180,27 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
+fn event_to_json(event: LogEvent, indexed_fields: &Vec<Atom>, timestamp: i64) -> JsonValue {
+    let mut fields = Event::new_empty_log().into_log();
+    for field in indexed_fields.iter() {
+        if let Some(value) = event.get(field) {
+            fields.insert(field, value.clone());
+        }
+    }
+
+    json!({
+        "fields": fields.unflatten(),
+        "event": event.unflatten(),
+        "time": timestamp
+    })
+}
+
+fn encode_event(
+    host_field: &Atom,
+    event: Event,
+    indexed_fields: &Vec<Atom>,
+    encoding: &Encoding,
+) -> Option<Vec<u8>> {
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
@@ -187,11 +211,7 @@ fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<
     };
 
     let mut body = match encoding {
-        Encoding::Json => json!({
-            "fields": {}, // FIXME: there should be a way to set index fields
-            "event": event.unflatten(),
-            "time": timestamp,
-        }),
+        Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
             "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
@@ -228,7 +248,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let bytes = encode_event(&host, event, &Encoding::Json).unwrap();
+        let bytes = encode_event(&host, event, &vec![], &Encoding::Json).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
@@ -279,7 +299,7 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), cx).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text, vec![]), cx).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -311,7 +331,7 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), cx).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text, vec![]), cx).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -340,12 +360,12 @@ mod integration_tests {
     }
 
     #[test]
-    #[ignore]
     fn splunk_custom_fields() {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), cx).unwrap();
+        let indexed_fields = vec![Atom::from("asdf")];
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json, indexed_fields), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -373,12 +393,12 @@ mod integration_tests {
     }
 
     #[test]
-    #[ignore]
     fn splunk_hostname() {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), cx).unwrap();
+        let indexed_fields = vec![Atom::from("asdf")];
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json, indexed_fields), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -409,14 +429,13 @@ mod integration_tests {
     }
 
     #[test]
-    #[ignore]
     fn splunk_configure_hostname() {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
         let config = super::HecSinkConfig {
             host_field: "roast".into(),
-            ..config(Encoding::Json)
+            ..config(Encoding::Json, vec![Atom::from("asdf")])
         };
 
         let sink = sinks::splunk_hec::hec(config, cx).unwrap();
@@ -457,7 +476,7 @@ mod integration_tests {
 
         // OK
         {
-            let config = config(Encoding::Text);
+            let config = config(Encoding::Text, vec![]);
             let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
             rt.block_on(healthcheck).unwrap();
         }
@@ -466,7 +485,7 @@ mod integration_tests {
         {
             let config = HecSinkConfig {
                 host: "http://localhost:1111".to_string(),
-                ..config(Encoding::Text)
+                ..config(Encoding::Text, vec![])
             };
             let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
 
@@ -490,7 +509,7 @@ mod integration_tests {
         {
             let config = HecSinkConfig {
                 host: "http://localhost:5503".to_string(),
-                ..config(Encoding::Text)
+                ..config(Encoding::Text, vec![])
             };
 
             let unhealthy = warp::any()
@@ -525,7 +544,7 @@ mod integration_tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config(encoding: Encoding) -> super::HecSinkConfig {
+    fn config(encoding: Encoding, indexed_fields: Vec<Atom>) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
@@ -536,6 +555,7 @@ mod integration_tests {
                 max_size: Some(1),
                 timeout_secs: None,
             },
+            indexed_fields,
             ..Default::default()
         }
     }

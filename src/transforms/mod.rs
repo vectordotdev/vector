@@ -12,6 +12,7 @@ pub mod geoip;
 pub mod grok_parser;
 pub mod json_parser;
 pub mod log_to_metric;
+pub mod logfmt_parser;
 pub mod lua;
 pub mod regex_parser;
 pub mod remove_fields;
