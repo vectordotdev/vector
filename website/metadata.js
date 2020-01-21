@@ -3406,6 +3406,7 @@ module.exports = {
     "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
     "date": "2020-01-20",
     "deletions_count": 11720,
+    "description": "You can't make an omelet without cracking some eggs. We have our eyes set on version 1 and a backlog of breaking changes we wanted to merge before we reach it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can into a single release.",
     "insertions_count": 23278,
     "last_version": "0.6.0",
     "posts": [
@@ -3463,6 +3464,7 @@ module.exports = {
         "title": "Prometheus Source"
       }
     ],
+    "subtitle": "The omelet",
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
@@ -9803,11 +9805,13 @@ module.exports = {
       "compare_url": "https://github.com/timberio/vector/compare/v...v0.4.0",
       "date": "2019-09-24",
       "deletions_count": 8605,
+      "description": "",
       "insertions_count": 27640,
       "last_version": null,
       "posts": [
 
       ],
+      "subtitle": "",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
@@ -11081,11 +11085,13 @@ module.exports = {
       "compare_url": "https://github.com/timberio/vector/compare/v0.4.0...v0.5.0",
       "date": "2019-10-09",
       "deletions_count": 3038,
+      "description": "",
       "insertions_count": 6839,
       "last_version": "0.4.0",
       "posts": [
 
       ],
+      "subtitle": "",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
@@ -16019,6 +16025,7 @@ module.exports = {
       "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
       "date": "2019-12-09",
       "deletions_count": 9213,
+      "description": "",
       "insertions_count": 22141,
       "last_version": "0.5.0",
       "posts": [
@@ -16064,6 +16071,7 @@ module.exports = {
           "title": "Unit Testing Your Vector Config Files"
         }
       ],
+      "subtitle": "",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
@@ -19252,6 +19260,7 @@ module.exports = {
       "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
       "date": "2020-01-20",
       "deletions_count": 11720,
+      "description": "You can't make an omelet without cracking some eggs. We have our eyes set on version 1 and a backlog of breaking changes we wanted to merge before we reach it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can into a single release.",
       "insertions_count": 23278,
       "last_version": "0.6.0",
       "posts": [
@@ -19309,6 +19318,7 @@ module.exports = {
           "title": "Prometheus Source"
         }
       ],
+      "subtitle": "The omelet",
       "type": "initial dev",
       "type_url": "https://semver.org/#spec-item-4",
       "upgrade_guides": [
