@@ -30,14 +30,11 @@ pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, merge_fie
 ///
 /// Will concatenate `Bytes` and overwrite the rest value kinds.
 pub fn merge_value(current: &mut ValueKind, incoming: ValueKind) {
-    match incoming {
-        ValueKind::Bytes(incoming_bytes) => match current {
-            ValueKind::Bytes(current_bytes) => {
-                current_bytes.extend_from_slice(incoming_bytes.as_ref())
-            }
-            other_current => *other_current = ValueKind::Bytes(incoming_bytes),
-        },
-        other => *current = other,
+    match (current, incoming) {
+        (ValueKind::Bytes(current), ValueKind::Bytes(ref incoming)) => {
+            current.extend_from_slice(incoming)
+        }
+        (current, incoming) => *current = incoming,
     }
 }
 
