@@ -3438,7 +3438,7 @@ module.exports = {
       {
         "author_id": "ashley",
         "date": "2019-12-16",
-        "description": "Are your events the laughing stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+        "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
         "id": "ec2-metadata",
         "path": "website/blog/2019-12-16-ec2-metadata.md",
         "permalink": "https://vector.dev/blog/ec2-metadata",
@@ -3611,7 +3611,7 @@ module.exports = {
     {
       "author_id": "ashley",
       "date": "2019-12-16",
-      "description": "Are your events the laughing stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+      "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
       "id": "ec2-metadata",
       "path": "website/blog/2019-12-16-ec2-metadata.md",
       "permalink": "https://vector.dev/blog/ec2-metadata",
@@ -19284,7 +19284,7 @@ module.exports = {
         {
           "author_id": "ashley",
           "date": "2019-12-16",
-          "description": "Are your events the laughing stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+          "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
           "id": "ec2-metadata",
           "path": "website/blog/2019-12-16-ec2-metadata.md",
           "permalink": "https://vector.dev/blog/ec2-metadata",

@@ -6,13 +6,13 @@ author_id: "ashley"
 tags: ["type: announcement", "domain: transforms"]
 ---
 
-Are your events the laughing stock of the data warehouse? Then enrich them with
+Are your events the laughing-stock of the data warehouse? Then enrich them with
 our brand spanking new [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].
 
 <!--truncate-->
 
 Configuration isn't complicated, just add and hook up the transform. If you
-don't want all enrichments added then whitelist them with the `field` option:
+don't want all enrichments added then whitelist them with the `fields` option:
 
 ```toml
 [transforms.fill_me_up]
