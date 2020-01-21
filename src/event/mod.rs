@@ -282,9 +282,9 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
-fn decode_map(input: HashMap<String, proto::Value>) -> Option<Value> {
-    let mut accum: HashMap<Atom, Value> = HashMap::with_capacity(input.len());
-    for (key, value) in input {
+fn decode_map(fields: HashMap<String, proto::Value>) -> Option<Value> {
+    let mut accum: HashMap<Atom, Value> = HashMap::with_capacity(fields.len());
+    for (key, value) in fields {
         match decode_value(value) {
             Some(value) => {
                 accum.insert(Atom::from(key), value);
@@ -295,10 +295,10 @@ fn decode_map(input: HashMap<String, proto::Value>) -> Option<Value> {
     Some(Value::Map(accum))
 }
 
-fn decode_array(input: Vec<proto::Value>) -> Option<Value> {
-    let mut accum = Vec::with_capacity(input.len());
-    for item in input {
-        match decode_value(item) {
+fn decode_array(items: Vec<proto::Value>) -> Option<Value> {
+    let mut accum = Vec::with_capacity(items.len());
+    for value in items {
+        match decode_value(value) {
             Some(value) => accum.push(value),
             None => return None,
         }
@@ -394,31 +394,45 @@ impl From<proto::EventWrapper> for Event {
     }
 }
 
+fn encode_value(value: Value) -> proto::Value {
+    proto::Value {
+        kind: match value {
+            Value::Bytes(b) => Some(proto::value::Kind::RawBytes(b.to_vec())),
+            Value::Timestamp(ts) => Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
+                seconds: ts.timestamp(),
+                nanos: ts.timestamp_subsec_nanos() as i32,
+            })),
+            Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
+            Value::Float(value) => Some(proto::value::Kind::Float(value)),
+            Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
+            Value::Map(fields) => Some(proto::value::Kind::Map(encode_map(fields))),
+            Value::Array(items) => Some(proto::value::Kind::Array(encode_array(items))),
+        },
+    }
+}
+
+fn encode_map(fields: HashMap<Atom, Value>) -> proto::ValueMap {
+    proto::ValueMap {
+        fields: fields
+            .into_iter()
+            .map(|(key, value)| (key.to_string(), encode_value(value)))
+            .collect(),
+    }
+}
+
+fn encode_array(items: Vec<Value>) -> proto::ValueArray {
+    proto::ValueArray {
+        items: items.into_iter().map(|value| encode_value(value)).collect(),
+    }
+}
+
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
             Event::Log(LogEvent { fields }) => {
                 let fields = fields
                     .into_iter()
-                    .map(|(k, v)| {
-                        let value = proto::Value {
-                            kind: match v {
-                                Value::Bytes(b) => Some(proto::value::Kind::RawBytes(b.to_vec())),
-                                Value::Timestamp(ts) => {
-                                    Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
-                                        seconds: ts.timestamp(),
-                                        nanos: ts.timestamp_subsec_nanos() as i32,
-                                    }))
-                                }
-                                Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
-                                Value::Float(value) => Some(proto::value::Kind::Float(value)),
-                                Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
-                                Value::Map(_) => todo!(),
-                                Value::Array(_) => todo!(),
-                            },
-                        };
-                        (k.to_string(), value)
-                    })
+                    .map(|(k, v)| (k.to_string(), encode_value(v)))
                     .collect::<HashMap<_, _>>();
 
                 let event = EventProto::Log(Log { fields });
