@@ -35,7 +35,12 @@ def create_release_meta_file!(current_commits, new_version)
 
   existing_release =
     if File.exists?(release_meta_path)
-      TomlRB.parse(File.read(release_meta_path)).fetch("releases").fetch(new_version.to_s)
+      existing_contents = File.read(release_meta_path)
+      if existing_contents.length > 0
+        TomlRB.parse(existing_contents).fetch("releases").fetch(new_version.to_s)
+      else
+        {"commits" => []}
+      end
     else
       {"commits" => []}
     end
@@ -85,7 +90,7 @@ def create_release_meta_file!(current_commits, new_version)
           <<~EOF
           [releases."#{new_version}"]
           date = #{Time.now.utc.to_date.to_toml}
-          commits = #{commits.to_toml}
+          commits = #{new_commits.to_toml}
           EOF
         )
       end
@@ -192,8 +197,10 @@ def parse_commit_line!(commit_line)
 
   # Parse the stats
   stats = get_commit_stats(attributes.fetch("sha"))
-  stats_attributes = parse_commit_stats!(stats)
-  attributes.merge!(stats_attributes)
+  if /^\W*\p{Digit}+ files? changed,/.match(stats)
+    stats_attributes = parse_commit_stats!(stats)
+    attributes.merge!(stats_attributes)
+  end
 
   attributes
 end

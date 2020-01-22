@@ -35,14 +35,14 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Latest (0.7.0)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.6.X/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.7.X/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     </TabItem>
