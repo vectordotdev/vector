@@ -208,7 +208,7 @@ mod tests {
         },
     };
     use futures::Stream;
-    use std::{collections::HashMap, path::PathBuf};
+    use std::path::PathBuf;
 
     #[test]
     fn encode_text() {
@@ -230,8 +230,8 @@ mod tests {
         for (input, output) in input.into_iter().zip(output) {
             // let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
             //     serde_json::from_str(&output[..]).unwrap();
-            let output: Result<HashMap<String, HashMap<String, HashMap<String, String>>>, _> =
-                serde_json::from_str(&output[..]);
+            // let output: Result<HashMap<String, HashMap<String, HashMap<String, String>>>, _> =
+            // serde_json::from_str(&output[..]);
 
             println!("input: {:?}, output: {:?}", input, output);
 

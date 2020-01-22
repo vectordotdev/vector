@@ -1,5 +1,8 @@
 use crate::runtime::Runtime;
-use crate::Event;
+use crate::{
+    event::{Atom, Value},
+    Event,
+};
 
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use rand::distributions::Alphanumeric;
@@ -103,16 +106,7 @@ pub fn random_nested_events_with_stream(
     depth: usize,
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
-    random_events_with_stream_generic(count, move || {
-        let mut log = Event::new_empty_log().into_log();
-
-        let tree = random_pseudonested_map(len, breadth, depth);
-        for (k, v) in tree.into_iter() {
-            log.insert(k, v)
-        }
-
-        Event::Log(log)
-    })
+    random_events_with_stream_generic(count, move || random_nested_log_event(len, breadth, depth))
 }
 
 pub fn random_string(len: usize) -> String {
@@ -339,34 +333,40 @@ where
     (events, stream)
 }
 
-fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<String, String> {
+fn random_nested_map(len: usize, breadth: usize, depth: usize) -> HashMap<Atom, Value> {
     if breadth == 0 || depth == 0 {
         return HashMap::new();
     }
 
     if depth == 1 {
         let mut leaf = HashMap::new();
-        leaf.insert(random_string(len), random_string(len));
+        for _ in 0..breadth {
+            leaf.insert(
+                Atom::from(random_string(len)),
+                Value::Bytes(random_string(len).into()),
+            );
+        }
         return leaf;
     }
 
     let mut tree = HashMap::new();
     for _ in 0..breadth {
-        let prefix = random_string(len);
-        let subtree = random_pseudonested_map(len, breadth, depth - 1);
-
-        let subtree: HashMap<String, String> = subtree
-            .into_iter()
-            .map(|(mut key, value)| {
-                key.insert(0, '.');
-                key.insert_str(0, &prefix[..]);
-                (key, value)
-            })
-            .collect();
-
-        for (key, value) in subtree.into_iter() {
-            tree.insert(key, value);
-        }
+        tree.insert(
+            Atom::from(random_string(len)),
+            Value::Map(random_nested_map(len, breadth, depth - 1)),
+        );
     }
+
     tree
+}
+
+fn random_nested_log_event(len: usize, breadth: usize, depth: usize) -> Event {
+    let mut event = Event::new_empty_log();
+    let log = event.as_mut_log();
+
+    for (key, value) in random_nested_map(len, breadth, depth).into_iter() {
+        log.insert(key, value);
+    }
+
+    event
 }
