@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.6.0<a/>
+    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.7.0<a/>
   </strong>
 </p>
 
@@ -10,6 +10,15 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
+---
+
+<p align="center">
+  <strong>
+    New post! <a href="https://vector.dev/blog/prometheus-source">Prometheus Source</a>
+  </strong>
+</p>
+
+---
 
 Vector is an [open-source][urls.vector_repo] utility for building observability
 pipelines. [Collect][docs.sources], [transform][docs.transforms], and
@@ -63,7 +72,7 @@ of your observability data with Vector.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [twitter][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.6.0 (latest)][urls.v0.6.0]
+* [**Releases**][urls.vector_releases] - [v0.7.0 (latest)][urls.v0.7.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -120,10 +129,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Posts & Announcements
 
+* [Prometheus Source](https://vector.dev/blog/prometheus-source)
+* [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
+* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
+* [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
 * [Unit Testing Your Vector Config Files](https://vector.dev/blog/unit-testing-vector-config-files)
-* [Windows Support Is Here!](https://vector.dev/blog/windows-support)
-* [ARMv7 & ARM64 Support on Linux](https://vector.dev/blog/arm-support-on-linux)
-* [Introducing Vector](https://vector.dev/blog/introducing-vector)
 
 [view all...][urls.vector_blog]
 
@@ -188,7 +198,7 @@ Or use your own [preferred method][docs.installation].
 [urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.6.0]: https://vector.dev/releases/0.6.0/download
+[urls.v0.7.0]: https://vector.dev/releases/0.7.0/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community
