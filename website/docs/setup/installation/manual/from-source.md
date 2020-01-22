@@ -295,7 +295,7 @@ Building steps:
 
 The steps to compile Vector on Windows are different from the ones for other operating systems.
 
-1. Install Rust using [`rustup`][urls.rustup]. It would install toolchain for `nightly-x86_64-pc-windows-msvc` target on 64-bit machines by default. If you don't have VC++ build tools, the installer would prompt you to install them.
+1. Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build tools, the installer would prompt you to install them.
 
 2. Install [Perl for Windows][urls.perl_windows].
 
@@ -338,7 +338,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     ```
     set RUSTFLAGS=-Ctarget-feature=+crt-static
-    cargo +nightly-x86_64-pc-windows-msvc build --no-default-features --features default-msvc --release
+    cargo build --no-default-features --features default-msvc --release
     ```
 
 6. After these steps a binary `vector.exe` in `target\release` would be created. It can be started by running

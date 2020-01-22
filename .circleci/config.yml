@@ -20,7 +20,7 @@ install-rust-windows: &install-rust-windows
     shell: bash
     command: |
       curl https://sh.rustup.rs -sSf | sh -s -- -y \
-        --default-toolchain nightly-2019-11-19 \
+        --default-toolchain stable \
         --default-host x86_64-pc-windows-msvc
       # see https://github.com/rust-lang/cargo/issues/2078
       printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
@@ -136,7 +136,6 @@ jobs:
             AWS_SECRET_ACCESS_KEY: fake-aws-key
           command: |
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            rm rust-toolchain
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1
 
   test-stable-kubernetes:
