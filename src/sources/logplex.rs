@@ -65,7 +65,7 @@ impl SourceConfig for LogplexConfig {
 
         let routes = svc.or(ping);
 
-        info!(message = "building logplex server", addr = ?self.address);
+        info!(message = "building logplex server", addr = %self.address);
         let (_, server) = warp::serve(routes).bind_with_graceful_shutdown(self.address, tripwire);
 
         Ok(Box::new(server))

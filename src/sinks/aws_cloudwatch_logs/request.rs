@@ -124,7 +124,7 @@ impl Future for CloudwatchFuture {
                 State::CreateGroup(fut) => {
                     try_ready!(fut.poll().map_err(CloudwatchError::CreateGroup));
 
-                    info!("group created.");
+                    info!(message = "group created.", name = %self.client.group_name);
 
                     // This does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
@@ -135,7 +135,7 @@ impl Future for CloudwatchFuture {
                 State::CreateStream(fut) => {
                     try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
 
-                    info!("stream created.");
+                    info!(message = "stream created.", name = %self.client.stream_name);
 
                     self.state = State::DescribeStream(self.client.describe_stream());
                 }
