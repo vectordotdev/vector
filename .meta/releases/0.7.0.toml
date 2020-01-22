@@ -4,7 +4,7 @@ description = """You can't make an omelet without cracking some eggs. We have \
 our eyes set on version 1 and a backlog of breaking changes we wanted to merge \
 before we reach it. Version 0.7.0 is our attempt to cluster as many breaking \
 changes as we can into a single release."""
-date = 2020-01-20
+date = 2020-01-22
 commits = [
 {sha = "fba1b3e0676f6abc1b1ed5178a4972cd62b7fb01", message = "docs: Fix handling of locally-installed bundles (#1354)", author = "Bruce Guenter", date = 2019-12-12T11:24:50Z, files_count = 1, insertions_count = 2, deletions_count = 2},
 {sha = "e46e4601c28862e211f518a592152146be9f35ad", message = "chore: Rename Alex to Alexander", author = "Ben Johnson", date = 2019-12-12T12:28:17Z, files_count = 2, insertions_count = 2, deletions_count = 2},
