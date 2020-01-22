@@ -55,7 +55,7 @@ import Tabs from '@theme/Tabs';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Latest (0.7.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -65,7 +65,7 @@ import Tabs from '@theme/Tabs';
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.7.X | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -220,7 +220,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Latest (0.7.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -228,7 +228,7 @@ Building steps:
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.6.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.7.X | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -311,7 +311,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Latest (0.7.0)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -319,7 +319,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     ```
     git clone https://github.com/timberio/vector
-    git checkout v0.6.0
+    git checkout v0.7.0
     cd vector
     ```
 

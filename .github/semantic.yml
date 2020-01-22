@@ -49,6 +49,7 @@ scopes:
   - file source
   - journald source
   - kafka source
+  - logplex source
   - prometheus source
   - socket source
   - splunk_hec source

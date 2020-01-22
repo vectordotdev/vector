@@ -3,14 +3,11 @@
 //!
 //! In stdlib imported code, warnings are allowed.
 
+use std::fs::File;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
-use std::{
-    ptr,
-    mem::zeroed,
-};
-use std::fs::File;
+use std::{mem::zeroed, ptr};
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]
