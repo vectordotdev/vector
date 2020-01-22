@@ -60,7 +60,7 @@ impl File {
         let log = event.into_log();
 
         match self.encoding {
-            Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+            Encoding::Ndjson => serde_json::to_vec(&log)
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
             Encoding::Text => log
@@ -228,20 +228,25 @@ mod tests {
         let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
 
         for (input, output) in input.into_iter().zip(output) {
-            let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
-                serde_json::from_str(&output[..]).unwrap();
+            // let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
+            //     serde_json::from_str(&output[..]).unwrap();
+            let output: Result<HashMap<String, HashMap<String, HashMap<String, String>>>, _> =
+                serde_json::from_str(&output[..]);
 
-            let deeper = input.into_log().unflatten().match_against(output).unwrap();
-            for (input, output) in deeper {
-                let deeper = input.match_against_map(output).unwrap();
-                for (input, output) in deeper {
-                    let deeper = input.match_against_map(output).unwrap();
-                    for (input, output) in deeper {
-                        assert!(input.equals(output))
-                    }
-                }
-            }
+            println!("input: {:?}, output: {:?}", input, output);
+
+            // let deeper = input.into_log().match_against(output).unwrap();
+            // for (input, output) in deeper {
+            //     let deeper = input.match_against_map(output).unwrap();
+            //     for (input, output) in deeper {
+            //         let deeper = input.match_against_map(output).unwrap();
+            //         for (input, output) in deeper {
+            //             assert!(input.equals(output))
+            //         }
+            //     }
+            // }
         }
+        panic!("end of test");
     }
 
     #[test]

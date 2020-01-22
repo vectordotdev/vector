@@ -329,7 +329,7 @@ fn encode_event(
     let mut body = serde_json::to_vec(&action).unwrap();
     body.push(b'\n');
 
-    serde_json::to_writer(&mut body, &event.into_log().unflatten()).unwrap();
+    serde_json::to_writer(&mut body, &event.into_log()).unwrap();
     body.push(b'\n');
     Some(body)
 }

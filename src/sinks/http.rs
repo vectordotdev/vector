@@ -254,7 +254,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
         }
 
         Encoding::Ndjson => {
-            let mut b = serde_json::to_vec(&event.unflatten())
+            let mut b = serde_json::to_vec(&event)
                 .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                 .ok()?;
             b.push(b'\n');
@@ -262,7 +262,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
         }
 
         Encoding::Json => {
-            let mut b = serde_json::to_vec(&event.unflatten())
+            let mut b = serde_json::to_vec(&event)
                 .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                 .ok()?;
             b.push(b',');

@@ -238,7 +238,7 @@ fn encode_event(
         .unwrap_or_default();
 
     let body = match encoding {
-        Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
+        Encoding::Json => serde_json::to_vec(&event.as_log().clone()).unwrap(),
         Encoding::Text => event
             .as_log()
             .get(&event::MESSAGE)

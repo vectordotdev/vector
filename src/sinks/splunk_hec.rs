@@ -189,8 +189,8 @@ fn event_to_json(event: LogEvent, indexed_fields: &Vec<Atom>, timestamp: i64) ->
     }
 
     json!({
-        "fields": fields.unflatten(),
-        "event": event.unflatten(),
+        "fields": fields,
+        "event": event,
         "time": timestamp
     })
 }

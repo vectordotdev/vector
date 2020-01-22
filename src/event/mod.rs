@@ -10,7 +10,6 @@ use string_cache::DefaultAtom as Atom;
 
 pub mod flatten;
 pub mod metric;
-mod unflatten;
 
 pub use metric::Metric;
 
@@ -119,10 +118,6 @@ impl LogEvent {
             inner: self.fields.iter(),
         }
     }
-
-    pub fn unflatten(self) -> unflatten::Unflatten {
-        unflatten::Unflatten::from(self.fields)
-    }
 }
 
 impl std::ops::Index<&Atom> for LogEvent {
@@ -142,6 +137,15 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
                 .map(|(key, value)| (key.into(), value.into()))
                 .collect(),
         }
+    }
+}
+
+impl Serialize for LogEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_map(self.fields.clone())
     }
 }
 

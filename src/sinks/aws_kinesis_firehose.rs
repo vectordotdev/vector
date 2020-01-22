@@ -206,9 +206,7 @@ fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisFir
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
     let log = event.into_log();
     let data = match encoding {
-        Encoding::Json => {
-            serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
-        }
+        Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
             .get(&event::MESSAGE)
