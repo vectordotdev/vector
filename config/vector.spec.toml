@@ -4128,7 +4128,7 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The address to bind to.
+  # The address to bind to, this must include some <host>:<port> pair.
   #
   # * required
   # * type: string
@@ -4574,7 +4574,7 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The downstream Vector address.
+  # The downstream Vector address, this must include <host>:<port>.
   #
   # * required
   # * type: string

@@ -14,4 +14,4 @@ type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
 required = true
-description = "The downstream Vector address."
+description = "The downstream Vector address, this must include <host>:<port>."
