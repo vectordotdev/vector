@@ -731,6 +731,7 @@ jobs:
           name: Release Github
           command: |
             export PASS_VERSION=$(make version)
+            export PASS_CIRCLE_SHA1="$CIRCLE_SHA1"
             ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
