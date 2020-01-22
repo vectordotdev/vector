@@ -109,7 +109,7 @@ mod test {
 
         let cx = SinkContext::new_test(rt.executor());
         let (sink, _) = VectorSinkConfig {
-            address: format!("{}", addr),
+            address: format!("localhost:{}", addr.port()),
         }
         .build(cx)
         .unwrap();
