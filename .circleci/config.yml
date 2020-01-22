@@ -129,8 +129,12 @@ jobs:
           name: Build and test
           shell: bash
           no_output_timeout: 30m
+          environment:
+            RUSTFLAGS: -Ctarget-feature=+crt-static
+            RUST_BACKTRACE: full
+            AWS_ACCESS_KEY_ID: fake-aws-key
+            AWS_SECRET_ACCESS_KEY: fake-aws-key
           command: |
-            RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             rm rust-toolchain
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1
