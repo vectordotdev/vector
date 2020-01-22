@@ -131,8 +131,8 @@ Or use your own [preferred method][docs.installation].
 
 * [Prometheus Source](https://vector.dev/blog/prometheus-source)
 * [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
-* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
 * [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
+* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
 * [Unit Testing Your Vector Config Files](https://vector.dev/blog/unit-testing-vector-config-files)
 
 [view all...][urls.vector_blog]

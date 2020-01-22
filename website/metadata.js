@@ -3524,25 +3524,12 @@ module.exports = {
       }
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
-    "date": "2020-01-20",
+    "date": "2020-01-22",
     "deletions_count": 11774,
     "description": "You can't make an omelet without cracking some eggs. We have our eyes set on version 1 and a backlog of breaking changes we wanted to merge before we reach it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can into a single release.",
     "insertions_count": 24373,
     "last_version": "0.6.0",
     "posts": [
-      {
-        "author_id": "ashley",
-        "date": "2019-12-13",
-        "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
-        "id": "kubernetes-source-alpha",
-        "path": "website/blog/2019-12-13-kubernetes-source-alpha.md",
-        "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
-        "tags": [
-          "type: announcement",
-          "domain: sources"
-        ],
-        "title": "Alpha Kubernetes Source"
-      },
       {
         "author_id": "ashley",
         "date": "2019-12-13",
@@ -3555,6 +3542,19 @@ module.exports = {
           "domain: networking"
         ],
         "title": "Use Custom DNS Servers"
+      },
+      {
+        "author_id": "ashley",
+        "date": "2019-12-14",
+        "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+        "id": "kubernetes-source-alpha",
+        "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
+        "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+        "tags": [
+          "type: announcement",
+          "domain: sources"
+        ],
+        "title": "Alpha Kubernetes Source"
       },
       {
         "author_id": "ashley",
@@ -3645,8 +3645,8 @@ module.exports = {
     "platform: arm",
     "platform: windows",
     "domain: config",
-    "domain: sources",
     "domain: networking",
+    "domain: sources",
     "domain: transforms",
     "domain: metrics"
   ],
@@ -3707,19 +3707,6 @@ module.exports = {
     {
       "author_id": "ashley",
       "date": "2019-12-13",
-      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
-      "id": "kubernetes-source-alpha",
-      "path": "website/blog/2019-12-13-kubernetes-source-alpha.md",
-      "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
-      "tags": [
-        "type: announcement",
-        "domain: sources"
-      ],
-      "title": "Alpha Kubernetes Source"
-    },
-    {
-      "author_id": "ashley",
-      "date": "2019-12-13",
       "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
       "id": "custom-dns",
       "path": "website/blog/2019-12-13-custom-dns.md",
@@ -3729,6 +3716,19 @@ module.exports = {
         "domain: networking"
       ],
       "title": "Use Custom DNS Servers"
+    },
+    {
+      "author_id": "ashley",
+      "date": "2019-12-14",
+      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+      "id": "kubernetes-source-alpha",
+      "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
+      "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+      "tags": [
+        "type: announcement",
+        "domain: sources"
+      ],
+      "title": "Alpha Kubernetes Source"
     },
     {
       "author_id": "ashley",
@@ -19498,25 +19498,12 @@ module.exports = {
         }
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.6.0...v0.7.0",
-      "date": "2020-01-20",
+      "date": "2020-01-22",
       "deletions_count": 11774,
       "description": "You can't make an omelet without cracking some eggs. We have our eyes set on version 1 and a backlog of breaking changes we wanted to merge before we reach it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can into a single release.",
       "insertions_count": 24373,
       "last_version": "0.6.0",
       "posts": [
-        {
-          "author_id": "ashley",
-          "date": "2019-12-13",
-          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
-          "id": "kubernetes-source-alpha",
-          "path": "website/blog/2019-12-13-kubernetes-source-alpha.md",
-          "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
-          "tags": [
-            "type: announcement",
-            "domain: sources"
-          ],
-          "title": "Alpha Kubernetes Source"
-        },
         {
           "author_id": "ashley",
           "date": "2019-12-13",
@@ -19529,6 +19516,19 @@ module.exports = {
             "domain: networking"
           ],
           "title": "Use Custom DNS Servers"
+        },
+        {
+          "author_id": "ashley",
+          "date": "2019-12-14",
+          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+          "id": "kubernetes-source-alpha",
+          "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
+          "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
+          "tags": [
+            "type: announcement",
+            "domain: sources"
+          ],
+          "title": "Alpha Kubernetes Source"
         },
         {
           "author_id": "ashley",
