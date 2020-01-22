@@ -144,7 +144,7 @@ class BatchingSink < Sink
       "timeout_secs" =>
         {
           "default" => @request_timeout_secs,
-          "description" => "The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.",
+          "description" => "The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream.",
           "null" => false,
           "type" => "int",
           "unit" => "seconds"
