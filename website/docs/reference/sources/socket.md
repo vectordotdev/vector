@@ -107,7 +107,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
+The address to listen for connections on, or &quot;systemd#N&quot; to use the Nth socket passed by systemd socket activation.
 
 
 </Field>

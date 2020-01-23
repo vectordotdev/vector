@@ -427,7 +427,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream.
 
 
 </Field>

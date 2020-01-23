@@ -106,7 +106,7 @@ Override the default EC2 Metadata host.
 
 ### namespace
 
-Prepend a namespace to each field's key.
+Prepend a namespace to each field&#39;s key.
 
 
 </Field>
