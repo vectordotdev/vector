@@ -235,8 +235,9 @@ module.exports = {
     "permalink": "https://vector.dev/blog/prometheus-source",
     "tags": [
       "type: announcement",
-      "domain: metrics",
-      "domain: sources"
+      "event type: metrics",
+      "domain: sources",
+      "source: prometheus"
     ],
     "title": "Prometheus Source"
   },
@@ -3552,7 +3553,8 @@ module.exports = {
         "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
         "tags": [
           "type: announcement",
-          "domain: sources"
+          "domain: platforms",
+          "platform: kubernetes"
         ],
         "title": "Alpha Kubernetes Source"
       },
@@ -3565,7 +3567,8 @@ module.exports = {
         "permalink": "https://vector.dev/blog/ec2-metadata",
         "tags": [
           "type: announcement",
-          "domain: transforms"
+          "domain: transforms",
+          "transform: ec2_metadata"
         ],
         "title": "EC2 Metadata Enrichments"
       },
@@ -3578,8 +3581,9 @@ module.exports = {
         "permalink": "https://vector.dev/blog/prometheus-source",
         "tags": [
           "type: announcement",
-          "domain: metrics",
-          "domain: sources"
+          "event type: metrics",
+          "domain: sources",
+          "source: prometheus"
         ],
         "title": "Prometheus Source"
       }
@@ -3646,9 +3650,12 @@ module.exports = {
     "platform: windows",
     "domain: config",
     "domain: networking",
-    "domain: sources",
+    "platform: kubernetes",
     "domain: transforms",
-    "domain: metrics"
+    "transform: ec2_metadata",
+    "event type: metrics",
+    "domain: sources",
+    "source: prometheus"
   ],
   "posts": [
     {
@@ -3726,7 +3733,8 @@ module.exports = {
       "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
       "tags": [
         "type: announcement",
-        "domain: sources"
+        "domain: platforms",
+        "platform: kubernetes"
       ],
       "title": "Alpha Kubernetes Source"
     },
@@ -3739,7 +3747,8 @@ module.exports = {
       "permalink": "https://vector.dev/blog/ec2-metadata",
       "tags": [
         "type: announcement",
-        "domain: transforms"
+        "domain: transforms",
+        "transform: ec2_metadata"
       ],
       "title": "EC2 Metadata Enrichments"
     },
@@ -3752,8 +3761,9 @@ module.exports = {
       "permalink": "https://vector.dev/blog/prometheus-source",
       "tags": [
         "type: announcement",
-        "domain: metrics",
-        "domain: sources"
+        "event type: metrics",
+        "domain: sources",
+        "source: prometheus"
       ],
       "title": "Prometheus Source"
     }
@@ -19526,7 +19536,8 @@ module.exports = {
           "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
           "tags": [
             "type: announcement",
-            "domain: sources"
+            "domain: platforms",
+            "platform: kubernetes"
           ],
           "title": "Alpha Kubernetes Source"
         },
@@ -19539,7 +19550,8 @@ module.exports = {
           "permalink": "https://vector.dev/blog/ec2-metadata",
           "tags": [
             "type: announcement",
-            "domain: transforms"
+            "domain: transforms",
+            "transform: ec2_metadata"
           ],
           "title": "EC2 Metadata Enrichments"
         },
@@ -19552,8 +19564,9 @@ module.exports = {
           "permalink": "https://vector.dev/blog/prometheus-source",
           "tags": [
             "type: announcement",
-            "domain: metrics",
-            "domain: sources"
+            "event type: metrics",
+            "domain: sources",
+            "source: prometheus"
           ],
           "title": "Prometheus Source"
         }
