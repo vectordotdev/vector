@@ -11,6 +11,7 @@ use string_cache::DefaultAtom as Atom;
 pub mod discriminant;
 pub mod flatten;
 pub mod merge;
+pub mod merge_state;
 pub mod metric;
 mod unflatten;
 

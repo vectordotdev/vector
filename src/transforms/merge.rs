@@ -2,7 +2,7 @@ use super::Transform;
 use crate::runtime::TaskExecutor;
 use crate::{
     event::discriminant::Discriminant,
-    event::merge::merge_log_event,
+    event::merge_state::LogEventMergeState,
     event::{self, Event},
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
@@ -69,7 +69,7 @@ pub struct Merge {
     partial_event_marker: Atom,
     merge_fields: Vec<Atom>,
     stream_discriminant_fields: Vec<Atom>,
-    partial_event_merge_states: HashMap<Discriminant, PartialEventMergeState>,
+    log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
 impl From<MergeConfig> for Merge {
@@ -78,16 +78,17 @@ impl From<MergeConfig> for Merge {
             partial_event_marker: config.partial_event_marker,
             merge_fields: config.merge_fields,
             stream_discriminant_fields: config.stream_discriminant_fields,
-            partial_event_merge_states: HashMap::new(),
+            log_event_merge_states: HashMap::new(),
         }
     }
 }
 
 impl Transform for Merge {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
+        let mut event = event.into_log();
+
         // Prepare an event's discriminant.
-        let discriminant =
-            Discriminant::from_log_event(event.as_log(), &self.stream_discriminant_fields);
+        let discriminant = Discriminant::from_log_event(&event, &self.stream_discriminant_fields);
 
         // TODO: `lua` transform doesn't support assigning non-string values.
         // Normally we'd check for the field value to be `true`, and only then
@@ -99,22 +100,18 @@ impl Transform for Merge {
 
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
-        if event
-            .as_mut_log()
-            .remove(&self.partial_event_marker)
-            .is_some()
-        {
+        if event.remove(&self.partial_event_marker).is_some() {
             // We got a perial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.
-            match self.partial_event_merge_states.entry(discriminant) {
+            match self.log_event_merge_states.entry(discriminant) {
                 hash_map::Entry::Vacant(entry) => {
-                    entry.insert(PartialEventMergeState::new(event));
+                    entry.insert(LogEventMergeState::new(event));
                 }
                 hash_map::Entry::Occupied(mut entry) => {
                     entry
                         .get_mut()
-                        .merge_in_next_partial_event(event, &self.merge_fields);
+                        .merge_in_next_event(event, &self.merge_fields);
                 }
             }
 
@@ -127,55 +124,17 @@ impl Transform for Merge {
         // so we just return the event as is. Otherwise we proceed to merge in
         // the final non-partial event to the partial event merge state - and
         // then return the merged event.
-        let partial_event_merge_state = match self.partial_event_merge_states.remove(&discriminant)
-        {
-            Some(partial_event_merge_state) => partial_event_merge_state,
-            None => return Some(event),
+        let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
+            Some(log_event_merge_state) => log_event_merge_state,
+            None => return Some(Event::Log(event)),
         };
 
         // Merge in the final non-partial event and consume the merge state in
         // exchange for the merged event.
-        let merged_event =
-            partial_event_merge_state.merge_in_non_partial_event(event, &self.merge_fields);
+        let merged_event = log_event_merge_state.merge_in_final_event(event, &self.merge_fields);
 
         // Return the merged event.
-        Some(merged_event)
-    }
-}
-
-/// Encapsulates the inductive events merging algorithm.
-///
-/// In the future, this might be extended by various counters (the number of
-/// events that contributed to the current merge event for instance, or the
-/// event size) to support curcut breaker logic.
-#[derive(Debug)]
-struct PartialEventMergeState {
-    /// Intermediate event we merge into.
-    intermediate_merged_event: Event,
-}
-
-impl PartialEventMergeState {
-    /// Initialize the algorithm with a first partial event.
-    pub fn new(first_partial_event: Event) -> Self {
-        Self {
-            intermediate_merged_event: first_partial_event,
-        }
-    }
-
-    /// Merge the incoming partial event in.
-    pub fn merge_in_next_partial_event(&mut self, incoming: Event, merge_fields: &[Atom]) {
-        merge_log_event(
-            &mut self.intermediate_merged_event.as_mut_log(),
-            incoming.into_log(),
-            merge_fields,
-        );
-    }
-
-    /// Merge the final, non-partial event in and return the resulting (merged)
-    /// event.
-    pub fn merge_in_non_partial_event(mut self, incoming: Event, merge_fields: &[Atom]) -> Event {
-        self.merge_in_next_partial_event(incoming, merge_fields);
-        self.intermediate_merged_event
+        Some(Event::Log(merged_event))
     }
 }
 
