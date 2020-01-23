@@ -2,7 +2,7 @@
 id: kubernetes-source-alpha
 title: "Alpha Kubernetes Source"
 description: "Early adopters have something to chew on"
-author_id: "ashley"
+author_github: https://github.com/Jeffail
 tags: ["type: announcement", "domain: sources"]
 ---
 

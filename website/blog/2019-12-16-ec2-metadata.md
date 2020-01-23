@@ -2,7 +2,7 @@
 id: ec2-metadata
 title: "EC2 Metadata Enrichments"
 description: "Enrich your events with EC2 metadata"
-author_id: "ashley"
+author_github: https://github.com/Jeffail
 tags: ["type: announcement", "domain: transforms"]
 ---
 

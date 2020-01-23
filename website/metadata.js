@@ -228,11 +228,11 @@ module.exports = {
   },
   "latest_post": {
     "author_github": "https://github.com/Jeffail",
-    "date": "2019-11-25",
-    "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-    "id": "unit-testing-vector-config-files",
-    "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-    "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+    "date": "2020-01-07",
+    "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+    "id": "prometheus-source",
+    "path": "website/blog/2020-01-07-prometheus-source.md",
+    "permalink": "https://vector.dev/blog/prometheus-source",
     "tags": [
       "type: announcement",
       "domain: metrics",
@@ -3531,7 +3531,7 @@ module.exports = {
     "last_version": "0.6.0",
     "posts": [
       {
-        "author_id": "ashley",
+        "author_github": "https://github.com/Jeffail",
         "date": "2019-12-13",
         "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
         "id": "custom-dns",
@@ -3544,7 +3544,7 @@ module.exports = {
         "title": "Use Custom DNS Servers"
       },
       {
-        "author_id": "ashley",
+        "author_github": "https://github.com/Jeffail",
         "date": "2019-12-14",
         "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
         "id": "kubernetes-source-alpha",
@@ -3557,7 +3557,7 @@ module.exports = {
         "title": "Alpha Kubernetes Source"
       },
       {
-        "author_id": "ashley",
+        "author_github": "https://github.com/Jeffail",
         "date": "2019-12-16",
         "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
         "id": "ec2-metadata",
@@ -3570,7 +3570,7 @@ module.exports = {
         "title": "EC2 Metadata Enrichments"
       },
       {
-        "author_id": "ashley",
+        "author_github": "https://github.com/Jeffail",
         "date": "2020-01-07",
         "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
         "id": "prometheus-source",
@@ -3652,7 +3652,7 @@ module.exports = {
   ],
   "posts": [
     {
-      "author_id": "luke",
+      "author_github": "https://github.com/lukesteensen",
       "date": "2019-06-28",
       "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
       "id": "introducing-vector",
@@ -3664,7 +3664,7 @@ module.exports = {
       "title": "Introducing Vector"
     },
     {
-      "author_id": "ben",
+      "author_github": "https://github.com/binarylogic",
       "date": "2019-11-19",
       "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
       "id": "arm-support-on-linux",
@@ -3678,7 +3678,7 @@ module.exports = {
       "title": "ARMv7 & ARM64 Support on Linux"
     },
     {
-      "author_id": "ben",
+      "author_github": "https://github.com/binarylogic",
       "date": "2019-11-21",
       "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
       "id": "windows-support",
@@ -3692,7 +3692,7 @@ module.exports = {
       "title": "Windows Support Is Here!"
     },
     {
-      "author_id": "ashley",
+      "author_github": "https://github.com/Jeffail",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -3705,7 +3705,7 @@ module.exports = {
       "title": "Unit Testing Your Vector Config Files"
     },
     {
-      "author_id": "ashley",
+      "author_github": "https://github.com/Jeffail",
       "date": "2019-12-13",
       "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
       "id": "custom-dns",
@@ -3718,7 +3718,7 @@ module.exports = {
       "title": "Use Custom DNS Servers"
     },
     {
-      "author_id": "ashley",
+      "author_github": "https://github.com/Jeffail",
       "date": "2019-12-14",
       "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
       "id": "kubernetes-source-alpha",
@@ -3731,7 +3731,7 @@ module.exports = {
       "title": "Alpha Kubernetes Source"
     },
     {
-      "author_id": "ashley",
+      "author_github": "https://github.com/Jeffail",
       "date": "2019-12-16",
       "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
       "id": "ec2-metadata",
@@ -3744,7 +3744,7 @@ module.exports = {
       "title": "EC2 Metadata Enrichments"
     },
     {
-      "author_id": "ashley",
+      "author_github": "https://github.com/Jeffail",
       "date": "2020-01-07",
       "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
       "id": "prometheus-source",
@@ -6641,145 +6641,6 @@ module.exports = {
           "sha": "4b0735f5b64da0c7d6aba1a15d803d1767048fe4",
           "type": "docs"
         },
-        "sha": "f8ad1b5a0edcf214865e4ba1133b3a0df1465905",
-        "type": "chore"
-      }
-    ],
-    "compare_url": "https://github.com/timberio/vector/compare/v0.5.0...v0.6.0",
-    "date": "2019-12-09",
-    "deletions_count": 9213,
-    "insertions_count": 22141,
-    "last_version": "0.5.0",
-    "posts": [
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2019-11-19",
-        "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
-        "id": "arm-support-on-linux",
-        "path": "website/blog/2019-11-19-arm-support-on-linux.md",
-        "permalink": "https://vector.dev/blog/arm-support-on-linux",
-        "tags": [
-          "type: announcement",
-          "domain: platforms",
-          "platform: arm"
-        ],
-        "title": "ARMv7 & ARM64 Support on Linux"
-      },
-      {
-        "author_github": "https://github.com/binarylogic",
-        "date": "2019-11-21",
-        "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
-        "id": "windows-support",
-        "path": "website/blog/2019-11-21-windows-support.md",
-        "permalink": "https://vector.dev/blog/windows-support",
-        "tags": [
-          "type: announcement",
-          "domain: platforms",
-          "platform: windows"
-        ],
-        "title": "Windows Support Is Here!"
-      },
-      {
-        "author_github": "https://github.com/Jeffail",
-        "date": "2019-11-25",
-        "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-        "id": "unit-testing-vector-config-files",
-        "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-        "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
-        "tags": [
-          "type: announcement",
-          "domain: config"
-        ],
-        "title": "Unit Testing Your Vector Config Files"
-      }
-    ],
-    "type": "initial dev",
-    "type_url": "https://semver.org/#spec-item-4",
-    "upgrade_guides": [
-      {
-        "body": "<p>\nThe `file` and `console` sinks now require an explicit `encoding` option. The previous implicit nature was confusing and this should eliminate any suprises related to the output encoding format. Migration is easy:\n</p>\n\n<pre>\n [sinks.my_console_sink]\n   type = \"console\"\n+  encoding = \"json\" # or \"text\"\n\n\n [sinks.my_file_sink]\n   type = \"file\"\n+  encoding = \"json\" # or \"text\"\n</pre>\n",
-        "commits": [
-
-        ],
-        "id": "encoding-guide",
-        "title": "The `file` and `console` sinks now require `encoding`"
-      },
-      {
-        "body": "<p>\nThe `datadog` sink was incorrectly named since we'll be adding future support for DataDog logs. Migrating is as simple as renaming your sink:\n</p>\n\n<pre>\n [sinks.my_sink]\n-  type = \"datadog\"\n+  type = \"datadog_metrics\"\n</pre>\n",
-        "commits": [
-
-        ],
-        "id": "datadog-guide",
-        "title": "The `datadog` sink has been renamed to `datadog_metrics`"
-      }
-    ],
-    "version": "0.6.0"
-  },
-  "post_tags": [
-    "type: announcement",
-    "domain: platforms",
-    "platform: arm",
-    "platform: windows",
-    "domain: config"
-  ],
-  "posts": [
-    {
-      "author_github": "https://github.com/lukesteensen",
-      "date": "2019-06-28",
-      "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
-      "id": "introducing-vector",
-      "path": "website/blog/2019-06-28-introducing-vector.md",
-      "permalink": "https://vector.dev/blog/introducing-vector",
-      "tags": [
-        "type: announcement"
-      ],
-      "title": "Introducing Vector"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2019-11-19",
-      "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
-      "id": "arm-support-on-linux",
-      "path": "website/blog/2019-11-19-arm-support-on-linux.md",
-      "permalink": "https://vector.dev/blog/arm-support-on-linux",
-      "tags": [
-        "type: announcement",
-        "domain: platforms",
-        "platform: arm"
-      ],
-      "title": "ARMv7 & ARM64 Support on Linux"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2019-11-21",
-      "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
-      "id": "windows-support",
-      "path": "website/blog/2019-11-21-windows-support.md",
-      "permalink": "https://vector.dev/blog/windows-support",
-      "tags": [
-        "type: announcement",
-        "domain: platforms",
-        "platform: windows"
-      ],
-      "title": "Windows Support Is Here!"
-    },
-    {
-      "author_github": "https://github.com/Jeffail",
-      "date": "2019-11-25",
-      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-      "id": "unit-testing-vector-config-files",
-      "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-      "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
-      "tags": [
-        "type: announcement",
-        "domain: config"
-      ],
-      "title": "Unit Testing Your Vector Config Files"
-    }
-  ],
-  "releases": {
-    "0.4.0": {
-      "commits": [
         {
           "author": "Lucio Franco",
           "breaking_change": false,
@@ -16289,7 +16150,7 @@ module.exports = {
       "last_version": "0.5.0",
       "posts": [
         {
-          "author_id": "ben",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
           "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
           "id": "arm-support-on-linux",
@@ -16303,7 +16164,7 @@ module.exports = {
           "title": "ARMv7 & ARM64 Support on Linux"
         },
         {
-          "author_id": "ben",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
           "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
           "id": "windows-support",
@@ -16317,7 +16178,7 @@ module.exports = {
           "title": "Windows Support Is Here!"
         },
         {
-          "author_id": "ashley",
+          "author_github": "https://github.com/Jeffail",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
@@ -19644,12 +19505,12 @@ module.exports = {
       "last_version": "0.6.0",
       "posts": [
         {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2019-11-19",
-          "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
-          "id": "arm-support-on-linux",
-          "path": "website/blog/2019-11-19-arm-support-on-linux.md",
-          "permalink": "https://vector.dev/blog/arm-support-on-linux",
+          "author_github": "https://github.com/Jeffail",
+          "date": "2019-12-13",
+          "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+          "id": "custom-dns",
+          "path": "website/blog/2019-12-13-custom-dns.md",
+          "permalink": "https://vector.dev/blog/custom-dns",
           "tags": [
             "type: announcement",
             "domain: networking"
@@ -19657,12 +19518,12 @@ module.exports = {
           "title": "Use Custom DNS Servers"
         },
         {
-          "author_github": "https://github.com/binarylogic",
-          "date": "2019-11-21",
-          "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
-          "id": "windows-support",
-          "path": "website/blog/2019-11-21-windows-support.md",
-          "permalink": "https://vector.dev/blog/windows-support",
+          "author_github": "https://github.com/Jeffail",
+          "date": "2019-12-14",
+          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+          "id": "kubernetes-source-alpha",
+          "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
+          "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
           "tags": [
             "type: announcement",
             "domain: sources"
@@ -19671,11 +19532,11 @@ module.exports = {
         },
         {
           "author_github": "https://github.com/Jeffail",
-          "date": "2019-11-25",
-          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-          "id": "unit-testing-vector-config-files",
-          "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
-          "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+          "date": "2019-12-16",
+          "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+          "id": "ec2-metadata",
+          "path": "website/blog/2019-12-16-ec2-metadata.md",
+          "permalink": "https://vector.dev/blog/ec2-metadata",
           "tags": [
             "type: announcement",
             "domain: transforms"
@@ -19683,7 +19544,7 @@ module.exports = {
           "title": "EC2 Metadata Enrichments"
         },
         {
-          "author_id": "ashley",
+          "author_github": "https://github.com/Jeffail",
           "date": "2020-01-07",
           "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
           "id": "prometheus-source",
