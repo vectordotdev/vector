@@ -5,11 +5,11 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Avatar({className, id, inline, nameSuffix, rel, size, subTitle, vertical}) {
+function Avatar({className, github, inline, nameSuffix, rel, size, subTitle, vertical}) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {team}} = siteConfig.customFields;
-  const member = team.find(member => member.id == id) || team.find(member => member.id == 'ben');
+  const member = team.find(member => member.github == github) || team.find(member => member.id == 'ben');
 
   if (inline) {
     return (

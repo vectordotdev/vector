@@ -2,7 +2,7 @@
 id: prometheus-source
 title: "Prometheus Source"
 description: "Scrape prometheus metrics with Vector"
-author_id: "ashley"
+author_github: https://github.com/Jeffail
 tags: ["type: announcement", "domain: metrics", "domain: sources"]
 ---
 

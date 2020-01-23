@@ -93,6 +93,15 @@ jobs:
           command: |
             ./scripts/docker-run.sh checker make check-version
 
+  check-blog:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - run:
+          name: Check blog
+          command: |
+            ./scripts/docker-run.sh checker make check-blog
+
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
     steps:
@@ -794,6 +803,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-code
     - check-fmt
     - check-generate
+    - check-blog
     - test-stable
     - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -831,6 +841,7 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-blog
       - check-version:
           <<: *master-filters
       - test-stable
@@ -913,6 +924,8 @@ workflows:
       - check-fmt:
           <<: *release-filters
       - check-generate:
+          <<: *release-filters
+      - check-blog:
           <<: *release-filters
       - test-stable:
           <<: *release-filters
@@ -1027,6 +1040,7 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-blog
       - test-stable
       - test-stable-kubernetes
 

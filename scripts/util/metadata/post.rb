@@ -3,7 +3,7 @@ require 'front_matter_parser'
 class Post
   include Comparable
 
-  attr_reader :author_id,
+  attr_reader :author_github,
     :date,
     :description,
     :id,
@@ -21,7 +21,7 @@ class Post
     parsed = FrontMatterParser::Parser.parse_file(path)
     front_matter = parsed.front_matter
 
-    @author_id = front_matter.fetch("author_id")
+    @author_github = front_matter.fetch("author_github")
     @description = parsed.content.split("\n\n").first.remove_markdown_links
     @id = front_matter.fetch("id")
     @permalink = "#{BLOG_HOST}/#{id}"
@@ -59,7 +59,7 @@ class Post
 
   def to_h
     {
-      author_id: author_id,
+      author_github: author_github,
       date: date,
       description: description,
       id: id,
