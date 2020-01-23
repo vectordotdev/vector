@@ -65,7 +65,7 @@ else
     git add . -A
     git commit -sam 'chore: Prepare v#{release.version} release'
     git tag -a v#{release.version} -m "v#{release.version}"
-    git branch v#{branch_name}
+    git branch v#{branch_name} 2>/dev/null || true
     EOF
 
   commands.chomp!
