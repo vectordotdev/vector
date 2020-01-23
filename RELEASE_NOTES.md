@@ -8,6 +8,7 @@
 
 ---
 
+* [**v0.7.1**][urls.release_notes_0.7.1] - 2020-01-23 - 10 bug fixes
 * [**v0.7.0**][urls.release_notes_0.7.0] - 2020-01-22 - 13 new features, 10 enhancements, 12 bug fixes
 * [**v0.6.0**][urls.release_notes_0.6.0] - 2019-12-09 - 14 new features, 27 enhancements, 29 bug fixes
 * [**v0.5.0**][urls.release_notes_0.5.0] - 2019-10-09 - 7 new features, 2 enhancements, 1 bug fix
@@ -18,3 +19,4 @@
 [urls.release_notes_0.5.0]: https://vector.dev/releases/0.5.0
 [urls.release_notes_0.6.0]: https://vector.dev/releases/0.6.0
 [urls.release_notes_0.7.0]: https://vector.dev/releases/0.7.0
+[urls.release_notes_0.7.1]: https://vector.dev/releases/0.7.1
