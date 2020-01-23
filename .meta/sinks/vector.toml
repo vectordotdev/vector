@@ -13,5 +13,5 @@ write_to_description = "another downstream [`vector` source][docs.sources.vector
 type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
-null = false
-description = "The downstream Vector address."
+required = true
+description = "The downstream Vector address, this must include <host>:<port>."

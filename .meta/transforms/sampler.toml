@@ -11,7 +11,6 @@ output_types = ["log"]
 type = "[string]"
 common = true
 examples = [["[error]", "field2"]]
-null = true
 description = """\
 A list of regular expression patterns to exclude events from sampling. \
 If an event's `"message"` key matches _any_ of these patterns it will \
@@ -22,7 +21,7 @@ _not_ be sampled.\
 type = "int"
 common = true
 examples = [10]
-null = false
+required = true
 description = """\
 The rate at which events will be forwarded, expressed as 1/N. For example, \
 `rate = 10` means 1 out of every 10 events will be forwarded and the rest \

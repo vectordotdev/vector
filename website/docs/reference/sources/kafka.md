@@ -45,7 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "kafka" # example, must be: "kafka"
+  type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
@@ -62,15 +62,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "kafka" # example, must be: "kafka"
+  type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
 
   # OPTIONAL
-  auto_offset_reset = "smallest" # default
+  auto_offset_reset = "largest" # default
   key_field = "user_id" # example, no default
-  session_timeout_ms = 5000 # default, milliseconds
+  session_timeout_ms = 10000 # default, milliseconds
 ```
 
 </TabItem>
@@ -92,7 +92,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["smallest","earliest","beginning","largest","latest","end","error"]}
   name={"auto_offset_reset"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -115,7 +114,6 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
   enumValues={null}
   examples={["10.14.22.123:9092,10.14.23.332:9092"]}
   name={"bootstrap_servers"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -138,7 +136,6 @@ A comma-separated list of host and port pairs that are the addresses of the Kafk
   enumValues={null}
   examples={["consumer-group-name"]}
   name={"group_id"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -162,7 +159,6 @@ The consumer group name to be used to consume events from Kafka.
   enumValues={null}
   examples={["user_id"]}
   name={"key_field"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -185,7 +181,6 @@ The log field name to use for the topic key. If unspecified, the key would not b
   enumValues={null}
   examples={[5000,10000]}
   name={"session_timeout_ms"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -209,7 +204,6 @@ The Kafka session timeout in milliseconds.
   enumValues={null}
   examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
   name={"topics"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

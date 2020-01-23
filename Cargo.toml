@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
@@ -31,7 +31,6 @@ members = [
   ".",
   "lib/codec",
   "lib/file-source",
-  "lib/journald",
   "lib/tracing-metrics",
   "lib/tracing-limit",
 ]
@@ -40,7 +39,6 @@ members = [
 # Internal libs
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
-journald = { path = "lib/journald" }
 tracing-metrics = { path = "lib/tracing-metrics" }
 tracing-limit = { path = "lib/tracing-limit" }
 
@@ -71,6 +69,7 @@ rusoto_cloudwatch = "0.41.0"
 rusoto_kinesis = "0.41.0"
 rusoto_credential = "0.41.1"
 rusoto_firehose = "0.41.0"
+rusoto_sts = "0.41.0"
 
 # Tower
 tower = "0.1.1"
@@ -96,7 +95,6 @@ rand = "0.5.5"
 regex = "1.0.5"
 bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
-prometheus = "0.4.2"
 hyper = "0.12.35"
 hyper-openssl = "0.7"
 hyper-tls = "0.3.2"
@@ -142,6 +140,7 @@ strip-ansi-escapes = "0.1.0"
 colored = "1.9"
 warp = "0.1.20"
 evmap = { version = "7", features = ["bytes"] }
+logfmt = "0.0.2"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -152,7 +151,7 @@ built = "0.3"
 
 [dev-dependencies]
 approx = "0.3.0"
-criterion = "0.2.5"
+criterion = "0.3"
 reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"

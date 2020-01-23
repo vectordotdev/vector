@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "ansi_stripper" # example, must be: "ansi_stripper"
+  type = "ansi_stripper" # must be: "ansi_stripper"
   inputs = ["my-source-id"] # example
 
   # OPTIONAL
@@ -49,10 +49,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["message"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

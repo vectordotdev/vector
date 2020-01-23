@@ -16,5 +16,5 @@ benchmarking purposes\
 type = "int"
 common = true
 examples = [1000]
-null = false
+required = true
 description = "The number of events that must be received in order to print a summary of activity."

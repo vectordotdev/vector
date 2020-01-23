@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "statsd" # example, must be: "statsd"
+  type = "statsd" # must be: "statsd"
   address = "127.0.0.1:8126" # example
 ```
 
@@ -48,7 +48,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["127.0.0.1:8126"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -78,31 +77,104 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="counter"
-  values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer/Histogram","value":"timerhistogram"}]}>
+  values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer","value":"timer"}]}>
 
 import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 
+Given the following input:
 
+```text
+login.invocations:1|c
+```
+
+A metric event will be output with the following structure:
+
+```json
+{
+  "name": "login.invocations",
+  "kind": "incremental",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "value": {
+    "type": "counter",
+    "value": 1.0
+  }
+}
+```
 
 </TabItem>
 
 <TabItem value="gauge">
 
+Given the following input:
 
+```text
+gas_tank:0.50|g
+```
+
+A metric event will be output with the following structure:
+
+```json
+{
+  "name": "gas_tank",
+  "kind": "absolute",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "value": {
+    "type": "gauge",
+    "value": 0.5
+  }
+}
+```
 
 </TabItem>
 
 <TabItem value="set">
 
+Given the following input:
 
+```text
+unique_users:foo|s
+```
+
+A metric event will be output with the following structure:
+
+```json
+{
+  "name": "unique_users",
+  "kind": "incremental",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "value": {
+    "type": "set",
+    "values": ["foo"]
+  }
+}
+```
 
 </TabItem>
 
-<TabItem value="timerhistogram">
+<TabItem value="timer">
 
+Given the following input:
 
+```text
+login.time:22|ms|@0.1
+```
+
+A metric event will be output with the following structure:
+
+```json
+{
+  "name": "login.time",
+  "kind": "incremental",
+  "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
+  "value": {
+    "type": "distribution",
+    "values": [0.022], // ms become seconds
+    "sample_rates": [10]
+  }
+}
+```
 
 </TabItem>
 </Tabs>

@@ -45,11 +45,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "journald" # example, must be: "journald"
+  type = "journald" # must be: "journald"
 
   # OPTIONAL
   current_boot_only = true # default
-  units = ["ntpd", "sysinit.target"] # default
+  units = [] # default
 ```
 
 </TabItem>
@@ -60,14 +60,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED
-  type = "journald" # example, must be: "journald"
+  type = "journald" # must be: "journald"
 
   # OPTIONAL
   batch_size = 16 # default
   current_boot_only = true # default
   data_dir = "/var/lib/vector" # example, no default
-  local_only = true # default
-  units = ["ntpd", "sysinit.target"] # default
+  journalctl_path = "journalctl" # default
+  units = [] # default
 ```
 
 </TabItem>
@@ -89,7 +89,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[16]}
   name={"batch_size"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -112,7 +111,6 @@ The systemd journal is read in batches, and a checkpoint is set at the end of ea
   enumValues={null}
   examples={[true,false]}
   name={"current_boot_only"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -135,7 +133,6 @@ Include only entries from the current boot.
   enumValues={null}
   examples={["/var/lib/vector"]}
   name={"data_dir"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -154,22 +151,21 @@ The directory used to persist the journal checkpoint position. By default, the g
 
 <Field
   common={false}
-  defaultValue={true}
+  defaultValue={"journalctl"}
   enumValues={null}
-  examples={[true,false]}
-  name={"local_only"}
-  nullable={true}
+  examples={["/usr/local/bin/journalctl"]}
+  name={"journalctl_path"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"bool"}
+  type={"string"}
   unit={null}
   >
 
-### local_only
+### journalctl_path
 
-Include only entries from the local system
+The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search the path for [`journalctl`](#journalctl).
 
 
 </Field>
@@ -181,7 +177,6 @@ Include only entries from the local system
   enumValues={null}
   examples={[["ntpd","sysinit.target"]]}
   name={"units"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}

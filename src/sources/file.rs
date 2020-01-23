@@ -332,13 +332,11 @@ fn create_event(
     let mut event = Event::from(line);
 
     if let Some(file_key) = &file_key {
-        event.as_mut_log().insert_implicit(file_key.clone(), file);
+        event.as_mut_log().insert(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
-        event
-            .as_mut_log()
-            .insert_implicit(host_key, hostname.clone());
+        event.as_mut_log().insert(host_key, hostname.clone());
     }
 
     event
@@ -1001,7 +999,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             start_at_beginning: true,
-            ignore_older: Some(1000),
+            ignore_older: Some(5),
             ..test_default_file_config(&dir)
         };
 
@@ -1019,8 +1017,8 @@ mod tests {
 
         {
             // Set the modified times
-            let before = SystemTime::now() - Duration::from_secs(1010);
-            let after = SystemTime::now() - Duration::from_secs(990);
+            let before = SystemTime::now() - Duration::from_secs(8);
+            let after = SystemTime::now() - Duration::from_secs(2);
 
             let before_time = libc::timeval {
                 tv_sec: before

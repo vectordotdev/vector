@@ -11,7 +11,7 @@ an [agent role][docs.roles.agent], you'll want to user local data sources
 like the [`file`][docs.sources.file] or [`stdin`][docs.sources.stdin] sources.
 If you're deploying Vector in a [service role][docs.roles.service], you'll want
 to use sources that receive data over the network, like the
-[`vector`][docs.sources.vector], [`tcp`][docs.sources.tcp], and
+[`vector`][docs.sources.vector], [`socket`][docs.sources.socket], and
 [`syslog`][docs.sources.syslog] sources.
 
 ---
@@ -25,7 +25,7 @@ import VectorComponents from '@site/src/components/VectorComponents';
 [docs.roles.agent]: /docs/setup/deployment/roles/agent/
 [docs.roles.service]: /docs/setup/deployment/roles/service/
 [docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.socket]: /docs/reference/sources/socket/
 [docs.sources.stdin]: /docs/reference/sources/stdin/
 [docs.sources.syslog]: /docs/reference/sources/syslog/
-[docs.sources.tcp]: /docs/reference/sources/tcp/
 [docs.sources.vector]: /docs/reference/sources/vector/

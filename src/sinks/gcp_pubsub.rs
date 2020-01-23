@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -31,9 +31,9 @@ pub struct PubsubConfig {
     pub api_key: Option<String>,
     pub credentials_path: Option<String>,
 
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn encode_valid1() {
-        let log = LogEvent::from_iter([("message", "hello world")].into_iter().map(|&s| s));
+        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
         let body = make_body(encode_event(log.into()));
         let body = String::from_utf8_lossy(&body);
         assert_eq!(
@@ -274,8 +274,8 @@ mod tests {
 
     #[test]
     fn encode_valid2() {
-        let log1 = LogEvent::from_iter([("message", "hello world")].into_iter().map(|&s| s));
-        let log2 = LogEvent::from_iter([("message", "killroy was here")].into_iter().map(|&s| s));
+        let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
         let mut event = encode_event(log1.into());
         event.extend(encode_event(log2.into()));
         let body = make_body(event);

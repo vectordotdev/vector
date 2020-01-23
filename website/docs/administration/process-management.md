@@ -67,7 +67,6 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={"/etc/vector/vector.toml"}
   name={"-c, --config"}
-  nullable={false}
   required={true}
   type={"string"}>
 
@@ -81,7 +80,6 @@ Path to the Vector [configuration file][docs.configuration].
   common={true}
   defaultValue={"/etc/vector/vector.toml"}
   name={"-c, --config"}
-  nullable={false}
   required={true}
   type={"string"}>
 

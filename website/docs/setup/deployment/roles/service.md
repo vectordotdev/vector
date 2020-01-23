@@ -27,7 +27,7 @@ service on the host and should take full advantage of all resources.
 When Vector is deployed as a service it receives data over the network from
 upstream clients or services. Relevant sources include the
 [`vector`][docs.sources.vector], [`syslog`][docs.sources.syslog], and
-[`tcp`][docs.sources.tcp] sources.
+[`socket`][docs.sources.socket] sources.
 
 ### Performance Tuning
 
@@ -116,7 +116,7 @@ be at least 3 times your cumulative buffer size.
 
 If you've configured Vector to receive data over the network then you'll
 benefit from load balancing. Select sinks offer built-in load balancing,
-such as the [`http`][docs.sinks.http], [`tcp`][docs.sinks.tcp], and
+such as the [`http`][docs.sinks.http], [`socket`][docs.sinks.socket], and
 [`vector`][docs.sinks.vector] sinks. This is a very rudimentary form of load
 balancing that requires all clients to know about the available downstream
 hosts. A more formal load balancing strategy is outside of the scope of this
@@ -142,10 +142,10 @@ decisions, such as [load balancing][docs.roles.service#load-balancing].
 [docs.roles.service#load-balancing]: /docs/setup/deployment/roles/service/#load-balancing
 [docs.roles.service#on-disk-buffering]: /docs/setup/deployment/roles/service/#on-disk-buffering
 [docs.sinks.http]: /docs/reference/sinks/http/
-[docs.sinks.tcp]: /docs/reference/sinks/tcp/
+[docs.sinks.socket]: /docs/reference/sinks/socket/
 [docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.socket]: /docs/reference/sources/socket/
 [docs.sources.syslog]: /docs/reference/sources/syslog/
-[docs.sources.tcp]: /docs/reference/sources/tcp/
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.updating]: /docs/administration/updating/
 [pages.index#performance]: /#performance

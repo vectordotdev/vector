@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "lua" # example, must be: "lua"
+  type = "lua" # must be: "lua"
   inputs = ["my-source-id"] # example
   source = """
 require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
@@ -60,7 +60,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["/etc/vector/lua"]]}
   name={"search_dirs"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -83,7 +82,6 @@ A list of directories search when loading a Lua file via the `require` function.
   enumValues={null}
   examples={["require(\"script\") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
   name={"source"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

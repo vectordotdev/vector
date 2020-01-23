@@ -57,11 +57,14 @@ fn test_sink_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
     config.add_sink("panic", &["in"], PanicSink);
 
@@ -136,11 +139,14 @@ fn test_sink_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
     config.add_sink("error", &["in"], ErrorSink);
 
@@ -200,12 +206,15 @@ fn test_source_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_source("error", ErrorSourceConfig);
     config.add_sink(
         "out",
         &["in", "error"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
     let mut rt = runtime();
@@ -266,12 +275,15 @@ fn test_source_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_source("panic", PanicSourceConfig);
     config.add_sink(
         "out",
         &["in", "panic"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
     let mut rt = runtime();

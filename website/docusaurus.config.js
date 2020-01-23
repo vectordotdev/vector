@@ -21,6 +21,7 @@ module.exports = {
         {to: 'docs/', label: 'Docs', position: 'left'},
         {to: 'blog/', label: 'Blog', position: 'left'},
         {to: 'community/', label: 'Community', position: 'left'},
+        {href: 'https://chat.vector.dev', label: 'Chat', position: 'right'},
         {to: 'releases/', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],

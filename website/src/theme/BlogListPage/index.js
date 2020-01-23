@@ -36,7 +36,7 @@ function BlogListPage(props) {
         <div className="blog-list--filters">
           <a href="/blog/rss.xml" style={{float: 'right', fontSize: '1.5em', marginTop: '0px', marginLeft: '-30px', width: '30px'}}><i className="feather icon-rss"></i></a>
           <h1>The Vector Blog</h1>
-          <p>Thoughts on logs, metrics, and all things observability from the <Link to="/community/#team">Vector & Timber.io team</Link>.</p>
+          <p>Thoughts on monitoring and observability from the <Link to="/community/#team">Vector & Timber.io team</Link>.</p>
 
           <h3>Types</h3>
 

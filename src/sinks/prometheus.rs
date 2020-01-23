@@ -1,38 +1,31 @@
 use crate::{
     buffers::Acker,
-    event::metric::{MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue},
+    sinks::util::MetricEntry,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
-use futures::{future, try_ready, Async, AsyncSink, Future, Sink};
+use chrono::Utc;
+use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::{
     header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
 };
-use prometheus::{Encoder, Registry, TextEncoder};
+use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
-    ops::Add,
-    sync::{
-        mpsc::{channel, Sender},
-        Arc,
-    },
-    time::{Duration, Instant},
+    sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
-use tokio::timer::Delay;
 use tracing::field;
 
-/// Should be greater than 1ms to avoid accidentaly causing infinite loop.
-/// Limits minimal acceptable flush_period for PrometheusSinkConfig.
-/// 3ms to account for timer and time source inprecisions.
-const MIN_FLUSH_PERIOD_MS: u64 = 3; //ms
+const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Flush period for sets must be greater or equal to {}ms", min))]
+    #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
     FlushPeriodTooShort { min: u64 },
 }
 
@@ -44,9 +37,8 @@ pub struct PrometheusSinkConfig {
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
     pub buckets: Vec<f64>,
-    /// Should be greater than 1 ms to avoid accidentaly causing infinite loop
-    #[serde(default = "default_flush_period")]
-    pub flush_period: Duration,
+    #[serde(default = "default_flush_period_secs")]
+    pub flush_period_secs: u64,
 }
 
 pub fn default_histogram_buckets() -> Vec<f64> {
@@ -61,8 +53,8 @@ pub fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-pub fn default_flush_period() -> Duration {
-    Duration::from_secs(60)
+pub fn default_flush_period_secs() -> u64 {
+    60
 }
 
 inventory::submit! {
@@ -72,14 +64,12 @@ inventory::submit! {
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        // Checks
-        if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
+        if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
-                min: MIN_FLUSH_PERIOD_MS,
+                min: MIN_FLUSH_PERIOD_SECS,
             }));
         }
 
-        // Build
         let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(future::ok(()));
 
@@ -96,30 +86,211 @@ impl SinkConfig for PrometheusSinkConfig {
 }
 
 struct PrometheusSink {
-    registry: Arc<Registry>,
     server_shutdown_trigger: Option<Trigger>,
-    flush_channel: Option<Sender<prometheus::IntGauge>>,
     config: PrometheusSinkConfig,
-    counters: HashMap<String, prometheus::CounterVec>,
-    gauges: HashMap<String, prometheus::GaugeVec>,
-    histograms: HashMap<String, prometheus::HistogramVec>,
-    sets: HashMap<String, (prometheus::IntGaugeVec, HashSet<String>)>,
+    metrics: Arc<RwLock<IndexSet<MetricEntry>>>,
+    last_flush_timestamp: Arc<RwLock<i64>>,
     acker: Acker,
+}
+
+fn encode_namespace(namespace: &str, name: &str) -> String {
+    if !namespace.is_empty() {
+        format!("{}_{}", namespace, name)
+    } else {
+        name.to_string()
+    }
+}
+
+fn encode_tags(tags: &Option<HashMap<String, String>>) -> String {
+    if let Some(tags) = tags {
+        let mut parts: Vec<_> = tags
+            .iter()
+            .map(|(name, value)| format!("{}=\"{}\"", name, value))
+            .collect();
+
+        parts.sort();
+        format!("{{{}}}", parts.join(","))
+    } else {
+        String::from("")
+    }
+}
+
+fn encode_tags_with_extra(
+    tags: &Option<HashMap<String, String>>,
+    tag: String,
+    value: String,
+) -> String {
+    let mut parts: Vec<_> = if let Some(tags) = tags {
+        tags.iter()
+            .chain(vec![(&tag, &value)])
+            .map(|(name, value)| format!("{}=\"{}\"", name, value))
+            .collect()
+    } else {
+        vec![format!("{}=\"{}\"", tag, value)]
+    };
+
+    parts.sort();
+    format!("{{{}}}", parts.join(","))
+}
+
+fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
+    let mut s = String::new();
+    let name = &metric.name;
+    let fullname = encode_namespace(namespace, name);
+
+    let r#type = match &metric.value {
+        MetricValue::Counter { .. } => "counter",
+        MetricValue::Gauge { .. } => "gauge",
+        MetricValue::Distribution { .. } => "histogram",
+        MetricValue::Set { .. } => "gauge",
+        MetricValue::AggregatedHistogram { .. } => "histogram",
+        MetricValue::AggregatedSummary { .. } => "summary",
+    };
+
+    s.push_str(&format!("# HELP {} {}\n", fullname, name));
+    s.push_str(&format!("# TYPE {} {}\n", fullname, r#type));
+    s
+}
+
+fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: &Metric) -> String {
+    let mut s = String::new();
+    let fullname = encode_namespace(namespace, &metric.name);
+
+    if metric.kind.is_absolute() {
+        let tags = &metric.tags;
+
+        match &metric.value {
+            MetricValue::Counter { value } => {
+                s.push_str(&format!("{}{} {}\n", fullname, encode_tags(tags), value));
+            }
+            MetricValue::Gauge { value } => {
+                s.push_str(&format!("{}{} {}\n", fullname, encode_tags(tags), value));
+            }
+            MetricValue::Set { values } => {
+                // sets could expire
+                let value = if expired { 0 } else { values.len() };
+                s.push_str(&format!("{}{} {}\n", fullname, encode_tags(tags), value));
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+            } => {
+                // convert ditributions into aggregated histograms
+                let mut counts = Vec::new();
+                for _ in buckets {
+                    counts.push(0);
+                }
+                let mut sum = 0.0;
+                let mut count = 0;
+                for (v, c) in values.into_iter().zip(sample_rates.into_iter()) {
+                    buckets
+                        .iter()
+                        .enumerate()
+                        .skip_while(|&(_, b)| b < v)
+                        .for_each(|(i, _)| {
+                            counts[i] += c;
+                        });
+
+                    sum += v * (*c as f64);
+                    count += c;
+                }
+
+                for (b, c) in buckets.iter().zip(counts.iter()) {
+                    s.push_str(&format!(
+                        "{}_bucket{} {}\n",
+                        fullname,
+                        encode_tags_with_extra(tags, "le".to_string(), b.to_string()),
+                        c
+                    ));
+                }
+                s.push_str(&format!(
+                    "{}_bucket{} {}\n",
+                    fullname,
+                    encode_tags_with_extra(tags, "le".to_string(), "+Inf".to_string()),
+                    count
+                ));
+                let tags = encode_tags(tags);
+                s.push_str(&format!("{}_sum{} {}\n", fullname, tags, sum));
+                s.push_str(&format!("{}_count{} {}\n", fullname, tags, count));
+            }
+            MetricValue::AggregatedHistogram {
+                buckets,
+                counts,
+                count,
+                sum,
+            } => {
+                for (b, c) in buckets.iter().zip(counts.iter()) {
+                    s.push_str(&format!(
+                        "{}_bucket{} {}\n",
+                        fullname,
+                        encode_tags_with_extra(tags, "le".to_string(), b.to_string()),
+                        c
+                    ));
+                }
+                s.push_str(&format!(
+                    "{}_bucket{} {}\n",
+                    fullname,
+                    encode_tags_with_extra(tags, "le".to_string(), "+Inf".to_string()),
+                    count
+                ));
+                let tags = encode_tags(tags);
+                s.push_str(&format!("{}_sum{} {}\n", fullname, tags, sum));
+                s.push_str(&format!("{}_count{} {}\n", fullname, tags, count));
+            }
+            MetricValue::AggregatedSummary {
+                quantiles,
+                values,
+                count,
+                sum,
+            } => {
+                for (q, v) in quantiles.iter().zip(values.iter()) {
+                    s.push_str(&format!(
+                        "{}{} {}\n",
+                        fullname,
+                        encode_tags_with_extra(tags, "quantile".to_string(), q.to_string()),
+                        v
+                    ));
+                }
+                let tags = encode_tags(tags);
+                s.push_str(&format!("{}_sum{} {}\n", fullname, tags, sum));
+                s.push_str(&format!("{}_count{} {}\n", fullname, tags, count));
+            }
+        }
+    }
+
+    s
 }
 
 fn handle(
     req: Request<Body>,
-    registry: &Registry,
+    namespace: &str,
+    buckets: &[f64],
+    expired: bool,
+    metrics: &IndexSet<MetricEntry>,
 ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/metrics") => {
-            let mut buffer = vec![];
-            let encoder = TextEncoder::new();
-            let metric_families = registry.gather();
-            encoder.encode(&metric_families, &mut buffer).unwrap();
-            *response.body_mut() = buffer.into();
+            let mut s = String::new();
+
+            // output headers only once
+            let mut processed_headers = HashSet::new();
+
+            for metric in metrics {
+                let name = &metric.0.name;
+                let frame = encode_metric_datum(&namespace, &buckets, expired, &metric.0);
+
+                if !processed_headers.contains(&name) {
+                    let header = encode_metric_header(&namespace, &metric.0);
+                    s.push_str(&header);
+                    processed_headers.insert(name);
+                };
+
+                s.push_str(&frame);
+            }
+
+            *response.body_mut() = s.into();
 
             response.headers_mut().insert(
                 "Content-Type",
@@ -141,113 +312,11 @@ fn handle(
 impl PrometheusSink {
     fn new(config: PrometheusSinkConfig, acker: Acker) -> Self {
         Self {
-            registry: Arc::new(Registry::new()),
             server_shutdown_trigger: None,
-            flush_channel: None,
             config,
-            counters: HashMap::new(),
-            gauges: HashMap::new(),
-            histograms: HashMap::new(),
-            sets: HashMap::new(),
+            metrics: Arc::new(RwLock::new(IndexSet::new())),
+            last_flush_timestamp: Arc::new(RwLock::new(Utc::now().timestamp())),
             acker,
-        }
-    }
-
-    fn with_counter(
-        &mut self,
-        name: &str,
-        labels: &HashMap<&str, &str>,
-        f: impl Fn(&prometheus::CounterVec),
-    ) {
-        if let Some(counter) = self.counters.get(name) {
-            f(counter);
-        } else {
-            let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name, name).namespace(namespace);
-            let keys: Vec<_> = labels.keys().copied().collect();
-            let counter = prometheus::CounterVec::new(opts, &keys[..]).unwrap();
-            if let Err(e) = self.registry.register(Box::new(counter.clone())) {
-                error!("Error registering Prometheus counter: {}", e);
-            };
-            f(&counter);
-            self.counters.insert(name.to_string(), counter);
-        }
-    }
-
-    fn with_gauge(
-        &mut self,
-        name: &str,
-        labels: &HashMap<&str, &str>,
-        f: impl Fn(&prometheus::GaugeVec),
-    ) {
-        if let Some(gauge) = self.gauges.get(name) {
-            f(gauge);
-        } else {
-            let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name, name).namespace(namespace);
-            let keys: Vec<_> = labels.keys().copied().collect();
-            let gauge = prometheus::GaugeVec::new(opts, &keys[..]).unwrap();
-            if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
-                error!("Error registering Prometheus gauge: {}", e);
-            };
-            f(&gauge);
-            self.gauges.insert(name.to_string(), gauge);
-        }
-    }
-
-    fn with_histogram(
-        &mut self,
-        name: &str,
-        labels: &HashMap<&str, &str>,
-        f: impl Fn(&prometheus::HistogramVec),
-    ) {
-        if let Some(hist) = self.histograms.get(name) {
-            f(hist);
-        } else {
-            let buckets = self.config.buckets.clone();
-            let namespace = &self.config.namespace;
-            let opts = prometheus::HistogramOpts::new(name, name)
-                .buckets(buckets)
-                .namespace(namespace);
-            let keys: Vec<_> = labels.keys().copied().collect();
-            let hist = prometheus::HistogramVec::new(opts, &keys[..]).unwrap();
-            if let Err(e) = self.registry.register(Box::new(hist.clone())) {
-                error!("Error registering Prometheus histogram: {}", e);
-            };
-            f(&hist);
-            self.histograms.insert(name.to_string(), hist);
-        }
-    }
-
-    /// Calls f with entry corresponding to name. Creates entry if needed.
-    fn with_set(
-        &mut self,
-        name: &str,
-        labels: &HashMap<&str, &str>,
-        f: impl FnOnce(&mut (prometheus::IntGaugeVec, HashSet<String>)),
-    ) {
-        if let Some(set) = self.sets.get_mut(name) {
-            f(set);
-        } else {
-            let namespace = &self.config.namespace;
-            let opts = prometheus::Opts::new(name, name).namespace(namespace);
-            let keys: Vec<_> = labels.keys().copied().collect();
-            let counter = prometheus::IntGaugeVec::new(opts, &keys[..]).unwrap();
-            if let Err(e) = self.registry.register(Box::new(counter.clone())) {
-                error!("Error registering Prometheus gauge for set: {}", e);
-            };
-
-            // Send counter to flusher
-            if let Some(ch) = self.flush_channel.as_mut() {
-                let c = counter.with_label_values(&keys[..]);
-                if let Err(e) = ch.send(c) {
-                    error!("Error sending Prometheus gauge to flusher: {}", e);
-                }
-            }
-
-            let mut set = (counter, HashSet::new());
-            f(&mut set);
-            self.sets.insert(name.to_string(), set);
         }
     }
 
@@ -256,17 +325,30 @@ impl PrometheusSink {
             return;
         }
 
-        let registry = Arc::clone(&self.registry);
+        let metrics = Arc::clone(&self.metrics);
+        let namespace = self.config.namespace.clone();
+        let buckets = self.config.buckets.clone();
+        let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
+        let flush_period_secs = self.config.flush_period_secs.clone();
+
         let new_service = move || {
-            let registry = Arc::clone(&registry);
+            let metrics = Arc::clone(&metrics);
+            let namespace = namespace.clone();
+            let buckets = buckets.clone();
+            let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
+            let flush_period_secs = flush_period_secs.clone();
 
             service_fn(move |req| {
+                let metrics = metrics.read().unwrap();
+                let last_flush_timestamp = last_flush_timestamp.read().unwrap();
+                let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
+                let expired = interval > flush_period_secs;
                 info_span!(
                     "prometheus_server",
                     method = field::debug(req.method()),
                     path = field::debug(req.uri().path()),
                 )
-                .in_scope(|| handle(req, &registry))
+                .in_scope(|| handle(req, &namespace, &buckets, expired, &metrics))
             })
         };
 
@@ -279,40 +361,6 @@ impl PrometheusSink {
 
         tokio::spawn(server);
         self.server_shutdown_trigger = Some(trigger);
-
-        self.start_flusher(tripwire);
-    }
-
-    /// Flusher will stop when tripwire is done
-    fn start_flusher(&mut self, mut tripwire: Tripwire) {
-        let (send, recv) = channel();
-        self.flush_channel = Some(send);
-
-        let period = self.config.flush_period;
-        let mut timer = Delay::new(Instant::now().add(period));
-
-        let mut counters = Vec::new();
-        let flusher = future::poll_fn(move || {
-            // Check for shutdown
-            while tripwire.poll() == Ok(Async::NotReady) {
-                // Check messages
-                counters.extend(recv.try_iter());
-
-                // Check timer
-                try_ready!(timer.poll().map_err(|_| ()));
-
-                // Reset values
-                for counter in counters.iter() {
-                    counter.set(0);
-                }
-
-                // Reset timer
-                timer.reset(Instant::now().add(period));
-            }
-            Ok(Async::Ready(()))
-        });
-
-        tokio::spawn(flusher);
     }
 }
 
@@ -326,104 +374,33 @@ impl Sink for PrometheusSink {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        let metric = event.into_metric();
-        let name = metric.name;
-        let labels = if let Some(ref tags) = metric.tags {
-            tags.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-        } else {
-            HashMap::new()
-        };
+        let item = event.into_metric();
+        let mut metrics = self.metrics.write().unwrap();
 
-        match metric.kind {
+        match item.kind {
             MetricKind::Incremental => {
-                match metric.value {
-                    MetricValue::Counter { value } => {
-                        self.with_counter(&name, &labels, |counter| {
-                            if let Ok(c) = counter.get_metric_with(&labels) {
-                                c.inc_by(value);
-                            } else {
-                                error!(
-                                    "Error getting Prometheus counter with labels: {:?}",
-                                    &labels
-                                );
-                            }
-                        })
-                    }
-                    MetricValue::Gauge { value } => self.with_gauge(&name, &labels, |gauge| {
-                        if let Ok(g) = gauge.get_metric_with(&labels) {
-                            g.add(value);
-                        } else {
-                            error!("Error getting Prometheus gauge with labels: {:?}", &labels);
+                let new = MetricEntry(item.clone().into_absolute());
+                if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
+                    if item.value.is_set() {
+                        // sets need to be expired from time to time
+                        // because otherwise they could grow infinitelly
+                        let now = Utc::now().timestamp();
+                        let interval = now - *self.last_flush_timestamp.read().unwrap();
+                        if interval > self.config.flush_period_secs as i64 {
+                            *self.last_flush_timestamp.write().unwrap() = now;
+                            existing.reset();
                         }
-                    }),
-                    MetricValue::Distribution {
-                        values,
-                        sample_rates,
-                    } => self.with_histogram(&name, &labels, |hist| {
-                        if let Ok(h) = hist.get_metric_with(&labels) {
-                            for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
-                                for _ in 0..*sample_rate {
-                                    h.observe(*val);
-                                }
-                            }
-                        } else {
-                            error!(
-                                "Error getting Prometheus histogram with labels: {:?}",
-                                &labels
-                            );
-                        }
-                    }),
-                    MetricValue::Set { values } => {
-                        // Sets are implemented using prometheus integer gauges
-                        self.with_set(&name, &labels, |&mut (ref mut counter, ref mut set)| {
-                            if let Ok(c) = counter.get_metric_with(&labels) {
-                                // Check if counter was reset
-                                if c.get() < set.len() as i64 {
-                                    // Counter was reset
-                                    set.clear();
-                                }
-                                for val in values {
-                                    // Check for uniques of value
-                                    if set.insert(val.to_string()) {
-                                        // Val is a new unique value, therefore gauge should be incremented
-                                        c.add(1);
-                                        // There is a possiblity that counter was reset between get() and add()
-                                        // so that needs to be checked
-                                        match c.get() {
-                                            // Reset after c.add
-                                            0 => set.clear(),
-                                            // Reset between first get() and add()
-                                            1 if set.len() > 1 => {
-                                                // Outside world could see metric as 1, if they so happen to
-                                                // request metrics between add() and following set()
-                                                // But this glitch is ok since either way flushes are scheduled
-                                                // to happen in periods with best effort basis.
-                                                c.set(0);
-                                                set.clear();
-                                            }
-                                            // Everything is fine
-                                            _ => (),
-                                        }
-                                    }
-                                }
-                            } else {
-                                error!("Error getting Prometheus set with labels: {:?}", &labels);
-                            }
-                        });
                     }
-                    _ => {}
-                }
+                    existing.add(&item);
+                    metrics.insert(MetricEntry(existing));
+                } else {
+                    metrics.insert(new);
+                };
             }
-            MetricKind::Absolute => match metric.value {
-                MetricValue::Gauge { value } => self.with_gauge(&name, &labels, |gauge| {
-                    if let Ok(g) = gauge.get_metric_with(&labels) {
-                        g.set(value);
-                    } else {
-                        error!("Error getting Prometheus gauge with labels: {:?}", &labels);
-                    }
-                }),
-                _ => {}
-            },
+            MetricKind::Absolute => {
+                let new = MetricEntry(item);
+                metrics.replace(new);
+            }
         };
 
         self.acker.ack(1);
@@ -435,5 +412,175 @@ impl Sink for PrometheusSink {
         self.start_server_if_needed();
 
         Ok(Async::Ready(()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use pretty_assertions::assert_eq;
+
+    fn tags() -> HashMap<String, String> {
+        vec![("code".to_owned(), "200".to_owned())]
+            .into_iter()
+            .collect()
+    }
+
+    #[test]
+    fn test_encode_counter() {
+        let metric = Metric {
+            name: "hits".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 10.0 },
+        };
+
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP vector_hits hits\n# TYPE vector_hits counter\n".to_owned()
+        );
+        assert_eq!(frame, "vector_hits{code=\"200\"} 10\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_gauge() {
+        let metric = Metric {
+            name: "temperature".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: -1.1 },
+        };
+
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP vector_temperature temperature\n# TYPE vector_temperature gauge\n".to_owned()
+        );
+        assert_eq!(frame, "vector_temperature{code=\"200\"} -1.1\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_set() {
+        let metric = Metric {
+            name: "users".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Set {
+                values: vec!["foo".into()].into_iter().collect(),
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP users users\n# TYPE users gauge\n".to_owned()
+        );
+        assert_eq!(frame, "users 1\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_expired_set() {
+        let metric = Metric {
+            name: "users".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Set {
+                values: vec!["foo".into()].into_iter().collect(),
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[], true, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP users users\n# TYPE users gauge\n".to_owned()
+        );
+        assert_eq!(frame, "users 0\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_distribution() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[0.0, 2.5, 5.0], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests histogram\n".to_owned()
+        );
+        assert_eq!(frame, "requests_bucket{le=\"0\"} 0\nrequests_bucket{le=\"2.5\"} 6\nrequests_bucket{le=\"5\"} 8\nrequests_bucket{le=\"+Inf\"} 8\nrequests_sum 15\nrequests_count 8\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_histogram() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedHistogram {
+                buckets: vec![1.0, 2.1, 3.0],
+                counts: vec![1, 2, 3],
+                count: 6,
+                sum: 12.5,
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests histogram\n".to_owned()
+        );
+        assert_eq!(frame, "requests_bucket{le=\"1\"} 1\nrequests_bucket{le=\"2.1\"} 2\nrequests_bucket{le=\"3\"} 3\nrequests_bucket{le=\"+Inf\"} 6\nrequests_sum 12.5\nrequests_count 6\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_summary() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedSummary {
+                quantiles: vec![0.01, 0.5, 0.99],
+                values: vec![1.5, 2.0, 3.0],
+                count: 6,
+                sum: 12.0,
+            },
+        };
+
+        let header = encode_metric_header("", &metric);
+        let frame = encode_metric_datum("", &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+        );
+        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.01\"} 1.5\nrequests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 12\nrequests_count{code=\"200\"} 6\n".to_owned());
     }
 }

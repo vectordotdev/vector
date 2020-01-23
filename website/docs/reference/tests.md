@@ -64,9 +64,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
 
       # OPTIONAL
-      "message.eq" = "this is the content to match against" # example
-      "host.exists" = true # example
-      "method.neq" = "POST" # example
+      "message.eq" = "this is the content to match against"
+      "host.exists" = true
+      "method.neq" = "POST"
 
   # REQUIRED - Input
   [tests.input]
@@ -103,9 +103,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
 
       # OPTIONAL
-      "message.eq" = "this is the content to match against" # example
-      "host.exists" = true # example
-      "method.neq" = "POST" # example
+      "message.eq" = "this is the content to match against"
+      "host.exists" = true
+      "method.neq" = "POST"
 
   # REQUIRED - Input
   [tests.input]
@@ -118,7 +118,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # OPTIONAL - Log fields
     [tests.input.log_fields]
-      message = "some message contents"
+      message = "some message contents" # example
+      host = "myhost" # example
 
     # OPTIONAL - Metric
     [tests.input.metric]
@@ -134,7 +135,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
       # OPTIONAL - Tags
       [tests.input.metric.tags]
-        host = "foohost"
+        host = "foohost" # example
+        region = "us-east-1" # example
 ```
 
 </TabItem>
@@ -158,7 +160,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"input"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -180,7 +181,6 @@ A table that defines a unit test input event.
   enumValues={null}
   examples={["foo"]}
   name={"insert_at"}
-  nullable={false}
   path={"input"}
   relevantWhen={null}
   required={true}
@@ -203,7 +203,6 @@ The name of a transform, the input event will be delivered to this transform in 
   enumValues={null}
   examples={[]}
   name={"log_fields"}
-  nullable={true}
   path={"input"}
   relevantWhen={{"type":"log"}}
   required={false}
@@ -225,7 +224,6 @@ Specifies the log fields when the input type is 'log'.
   enumValues={null}
   examples={[{"message":"some message contents"},{"host":"myhost"}]}
   name={"`[field-name]`"}
-  nullable={false}
   path={"input.log_fields"}
   relevantWhen={null}
   required={true}
@@ -253,7 +251,6 @@ A key/value pair representing a field to be added to the input event.
   enumValues={null}
   examples={[]}
   name={"metric"}
-  nullable={true}
   path={"input"}
   relevantWhen={{"type":"metric"}}
   required={false}
@@ -275,7 +272,6 @@ Specifies the metric type when the input type is 'metric'.
   enumValues={{"plus":"Increase the gauge","minus":"Decrease the gauge"}}
   examples={["plus","minus"]}
   name={"direction"}
-  nullable={true}
   path={"input.metric"}
   relevantWhen={null}
   required={false}
@@ -298,7 +294,6 @@ The direction to increase or decrease the gauge value.
   enumValues={null}
   examples={["duration_total"]}
   name={"name"}
-  nullable={false}
   path={"input.metric"}
   relevantWhen={null}
   required={true}
@@ -321,7 +316,6 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   enumValues={null}
   examples={[1]}
   name={"sample_rate"}
-  nullable={true}
   path={"input.metric"}
   relevantWhen={null}
   required={false}
@@ -344,7 +338,6 @@ The bucket/distribution the metric is a part of.
   enumValues={null}
   examples={[]}
   name={"tags"}
-  nullable={true}
   path={"input.metric"}
   relevantWhen={null}
   required={false}
@@ -355,7 +348,7 @@ The bucket/distribution the metric is a part of.
 
 ##### tags
 
-Key/value pairs representing [metric tags][docs.data-model#tags].
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 <Fields filters={false}>
 
@@ -366,7 +359,6 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   enumValues={null}
   examples={[{"host":"foohost"},{"region":"us-east-1"}]}
   name={"`[tag-name]`"}
-  nullable={false}
   path={"input.metric.tags"}
   relevantWhen={null}
   required={true}
@@ -377,7 +369,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
 
 ###### `[tag-name]`
 
-Key/value pairs representing [metric tags][docs.data-model#tags].
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 </Field>
@@ -394,7 +386,6 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   enumValues={null}
   examples={["2019-11-01T21:15:47.443232Z"]}
   name={"timestamp"}
-  nullable={false}
   path={"input.metric"}
   relevantWhen={null}
   required={true}
@@ -414,10 +405,9 @@ Time metric was created/ingested.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
+  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
   examples={["counter"]}
   name={"type"}
-  nullable={false}
   path={"input.metric"}
   relevantWhen={null}
   required={true}
@@ -440,7 +430,6 @@ The metric type.
   enumValues={null}
   examples={[10.2]}
   name={"val"}
-  nullable={false}
   path={"input.metric"}
   relevantWhen={null}
   required={true}
@@ -468,7 +457,6 @@ Amount to increment/decrement or gauge.
   enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
   examples={["raw","log","metric"]}
   name={"type"}
-  nullable={false}
   path={"input"}
   relevantWhen={null}
   required={true}
@@ -491,7 +479,6 @@ The event type.
   enumValues={null}
   examples={["some message contents"]}
   name={"value"}
-  nullable={true}
   path={"input"}
   relevantWhen={{"type":"raw"}}
   required={false}
@@ -519,7 +506,6 @@ Specifies the log message field contents when the input type is 'raw'.
   enumValues={null}
   examples={["foo test"]}
   name={"name"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -542,7 +528,6 @@ A unique identifier for this test.
   enumValues={null}
   examples={[]}
   name={"outputs"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -564,7 +549,6 @@ A table that defines a unit test expected output.
   enumValues={null}
   examples={[]}
   name={"conditions"}
-  nullable={false}
   path={"outputs"}
   relevantWhen={null}
   required={true}
@@ -586,7 +570,6 @@ A table that defines a collection of conditions to check against the output of a
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"}]}
   name={"`<field_name>`.eq"}
-  nullable={true}
   path={"outputs.conditions"}
   relevantWhen={null}
   required={false}
@@ -609,7 +592,6 @@ Check whether a fields contents exactly matches the value specified.
   enumValues={null}
   examples={[{"host.exists":true}]}
   name={"`<field_name>`.exists"}
-  nullable={true}
   path={"outputs.conditions"}
   relevantWhen={null}
   required={false}
@@ -632,7 +614,6 @@ Check whether a field exists or does not exist, depending on the provided valueb
   enumValues={null}
   examples={[{"method.neq":"POST"}]}
   name={"`<field_name>`.neq"}
-  nullable={true}
   path={"outputs.conditions"}
   relevantWhen={null}
   required={false}
@@ -655,7 +636,6 @@ Check whether a fields contents does not match the value specified.
   enumValues={null}
   examples={["check_fields"]}
   name={"type"}
-  nullable={false}
   path={"outputs.conditions"}
   relevantWhen={null}
   required={true}
@@ -683,7 +663,6 @@ The type of the condition to execute. Currently only the `check_fields` type is 
   enumValues={null}
   examples={["foo"]}
   name={"extract_from"}
-  nullable={false}
   path={"outputs"}
   relevantWhen={null}
   required={true}
@@ -708,9 +687,9 @@ The name of a transform, at the end of the test events extracted from this trans
 </Fields>
 
 
-[docs.data-model#counters]: /docs/about/data-model/#counters
-[docs.data-model#gauges]: /docs/about/data-model/#gauges
-[docs.data-model#histograms]: /docs/about/data-model/#histograms
-[docs.data-model#sets]: /docs/about/data-model/#sets
-[docs.data-model#tags]: /docs/about/data-model/#tags
+[docs.data-model.metric#counter]: /docs/about/data-model/metric/#counter
+[docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution
+[docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
+[docs.data-model.metric#set]: /docs/about/data-model/metric/#set
+[docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing/

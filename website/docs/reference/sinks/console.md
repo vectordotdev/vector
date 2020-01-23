@@ -44,14 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "console" # example, must be: "console"
+  # REQUIRED
+  type = "console" # must be: "console"
   inputs = ["my-source-id"] # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
+  # OPTIONAL
   target = "stdout" # default, enum
 ```
 
@@ -63,15 +60,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "console" # example, must be: "console"
+  type = "console" # must be: "console"
   inputs = ["my-source-id"] # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
   # OPTIONAL - General
-  healthcheck = true # default
   target = "stdout" # default, enum
+  healthcheck = true # default
+
+  # OPTIONAL - requests
+  encoding = "json" # example, no default, enum
 ```
 
 </TabItem>
@@ -88,15 +85,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   name={"encoding"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -116,7 +112,6 @@ The encoding format used to serialize the events before outputting.
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -139,10 +134,9 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
   name={"target"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

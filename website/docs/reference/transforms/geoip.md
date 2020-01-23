@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "geoip" # example, must be: "geoip"
+  type = "geoip" # must be: "geoip"
   inputs = ["my-source-id"] # example
   database = "/path/to/GeoLite2-City.mmdb" # example
   source = "ip_address" # example
@@ -51,7 +51,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["/path/to/GeoLite2-City.mmdb"]}
   name={"database"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -75,7 +74,6 @@ Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City
   enumValues={null}
   examples={["ip_address","x-forwarded-for"]}
   name={"source"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -98,10 +96,9 @@ The field name that contains the IP address. This field should contain a valid I
   enumValues={null}
   examples={["geoip"]}
   name={"target"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

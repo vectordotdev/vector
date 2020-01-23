@@ -44,7 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "stdin" # example, must be: "stdin"
+  # REQUIRED - General
+  type = "stdin" # must be: "stdin"
+
+  # OPTIONAL - Context
+  host_key = "host" # default
 ```
 
 </TabItem>
@@ -55,13 +59,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "stdin" # example, must be: "stdin"
-
-  # OPTIONAL - General
-  max_length = 102400 # default, bytes
+  type = "stdin" # must be: "stdin"
 
   # OPTIONAL - Context
   host_key = "host" # default
+
+  # OPTIONAL - General
+  max_length = 102400 # default, bytes
 ```
 
 </TabItem>
@@ -78,15 +82,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
   name={"host_key"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -106,7 +109,6 @@ The key name added to each event representing the current host. See [Context](#c
   enumValues={null}
   examples={[102400]}
   name={"max_length"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}

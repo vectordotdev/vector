@@ -44,10 +44,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "prometheus" # example, must be: "prometheus"
+  # REQUIRED
+  type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
+
+  # OPTIONAL
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
+  flush_period_secs = 60 # default, seconds
 ```
 
 </TabItem>
@@ -58,13 +63,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED
-  type = "prometheus" # example, must be: "prometheus"
+  type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"] # example
   address = "0.0.0.0:9598" # example
   namespace = "service" # example
 
   # OPTIONAL
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
+  flush_period_secs = 60 # default, seconds
   healthcheck = true # default
 ```
 
@@ -87,7 +93,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["0.0.0.0:9598"]}
   name={"address"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -105,15 +110,14 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
   enumValues={null}
   examples={[[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]]}
   name={"buckets"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
@@ -121,7 +125,29 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
 
 ### buckets
 
-Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
+Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms. See [Histogram Buckets](#histogram-buckets) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={60}
+  enumValues={null}
+  examples={[60]}
+  name={"flush_period_secs"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+### flush_period_secs
+
+Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 </Field>
@@ -133,7 +159,6 @@ Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics
   enumValues={null}
   examples={[true,false]}
   name={"healthcheck"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={false}
@@ -156,7 +181,6 @@ Enables/disables the sink healthcheck upon start.
   enumValues={null}
   examples={["service"]}
   name={"namespace"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -428,9 +452,10 @@ discussion with your use case if you find this to be a problem.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric#counters]: /docs/about/data-model/metric/#counters
+[docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution
 [docs.data-model.metric#gauges]: /docs/about/data-model/metric/#gauges
-[docs.data-model.metric#histogram]: /docs/about/data-model/metric/#histogram
 [docs.data-model.metric#histograms]: /docs/about/data-model/metric/#histograms
+[docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#sets]: /docs/about/data-model/metric/#sets
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.issue_387]: https://github.com/timberio/vector/issues/387

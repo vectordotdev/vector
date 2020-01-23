@@ -155,19 +155,12 @@ metadata.releases_list.each do |release|
       <<~EOF
       import React from 'react';
 
-      import Layout from '@theme/Layout';
       import ReleaseNotes from '@site/src/components/ReleaseNotes';
 
       function ReleaseNotesPage() {
         const version = "#{release.version}";
 
-        return (
-          <Layout title={`Vector v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
-            <main>
-              <ReleaseNotes version={version} />
-            </main>
-          </Layout>
-        );
+        return <ReleaseNotes version={version} />;
       }
 
       export default ReleaseNotesPage;
@@ -187,14 +180,14 @@ metadata.components.each do |component|
   if !File.exists?(template_path)
     contents = templates.component_default(component)
     File.open(template_path, 'w+') { |file| file.write(contents) }
-    templates = Templates.new(ROOT_DIR, metadata)
   end
 end
 
 erb_paths =
   Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
-  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }
+  filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }.
+  filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix") }
 
 #
 # Create missing .md files
@@ -211,6 +204,8 @@ end
 # Render templates
 #
 
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+templates = Templates.new(ROOT_DIR, metadata)
 
 erb_paths.
   select { |path| !templates.partial?(path) }.

@@ -5,6 +5,24 @@
   force = false
 
 [[redirects]]
+  from = "/docs/reference/sinks/tcp/"
+  to = "/docs/reference/sinks/socket/"
+  status = 301
+  force = false
+
+[[redirects]]
+  from = "/docs/reference/sources/tcp/"
+  to = "/docs/reference/sources/socket/"
+  status = 301
+  force = false
+
+[[redirects]]
+  from = "/docs/reference/sources/udp/"
+  to = "/docs/reference/sources/socket/"
+  status = 301
+  force = false
+
+[[redirects]]
   from = "/download/"
   to = "/releases/latest/download/"
   status = 302

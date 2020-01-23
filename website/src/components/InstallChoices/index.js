@@ -81,3 +81,4 @@ function InstallChoices({docker, os, packageManager}) {
 
 
 export default InstallChoices;
+export {ArchChoices};

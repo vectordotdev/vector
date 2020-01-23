@@ -1,4 +1,4 @@
-<%- component = metadata.sinks.tcp -%>
+<%- component = metadata.sources.prometheus -%>
 
 <%= component_header(component) %>
 
@@ -16,14 +16,11 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.output -%>
 ## Output
 
-<%= component_output(component, component.output) %>
+<%= component_output(component, component.output.metric, heading_depth: 3) %>
 
-<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
-
 

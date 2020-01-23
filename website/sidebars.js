@@ -9,7 +9,7 @@ module.exports = {
         "about/concepts",
         {
           type: 'category',
-          label: 'Data Model',
+          label: 'Data Model (Event)',
           items: [
             "about/data-model",
             "about/data-model/log",
@@ -122,6 +122,12 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/logplex",
+            
+              "reference/sources/prometheus",
+            
+              "reference/sources/socket",
+            
               "reference/sources/splunk_hec",
             
               "reference/sources/statsd",
@@ -129,10 +135,6 @@ module.exports = {
               "reference/sources/stdin",
             
               "reference/sources/syslog",
-            
-              "reference/sources/tcp",
-            
-              "reference/sources/udp",
             
               "reference/sources/vector",
             
@@ -165,6 +167,8 @@ module.exports = {
               "reference/transforms/json_parser",
             
               "reference/transforms/log_to_metric",
+            
+              "reference/transforms/logfmt_parser",
             
               "reference/transforms/lua",
             
@@ -220,11 +224,11 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
+              "reference/sinks/socket",
+            
               "reference/sinks/splunk_hec",
             
               "reference/sinks/statsd",
-            
-              "reference/sinks/tcp",
             
               "reference/sinks/vector",
             

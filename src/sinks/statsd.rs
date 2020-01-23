@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{BatchConfig, BatchServiceSink, Buffer, SinkExt},
+    sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, sink::Sink, Future, Poll};
@@ -48,8 +48,8 @@ pub struct StatsdSinkConfig {
     pub namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -316,9 +316,9 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch: BatchConfig {
-                batch_size: Some(512),
-                batch_timeout: Some(1),
+            batch: BatchBytesConfig {
+                max_size: Some(512),
+                timeout_secs: Some(1),
             },
         };
 

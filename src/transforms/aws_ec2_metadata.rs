@@ -161,7 +161,7 @@ impl Transform for Ec2MetadataTransform {
 
         self.state.for_each(|k, v| {
             if let Some(value) = v.get(0) {
-                log.insert_explicit(k.clone(), value.clone());
+                log.insert(k.clone(), value.clone());
             }
         });
 

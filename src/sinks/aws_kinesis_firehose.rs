@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -10,7 +10,7 @@ use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_firehose::{
-    KinesisFirehose, KinesisFirehoseClient, ListDeliveryStreamsInput, PutRecordBatchError,
+    DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
     PutRecordBatchInput, PutRecordBatchOutput, Record,
 };
 use serde::{Deserialize, Serialize};
@@ -32,15 +32,15 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_timeout_secs: Some(30),
+        timeout_secs: Some(30),
         ..Default::default()
     };
 }
@@ -83,7 +83,7 @@ impl KinesisFirehoseService {
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = create_client(config.region.clone().try_into()?, cx.resolver())?;
 
-        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -151,17 +151,12 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
-    #[snafu(display("ListDeliveryStreams failed: {}", source))]
-    ListDeliveryStreamsFailed {
-        source: RusotoError<rusoto_firehose::ListDeliveryStreamsError>,
+    #[snafu(display("DescribeDeliveryStream failed: {}", source))]
+    DescribeDeliveryStreamFailed {
+        source: RusotoError<rusoto_firehose::DescribeDeliveryStreamError>,
     },
-    #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
+    #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
-    #[snafu(display(
-        "Stream returned does not contain any streams that match {}",
-        stream_name
-    ))]
-    NoMatchingStreamName { stream_name: String },
 }
 
 fn healthcheck(
@@ -172,22 +167,18 @@ fn healthcheck(
     let stream_name = config.stream_name;
 
     let fut = client
-        .list_delivery_streams(ListDeliveryStreamsInput {
-            exclusive_start_delivery_stream_name: Some(stream_name.clone()),
+        .describe_delivery_stream(DescribeDeliveryStreamInput {
+            delivery_stream_name: stream_name.clone(),
+            exclusive_start_destination_id: None,
             limit: Some(1),
-            delivery_stream_type: None,
         })
-        .map_err(|source| HealthcheckError::ListDeliveryStreamsFailed { source }.into())
-        .and_then(move |res| Ok(res.delivery_stream_names.into_iter().next()))
+        .map_err(|source| HealthcheckError::DescribeDeliveryStreamFailed { source }.into())
+        .and_then(move |res| Ok(res.delivery_stream_description.delivery_stream_name))
         .and_then(move |name| {
-            if let Some(name) = name {
-                if name == stream_name {
-                    Ok(())
-                } else {
-                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
-                }
+            if name == stream_name {
+                Ok(())
             } else {
-                Err(HealthcheckError::NoMatchingStreamName { stream_name }.into())
+                Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
             }
         });
 
@@ -239,7 +230,7 @@ mod tests {
     fn firehose_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("key", "value");
+        event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
@@ -256,7 +247,10 @@ mod integration_tests {
     use crate::{
         region::RegionOrEndpoint,
         runtime,
-        sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchConfig, Provider},
+        sinks::{
+            elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
+            util::BatchEventsConfig,
+        },
         test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
     };
@@ -284,13 +278,13 @@ mod integration_tests {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
             encoding: Encoding::Json, // required for ES destination w/ localstack
-            batch: BatchConfig {
-                batch_size: Some(2),
-                batch_timeout: None,
+            batch: BatchEventsConfig {
+                max_events: Some(2),
+                timeout_secs: None,
             },
             request: TowerRequestConfig {
-                request_timeout_secs: Some(10),
-                request_retry_attempts: Some(0),
+                timeout_secs: Some(10),
+                retry_attempts: Some(0),
                 ..Default::default()
             },
         };
@@ -308,7 +302,7 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(1));
 
         let config = ElasticSearchConfig {
-            provider: Some(Provider::Aws),
+            auth: Some(ElasticSearchAuth::Aws),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
             index: Some(stream.clone()),
             ..Default::default()

@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, BatchConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
+        retries::RetryLogic, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
         ServiceBuilderExt, SinkExt, TowerRequestConfig,
     },
     template::Template,
@@ -42,16 +42,16 @@ pub struct S3SinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     pub compression: Compression,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_in_flight_limit: Some(25),
-        request_rate_limit_num: Some(25),
+        in_flight_limit: Some(25),
+        rate_limit_num: Some(25),
         ..Default::default()
     };
 }
@@ -357,7 +357,7 @@ mod tests {
     fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("key", "value");
+        event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
@@ -492,7 +492,7 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log().insert_implicit("i", format!("{}", i));
+            e.as_mut_log().insert("i", format!("{}", i));
             e
         });
 
@@ -544,7 +544,7 @@ mod integration_tests {
 
             let i = if i < 10 { 1 } else { 2 };
 
-            event.as_mut_log().insert_implicit("i", format!("{}", i));
+            event.as_mut_log().insert("i", format!("{}", i));
             tx.send(event).unwrap();
         }
 
@@ -555,7 +555,7 @@ mod integration_tests {
 
             let i = if i < 5 { 2 } else { 3 };
 
-            event.as_mut_log().insert_implicit("i", format!("{}", i));
+            event.as_mut_log().insert("i", format!("{}", i));
             tx.send(event).unwrap();
         }
 
@@ -664,9 +664,9 @@ mod integration_tests {
             key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            batch: BatchConfig {
-                batch_size: Some(batch_size),
-                batch_timeout: Some(5),
+            batch: BatchBytesConfig {
+                max_size: Some(batch_size),
+                timeout_secs: Some(5),
             },
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()

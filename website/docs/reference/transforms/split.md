@@ -27,18 +27,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "split" # example, must be: "split"
+  type = "split" # must be: "split"
   inputs = ["my-source-id"] # example
   field_names = ["timestamp", "level", "message"] # example
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  separator = "," # default
+  separator = "whitespace" # default
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
-    status = "int"
 ```
 
 ## Options
@@ -56,10 +55,9 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[true,false]}
   name={"drop_field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -79,10 +77,9 @@ If `true` the [`field`](#field) will be dropped after parsing.
   enumValues={null}
   examples={["message"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -102,7 +99,6 @@ The field to apply the split on.
   enumValues={null}
   examples={[["timestamp","level","message"]]}
   name={"field_names"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -125,10 +121,9 @@ The field names assigned to the resulting tokens, in order.
   enumValues={null}
   examples={[","]}
   name={"separator"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"[string]"}
   unit={null}
@@ -148,7 +143,6 @@ The separator to split the field on. If no separator is given, it will split on 
   enumValues={null}
   examples={[]}
   name={"types"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -165,15 +159,14 @@ Key/Value pairs representing mapped log field types.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
   name={"`[field-name]`"}
-  nullable={false}
   path={"types"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

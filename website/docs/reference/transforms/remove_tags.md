@@ -26,7 +26,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_tags" # example, must be: "remove_tags"
+  type = "remove_tags" # must be: "remove_tags"
   inputs = ["my-source-id"] # example
   tags = ["tag1", "tag2"] # example
 ```
@@ -46,7 +46,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["tag1","tag2"]]}
   name={"tags"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

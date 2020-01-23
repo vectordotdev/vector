@@ -27,7 +27,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # REQUIRED
-  type = "sampler" # example, must be: "sampler"
+  type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"] # example
   rate = 10 # example
 
@@ -50,7 +50,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[["[error]","field2"]]}
   name={"pass_list"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -73,7 +72,6 @@ A list of regular expression patterns to exclude events from sampling. If an eve
   enumValues={null}
   examples={[10]}
   name={"rate"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

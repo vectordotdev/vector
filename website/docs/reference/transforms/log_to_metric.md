@@ -22,24 +22,19 @@ The Vector `log_to_metric` transform accepts [`log`][docs.data-model.log] events
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.my_transform_id]
-  # REQUIRED - General
-  type = "log_to_metric" # example, must be: "log_to_metric"
-  inputs = ["my-source-id"] # example
+[transforms.log_to_metric]
+  type = "log_to_metric"
 
-  # REQUIRED - Metrics
-  [[transforms.my_transform_id.metrics]]
-    # REQUIRED
-    type = "counter" # example, enum
-    field = "duration" # example
-    name = "duration_total" # example
-
-    # OPTIONAL
-    [transforms.my_transform_id.metrics.tags]
-      host = "${HOSTNAME}"
+  [[transforms.log_to_metric.metrics]]
+    type = "histogram"
+    field = "time"
+    name = "time_ms" # optional
+    tags.status = "{{status}}" # optional
+    tags.host = "{{host}}" # optional
+    tags.env = "${ENV}" # optional
 ```
 
 ## Options
@@ -57,7 +52,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={[]}
   name={"metrics"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -79,7 +73,6 @@ A table of key/value pairs representing the keys to be added to the event.
   enumValues={null}
   examples={["duration"]}
   name={"field"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={null}
   required={true}
@@ -97,15 +90,14 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
   name={"increment_by_value"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -125,7 +117,6 @@ If `true` the metric will be incremented by the [`field`](#field) value. If `fal
   enumValues={null}
   examples={["duration_total"]}
   name={"name"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={null}
   required={true}
@@ -148,7 +139,6 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   enumValues={null}
   examples={[]}
   name={"tags"}
-  nullable={true}
   path={"metrics"}
   relevantWhen={null}
   required={false}
@@ -159,7 +149,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
 
 #### tags
 
-Key/value pairs representing [metric tags][docs.data-model#tags].
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 <Fields filters={false}>
 
@@ -170,7 +160,6 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
   enumValues={null}
   examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
   name={"`[tag-name]`"}
-  nullable={false}
   path={"metrics.tags"}
   relevantWhen={null}
   required={true}
@@ -181,7 +170,7 @@ Key/value pairs representing [metric tags][docs.data-model#tags].
 
 ##### `[tag-name]`
 
-Key/value pairs representing [metric tags][docs.data-model#tags]. Environment variables and field interpolation is allowed.
+Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environment variables and field interpolation is allowed.
 
 
 </Field>
@@ -195,10 +184,9 @@ Key/value pairs representing [metric tags][docs.data-model#tags]. Environment va
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model#counters].","gauge":"A [gauge metric type][docs.data-model#gauges].","histogram":"A [histogram metric type][docs.data-model#histograms].","set":"A [set metric type][docs.data-model#sets]."}}
+  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
   examples={["counter","gauge","histogram","set"]}
   name={"type"}
-  nullable={false}
   path={"metrics"}
   relevantWhen={null}
   required={true}
@@ -568,11 +556,11 @@ individual metrics for reduction in the metrics storage itself.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#counters]: /docs/about/data-model/#counters
-[docs.data-model#gauges]: /docs/about/data-model/#gauges
-[docs.data-model#histograms]: /docs/about/data-model/#histograms
-[docs.data-model#sets]: /docs/about/data-model/#sets
-[docs.data-model#tags]: /docs/about/data-model/#tags
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric#counter]: /docs/about/data-model/metric/#counter
+[docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution
+[docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
+[docs.data-model.metric#set]: /docs/about/data-model/metric/#set
+[docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/

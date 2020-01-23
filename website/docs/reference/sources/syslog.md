@@ -44,11 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "syslog" # example, must be: "syslog"
+  # REQUIRED - General
+  type = "syslog" # must be: "syslog"
   mode = "tcp" # example, enum
 
-  # OPTIONAL
+  # OPTIONAL - Context
+  host_key = "host" # default
+
+  # OPTIONAL - General
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
@@ -61,16 +64,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # REQUIRED - General
-  type = "syslog" # example, must be: "syslog"
+  type = "syslog" # must be: "syslog"
   mode = "tcp" # example, enum
+
+  # OPTIONAL - Context
+  host_key = "host" # default
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
   max_length = 102400 # default, bytes
   path = "/path/to/socket" # example, no default, relevant when mode = "unix"
-
-  # OPTIONAL - Context
-  host_key = "host" # default
 ```
 
 </TabItem>
@@ -92,7 +95,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#2"]}
   name={"address"}
-  nullable={true}
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
   required={false}
@@ -110,15 +112,14 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
   name={"host_key"}
-  nullable={false}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -138,7 +139,6 @@ The key name added to each event representing the current host. See [Context](#c
   enumValues={null}
   examples={[102400]}
   name={"max_length"}
-  nullable={true}
   path={null}
   relevantWhen={null}
   required={false}
@@ -161,7 +161,6 @@ The maximum bytes size of incoming messages before they are discarded.
   enumValues={{"tcp":"Read incoming Syslog data over the TCP protocol.","udp":"Read incoming Syslog data over the UDP protocol.","unix":"Read uncoming Syslog data through a Unix socker."}}
   examples={["tcp","udp","unix"]}
   name={"mode"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -184,7 +183,6 @@ The input mode.
   enumValues={null}
   examples={["/path/to/socket"]}
   name={"path"}
-  nullable={true}
   path={null}
   relevantWhen={{"mode":"unix"}}
   required={false}
@@ -422,14 +420,14 @@ is not an exact specification, but an observation of behavior.
 
 Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
 fails, the event will be dropped and `warning` log line will be emitted. If
-this is the case, we recommend using the [`tcp` source][docs.sources.tcp]
+this is the case, we recommend using the [`socket` source][docs.sources.socket]
 combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
 implement your own ingestion and parsing scheme.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.sources.tcp]: /docs/reference/sources/tcp/
+[docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

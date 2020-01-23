@@ -232,22 +232,22 @@ mod tests {
         let sink = PartitionedFileSink::new(&config);
 
         let (mut input, _) = random_events_with_stream(32, 8);
-        input[0].as_mut_log().insert_implicit("date", "2019-26-07");
-        input[0].as_mut_log().insert_implicit("level", "warning");
-        input[1].as_mut_log().insert_implicit("date", "2019-26-07");
-        input[1].as_mut_log().insert_implicit("level", "error");
-        input[2].as_mut_log().insert_implicit("date", "2019-26-07");
-        input[2].as_mut_log().insert_implicit("level", "warning");
-        input[3].as_mut_log().insert_implicit("date", "2019-27-07");
-        input[3].as_mut_log().insert_implicit("level", "error");
-        input[4].as_mut_log().insert_implicit("date", "2019-27-07");
-        input[4].as_mut_log().insert_implicit("level", "warning");
-        input[5].as_mut_log().insert_implicit("date", "2019-27-07");
-        input[5].as_mut_log().insert_implicit("level", "warning");
-        input[6].as_mut_log().insert_implicit("date", "2019-28-07");
-        input[6].as_mut_log().insert_implicit("level", "warning");
-        input[7].as_mut_log().insert_implicit("date", "2019-29-07");
-        input[7].as_mut_log().insert_implicit("level", "error");
+        input[0].as_mut_log().insert("date", "2019-26-07");
+        input[0].as_mut_log().insert("level", "warning");
+        input[1].as_mut_log().insert("date", "2019-26-07");
+        input[1].as_mut_log().insert("level", "error");
+        input[2].as_mut_log().insert("date", "2019-26-07");
+        input[2].as_mut_log().insert("level", "warning");
+        input[3].as_mut_log().insert("date", "2019-27-07");
+        input[3].as_mut_log().insert("level", "error");
+        input[4].as_mut_log().insert("date", "2019-27-07");
+        input[4].as_mut_log().insert("level", "warning");
+        input[5].as_mut_log().insert("date", "2019-27-07");
+        input[5].as_mut_log().insert("level", "warning");
+        input[6].as_mut_log().insert("date", "2019-28-07");
+        input[6].as_mut_log().insert("level", "warning");
+        input[7].as_mut_log().insert("date", "2019-29-07");
+        input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter_ok(input.clone().into_iter());
         let mut rt = crate::test_util::runtime();

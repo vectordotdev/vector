@@ -1,4 +1,4 @@
-use super::{Value, ValueKind};
+use super::Value;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Serialize, Serializer};
@@ -12,7 +12,7 @@ lazy_static! {
 
 #[derive(Debug, Clone, PartialEq)]
 enum MapValue {
-    Value(ValueKind),
+    Value(Value),
     Map(HashMap<Atom, MapValue>),
     Array(Vec<MapValue>),
     Null,
@@ -25,10 +25,7 @@ pub struct Unflatten {
 
 impl From<HashMap<Atom, Value>> for Unflatten {
     fn from(log: HashMap<Atom, Value>) -> Self {
-        let log = log
-            .into_iter()
-            .map(|(k, v)| (k, v.value))
-            .collect::<HashMap<_, _>>();
+        let log = log.into_iter().collect::<HashMap<_, _>>();
 
         // We must wrap the outter map in a MapValue to support
         // the recursive merge.
@@ -207,10 +204,10 @@ pub type ShallowMatch<V> = Option<Vec<(TestMapValue, V)>>;
 impl TestMapValue {
     pub fn equals<V>(&self, theirs: V) -> bool
     where
-        ValueKind: From<V>,
+        Value: From<V>,
     {
         match &self.value {
-            MapValue::Value(ours) => *ours == ValueKind::from(theirs),
+            MapValue::Value(ours) => *ours == Value::from(theirs),
             _ => false,
         }
     }
@@ -333,8 +330,8 @@ mod tests {
     #[test]
     fn nested() {
         let mut e = Event::new_empty_log().into_log();
-        e.insert_implicit("a.b.c", "v1");
-        e.insert_implicit("a.b.d", "v2");
+        e.insert("a.b.c", "v1");
+        e.insert("a.b.d", "v2");
 
         let json = serde_json::to_string(&e.unflatten()).unwrap();
         let expected = serde_json::from_str::<Expected>(&json).unwrap();
@@ -368,8 +365,8 @@ mod tests {
         // of hashmap iteration ordering.
         for _ in 0..100 {
             let mut e = Event::new_empty_log().into_log();
-            e.insert_implicit("a.b[0]", "v1");
-            e.insert_implicit("a.b[1]", "v2");
+            e.insert("a.b[0]", "v1");
+            e.insert("a.b[1]", "v2");
 
             #[derive(Deserialize, Debug)]
             #[serde(rename_all = "snake_case")]
@@ -395,7 +392,7 @@ mod tests {
         fn unflatten_abirtrary(json in prop::json()) {
             let s = serde_json::to_string(&json).unwrap();
             let mut event = Event::new_empty_log();
-            event.as_mut_log().insert_implicit(event::MESSAGE.clone(), s);
+            event.as_mut_log().insert(event::MESSAGE.clone(), s);
 
             let mut parser = JsonParser::from(JsonParserConfig::default());
             let event = parser.transform(event).unwrap().into_log();

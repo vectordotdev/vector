@@ -26,7 +26,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "field_filter" # example, must be: "field_filter"
+  type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"] # example
   field = "file" # example
   value = "/var/log/nginx.log" # example
@@ -47,7 +47,6 @@ import Field from '@site/src/components/Field';
   enumValues={null}
   examples={["file"]}
   name={"field"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}
@@ -70,7 +69,6 @@ The target log field to compare against the [`value`](#value).
   enumValues={null}
   examples={["/var/log/nginx.log"]}
   name={"value"}
-  nullable={false}
   path={null}
   relevantWhen={null}
   required={true}

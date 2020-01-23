@@ -112,7 +112,7 @@ impl rlua::UserData for Event {
             rlua::MetaMethod::NewIndex,
             |_ctx, this, (key, value): (String, Option<rlua::String<'lua>>)| {
                 if let Some(string) = value {
-                    this.as_mut_log().insert_explicit(key, string.as_bytes());
+                    this.as_mut_log().insert(key, string.as_bytes());
                 } else {
                     this.as_mut_log().remove(&key.into());
                 }
@@ -212,7 +212,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("name", "Bob");
+        event.as_mut_log().insert("name", "Bob");
         let event = transform.transform(event).unwrap();
 
         assert!(event.as_log().get(&"name".into()).is_none());
@@ -229,7 +229,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("name", "Bob");
+        event.as_mut_log().insert("name", "Bob");
         let event = transform.transform(event);
 
         assert!(event.is_none());
@@ -393,8 +393,8 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit("name", "Bob");
-        event.as_mut_log().insert_explicit("friend", "Alice");
+        event.as_mut_log().insert("name", "Bob");
+        event.as_mut_log().insert("friend", "Alice");
 
         let event = transform.transform(event).unwrap();
 

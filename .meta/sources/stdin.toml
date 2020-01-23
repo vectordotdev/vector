@@ -11,14 +11,13 @@ through_description = "standard input (STDIN)"
 [sources.stdin.options.max_length]
 type = "int"
 default = 102400
-null = true
 unit = "bytes"
 description = "The maxiumum bytes size of a message before it is discarded."
 
 [sources.stdin.options.host_key]
 type = "string"
 category = "Context"
-null = false
+required = true
 default = "host"
 section = "context"
 description = """\
@@ -48,7 +47,7 @@ A log event will be output with the following structure:
 [sources.stdin.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-optional = false
+required = true
 description = """\
 The local hostname.
 """
@@ -56,7 +55,7 @@ The local hostname.
 [sources.stdin.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The raw message, unaltered.
 """
@@ -64,7 +63,7 @@ The raw message, unaltered.
 [sources.stdin.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The exact time the event was ingested.\
 """

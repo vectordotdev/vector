@@ -1,6 +1,6 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{BatchConfig, Compression, TowerRequestConfig},
+    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use indexmap::IndexMap;
@@ -30,10 +30,10 @@ pub struct NewRelicLogsConfig {
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
 
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
 
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
@@ -74,22 +74,18 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => "https://log-api.eu.newrelic.com/log/v1",
         };
 
-        let batch = BatchConfig {
+        let batch = BatchBytesConfig {
             // The max request size is 10MiB, so in order to be comfortably
             // within this we batch up to 5MiB.
-            batch_size: Some(
-                self.batch
-                    .batch_size
-                    .unwrap_or(bytesize::mib(5u64) as usize),
-            ),
+            max_size: Some(self.batch.max_size.unwrap_or(bytesize::mib(5u64) as usize)),
             ..self.batch
         };
 
         let request = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
-            request_in_flight_limit: Some(self.request.request_in_flight_limit.unwrap_or(100)),
-            request_rate_limit_num: Some(self.request.request_rate_limit_num.unwrap_or(100)),
+            in_flight_limit: Some(self.request.in_flight_limit.unwrap_or(100)),
+            rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
             ..self.request
         };
 
@@ -97,7 +93,7 @@ impl NewRelicLogsConfig {
             uri: uri.to_owned(),
             method: Some(HttpMethod::Post),
             healthcheck_uri: None,
-            basic_auth: None,
+            auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
             encoding: Encoding::Json,
@@ -148,17 +144,17 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
-            http_config.batch.batch_size,
+            http_config.batch.max_size,
             Some(bytesize::mib(5u64) as usize)
         );
-        assert_eq!(http_config.request.request_in_flight_limit, Some(100));
-        assert_eq!(http_config.request.request_rate_limit_num, Some(100));
+        assert_eq!(http_config.request.in_flight_limit, Some(100));
+        assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
             http_config.headers.unwrap()["X-License-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
-        assert!(http_config.basic_auth.is_none());
+        assert!(http_config.auth.is_none());
     }
 
     #[test]
@@ -166,9 +162,9 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::default();
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.batch_size = Some(bytesize::mib(8u64) as usize);
-        nr_config.request.request_in_flight_limit = Some(12);
-        nr_config.request.request_rate_limit_num = Some(24);
+        nr_config.batch.max_size = Some(bytesize::mib(8u64) as usize);
+        nr_config.request.in_flight_limit = Some(12);
+        nr_config.request.rate_limit_num = Some(24);
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -176,17 +172,17 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
-            http_config.batch.batch_size,
+            http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.request_in_flight_limit, Some(12));
-        assert_eq!(http_config.request.request_rate_limit_num, Some(24));
+        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
-        assert!(http_config.basic_auth.is_none());
+        assert!(http_config.auth.is_none());
     }
 
     #[test]
@@ -194,9 +190,13 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
-        batch_size = 8388608
-        request_in_flight_limit = 12
-        request_rate_limit_num = 24
+
+        [batch]
+        max_size = 8388608
+
+        [request]
+        in_flight_limit = 12
+        rate_limit_num = 24
     "#;
         let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
 
@@ -206,17 +206,17 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
-            http_config.batch.batch_size,
+            http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.request_in_flight_limit, Some(12));
-        assert_eq!(http_config.request.request_rate_limit_num, Some(24));
+        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
-        assert!(http_config.basic_auth.is_none());
+        assert!(http_config.auth.is_none());
     }
 
     fn build_test_server(
