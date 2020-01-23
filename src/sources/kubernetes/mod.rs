@@ -39,13 +39,10 @@ enum BuildError {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct KubernetesConfig {
-    #[serde(default)]
     include_container_names: Vec<String>,
-    #[serde(default)]
     include_pod_uids: Vec<String>,
-    #[serde(default)]
     include_namespaces: Vec<String>,
 }
 

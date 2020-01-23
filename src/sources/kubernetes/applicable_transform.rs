@@ -24,7 +24,17 @@ impl Transform for ApplicableTransform {
                     Some(event)
                 } else {
                     *self = Self::Transform(None);
-                    warn!("No applicable transform.");
+                    // It could happen if user used:
+                    //  - The newest Kubernetes which had breaking change related to logging,
+                    //    and we haven't updated vector.
+                    //    Currently v1.17
+                    //
+                    //  - One of older, pre CRI, Kubernetes version.
+                    //    Theoretically, v1.5 is the lowest workable version.
+                    //    Confirmed to work since v1.13
+                    //
+                    //  - Container runtime with alpha/beta/buggy implementation of CRI.
+                    warn!("Unsupported Kubernetes version and Container runtime pair. Try changing one or the other, and consult with our documentation.");
                     None
                 }
             }

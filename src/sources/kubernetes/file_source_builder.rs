@@ -7,6 +7,7 @@ use crate::{
     topology::config::{GlobalOptions, SourceConfig},
 };
 use futures::sync::mpsc;
+use std::iter::FromIterator;
 
 use super::{BuildError, KubernetesConfig, LOG_DIRECTORY};
 
@@ -57,41 +58,124 @@ impl<'a> FileSourceBuilder<'a> {
 
     /// Configures include in FileConfig
     fn file_source_include(&mut self) -> crate::Result<()> {
-        // Prepare include patterns
+        // Paths to log files can contain: namespace, pod uid, and container name.
+        // This property of paths is exploited by embeding config.include_* filters into globs.
+        // https://en.wikipedia.org/wiki/Glob_(programming)
+        //
+        // These globs are passed to file_source which will then only listen for
+        // log files that satisfy those globs.
+        //
+        // This method constructs those globs and adds them to the file source configuration.
 
-        // Contains patterns that match on all possible included UIDs.
-        let include_pod_uids = self
-            .numerical_pod_uids()?
-            .into_iter()
-            .flat_map(|uid| to_uid_forms(uid.as_str()))
-            .collect();
+        // For constructing globs it's important how include filters interact:
+        //  - Inside same filter, different values are alteratives. OR
+        //    Because of this it's necessary to have at least one glob per value per filter.
+        //  - Between filters, values are necessary. AND
+        //    Because of this all globs of one filter need to be paired up with all globs of other filter.
+        //    And then those pairs with globs of third filter.
 
-        // Pattern that matches to all UIDs, and only UIDs.
-        let any_uid = to_uid_forms("");
-        let pod_uids = not_empty_or_else(&include_pod_uids, &any_uid);
+        let namespaces = if self.config.include_namespaces.is_empty() {
+            // Any namespace
+            vec!["*".to_string()]
+        } else {
+            // Globs that match only on included namespaces.
+            // Example:
+            // With include_namespaces = ["telemetry","app"],
+            // this will be:[
+            //      "telemetry"
+            //      "app"
+            // ]
+            self.config.include_namespaces.clone()
+        };
 
-        // Contains patterns: container_name*
-        let include_container_names = self
-            .config
-            .include_container_names
-            .iter()
-            .map(|name| name.clone() + "*")
-            .collect();
+        let pod_uids = if self.config.include_pod_uids.is_empty() {
+            // Pattern that matches to all UIDs, and only UIDs per https://tools.ietf.org/html/rfc4122.
+            // Will be:[
+            //     "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
+            //     "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
+            // ]
+            PartialUid::default().uid_globs()
+        } else {
+            // Constructs globs that match on uids starting with any partial uid in include_pod_uid.
+            // Example:
+            // With include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"],
+            // this will be:[
+            //      "a0x7ft9d-8f18-2345-19fa-930f8fa71234"
+            //      "8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]"
+            // ]
+            self.config
+                .include_pod_uids
+                .clone()
+                .into_iter()
+                .map(PartialUid::new)
+                .collect::<Result<Vec<_>, BuildError>>()?
+                .iter()
+                .flat_map(PartialUid::uid_globs)
+                .collect()
+        };
 
-        let any_name = vec!["*".to_string()];
-        let container_names = not_empty_or_else(&include_container_names, &any_name);
+        let container_names = if self.config.include_container_names.is_empty() {
+            // Any name
+            vec!["*".to_string()]
+        } else {
+            // Constructs globs that match on container names starting with any prefix in
+            // include_container_names.
+            // Example:
+            // With include_container_names = ["busybox","redis"],
+            // this will be:[
+            //      "busybox*"
+            //      "redis*"
+            // ]
+            self.config
+                .include_container_names
+                .iter()
+                .map(|name| name.clone() + "*")
+                .collect()
+        };
 
-        let any_namespace = vec!["*".to_string()];
-        // Will match only on exactly included namespaces, or any if none specified.
-        let namespaces = not_empty_or_else(&self.config.include_namespaces, &any_namespace);
-
-        // The following creates and adds path includes of form:
+        // The following creates and adds globs of form:
         // LOG_DIRECTORY/uid/container_name/*.log
         //
+        // Files matching those globs will be monitored for logs.
+        //
         // To construct the paths, it's necessary to make every
-        // possible combination of uid and container_name.
-        for uid in pod_uids {
-            for container_name in container_names {
+        // possible combination of uid globs and container_name globs.
+        //
+        // Examples:
+        //
+        // 1.
+        //  - Empty include_pod_uid
+        //  - Empty include_container_names
+        // -------------------------------------------------------------------------------------------
+        // Globs:
+        //      LOG_DIRECTORY/[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log
+        //      LOG_DIRECTORY/[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log
+        //
+        // 2.
+        //  - include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
+        //  - Empty include_container_names
+        // -------------------------------------------------------------------------------------------
+        // Globs:
+        //      LOG_DIRECTORY/a0x7ft9d-8f18-2345-19fa-930f8fa71234/*/*.log
+        //      LOG_DIRECTORY/a0x7ft9d8f18234519fa930f8fa71234/*/*.log
+        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log
+        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log
+        //
+        // 3.
+        //  - include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
+        //  - include_container_names = ["busybox","redis"]
+        // -------------------------------------------------------------------------------------------
+        // Globs:
+        //      LOG_DIRECTORY/a0x7ft9d-8f18-2345-19fa-930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/a0x7ft9d-8f18-2345-19fa-930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/a0x7ft9d8f18234519fa930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/a0x7ft9d8f18234519fa930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
+        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
+        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        for uid in &pod_uids {
+            for container_name in &container_names {
                 self.file_config.include.push(
                     (LOG_DIRECTORY.to_owned()
                         + format!("{}/{}/*.log", uid, container_name).as_str())
@@ -100,14 +184,37 @@ impl<'a> FileSourceBuilder<'a> {
             }
         }
 
-        // The following creates and adds path includes of form:
+        // The following creates and adds globs of form:
         // LOG_DIRECTORY/namespace_*_uid/container_name/*.log
         //
         // To construct the paths, it's necessary to make every
-        // possible combination of uid, container_name, and namespace.
-        for uid in pod_uids {
-            for container_name in container_names {
-                for namespace in namespaces {
+        // possible combination of namespace globs, uid globs, and container name globs.
+        //
+        // Example:
+        //  - include_namespaces = ["telemetry","app"]
+        //  - include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
+        //  - include_container_names = ["busybox","redis"]
+        // -------------------------------------------------------------------------------------------
+        // Globs:
+        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d8f18234519fa930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d8f18234519fa930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        //      LOG_DIRECTORY/app_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/app_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/app_*_a0x7ft9d8f18234519fa930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/app_*_a0x7ft9d8f18234519fa930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        for namespace in &namespaces {
+            for uid in &pod_uids {
+                for container_name in &container_names {
                     self.file_config.include.push(
                         (LOG_DIRECTORY.to_owned()
                             + format!("{}_*_{}/{}/*.log", namespace, uid, container_name).as_str())
@@ -120,7 +227,14 @@ impl<'a> FileSourceBuilder<'a> {
         Ok(())
     }
 
-    /// Configures exclude in FileConfig
+    /// Configures exclude in FileConfig.
+    ///
+    /// By default it's good to exclude "kube-system" namespace and "vector*" container name.
+    /// But that default can/must be turned off if the user has anything included. The reason being:
+    /// a) if user hasn't included  "kube-system" or "vector*", than they will be filtered out
+    ///    with include, so exclude isn't necessary.
+    /// b) if user has included "kube-system" or "vector*", then that is a sign that user wants
+    ///    to log it so excluding it is not valid.
     fn file_source_exclude(&mut self) {
         // True if there is no includes
         let no_include = self.config.include_container_names.is_empty()
@@ -144,79 +258,65 @@ impl<'a> FileSourceBuilder<'a> {
                 .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
         }
     }
+}
 
-    /// Checks included uids for validity, and transforms them to numerical format.
-    fn numerical_pod_uids(&self) -> Result<Vec<String>, BuildError> {
-        let mut include_pod_uids = Vec::new();
-        for pod_uid in &self.config.include_pod_uids {
-            let mut pod_uid = pod_uid.clone();
+/// Partial UUID in numerical format (without the '-') as defined by https://tools.ietf.org/html/rfc4122.
+/// Has [0,32] UUID characters.
+#[derive(Clone, Debug, Default)]
+struct PartialUid {
+    partial_uid: String,
+}
 
-            // Check if pod_uid contains only UID valid characters
-            if !pod_uid.chars().all(|c| {
-                c.is_numeric() || ('A'..='F').contains(&c) || ('a'..='f').contains(&c) || c == '-'
-            }) {
-                error!(message = "Configuration 'include_pod_uids' contains not UID", uid = ?pod_uid);
-                return Err(BuildError::IllegalCharacterInUid {
-                    uid: pod_uid.clone(),
-                });
-            }
-
-            // Remove dashes from uid so to always have numerical format
-            // of uid.
-            pod_uid.retain(|c| c != '-');
-
-            if pod_uid.chars().count() > 32 {
-                return Err(BuildError::UidToLarge {
-                    uid: pod_uid.clone(),
-                });
-            }
-
-            include_pod_uids.push(pod_uid);
+impl PartialUid {
+    /// Checks partial_uid for validity, and transforms them to numerical format.
+    fn new(mut partial_uid: String) -> Result<Self, BuildError> {
+        // Check if partial_uid contains only UUID valid characters as defined by https://tools.ietf.org/html/rfc4122.
+        if !partial_uid.chars().all(|c| {
+            c.is_numeric() || ('A'..='F').contains(&c) || ('a'..='f').contains(&c) || c == '-'
+        }) {
+            error!(message = "Configuration 'include_pod_uids' contains an illegal UID.", uid = ?partial_uid);
+            return Err(BuildError::IllegalCharacterInUid {
+                uid: partial_uid.clone(),
+            });
         }
 
-        Ok(include_pod_uids)
-    }
-}
+        // Remove dashes from uid so to always have numerical format
+        // of uid.
+        partial_uid.retain(|c| c != '-');
 
-/// Transforms uid to two UID forms defined by https://tools.ietf.org/html/rfc4122.
-///  * 32 character number (numercial format)
-///  * 8_char-4_char-4_char-4_char-12_char
-/// If uid has less than 32 hexadecimal digits, if will be filled up
-/// with "[0-9A-Fa-f]" per digit up to 32 .
-fn to_uid_forms(uid: &str) -> Vec<String> {
-    let mut it = uid.chars();
-    vec![
-        format!(
-            "{}-{}-{}-{}-{}",
-            char_or_hexadecimal(&mut it, 8),
-            char_or_hexadecimal(&mut it, 4),
-            char_or_hexadecimal(&mut it, 4),
-            char_or_hexadecimal(&mut it, 4),
-            char_or_hexadecimal(&mut it, 12)
-        ),
-        char_or_hexadecimal(&mut uid.chars(), 32),
-    ]
-}
-
-/// Joins n next characters from iterator.
-/// If there is not enough of characters, uses "[0-9A-Fa-f]" instead of a character.
-fn char_or_hexadecimal(it: &mut impl Iterator<Item = char>, n: usize) -> String {
-    let mut tmp = String::new();
-    for _ in 0..n {
-        if let Some(item) = it.next() {
-            tmp.push(item);
-        } else {
-            tmp.push_str("[0-9A-Fa-f]")
+        if partial_uid.chars().count() > 32 {
+            return Err(BuildError::UidToLarge {
+                uid: partial_uid.clone(),
+            });
         }
-    }
-    tmp
-}
 
-/// A helper method to remove duplication.
-fn not_empty_or_else<'a>(o: &'a Vec<String>, default: &'a Vec<String>) -> &'a Vec<String> {
-    if o.is_empty() {
-        default
-    } else {
-        o
+        Ok(Self { partial_uid })
+    }
+
+    /// Transforms partial uid to two globs that match on two UUID forms
+    /// as defined by https://tools.ietf.org/html/rfc4122:
+    ///  - 8char-4char-4char-4char-12char
+    ///  - 32 character number (numerical format)
+    /// If partial_uid has less than 32 UUID characters, if will be filled up
+    /// with "[0-9A-Fa-f]" glob pattern so to match exactly 32 UUID characters.
+    fn uid_globs(&self) -> Vec<String> {
+        let parts = self
+            .partial_uid
+            .chars()
+            .map(|ch| String::from_iter(Some(ch)))
+            .chain((0..32).into_iter().map(|_| "[0-9A-Fa-f]".to_owned()))
+            .collect::<Vec<String>>();
+
+        vec![
+            format!(
+                "{}-{}-{}-{}-{}",
+                parts[0..8].concat(),
+                parts[8..12].concat(),
+                parts[12..16].concat(),
+                parts[16..20].concat(),
+                parts[20..32].concat(),
+            ),
+            parts[0..32].concat(),
+        ]
     }
 }
