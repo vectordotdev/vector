@@ -63,6 +63,9 @@ release: ## Release a new Vector version
 	@$(MAKE) generate CHECK_URLS=false
 	@$(MAKE) release-commit
 
+release-push: ## Push new Vector version
+	@scripts/release-push.sh
+
 run: ## Starts Vector in development mode
 	@cargo run
 
