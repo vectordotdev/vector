@@ -213,7 +213,7 @@ The name of a transform, the input event will be delivered to this transform in 
 
 #### log_fields
 
-Specifies the log fields when the input type is 'log'.
+Specifies the log fields when the input type is &#39;log&#39;.
 
 <Fields filters={false}>
 
@@ -261,7 +261,7 @@ A key/value pair representing a field to be added to the input event.
 
 #### metric
 
-Specifies the metric type when the input type is 'metric'.
+Specifies the metric type when the input type is &#39;metric&#39;.
 
 <Fields filters={false}>
 
@@ -304,7 +304,7 @@ The direction to increase or decrease the gauge value.
 
 ##### name
 
-The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
+The name of the metric. Defaults to `&lt;field&gt;_total` for `counter` and `&lt;field&gt;` for `gauge`.
 
 
 </Field>
@@ -489,7 +489,7 @@ The event type.
 
 #### value
 
-Specifies the log message field contents when the input type is 'raw'.
+Specifies the log message field contents when the input type is &#39;raw&#39;.
 
 
 </Field>

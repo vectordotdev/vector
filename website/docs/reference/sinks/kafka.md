@@ -203,7 +203,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
