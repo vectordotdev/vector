@@ -101,7 +101,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The downstream Vector address, this must include &lt;host&gt;:&lt;port&gt;.
+The downstream Vector address to connect to, this must include &lt;host&gt;:&lt;port&gt;.
 
 
 </Field>

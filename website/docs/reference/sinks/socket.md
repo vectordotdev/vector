@@ -116,7 +116,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to bind to, this must include some &lt;host&gt;:&lt;port&gt; pair.
+The address to connect to, this must include some &lt;host&gt;:&lt;port&gt; pair.
 
 
 </Field>
