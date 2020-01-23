@@ -17,8 +17,6 @@ Group: Applications/System
 Source: %{_source}
 URL: %{_url}
 
-Requires: systemd
-
 %description
 %{summary}
 
