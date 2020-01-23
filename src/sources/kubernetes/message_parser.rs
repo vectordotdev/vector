@@ -141,4 +141,28 @@ mod tests {
                 .with_timezone(&Utc),
         );
     }
+
+    #[test]
+    fn docker_message_transform() {
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit(
+            "message",
+            r#"{"log":"12", "time":"2019-10-02T13:21:36.927620189+02:00", "stream" : "stdout"}"#
+                .to_owned(),
+        );
+
+        let mut transform = DockerMessageTransformer::new();
+
+        let event = transform.transform(event).expect("Transformed");
+
+        has(&event, event::MESSAGE.as_ref(), "12");
+        has(&event, "stream", "stdout");
+        has(
+            &event,
+            event::TIMESTAMP.as_ref(),
+            DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
+                .unwrap()
+                .with_timezone(&Utc),
+        );
+    }
 }
