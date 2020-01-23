@@ -379,6 +379,17 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+## Special notes
+
+If you run Vector from a non-root user, you need to add that user to the
+`systemd-journal` group.
+
+For example, if the user is named `vector`, it can be done by running
+
+```sh
+usermod -aG systemd-journal vector
+```
+
 
 [docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
