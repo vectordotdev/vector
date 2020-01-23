@@ -66,6 +66,10 @@ impl<'a> FileSourceBuilder<'a> {
         // log files that satisfy those globs.
         //
         // This method constructs those globs and adds them to the file source configuration.
+        //
+        // We are using globs to read only the log files of containers whose
+        // metadata (namespace, pod uid, name) passes include_* filters. That way, we are
+        // reading less, and processing less, so that's a performace win.
 
         // For constructing globs it's important how include filters interact:
         //  - Inside same filter, different values are alteratives. OR

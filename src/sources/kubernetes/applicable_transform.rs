@@ -34,6 +34,8 @@ impl Transform for ApplicableTransform {
                     //    Confirmed to work since v1.13
                     //
                     //  - Container runtime with alpha/beta/buggy implementation of CRI.
+                    //
+                    // CRI current version: https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2
                     warn!("Unsupported Kubernetes version and Container runtime pair. Try changing one or the other, and consult with our documentation.");
                     None
                 }
