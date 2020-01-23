@@ -98,10 +98,12 @@ impl<'a> FileSourceBuilder<'a> {
         } else {
             // Constructs globs that match on uids starting with any partial uid in include_pod_uid.
             // Example:
-            // With include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"],
+            // With include_pod_uid = ["a027f09d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"],
             // this will be:[
-            //      "a0x7ft9d-8f18-2345-19fa-930f8fa71234"
+            //      "a027f09d-8f18-2345-19fa-930f8fa71234"
+            //      "a027f09d8f18234519fa930f8fa71234"
             //      "8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]"
+            //      "8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]"
             // ]
             self.config
                 .include_pod_uids
@@ -152,24 +154,24 @@ impl<'a> FileSourceBuilder<'a> {
         //      LOG_DIRECTORY/[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log
         //
         // 2.
-        //  - include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
+        //  - include_pod_uid = ["a027f09d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
         //  - Empty include_container_names
         // -------------------------------------------------------------------------------------------
         // Globs:
-        //      LOG_DIRECTORY/a0x7ft9d-8f18-2345-19fa-930f8fa71234/*/*.log
-        //      LOG_DIRECTORY/a0x7ft9d8f18234519fa930f8fa71234/*/*.log
+        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/*/*.log
+        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/*/*.log
         //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log
         //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log
         //
         // 3.
-        //  - include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
+        //  - include_pod_uid = ["a027f09d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
         //  - include_container_names = ["busybox","redis"]
         // -------------------------------------------------------------------------------------------
         // Globs:
-        //      LOG_DIRECTORY/a0x7ft9d-8f18-2345-19fa-930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/a0x7ft9d-8f18-2345-19fa-930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/a0x7ft9d8f18234519fa930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/a0x7ft9d8f18234519fa930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/redis/*.log
         //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
         //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
         //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
@@ -192,22 +194,22 @@ impl<'a> FileSourceBuilder<'a> {
         //
         // Example:
         //  - include_namespaces = ["telemetry","app"]
-        //  - include_pod_uid = ["a0x7ft9d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
+        //  - include_pod_uid = ["a027f09d8f18234519fa930f8fa71234","8f0290f83cb28fff201a8fcc310928"]
         //  - include_container_names = ["busybox","redis"]
         // -------------------------------------------------------------------------------------------
         // Globs:
-        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d8f18234519fa930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/telemetry_*_a0x7ft9d8f18234519fa930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d8f18234519fa930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d8f18234519fa930f8fa71234/redis/*.log
         //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
         //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
         //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
         //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
-        //      LOG_DIRECTORY/app_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/app_*_a0x7ft9d-8f18-2345-19fa-930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/app_*_a0x7ft9d8f18234519fa930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/app_*_a0x7ft9d8f18234519fa930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d8f18234519fa930f8fa71234/busybox/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d8f18234519fa930f8fa71234/redis/*.log
         //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
         //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
         //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
@@ -318,5 +320,57 @@ impl PartialUid {
             ),
             parts[0..32].concat(),
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PartialUid;
+    use std::collections::HashSet;
+    use std::iter::FromIterator;
+
+    #[test]
+    fn invalid_uuid_char() {
+        assert!(PartialUid::new("afp".to_owned()).is_err());
+    }
+
+    #[test]
+    fn uuid_to_big() {
+        assert!(PartialUid::new((0..33).map(|_| "0").collect::<String>()).is_err());
+    }
+
+    #[test]
+    fn valid_partial_uuid() {
+        assert!(PartialUid::new("af04".to_owned()).is_ok());
+    }
+
+    #[test]
+    fn full_globs() {
+        assert_eq!(
+            HashSet::<String>::from_iter(
+                PartialUid::new("a027f09d8f18234519fa930f8fa71234".to_owned())
+                    .unwrap()
+                    .uid_globs()
+            ),
+            HashSet::<String>::from_iter(vec![
+                "a027f09d8f18234519fa930f8fa71234".to_owned(),
+                "a027f09d-8f18-2345-19fa-930f8fa71234".to_owned()
+            ])
+        );
+    }
+
+    #[test]
+    fn partial_globs() {
+        assert_eq!(
+            HashSet::<String>::from_iter(
+                PartialUid::new("8f0290f83cb28fff201a8fcc310928".to_owned())
+                    .unwrap()
+                    .uid_globs()
+            ),
+            HashSet::<String>::from_iter(vec![
+                "8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]".to_owned(),
+                "8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]".to_owned()
+            ])
+        );
     }
 }
