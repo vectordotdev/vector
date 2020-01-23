@@ -90,7 +90,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ### LOG
 
-Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#level] for more information on the available levels.
+Sets Vector&#39;s log level. See the [log section in the monitoring guide][docs.monitoring#level] for more information on the available levels.
 
 
 </Field>

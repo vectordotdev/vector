@@ -296,7 +296,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -389,7 +389,7 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
-The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either "endpoint" or "region" must be specified.
+The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either &quot;endpoint&quot; or &quot;region&quot; must be specified.
 
 
 </Field>
@@ -499,7 +499,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### key_prefix
 
-A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
+A prefix to apply to all object key names. This should be used to partition your objects, and it&#39;s important to end this value with a `/` if you want this to be the root S3 &quot;folder&quot;. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 
 </Field>
@@ -521,7 +521,7 @@ A prefix to apply to all object key names. This should be used to partition your
 
 ### region
 
-The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either "region" or "endpoint" must be specified.
+The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either &quot;region&quot; or &quot;endpoint&quot; must be specified.
 
 
 </Field>
@@ -696,7 +696,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
