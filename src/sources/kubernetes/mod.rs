@@ -7,7 +7,7 @@ mod message_parser;
 
 use self::applicable_transform::ApplicableTransform;
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     sources::Source,
     topology::config::{DataType, GlobalOptions, SourceConfig},
     transforms::{

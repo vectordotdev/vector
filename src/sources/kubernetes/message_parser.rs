@@ -1,6 +1,6 @@
 use super::ApplicableTransform;
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event, Value},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
         regex_parser::{RegexParser, RegexParserConfig},
@@ -53,12 +53,12 @@ impl Transform for DockerMessageTransformer {
         let log = event.as_mut_log();
 
         // time -> timestamp
-        if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&self.atom_time) {
+        if let Some(Value::Bytes(timestamp_bytes)) = log.remove(&self.atom_time) {
             match DateTime::parse_from_rfc3339(
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
                 Ok(timestamp) => {
-                    log.insert_explicit(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
+                    log.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
                 }
                 Err(error) => {
                     debug!(message = "Non rfc3339 timestamp.", %error, rate_limit_secs = 10);
@@ -72,7 +72,7 @@ impl Transform for DockerMessageTransformer {
 
         // log -> message
         if let Some(message) = log.remove(&self.atom_log) {
-            log.insert_explicit(event::MESSAGE.clone(), message);
+            log.insert(event::MESSAGE.clone(), message);
         } else {
             debug!(message = "Missing field.", field = %self.atom_log, rate_limit_secs = 10);
             return None;
@@ -108,7 +108,7 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
 mod tests {
     use super::*;
 
-    fn has<V: Into<ValueKind>>(event: &Event, field: &str, data: V) {
+    fn has<V: Into<Value>>(event: &Event, field: &str, data: V) {
         assert_eq!(
             event
                 .as_log()
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn cri_message_transform() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
+        event.as_mut_log().insert(
             "message",
             "2019-10-02T13:21:36.927620189+02:00 stdout F 12".to_owned(),
         );
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn docker_message_transform() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
+        event.as_mut_log().insert(
             "message",
             r#"{"log":"12", "time":"2019-10-02T13:21:36.927620189+02:00", "stream" : "stdout"}"#
                 .to_owned(),
