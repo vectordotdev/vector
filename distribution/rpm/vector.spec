@@ -6,6 +6,7 @@
 %define _source %{_name}-%{_arch}.tar.gz
 %define _sourceroot %{_name}-%{_arch}
 %define _buildname %{name}-%{version}-%{release}.%{_arch}
+%define _username %{_name}
 
 Name: %{_name}
 Summary: A High-Performance Logs, Metrics, and Events Routing Layer
@@ -16,7 +17,7 @@ Group: Applications/System
 Source: %{_source}
 URL: %{_url}
 
-BuildRequires: systemd
+Requires: systemd
 
 %description
 %{summary}
@@ -35,7 +36,7 @@ rm -rf %{buildroot}
 mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
-mkdir -p %{buildroot}%{_datadir}/%{_name}
+mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
 cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
@@ -44,6 +45,13 @@ cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/example
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
 cp -a %{_builddir}/README.md %{buildroot}/README.md
 cp -a %{_builddir}/LICENSE %{buildroot}/LICENSE
+
+%post
+getent group %{_username} > /dev/null || groupadd -r %{_username}
+getent passwd %{_username} > /dev/null || \
+  useradd -r -d %{_sharedstatedir}/%{_name} -g  -s /sbin/nologin \
+  -c "Vector observability data router" %{_username}
+chown %{_username} %{_sharedstatedir}/%{_name}
 
 %clean
 rm -rf %{buildroot}
@@ -55,6 +63,7 @@ rm -rf %{buildroot}
 %config(noreplace) %{_sysconfdir}/%{_name}/vector.toml
 %config %{_sysconfdir}/%{_name}/vector.spec.toml
 %config %{_sysconfdir}/%{_name}/examples/*
+%dir %{_sharedstatedir}/%{_name}
 %doc /README.md
 %license /LICENSE
 
