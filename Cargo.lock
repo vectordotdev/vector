@@ -4109,7 +4109,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "vector"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "approx 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "atty 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",

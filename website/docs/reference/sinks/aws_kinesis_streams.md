@@ -261,7 +261,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -354,7 +354,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### partition_key_field
 
-The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.
+The log field used as the Kinesis record&#39;s partition key value. See [Partitioning](#partitioning) for more info.
 
 
 </Field>
@@ -551,7 +551,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
