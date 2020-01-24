@@ -1,8 +1,5 @@
-use crate::transforms::{
-    merge::{Merge, MergeConfig},
-    Transform,
-};
 use crate::{
+    event::merge_state::LogEventMergeState,
     event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -47,7 +44,7 @@ pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
-    partial_event_marker: Option<Atom>,
+    partial_event_marker_field: Option<Atom>,
     auto_partial_merge: bool,
 }
 
@@ -57,7 +54,7 @@ impl Default for DockerConfig {
             include_containers: None,
             include_labels: None,
             include_images: None,
-            partial_event_marker: Some(event::PARTIAL.clone()),
+            partial_event_marker_field: Some(event::PARTIAL.clone()),
             auto_partial_merge: true,
         }
     }
@@ -85,6 +82,15 @@ impl DockerConfig {
             true
         }
     }
+
+    fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
+        if let Some(val) = &self.partial_event_marker_field {
+            if val.is_empty() {
+                self.partial_event_marker_field = None;
+            }
+        }
+        self
+    }
 }
 
 inventory::submit! {
@@ -99,9 +105,12 @@ impl SourceConfig for DockerConfig {
         _globals: &GlobalOptions,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
-        DockerSource::new(self.clone(), out)
-            .map(Box::new)
-            .map(|source| source as Box<_>)
+        DockerSource::new(
+            self.clone().with_empty_partial_event_marker_field_as_none(),
+            out,
+        )
+        .map(Box::new)
+        .map(|source| source as Box<_>)
     }
 
     fn output_type(&self) -> DataType {
@@ -215,33 +224,6 @@ impl DockerSource {
         config: DockerConfig,
         out: Sender<Event>,
     ) -> crate::Result<impl Future<Item = (), Error = ()>> {
-        // Built-in merge transform config.
-        // We spawn a merge transform per docker log event stream (which
-        // happens to be per container).
-        // If `None` or empty string, no merging is performed, allowing use to
-        // effectively opt-out from the built-in automating partial message
-        // merging.
-        let merge_transform_config = if config.auto_partial_merge {
-            config
-                .partial_event_marker
-                .clone()
-                .and_then(|partial_event_marker| {
-                    // Allow using empty value as if it's `None`.
-                    if partial_event_marker.is_empty() {
-                        None
-                    } else {
-                        Some(partial_event_marker)
-                    }
-                })
-                .map(|partial_event_marker| MergeConfig {
-                    partial_event_marker,
-                    merge_fields: vec![event::MESSAGE.clone()],
-                    stream_discriminant_fields: vec![],
-                })
-        } else {
-            None
-        };
-
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
 
@@ -260,7 +242,7 @@ impl DockerSource {
         // t2 -- outside: container stoped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
-        let esb = EventStreamBuilder::new(core, out, main_send, merge_transform_config);
+        let esb = EventStreamBuilder::new(core, out, main_send);
 
         // Construct, capture currently running containers, and do main future(self)
         Ok(DockerSource {
@@ -512,8 +494,6 @@ struct EventStreamBuilder {
     out: Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: UnboundedSender<ContainerLogInfo>,
-    /// A built-in merge transform config.
-    merge_transform_config: Option<MergeConfig>,
 }
 
 impl EventStreamBuilder {
@@ -521,13 +501,11 @@ impl EventStreamBuilder {
         core: DockerSourceCore,
         out: Sender<Event>,
         main_send: UnboundedSender<ContainerLogInfo>,
-        merge_transform_config: Option<MergeConfig>,
     ) -> Self {
         EventStreamBuilder {
             core: Arc::new(core),
             out,
             main_send,
-            merge_transform_config,
         }
     }
 
@@ -585,17 +563,22 @@ impl EventStreamBuilder {
 
         // Create event streamer
         let mut state = Some((self.main_send.clone(), info));
-        let partial_event_marker = self.core.config.partial_event_marker.clone();
-        let event_stream = tokio::prelude::stream::poll_fn(move || {
+        let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
+        let auto_partial_merge = self.core.config.auto_partial_merge;
+        let mut partial_event_merge_state = None;
+        tokio::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
                 // Main event loop
                 loop {
                     return match stream.poll() {
                         Ok(Async::Ready(Some(message))) => {
-                            if let Some(event) =
-                                info.new_event(message, partial_event_marker.clone())
-                            {
+                            if let Some(event) = info.new_event(
+                                message,
+                                partial_event_marker_field.clone(),
+                                auto_partial_merge,
+                                &mut partial_event_merge_state,
+                            ) {
                                 Ok(Async::Ready(Some(event)))
                             } else {
                                 continue;
@@ -627,25 +610,9 @@ impl EventStreamBuilder {
             }
 
             Ok(Async::Ready(None))
-        });
-
-        // Prepare merge transform is the configuration is available, otherwise
-        // user must've opted out from the automatic merging, so we skip
-        // the merge transform creation.
-        let mut merge_transform: Option<Merge> =
-            self.merge_transform_config.clone().map(Into::into);
-
-        // Pass all events to merge transform is there is some, and return them
-        // as is otherwise. We can't perform the check outside of `filter_map`
-        // because the resulting stream type has to be of a particular type.
-        let event_stream = event_stream.filter_map(move |event| match merge_transform {
-            Some(ref mut merge_transform) => Transform::transform(merge_transform, event),
-            None => Some(event),
-        });
-
-        event_stream
-            .forward(self.out.clone().sink_map_err(|_| ()))
-            .map(|_| ())
+        })
+        .forward(self.out.clone().sink_map_err(|_| ()))
+        .map(|_| ())
     }
 }
 
@@ -748,9 +715,15 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the begining of message
-    /// Expects messages to be ordered by timestamps
-    fn new_event(&mut self, message: Chunk, partial_event_marker: Option<Atom>) -> Option<Event> {
+    /// Expects timestamp at the begining of message.
+    /// Expects messages to be ordered by timestamps.
+    fn new_event(
+        &mut self,
+        message: Chunk,
+        partial_event_marker_field: Option<Atom>,
+        auto_partial_merge: bool,
+        partial_event_merge_state: &mut Option<LogEventMergeState>,
+    ) -> Option<Event> {
         let mut log_event = Event::new_empty_log().into_log();
 
         let stream = match message.stream_type {
@@ -802,21 +775,21 @@ impl ContainerLogInfo {
             }
         }
 
-        // Message is actually one line from stderr or stdout, and they are delimited with newline
-        // so that newline needs to be removed.
-        if bytes_message
+        // Message is actually one line from stderr or stdout, and they are
+        // delimited with newline, so that newline needs to be removed.
+        // If there's no newline, the event is considered partial, and will
+        // either be merged within the docker source, or marked accordingly
+        // before sending out, depending on the configuration.
+        let is_partial = if bytes_message
             .last()
             .map(|&b| b as char == '\n')
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
+            false
         } else {
-            // If message doesn't contain a newline at the end, consider it a partial event.
-            // Add a partial event marker if we're requested to do so.
-            if let Some(partial_event_marker) = partial_event_marker {
-                log_event.insert(partial_event_marker, true);
-            }
-        }
+            true
+        };
 
         // Supply message
         log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
@@ -831,6 +804,47 @@ impl ContainerLogInfo {
         log_event.insert(NAME.clone(), self.metadata.name.clone());
         log_event.insert(IMAGE.clone(), self.metadata.image.clone());
         log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+
+        // If automatic partial event merging is requested - do it.
+        // Otherwise mark partial events and return all the events with no
+        // merging.
+        let log_event = if auto_partial_merge {
+            // Partial event events merging logic.
+
+            // If event is partial, stash it and return None.
+            if is_partial {
+                // If we already have a merge state, this means this message have to
+                // merged with a previous one. Othersire, we create an new merge
+                // state with the current message being the initial one.
+                if let Some(partial_event_merge_state) = partial_event_merge_state {
+                    partial_event_merge_state
+                        .merge_in_next_event(log_event, &[event::MESSAGE.clone()]);
+                } else {
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                };
+                return None;
+            };
+
+            // This is not a parial event. If we have had a partial event merge
+            // state before, this must be a final event that would give us a merged
+            // event we can return. Otherwise it's just a regular event that we
+            // return as is.
+            match partial_event_merge_state.take() {
+                Some(partial_event_merge_state) => partial_event_merge_state
+                    .merge_in_final_event(log_event, &[event::MESSAGE.clone()]),
+                None => log_event,
+            }
+        } else {
+            // If the evnt is partial, just set the partial event marker field.
+            if is_partial {
+                // Only add partial event marker field if it's requested.
+                if let Some(partial_event_marker_field) = partial_event_marker_field {
+                    log_event.insert(partial_event_marker_field, true);
+                }
+            }
+            // Return the log event as is, partial or not. No merging here.
+            log_event
+        };
 
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
