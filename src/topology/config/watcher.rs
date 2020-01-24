@@ -1,5 +1,4 @@
 use super::Config;
-use futures::{stream, sync::mpsc, Async, Stream};
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     path::{Path, PathBuf},
@@ -8,13 +7,12 @@ use std::{
     time::Duration,
 };
 
-
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
-/// so to avoid receiving repetitions of previous events on macOS. 
-/// 
+/// so to avoid receiving repetitions of previous events on macOS.
+///
 /// But, config and topology reload logic can handle:
 ///  - Invalid config, caused either by user or by data race.
-///  - Frequent changes, caused by user/editor modifying/saving file in small chunks. 
+///  - Frequent changes, caused by user/editor modifying/saving file in small chunks.
 /// so we can use smaller, more responsive delay.
 pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
@@ -22,23 +20,20 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// On unix triggers SIGHUP when file on config_path changes.
 /// Accumulates file changes until no change for given duration has occured.
-/// Has best effort guarante of detecting all file changes from the end of 
+/// Has best effort guarante of detecting all file changes from the layend of
 /// this function until the main thread stops.
-/// 
+///
 /// Doesn't do anything on Windows.
-pub fn config_watcher(
-    config: &Config,
-    config_path: PathBuf,
-    duration: Duration,
-) {
-    #[cfg(unix)]
+pub fn config_watcher(config: &Config, config_path: PathBuf, delay: Duration) {
     if config.global.reload_config {
-        // Create watcher now so not to miss any changes happening between
-        // returning from this function and thread started.
-        let mut watcher = create_watcher(&config_path, delay);
+        #[cfg(unix)]
+        {
+            use nix::sys::signal;
+            // Create watcher now so not to miss any changes happening between
+            // returning from this function and thread started.
+            let mut watcher = create_watcher(&config_path, delay);
 
-        thread::spawn(move || {
-            loop {
+            thread::spawn(move || loop {
                 if let Some((_, receiver)) = watcher.take() {
                     info!("Watching configuration file");
                     while let Ok(msg) = receiver.recv() {
@@ -47,7 +42,9 @@ pub fn config_watcher(
                             | DebouncedEvent::Create(_)
                             | DebouncedEvent::Remove(_) => {
                                 info!("Configuration file changed");
-                                nix::sys::signal::raise(nix::sys::signal::Signal::SIGHUP);
+                                let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
+                                    debug!(message = "Unable to raise SIGHUP.", ?error)
+                                });
                             }
                             event => debug!(message = "Ignoring event", ?event),
                         }
@@ -58,8 +55,8 @@ pub fn config_watcher(
                 thread::sleep(RETRY_TIMEOUT);
 
                 watcher = create_watcher(&config_path, delay);
-            }
-        });
+            });
+        }
     }
 }
 
@@ -91,6 +88,7 @@ mod tests {
     use std::time::{Duration, Instant};
     use std::{fs::File, io::Write};
     use tokio::timer::Delay;
+    use tokio_signal::unix::{Signal, SIGHUP};
 
     #[test]
     fn file_update() {
@@ -102,16 +100,18 @@ mod tests {
         let mut config = Config::empty();
         config.global.reload_config = true;
 
-        let mut watcher = config_watcher(&config, file_path, delay);
+        config_watcher(&config, file_path, delay);
 
         file.write_all(&[0]).unwrap();
         std::mem::drop(file);
 
         let mut rt = runtime();
 
+        let signal = Signal::new(SIGHUP).flatten_stream();
         let result = rt
             .block_on(
-                future::poll_fn(move || watcher.poll())
+                signal
+                    .into_future()
                     .select2(Delay::new(Instant::now() + delay * 5)),
             )
             .ok()

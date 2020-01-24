@@ -19,6 +19,7 @@ data:
 
     # Set global options
     data_dir = "/var/tmp/vector"
+    reload_config = true
 
     # Ingest logs from Kubernetes
     [sources.kubernetes]
