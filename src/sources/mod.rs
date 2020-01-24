@@ -3,6 +3,7 @@ use snafu::Snafu;
 
 pub mod docker;
 pub mod file;
+pub mod http;
 pub mod journald;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
