@@ -738,6 +738,7 @@ jobs:
           command: |
             export PASS_VERSION=$(make version)
             export PASS_CIRCLE_SHA1="$CIRCLE_SHA1"
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
             ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
