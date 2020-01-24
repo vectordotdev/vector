@@ -724,14 +724,11 @@ impl ContainerLogInfo {
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
     ) -> Option<Event> {
-        let mut log_event = Event::new_empty_log().into_log();
-
         let stream = match message.stream_type {
             StreamType::StdErr => STDERR.clone(),
             StreamType::StdOut => STDOUT.clone(),
             _ => return None,
         };
-        log_event.insert(STREAM.clone(), stream);
 
         let mut bytes_message = BytesMut::from(message.data);
 
@@ -739,7 +736,7 @@ impl ContainerLogInfo {
 
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
-        match DateTime::parse_from_rfc3339(timestamp_str) {
+        let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
@@ -759,21 +756,23 @@ impl ContainerLogInfo {
                         return None;
                     }
                 }
-                // Supply timestamp
-                log_event.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc));
 
                 self.last_log = Some((timestamp, self.generation));
 
                 let log = splitter.next()?;
                 let remove_len = message.len() - log.len();
                 bytes_message.advance(remove_len);
+
+                // Provide the timestamp.
+                Some(timestamp.with_timezone(&Utc))
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
                 error!(message="Didn't recieve rfc3339 timestamp from docker",%error);
-                // So log whole message
+                // So continue normally but without a timestamp.
+                None
             }
-        }
+        };
 
         // Message is actually one line from stderr or stdout, and they are
         // delimited with newline, so that newline needs to be removed.
@@ -791,7 +790,8 @@ impl ContainerLogInfo {
             true
         };
 
-        // Supply message
+        // Populate the message. We only need a message to merge.
+        let mut log_event = Event::new_empty_log().into_log();
         log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
 
         // We got the message, that's the only part of the event we merge, so if
@@ -858,16 +858,33 @@ impl ContainerLogInfo {
             false
         };
 
-        // Supply container
-        log_event.insert(CONTAINER.clone(), self.id.0.clone());
+        // Populate the rest of the fields.
+        {
+            // Stream we got the message from.
+            log_event.insert(STREAM.clone(), stream);
 
-        // Add Metadata
-        for (key, value) in self.metadata.labels.iter() {
-            log_event.insert(key.clone(), value.clone());
+            // Timestamp of the event.
+            if let Some(timestamp) = timestamp {
+                log_event.insert(event::TIMESTAMP.clone(), timestamp);
+            }
+
+            // Container ID.
+            log_event.insert(CONTAINER.clone(), self.id.0.clone());
+
+            // Labels.
+            for (key, value) in self.metadata.labels.iter() {
+                log_event.insert(key.clone(), value.clone());
+            }
+
+            // Container name.
+            log_event.insert(NAME.clone(), self.metadata.name.clone());
+
+            // Container image.
+            log_event.insert(IMAGE.clone(), self.metadata.image.clone());
+
+            // Timestamp of the container creation.
+            log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
         }
-        log_event.insert(NAME.clone(), self.metadata.name.clone());
-        log_event.insert(IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
 
         // The event is fully initialized now.
 
