@@ -1,10 +1,13 @@
+use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{Event, Unflatten},
-    sinks::util::{
-        gcp::{GcpAuthConfig, GcpCredentials, Scope},
-        http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
-        BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+    sinks::{
+        util::{
+            http::{https_client, HttpRetryLogic, HttpService},
+            tls::{TlsOptions, TlsSettings},
+            BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, RouterSink,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -74,7 +77,7 @@ lazy_static! {
 
 #[typetag::serde(name = "gcp_stackdriver_logging")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
         let sink = self.service(&cx, &creds)?;
         let healthcheck = self.healthcheck(&cx, &creds)?;
@@ -96,7 +99,7 @@ impl StackdriverConfig {
         &self,
         cx: &SinkContext,
         creds: &Option<GcpCredentials>,
-    ) -> crate::Result<super::RouterSink> {
+    ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -140,7 +143,7 @@ impl StackdriverConfig {
         &self,
         cx: &SinkContext,
         creds: &Option<GcpCredentials>,
-    ) -> crate::Result<super::Healthcheck> {
+    ) -> crate::Result<Healthcheck> {
         let mut request = make_request(Body::from(self.write_request().into_bytes()));
 
         if let Some(creds) = creds.as_ref() {
@@ -160,7 +163,7 @@ impl StackdriverConfig {
                     creds.map(|creds| creds.spawn_regenerate_token());
                     Ok(())
                 }
-                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
             });
 
         Ok(Box::new(healthcheck))

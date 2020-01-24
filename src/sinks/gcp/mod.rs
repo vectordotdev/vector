@@ -1,5 +1,5 @@
 use futures::{Future, Stream};
-pub use goauth::scopes::Scope;
+use goauth::scopes::Scope;
 use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr};
 use hyper::{
     header::{HeaderValue, AUTHORIZATION},
@@ -11,6 +11,9 @@ use snafu::{ResultExt, Snafu};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::timer::Interval;
+
+pub mod pubsub;
+pub mod stackdriver_logging;
 
 #[derive(Debug, Snafu)]
 enum GcpError {

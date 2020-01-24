@@ -1,10 +1,13 @@
+use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
-    sinks::util::{
-        gcp::{GcpAuthConfig, GcpCredentials, Scope},
-        http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
-        BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+    sinks::{
+        util::{
+            http::{https_client, HttpRetryLogic, HttpService},
+            tls::{TlsOptions, TlsSettings},
+            BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, RouterSink, UriParseError,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -38,7 +41,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         // We only need to load the credentials if we are not targetting an emulator.
         let creds = match self.emulator_host {
             None => self.auth.make_credentials(Scope::PubSub)?,
@@ -65,7 +68,7 @@ impl PubsubConfig {
         &self,
         cx: &SinkContext,
         creds: &Option<GcpCredentials>,
-    ) -> crate::Result<super::RouterSink> {
+    ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&Default::default());
 
@@ -101,7 +104,7 @@ impl PubsubConfig {
         &self,
         cx: &SinkContext,
         creds: &Option<GcpCredentials>,
-    ) -> crate::Result<super::Healthcheck> {
+    ) -> crate::Result<Healthcheck> {
         let uri = self.uri("")?;
         let mut request = Request::get(uri).body(Body::empty()).unwrap();
         if let Some(creds) = creds.as_ref() {
@@ -124,7 +127,7 @@ impl PubsubConfig {
                     creds.map(|creds| creds.spawn_regenerate_token());
                     Ok(())
                 }
-                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
             });
 
         Ok(Box::new(healthcheck))
@@ -144,7 +147,7 @@ impl PubsubConfig {
             None => uri,
         };
         uri.parse::<Uri>()
-            .context(super::UriParseError)
+            .context(UriParseError)
             .map_err(Into::into)
     }
 }
