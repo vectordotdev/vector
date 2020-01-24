@@ -145,6 +145,7 @@ notify = "4.0.14"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
+nix = "0.16.1"
 
 [build-dependencies]
 prost-build = "0.5.0"

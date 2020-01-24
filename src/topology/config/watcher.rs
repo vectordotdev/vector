@@ -8,6 +8,7 @@ use std::{
     time::Duration,
 };
 
+
 // Per notify own documentation, it's advised to have delay of more than 30 sec,
 // so to avoid receiving repetitions of previous events on macOS.
 // Larger delays hurt responsivity, but that's fine as this is primarily designed
@@ -16,16 +17,16 @@ pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_se
 
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
-/// Returns when config should be reloaded.
-/// Never errors, and never ends.
+/// On unix triggers SIGHUP when file on config_path changes.
+/// Accumulates file changes until no change for given duration has occured.
+/// 
+/// Doesn't do anything on Windows.
 pub fn config_watcher(
     config: &Config,
     config_path: PathBuf,
-    delay: Duration,
-) -> impl Stream<Item = (), Error = ()> {
-    // Each sender has one slot, and 0 shared slots.
-    let (mut out_sender, out_receiver) = mpsc::channel(0);
-
+    duration: Duration,
+) {
+    #[cfg(unix)]
     if config.global.reload_config {
         // Create watcher now so not to miss any changes happening between
         // returning from this function and thread started.
@@ -41,9 +42,7 @@ pub fn config_watcher(
                             | DebouncedEvent::Create(_)
                             | DebouncedEvent::Remove(_) => {
                                 info!("Configuration file changed");
-                                // If Ok, good, if Err, then there is already a message
-                                // in the channel so this one is not required.
-                                let _ = out_sender.try_send(());
+                                nix::sys::signal::raise(nix::sys::signal::Signal::SIGHUP);
                             }
                             event => debug!(message = "Ignoring event", ?event),
                         }
@@ -57,15 +56,6 @@ pub fn config_watcher(
             }
         });
     }
-
-    let mut change_stream = out_receiver.fuse();
-    stream::poll_fn(move || {
-        change_stream.poll().map(|asyn| match asyn {
-            // Fulfills neverending promise
-            Async::Ready(None) => Async::NotReady,
-            asyn => asyn,
-        })
-    })
 }
 
 fn create_watcher(
@@ -110,7 +100,6 @@ mod tests {
         let mut watcher = config_watcher(&config, file_path, delay);
 
         file.write_all(&[0]).unwrap();
-        // Windows won't emit Write event while File handle is present.
         std::mem::drop(file);
 
         let mut rt = runtime();
