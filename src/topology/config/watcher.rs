@@ -19,6 +19,8 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// On unix triggers SIGHUP when file on config_path changes.
 /// Accumulates file changes until no change for given duration has occured.
+/// Guarantes capture of all file changes from the end of this function until 
+/// main thread stops.
 /// 
 /// Doesn't do anything on Windows.
 pub fn config_watcher(

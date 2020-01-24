@@ -251,6 +251,17 @@ fn main() {
         std::process::exit(exitcode::CONFIG);
     });
 
+    // Start listening for config changes immediately.
+    // There is a chance of config file changing since we read
+    // it unitl the end of this function. This should be extremly
+    // rare, the solution is somewhat complex, intrusive, so
+    // this will be fine for now.
+    vector::topology::config::watcher::config_watcher(
+        &config,
+        opts.config_path.clone(),
+        vector::topology::config::watcher::CONFIG_WATCH_DELAY,
+    );
+
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
         let num_threads = min(4, threads);
