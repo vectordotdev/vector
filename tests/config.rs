@@ -594,6 +594,7 @@ fn parses_sink_full_es_basic_auth() {
     .unwrap();
 }
 
+#[cfg(feature = "docker")]
 #[test]
 fn parses_sink_full_es_aws() {
     load(
