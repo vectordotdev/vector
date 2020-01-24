@@ -742,17 +742,16 @@ jobs:
             ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Homebrew
           command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-homebrew
+            export PASS_VERSION=$(make version)
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
+            ./scripts/docker-run.sh releaser make release-homebrew
 
   release-s3:
     docker:
