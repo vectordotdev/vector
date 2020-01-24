@@ -491,62 +491,7 @@ module.exports = {
     "insertions_count": 281,
     "last_version": "0.7.0",
     "posts": [
-      {
-        "author_github": "https://github.com/Jeffail",
-        "date": "2019-12-13",
-        "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
-        "id": "custom-dns",
-        "path": "website/blog/2019-12-13-custom-dns.md",
-        "permalink": "https://vector.dev/blog/custom-dns",
-        "tags": [
-          "type: announcement",
-          "domain: networking"
-        ],
-        "title": "Use Custom DNS Servers"
-      },
-      {
-        "author_github": "https://github.com/Jeffail",
-        "date": "2019-12-14",
-        "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
-        "id": "kubernetes-source-alpha",
-        "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
-        "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
-        "tags": [
-          "type: announcement",
-          "domain: platforms",
-          "platform: kubernetes"
-        ],
-        "title": "Alpha Kubernetes Source"
-      },
-      {
-        "author_github": "https://github.com/Jeffail",
-        "date": "2019-12-16",
-        "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
-        "id": "ec2-metadata",
-        "path": "website/blog/2019-12-16-ec2-metadata.md",
-        "permalink": "https://vector.dev/blog/ec2-metadata",
-        "tags": [
-          "type: announcement",
-          "domain: transforms",
-          "transform: ec2_metadata"
-        ],
-        "title": "EC2 Metadata Enrichments"
-      },
-      {
-        "author_github": "https://github.com/Jeffail",
-        "date": "2020-01-07",
-        "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
-        "id": "prometheus-source",
-        "path": "website/blog/2020-01-07-prometheus-source.md",
-        "permalink": "https://vector.dev/blog/prometheus-source",
-        "tags": [
-          "type: announcement",
-          "event type: metrics",
-          "domain: sources",
-          "source: prometheus"
-        ],
-        "title": "Prometheus Source"
-      }
+
     ],
     "subtitle": "",
     "type": "initial dev",
