@@ -14,7 +14,7 @@ pushd $td
 git config --global user.email "bradybot@timber.io"
 git config --global user.name "bradybot"
 
-git clone git@github.com:timberio/homebrew-brew.git
+git clone "https://$GITHUB_TOKEN:x-oauth-basic@github.com/timberio/homebrew-brew"
 cd homebrew-brew
 
 package_url="https://packages.timber.io/vector/$VERSION/vector-x86_64-apple-darwin.tar.gz"
