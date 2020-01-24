@@ -9,18 +9,21 @@ use std::{
 };
 
 
-// Per notify own documentation, it's advised to have delay of more than 30 sec,
-// so to avoid receiving repetitions of previous events on macOS.
-// Larger delays hurt responsivity, but that's fine as this is primarily designed
-// for cloud usage which isn't exactly super responsive.
-pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(31);
+/// Per notify own documentation, it's advised to have delay of more than 30 sec,
+/// so to avoid receiving repetitions of previous events on macOS. 
+/// 
+/// But, config and topology reload logic can handle:
+///  - Invalid config, caused either by user or by data race.
+///  - Frequent changes, caused by user/editor modifying/saving file in small chunks. 
+/// so we can use smaller, more responsive delay.
+pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// On unix triggers SIGHUP when file on config_path changes.
 /// Accumulates file changes until no change for given duration has occured.
-/// Guarantes capture of all file changes from the end of this function until 
-/// main thread stops.
+/// Has best effort guarante of detecting all file changes from the end of 
+/// this function until the main thread stops.
 /// 
 /// Doesn't do anything on Windows.
 pub fn config_watcher(
