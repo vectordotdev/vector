@@ -49,6 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
+  region = "us-east-1" # example
 
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -69,6 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
+  region = "us-east-1" # example
 
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -77,7 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   key_prefix = "date=%F/" # default
 
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 
@@ -386,29 +387,7 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
-Custom endpoint for use with AWS-compatible services.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -519,6 +498,28 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### key_prefix
 
 A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>

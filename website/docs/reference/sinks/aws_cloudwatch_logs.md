@@ -48,6 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
+  region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL
@@ -66,13 +67,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
+  region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   create_missing_group = true # default
   create_missing_stream = true # default
-  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 
@@ -403,29 +404,7 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-Custom endpoint for use with AWS-compatible services.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -470,6 +449,28 @@ The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stre
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>

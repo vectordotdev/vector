@@ -1525,6 +1525,13 @@ end
   group_name = "ec2/{{ instance_id }}"
   group_name = "group-name"
 
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  region = "us-east-1"
+
   # The stream name of the target CloudWatch Logs stream.
   #
   # * required
@@ -1558,15 +1565,8 @@ end
   create_missing_stream = true
   create_missing_stream = false
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
-  # Custom endpoint for use with AWS-compatible services.
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
@@ -1743,15 +1743,15 @@ end
   # * type: string
   namespace = "service"
 
-  # Custom endpoint for use with AWS-compatible services.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  region = "us-east-1"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
@@ -1786,21 +1786,21 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  region = "us-east-1"
+
   # The stream name of the target Kinesis Firehose delivery stream.
   #
   # * required
   # * type: string
   stream_name = "my-stream"
 
-  # Custom endpoint for use with AWS-compatible services.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
@@ -1975,21 +1975,21 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  region = "us-east-1"
+
   # The stream name of the target Kinesis Logs stream.
   #
   # * required
   # * type: string
   stream_name = "my-stream"
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
-  # Custom endpoint for use with AWS-compatible services.
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
@@ -2188,12 +2188,12 @@ end
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  region = "us-east-1"
 
-  # Custom endpoint for use with AWS-compatible services.
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
@@ -2912,15 +2912,15 @@ end
   index = "application-{{ application_id }}-%Y-%m-%d"
   index = "vector-%Y-%m-%d"
 
-  # Custom endpoint for use with AWS-compatible services.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  region = "us-east-1"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
@@ -3792,21 +3792,21 @@ end
   # * type: string
   key_field = "user_id"
 
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  region = "us-east-1"
+
   # The Kafka topic name to write events to.
   #
   # * required
   # * type: string
   topic = "topic-1234"
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
-  # Custom endpoint for use with AWS-compatible services.
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default

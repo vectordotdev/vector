@@ -47,6 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
+  region = "us-east-1" # example
 ```
 
 </TabItem>
@@ -60,9 +61,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
+  region = "us-east-1" # example
 
   # OPTIONAL
-  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 ```
@@ -96,29 +97,7 @@ import Field from '@site/src/components/Field';
 
 ### endpoint
 
-Custom endpoint for use with AWS-compatible services.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -163,6 +142,28 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### namespace
 
 A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>

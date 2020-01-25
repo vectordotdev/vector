@@ -46,6 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
   inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
   stream_name = "my-stream" # example
 ```
 
@@ -59,10 +60,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
   inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 
@@ -327,29 +328,7 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
-Custom endpoint for use with AWS-compatible services.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -372,6 +351,28 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>

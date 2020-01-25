@@ -128,21 +128,22 @@ class Sink < Component
 
       @options.endpoint =
         Option.new({
-          "description" => "Custom endpoint for use with AWS-compatible services.",
+          "description" => "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot.",
           "examples" => ["127.0.0.0:5000"],
           "name" => "endpoint",
-          "null" => false,
-          "optional" => true,
+          "null" => true,
+          "required" => false,
           "type" => "string"
         })
 
       @options.region =
         Option.new({
+          "common" => true,
           "description" => "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region.",
-          "examples" => ["127.0.0.0:5000"],
-          "name" => "endpoint",
-          "null" => false,
-          "optional" => true,
+          "examples" => ["us-east-1"],
+          "name" => "region",
+          "null" => true,
+          "required" => true,
           "type" => "string"
         })
     end

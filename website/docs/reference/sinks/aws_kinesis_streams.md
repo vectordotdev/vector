@@ -47,6 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
   stream_name = "my-stream" # example
 
   # OPTIONAL
@@ -63,10 +64,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   partition_key_field = "user_id" # example, no default
@@ -332,29 +333,7 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-Custom endpoint for use with AWS-compatible services.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -399,6 +378,28 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### partition_key_field
 
 The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>

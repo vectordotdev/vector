@@ -47,6 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
 
   # OPTIONAL
   doc_type = "_doc" # default
@@ -64,11 +65,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"] # example
+  region = "us-east-1" # example
 
   # OPTIONAL - General
   doc_type = "_doc" # default
   index = "vector-%F" # default
-  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
@@ -447,29 +448,7 @@ The [`doc_type`](#doc_type) for your index data. This is only relevant for Elast
 
 ### endpoint
 
-Custom endpoint for use with AWS-compatible services.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -633,6 +612,28 @@ A custom parameter to be added to each Elasticsearch request.
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+
 
 </Field>
 
