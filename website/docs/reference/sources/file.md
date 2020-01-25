@@ -200,6 +200,28 @@ Configuration for how the file source should identify files.
 
 
 <Field
+  common={false}
+  defaultValue={"checksum"}
+  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
+  examples={["checksum","device_and_inode"]}
+  name={"strategy"}
+  path={"fingerprinting"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
+
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={256}
   enumValues={null}
@@ -238,28 +260,6 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 #### ignored_header_bytes
 
 The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"checksum"}
-  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
-  examples={["checksum","device_and_inode"]}
-  name={"strategy"}
-  path={"fingerprinting"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### strategy
-
-The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
 
 
 </Field>

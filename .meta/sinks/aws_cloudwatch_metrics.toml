@@ -20,10 +20,3 @@ common = true
 examples = ["service"]
 required = true
 description = "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
-
-[sinks.aws_cloudwatch_metrics.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-required = true
-description = "The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides."

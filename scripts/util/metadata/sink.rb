@@ -135,6 +135,16 @@ class Sink < Component
           "optional" => true,
           "type" => "string"
         })
+
+      @options.region =
+        Option.new({
+          "description" => "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region.",
+          "examples" => ["127.0.0.0:5000"],
+          "name" => "endpoint",
+          "null" => false,
+          "optional" => true,
+          "type" => "string"
+        })
     end
 
     if buffer?

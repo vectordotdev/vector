@@ -1525,12 +1525,6 @@ end
   group_name = "ec2/{{ instance_id }}"
   group_name = "group-name"
 
-  # The AWS region of the target CloudWatch Logs stream resides.
-  #
-  # * required
-  # * type: string
-  region = "us-east-1"
-
   # The stream name of the target CloudWatch Logs stream.
   #
   # * required
@@ -1563,6 +1557,14 @@ end
   # * type: bool
   create_missing_stream = true
   create_missing_stream = false
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Custom endpoint for use with AWS-compatible services.
   #
@@ -1741,13 +1743,15 @@ end
   # * type: string
   namespace = "service"
 
-  # The AWS region of the target CloudWatch stream resides.
-  #
-  # * required
-  # * type: string
-  region = "us-east-1"
-
   # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * optional
   # * no default
@@ -1782,12 +1786,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The AWS region of the target Kinesis Firehose delivery stream resides.
-  #
-  # * required
-  # * type: string
-  region = "us-east-1"
-
   # The stream name of the target Kinesis Firehose delivery stream.
   #
   # * required
@@ -1795,6 +1793,14 @@ end
   stream_name = "my-stream"
 
   # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * optional
   # * no default
@@ -1969,17 +1975,19 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The AWS region of the target Kinesis stream resides.
-  #
-  # * required
-  # * type: string
-  region = "us-east-1"
-
   # The stream name of the target Kinesis Logs stream.
   #
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Custom endpoint for use with AWS-compatible services.
   #
@@ -2177,6 +2185,14 @@ end
   compression = "gzip"
   compression = "none"
 
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
+
   # Custom endpoint for use with AWS-compatible services.
   #
   # * optional
@@ -2191,14 +2207,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-  # The AWS region of the target S3 bucket. Either "region" or "endpoint" must be
-  # specified.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # Object Names
@@ -2911,6 +2919,14 @@ end
   # * type: string
   endpoint = "127.0.0.0:5000"
 
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -2926,26 +2942,6 @@ end
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
-
-  # The provider of the Elasticsearch service. This is used to properly
-  # authenticate with the Elasticsearch cluster. For example, authentication for
-  # AWS Elasticsearch Service requires that we obtain AWS credentials to properly
-  # sign the request.
-  #
-  # * optional
-  # * default: "default"
-  # * type: string
-  # * enum: "default" or "aws"
-  provider = "default"
-  provider = "aws"
-
-  # When using the AWS provider, the AWS region of the target Elasticsearch
-  # instance.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # Auth
@@ -3801,6 +3797,14 @@ end
   # * required
   # * type: string
   topic = "topic-1234"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Custom endpoint for use with AWS-compatible services.
   #

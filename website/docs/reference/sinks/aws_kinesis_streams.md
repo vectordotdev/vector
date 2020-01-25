@@ -47,7 +47,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
   stream_name = "my-stream" # example
 
   # OPTIONAL
@@ -64,10 +63,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
+  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   partition_key_field = "user_id" # example, no default
@@ -333,6 +332,28 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
 Custom endpoint for use with AWS-compatible services.
 
 
@@ -378,28 +399,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### partition_key_field
 
 The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides.
 
 
 </Field>
@@ -630,7 +629,7 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs strea
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -652,7 +651,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -670,7 +669,7 @@ For example:
 
 ## How It Works
 
-### Authentication
+### AWS Authentication
 
 Vector checks for AWS credentials in the following order:
 
@@ -810,10 +809,10 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
 [urls.aws_kinesis_split_shards]: https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_streams

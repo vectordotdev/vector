@@ -55,9 +55,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-
-  # OPTIONAL - General
-  region = "us-east-1" # example, no default
 ```
 
 </TabItem>
@@ -81,8 +78,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
-  region = "us-east-1" # example, no default
 
   # OPTIONAL - requests
   encoding = "ndjson" # example, no default, enum
@@ -389,6 +386,29 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
+Custom endpoint for use with AWS-compatible services.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>
@@ -499,28 +519,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### key_prefix
 
 A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either "region" or "endpoint" must be specified.
 
 
 </Field>
@@ -729,7 +727,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -751,7 +749,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -761,7 +759,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ## How It Works
 
-### Authentication
+### AWS Authentication
 
 Vector checks for AWS credentials in the following order:
 
@@ -941,8 +939,8 @@ You can read more about the complete syntax in the
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.aws_s3]: https://aws.amazon.com/s3/
-[urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

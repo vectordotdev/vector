@@ -48,7 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
-  region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL
@@ -67,13 +66,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
-  region = "us-east-1" # example
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   create_missing_group = true # default
   create_missing_stream = true # default
+  endpoint = "127.0.0.0:5000" # example, no default
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 
@@ -404,6 +403,28 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
 Custom endpoint for use with AWS-compatible services.
 
 
@@ -449,28 +470,6 @@ The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stre
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.
 
 
 </Field>
@@ -701,7 +700,7 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs st
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -723,7 +722,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -772,7 +771,7 @@ X-Amz-Target: Logs_20140328.PutLogEvents
 
 ## How It Works
 
-### Authentication
+### AWS Authentication
 
 Vector checks for AWS credentials in the following order:
 
@@ -903,9 +902,9 @@ You can read more about the complete syntax in the
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [urls.aws_cw_logs_group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-[urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

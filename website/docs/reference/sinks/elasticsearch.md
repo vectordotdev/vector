@@ -69,10 +69,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   doc_type = "_doc" # default
   index = "vector-%F" # default
   endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
-  provider = "default" # default, enum
-  region = "us-east-1" # example, no default
 
   # OPTIONAL - Auth
   [sinks.my_sink_id.auth]
@@ -158,28 +157,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
-  name={"password"}
-  path={"auth"}
-  relevantWhen={{"strategy":"basic"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### password
-
-The basic authentication password.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["aws","basic"]}
   name={"strategy"}
@@ -194,6 +171,28 @@ The basic authentication password.
 #### strategy
 
 The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
+  name={"password"}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### password
+
+The basic authentication password.
 
 
 </Field>
@@ -458,6 +457,28 @@ Custom endpoint for use with AWS-compatible services.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["127.0.0.0:5000"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
   name={"headers"}
   path={null}
@@ -540,7 +561,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the [`provider`](#provider) is not `"aws"`
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`
 
 
 </Field>
@@ -563,28 +584,6 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
 ### index
 
 Index name to write events to. See [Template Syntax](#template-syntax) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"default"}
-  enumValues={{"default":"A generic Elasticsearch provider.","aws":"The [AWS Elasticsearch Service][urls.aws_elasticsearch]."}}
-  examples={["default","aws"]}
-  name={"provider"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### provider
-
-The provider of the Elasticsearch service. This is used to properly authenticate with the Elasticsearch cluster. For example, authentication for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we obtain AWS credentials to properly sign the request.
 
 
 </Field>
@@ -634,28 +633,6 @@ A custom parameter to be added to each Elasticsearch request.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance.
-
 
 </Field>
 
@@ -1021,7 +998,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -1043,7 +1020,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -1076,7 +1053,7 @@ Content-Length: <byte_size>
 
 ## How It Works
 
-### Authentication
+### AWS Authentication
 
 Vector checks for AWS credentials in the following order:
 
@@ -1208,7 +1185,7 @@ You can read more about the complete syntax in the
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
-[urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html

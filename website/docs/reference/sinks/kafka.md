@@ -67,6 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 
   # OPTIONAL - requests
@@ -254,6 +255,28 @@ The behavior when the buffer becomes full.
 ### encoding
 
 The encoding format used to serialize the events before outputting.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>
@@ -506,7 +529,7 @@ The Kafka topic name to write events to.
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -528,7 +551,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [Authentication](#authentication) for more info.
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -538,7 +561,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ## How It Works
 
-### Authentication
+### AWS Authentication
 
 Vector checks for AWS credentials in the following order:
 
@@ -601,6 +624,7 @@ event-by-event basis. It does not batch data.
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

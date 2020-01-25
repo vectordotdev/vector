@@ -149,28 +149,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
-  name={"password"}
-  path={"auth"}
-  relevantWhen={{"strategy":"basic"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### password
-
-The basic authentication password.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["basic"]}
   name={"strategy"}
@@ -185,6 +163,28 @@ The basic authentication password.
 #### strategy
 
 The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
+  name={"password"}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### password
+
+The basic authentication password.
 
 
 </Field>

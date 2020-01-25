@@ -104,6 +104,7 @@ Configuration for how the file source should identify files.\
 [sources.file.options.fingerprinting.options.strategy]
 type = "string"
 default = "checksum"
+prioritize = true
 description = """\
 The strategy used to uniquely identify files. This is important for \
 [checkpointing](#checkpointing) when file rotation is used.\
