@@ -252,15 +252,18 @@ fn main() {
     });
 
     // Start listening for config changes immediately.
+    //
     // There is a chance of config file changing since we read
-    // it unitl the end of this function. This should be extremly
-    // rare, the solution is somewhat complex, intrusive, so
-    // this will be fine for now.
-    vector::topology::config::watcher::config_watcher(
+    // it with vector::topology::Config::load until the end of
+    // vector::topology::config::watcher::config_watcher function.
+    // This should be extremly rare, and because the solution is
+    // somewhat complex, intrusive, this will be fine for now.
+    let _ = vector::topology::config::watcher::config_watcher(
         &config,
         opts.config_path.clone(),
         vector::topology::config::watcher::CONFIG_WATCH_DELAY,
-    );
+    )
+    .map_err(|error| error!(?error));
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));

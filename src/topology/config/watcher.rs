@@ -1,4 +1,5 @@
 use super::Config;
+use crate::Error;
 use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     path::{Path, PathBuf},
@@ -20,44 +21,66 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// On unix triggers SIGHUP when file on config_path changes.
 /// Accumulates file changes until no change for given duration has occured.
-/// Has best effort guarante of detecting all file changes from the layend of
+/// Has best effort guarante of detecting all file changes from the end of
 /// this function until the main thread stops.
 ///
-/// Doesn't do anything on Windows.
-pub fn config_watcher(config: &Config, config_path: PathBuf, delay: Duration) {
+/// Errors on Windows.
+pub fn config_watcher(config: &Config, config_path: PathBuf, delay: Duration) -> Result<(), Error> {
     if config.global.reload_config {
         #[cfg(unix)]
         {
-            use nix::sys::signal;
             // Create watcher now so not to miss any changes happening between
             // returning from this function and thread started.
             let mut watcher = create_watcher(&config_path, delay);
 
             thread::spawn(move || loop {
                 if let Some((_, receiver)) = watcher.take() {
-                    info!("Watching configuration file");
+                    info!("Watching configuration file.");
                     while let Ok(msg) = receiver.recv() {
                         match msg {
                             DebouncedEvent::Write(_)
                             | DebouncedEvent::Create(_)
                             | DebouncedEvent::Remove(_) => {
-                                info!("Configuration file changed");
-                                let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
-                                    debug!(message = "Unable to raise SIGHUP.", ?error)
-                                });
+                                info!("Configuration file changed.");
+                                raise_sighup()
                             }
                             event => debug!(message = "Ignoring event", ?event),
                         }
                     }
-                    error!("Stoped watching configuration file");
+                    error!("Stoped watching configuration file.");
                 }
 
                 thread::sleep(RETRY_TIMEOUT);
 
                 watcher = create_watcher(&config_path, delay);
+
+                if watcher.is_some() {
+                    // Config file could have changed while we weren't watching,
+                    // so for a good measure raise SIGHUP and let reload logic
+                    // to determine if anything changed.
+                    info!("Speculating that configuration file changed.");
+                    raise_sighup();
+                }
             });
+
+            Ok(())
         }
+
+        #[cfg(windows)]
+        {
+            Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .")
+        }
+    } else {
+        Ok(())
     }
+}
+
+#[cfg(unix)]
+fn raise_sighup() {
+    use nix::sys::signal;
+    let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
+        error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = ?error)
+    });
 }
 
 fn create_watcher(
