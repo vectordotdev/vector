@@ -19,7 +19,7 @@
 
 <%= "#" * heading_depth %> <%= option.name %>
 
-<%= option.description.html_escape %>[[references:<%= option.name %>]]
+<%= option.description %>[[references:<%= option.name %>]]
 
 <%- if option.options_list.any? -%>
 <%= options(option.options_list, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
