@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   type = "logplex" # must be: "logplex"
-  address = nil # example
+  address = "0.0.0.0:8088" # example
 ```
 
 ## Options
@@ -46,7 +46,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["0.0.0.0:8088"]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -58,7 +58,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to accept connections on.
+The address to accept connections on. The address _must_ include a port.
 
 
 </Field>

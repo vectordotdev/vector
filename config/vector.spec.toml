@@ -382,10 +382,11 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "logplex"
   type = "logplex"
 
-  # The address to accept connections on.
+  # The address to accept connections on. The address _must_ include a port.
   #
   # * required
   # * type: string
+  address = "0.0.0.0:8088"
 
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]

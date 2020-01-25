@@ -11,7 +11,8 @@ through_description = "the [Heroku Logplex HTTP Drain protocol][urls.logplex_pro
 [sources.logplex.options.address]
 type = "string"
 common = true
+examples = ["0.0.0.0:8088"]
 required = true
 description = """\
-The address to accept connections on.\
+The address to accept connections on. The address _must_ include a port.\
 """
