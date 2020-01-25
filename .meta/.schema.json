@@ -1,0 +1,16 @@
+{
+  "$id": "https://example.com/person.schema.json",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "Vector Meta Schema",
+  "type": "object",
+  "required": [ "sinks" ],
+  "properties": {
+    "sinks": {
+      "type": "array",
+      "description": "List of Vector sinks",
+      "items": { "$ref": "schema/sink.json#sink" },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}
