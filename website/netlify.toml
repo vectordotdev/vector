@@ -1,8 +1,54 @@
+# Subdomain reedirects
+
 [[redirects]]
   from = "https://vector-project.netlify.com/*"
   to = "https://vector.dev/:splat"
   status = 301
   force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/administration/stopping"
+  to = "https://vector.dev/docs/administration/process-management/#stopping"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/administration/reloading"
+  to = "https://vector.dev/docs/administration/process-management/#reloading"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/administration/starting"
+  to = "https://vector.dev/docs/administration/process-management/#starting"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/configuration"
+  to = "https://vector.dev/docs/setup/configuration/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/usage/configuration/*"
+  to = "https://vector.dev/docs/reference/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/*"
+  to = "https://vector.dev/docs/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://chat.vector.dev/*"
+  to = "https://gitter.im/timberio-vector/community"
+  status = 302
+  force = true
+
+# Internal page redirects
 
 [[redirects]]
   from = "/docs/"
