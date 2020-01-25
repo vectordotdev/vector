@@ -127,7 +127,7 @@ If `true` the metric will be incremented by the [`field`](#field) value. If `fal
 
 #### name
 
-The name of the metric. Defaults to `&lt;field&gt;_total` for `counter` and `&lt;field&gt;` for `gauge`.
+The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
 
 
 </Field>

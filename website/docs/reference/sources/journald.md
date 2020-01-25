@@ -187,7 +187,7 @@ The full path of the [`journalctl`](#journalctl) executable. If not set, Vector 
 
 ### units
 
-The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `&quot;.&quot;` will have `&quot;.service&quot;` appended to make them a valid service unit name.
+The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.
 
 
 </Field>

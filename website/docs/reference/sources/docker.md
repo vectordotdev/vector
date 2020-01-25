@@ -108,7 +108,7 @@ A list of image names to match against. If not provided, all images will be incl
 
 ### include_labels
 
-A list of container object labels to match against when filtering running containers. This should follow the described label&#39;s synatx in [docker object labels docs][urls.docker_object_labels].
+A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].
 
 
 </Field>

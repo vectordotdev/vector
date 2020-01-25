@@ -101,7 +101,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The downstream Vector address to connect to, this must include &lt;host&gt;:&lt;port&gt;.
+The downstream Vector address to connect to. The address _must_ include a port.
 
 
 </Field>
@@ -188,7 +188,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>

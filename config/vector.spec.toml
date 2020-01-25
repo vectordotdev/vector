@@ -423,8 +423,9 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "socket"
   type = "socket"
 
-  # The address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation.
+  # The address to listen for connections on, or `systemd#N` to use the Nth
+  # socket passed by systemd socket activation. If an address is used it _must_
+  # include a port.
   #
   # * required
   # * type: string
@@ -625,8 +626,9 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "vector"
   type = "vector"
 
-  # The TCP address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation.
+  # The TCP address to listen for connections on, or `systemd#N to use the Nth
+  # socket passed by systemd socket activation. If an address is used it _must_
+  # include a port.
   #
   # * required
   # * type: string
@@ -4128,7 +4130,7 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The address to connect to, this must include some <host>:<port> pair.
+  # The address to connect to. The address _must_ include a port.
   #
   # * required
   # * type: string
@@ -4574,7 +4576,8 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The downstream Vector address to connect to, this must include <host>:<port>.
+  # The downstream Vector address to connect to. The address _must_ include a
+  # port.
   #
   # * required
   # * type: string

@@ -25,4 +25,4 @@ type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
 required = true
-description = "The address to connect to, this must include some <host>:<port> pair."
+description = "The address to connect to. The address _must_ include a port."
