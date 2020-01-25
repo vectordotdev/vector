@@ -132,7 +132,7 @@ import Field from '@site/src/components/Field';
 
 ### assume_role
 
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -776,10 +776,11 @@ X-Amz-Target: Logs_20140328.PutLogEvents
 
 Vector checks for AWS credentials in the following order:
 
+1. The [`assume_role` option](#assume_role), if provided.
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+1. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+1. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+1. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring#logs].
