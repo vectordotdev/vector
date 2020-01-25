@@ -29,7 +29,7 @@ class Sink < Component
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_providers = hash["service_provider"] || []
+    @service_providers = hash["service_providers"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 

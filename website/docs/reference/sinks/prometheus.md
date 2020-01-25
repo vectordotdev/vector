@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
 status: "beta"

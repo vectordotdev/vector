@@ -8,7 +8,7 @@ sidebar_label: "journald|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
 status: "beta"
 title: "Journald Source"
-unsupported_operating_systems: ["macos","windows"]
+unsupported_operating_systems: ["Linux","MacOS","Windows"]
 ---
 
 The Vector `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.

@@ -1564,6 +1564,13 @@ end
   create_missing_stream = true
   create_missing_stream = false
 
+  # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -1740,6 +1747,13 @@ end
   # * type: string
   region = "us-east-1"
 
+  # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -1779,6 +1793,13 @@ end
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1959,6 +1980,13 @@ end
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2149,13 +2177,12 @@ end
   compression = "gzip"
   compression = "none"
 
-  # The endpoint of the target S3 bucket. Either "endpoint" or "region" must be
-  # specified.
+  # Custom endpoint for use with AWS-compatible services.
   #
   # * optional
   # * no default
   # * type: string
-  endpoint = "https://s3.us-east-1.amazonaws.com"
+  endpoint = "127.0.0.0:5000"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2876,6 +2903,13 @@ end
   # * type: string
   index = "application-{{ application_id }}-%Y-%m-%d"
   index = "vector-%Y-%m-%d"
+
+  # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3767,6 +3801,13 @@ end
   # * required
   # * type: string
   topic = "topic-1234"
+
+  # Custom endpoint for use with AWS-compatible services.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  endpoint = "127.0.0.0:5000"
 
   # Enables/disables the sink healthcheck upon start.
   #

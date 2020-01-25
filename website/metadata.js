@@ -16757,11 +16757,13 @@ module.exports = {
       "id": "aws_cloudwatch_logs_sink",
       "name": "aws_cloudwatch_logs",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16779,11 +16781,13 @@ module.exports = {
       "id": "aws_cloudwatch_metrics_sink",
       "name": "aws_cloudwatch_metrics",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16801,11 +16805,13 @@ module.exports = {
       "id": "aws_kinesis_firehose_sink",
       "name": "aws_kinesis_firehose",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16823,11 +16829,13 @@ module.exports = {
       "id": "aws_kinesis_streams_sink",
       "name": "aws_kinesis_streams",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16845,11 +16853,13 @@ module.exports = {
       "id": "aws_s3_sink",
       "name": "aws_s3",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16868,11 +16878,13 @@ module.exports = {
       "id": "blackhole_sink",
       "name": "blackhole",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16890,11 +16902,13 @@ module.exports = {
       "id": "clickhouse_sink",
       "name": "clickhouse",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16913,11 +16927,13 @@ module.exports = {
       "id": "console_sink",
       "name": "console",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16935,11 +16951,13 @@ module.exports = {
       "id": "datadog_metrics_sink",
       "name": "datadog_metrics",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "Datadog"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16957,11 +16975,14 @@ module.exports = {
       "id": "elasticsearch_sink",
       "name": "elasticsearch",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS",
+        "Elastic"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -16979,11 +17000,13 @@ module.exports = {
       "id": "file_sink",
       "name": "file",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17001,11 +17024,13 @@ module.exports = {
       "id": "gcp_pubsub_sink",
       "name": "gcp_pubsub",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "Google"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17023,11 +17048,13 @@ module.exports = {
       "id": "http_sink",
       "name": "http",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17045,11 +17072,14 @@ module.exports = {
       "id": "kafka_sink",
       "name": "kafka",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "AWS",
+        "Confluent"
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17067,11 +17097,13 @@ module.exports = {
       "id": "new_relic_logs_sink",
       "name": "new_relic_logs",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "New Relic"
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17089,11 +17121,13 @@ module.exports = {
       "id": "prometheus_sink",
       "name": "prometheus",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17111,11 +17145,13 @@ module.exports = {
       "id": "socket_sink",
       "name": "socket",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17133,11 +17169,13 @@ module.exports = {
       "id": "splunk_hec_sink",
       "name": "splunk_hec",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "Splunk"
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17155,11 +17193,13 @@ module.exports = {
       "id": "statsd_sink",
       "name": "statsd",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17177,11 +17217,13 @@ module.exports = {
       "id": "vector_sink",
       "name": "vector",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -17201,11 +17243,11 @@ module.exports = {
       "id": "docker_source",
       "name": "docker",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17223,11 +17265,11 @@ module.exports = {
       "id": "file_source",
       "name": "file",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17247,12 +17289,13 @@ module.exports = {
       "operating_systems": [
         "linux"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ]
     },
     "kafka": {
@@ -17266,11 +17309,11 @@ module.exports = {
       "id": "kafka_source",
       "name": "kafka",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17288,11 +17331,11 @@ module.exports = {
       "id": "logplex_source",
       "name": "logplex",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17310,11 +17353,11 @@ module.exports = {
       "id": "prometheus_source",
       "name": "prometheus",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17332,11 +17375,11 @@ module.exports = {
       "id": "socket_source",
       "name": "socket",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17354,11 +17397,11 @@ module.exports = {
       "id": "splunk_hec_source",
       "name": "splunk_hec",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17376,11 +17419,11 @@ module.exports = {
       "id": "statsd_source",
       "name": "statsd",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17398,11 +17441,11 @@ module.exports = {
       "id": "stdin_source",
       "name": "stdin",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17420,11 +17463,11 @@ module.exports = {
       "id": "syslog_source",
       "name": "syslog",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17443,11 +17486,11 @@ module.exports = {
       "id": "vector_source",
       "name": "vector",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17519,7 +17562,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17539,7 +17582,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17559,7 +17602,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17579,7 +17622,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17599,7 +17642,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17613,15 +17656,13 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": [
-        "filter"
-      ],
+      "function_category": "filter",
       "id": "concat_transform",
       "name": "concat",
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17642,7 +17683,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17662,7 +17703,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17682,7 +17723,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17702,7 +17743,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17723,7 +17764,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17743,7 +17784,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17763,7 +17804,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17783,7 +17824,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17803,7 +17844,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17823,7 +17864,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17843,7 +17884,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17863,7 +17904,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17883,7 +17924,7 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_provider": null,
+      "service_providers": null,
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
