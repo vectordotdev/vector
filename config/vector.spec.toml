@@ -2912,13 +2912,6 @@ end
   index = "application-{{ application_id }}-%Y-%m-%d"
   index = "vector-%Y-%m-%d"
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  region = "us-east-1"
-
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -2942,6 +2935,14 @@ end
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "us-east-1"
 
   #
   # Auth
@@ -3792,13 +3793,6 @@ end
   # * type: string
   key_field = "user_id"
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  region = "us-east-1"
-
   # The Kafka topic name to write events to.
   #
   # * required
@@ -3820,6 +3814,14 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "us-east-1"
 
   #
   # requests

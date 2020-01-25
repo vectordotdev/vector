@@ -48,7 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
-  region = "us-east-1" # example
   topic = "topic-1234" # example
 ```
 
@@ -64,12 +63,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
-  region = "us-east-1" # example
   topic = "topic-1234" # example
 
   # OPTIONAL - General
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
+  region = "us-east-1" # example, no default
 
   # OPTIONAL - requests
   encoding = "json" # example, no default, enum
@@ -328,14 +327,14 @@ The log field name to use for the topic key. If unspecified, the key will be ran
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
   name={"region"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

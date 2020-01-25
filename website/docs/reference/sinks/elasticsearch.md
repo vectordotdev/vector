@@ -47,7 +47,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
 
   # OPTIONAL
   doc_type = "_doc" # default
@@ -65,7 +64,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
 
   # OPTIONAL - General
   doc_type = "_doc" # default
@@ -73,6 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
+  region = "us-east-1" # example, no default
 
   # OPTIONAL - Auth
   [sinks.my_sink_id.auth]
@@ -617,14 +616,14 @@ A custom parameter to be added to each Elasticsearch request.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
   name={"region"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

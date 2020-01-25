@@ -138,12 +138,12 @@ class Sink < Component
 
       @options.region =
         Option.new({
-          "common" => true,
+          "common" => only_service_provider?("AWS"),
           "description" => "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region.",
           "examples" => ["us-east-1"],
           "name" => "region",
           "null" => true,
-          "required" => true,
+          "required" => only_service_provider?("AWS"),
           "type" => "string"
         })
     end
@@ -309,6 +309,10 @@ class Sink < Component
 
   def healthcheck?
     healthcheck == true
+  end
+
+  def only_service_provider?(provider_name)
+    service_providers.length == 1 && service_provider?(provider_name)
   end
 
   def plural_write_verb
