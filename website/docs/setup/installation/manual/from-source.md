@@ -10,6 +10,9 @@ Vector can also be compiled to a static binary for Linux for `x86_64`, `ARM64`,
 and `ARMv7` architectures. See [compiling using Docker](#compiling-using-docker)
 for details.
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
@@ -32,7 +35,18 @@ Steps](#next-steps) section.
 
 ## Installation
 
-import Tabs from '@theme/Tabs';
+<Tabs
+  block={true}
+  defaultValue="linux"
+  values={[
+    { label: 'Linux', value: 'linux'},
+    { label: 'Windows', value: 'windows'},
+    { label: 'Docker', value: 'docker'},
+  ]}>
+
+<TabItem value="linux">
+
+The following steps should be used to compile Vector directly on Linux based systems.
 
 1.  Install Rust
 
@@ -58,8 +72,6 @@ import Tabs from '@theme/Tabs';
         { label: 'Latest (0.7.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
-
-    import TabItem from '@theme/TabItem';
 
     <TabItem value="latest">
 
@@ -109,6 +121,154 @@ import Tabs from '@theme/Tabs';
     ```bash
     target/<target>/release/vector --config config/vector.toml
     ```
+
+</TabItem>
+<TabItem value="windows">
+
+The steps to compile Vector on Windows are different from the ones for other operating systems.
+
+1. Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build tools, the installer would prompt you to install them.
+
+2. Install [Perl for Windows][urls.perl_windows].
+
+3. In a Rust/MSVC environment (for example, using `x64 Native Tools Command Prompt`) add the binary directory of Perl installed on the previous step to `PATH`. For example, for default installation of  Strawberry Perl it is
+
+    ```
+    set PATH=%PATH%;C:\Strawberry\perl\bin
+    ```
+
+4. Get Vector's source using `git`:
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Master', value: 'master'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```
+    git clone https://github.com/timberio/vector
+    git checkout v0.7.1
+    cd vector
+    ```
+
+    </TabItem>
+    <TabItem value="master">
+
+    ```
+    git clone https://github.com/timberio/vector
+    cd vector
+    ```
+
+    </TabItem>
+    </Tabs>
+
+5.  Build Vector in release mode:
+
+    ```
+    set RUSTFLAGS=-Ctarget-feature=+crt-static
+    cargo build --no-default-features --features default-msvc --release
+    ```
+
+6.  After these steps a binary `vector.exe` in `target\release` would be created. It can be started by running
+
+    ```
+    .\target\release\vector --config config\vector.toml
+    ```
+
+</TabItem>
+<TabItem value="docker">
+
+It is possible to build statically linked binaries of Vector for Linux using Docker.
+
+In this case the dependencies listed in the previous section are not
+needed, as all of them would be automatically pulled by Docker.
+
+Building steps:
+
+1.  Download Vector's Source
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Master', value: 'master'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.7.X | \
+      tar xzf - -C vector --strip-components=1
+    ```
+
+    </TabItem>
+    <TabItem value="master">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/master.tar.gz | \
+      tar xzf - -C vector --strip-components=1
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  Build Vector using Docker
+
+    <Tabs
+      defaultValue="x86_64-unknown-linux-musl"
+      urlKey="file_name"
+      values={
+      [{
+        "label":"Linux (x86_64)",
+        "value":"x86_64-unknown-linux-musl"
+      }, {
+        "label":"Linux (ARM64)",
+        "value":"aarch64-unknown-linux-musl"
+      },{
+        "label":"Linux (ARMv7)",
+        "value":"armv7-unknown-linux-musleabihf"
+      }]
+      }>
+
+    <TabItem value="x86_64-unknown-linux-musl">
+
+    ```bash
+    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
+    ```
+
+    </TabItem>
+
+    <TabItem value="aarch64-unknown-linux-musl">
+
+    ```bash
+    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
+    ```
+
+    </TabItem>
+
+    <TabItem value="armv7-unknown-linux-musleabihf">
+
+    ```bash
+    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
+    ```
+
+    </TabItem>
+    </Tabs>
+
+    The command above builds a Docker image with Rust toolchain for a Linux target for the
+    corresponding architecture using `musl` as the C library, then starts a container from
+    this image, and then builds inside the Container. The target binary is located in
+    `target/<target triple>/release/vector` like in the previous case.
+
+</TabItem>
+</Tabs>
 
 ## Next Steps
 
@@ -204,148 +364,6 @@ Alternatively, for finer control, it is possible to use specific features from t
 | `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`. | |
 | `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
-
-## Compiling using Docker
-
-It is possible to build statically linked binaries of Vector for Linux using Docker.
-
-In this case the dependencies listed in the previous section are not
-needed, as all of them would be automatically pulled by Docker.
-
-Building steps:
-
-1.  Download Vector's Source
-
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
-        { label: 'Master', value: 'master'},
-      ]}>
-
-    <TabItem value="latest">
-
-    ```bash
-    mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.7.X | \
-      tar xzf - -C vector --strip-components=1
-    ```
-
-    </TabItem>
-    <TabItem value="master">
-
-    ```bash
-    mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/master.tar.gz | \
-      tar xzf - -C vector --strip-components=1
-    ```
-
-    </TabItem>
-    </Tabs>
-
-2. Build Vector using Docker
-  <Tabs
-    defaultValue="x86_64-unknown-linux-musl"
-    urlKey="file_name"
-    values={
-    [{
-      "label":"Linux (x86_64)",
-      "value":"x86_64-unknown-linux-musl"
-    }, {
-      "label":"Linux (ARM64)",
-      "value":"aarch64-unknown-linux-musl"
-    },{
-      "label":"Linux (ARMv7)",
-      "value":"armv7-unknown-linux-musleabihf"
-    }]
-    }>
-
-    <TabItem value="x86_64-unknown-linux-musl">
-
-    ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
-    ```
-
-    </TabItem>
-
-    <TabItem value="aarch64-unknown-linux-musl">
-
-    ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
-    ```
-
-    </TabItem>
-
-    <TabItem value="armv7-unknown-linux-musleabihf">
-
-    ```bash
-    PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
-    ```
-
-    </TabItem>
-  </Tabs>
-
-  The command above builds a Docker image with Rust toolchain for a Linux target for the
-  corresponding architecture using `musl` as the C library, then starts a container from
-  this image, and then builds inside the Container. The target binary is located in
-  `target/<target triple>/release/vector` like in the previous case.
-
-## Compiling on Windows
-
-The steps to compile Vector on Windows are different from the ones for other operating systems.
-
-1. Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build tools, the installer would prompt you to install them.
-
-2. Install [Perl for Windows][urls.perl_windows].
-
-3. In a Rust/MSVC environment (for example, using `x64 Native Tools Command Prompt`) add the binary directory of Perl installed on the previous step to `PATH`. For example, for default installation of  Strawberry Perl it is
-
-    ```
-    set PATH=%PATH%;C:\Strawberry\perl\bin
-    ```
-
-4. Get Vector's source using `git`:
-
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
-        { label: 'Master', value: 'master'},
-      ]}>
-
-    <TabItem value="latest">
-
-    ```
-    git clone https://github.com/timberio/vector
-    git checkout v0.7.1
-    cd vector
-    ```
-
-    </TabItem>
-    <TabItem value="master">
-
-    ```
-    git clone https://github.com/timberio/vector
-    cd vector
-    ```
-
-    </TabItem>
-    </Tabs>
-
-5. Build Vector in release mode:
-
-    ```
-    set RUSTFLAGS=-Ctarget-feature=+crt-static
-    cargo build --no-default-features --features default-msvc --release
-    ```
-
-6. After these steps a binary `vector.exe` in `target\release` would be created. It can be started by running
-
-    ```
-    .\target\release\vector --config config\vector.toml
-    ```
 
 
 [docs.configuration]: /docs/setup/configuration/
