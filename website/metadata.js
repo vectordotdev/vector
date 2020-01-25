@@ -17287,13 +17287,12 @@ module.exports = {
       "id": "journald_source",
       "name": "journald",
       "operating_systems": [
-        "linux"
+        "Linux"
       ],
       "service_providers": null,
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
-        "Linux",
         "MacOS",
         "Windows"
       ]

@@ -3,12 +3,12 @@ delivery_guarantee: "best_effort"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
-operating_systems: ["linux"]
+operating_systems: ["Linux"]
 sidebar_label: "journald|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
 status: "beta"
 title: "Journald Source"
-unsupported_operating_systems: ["Linux","MacOS","Windows"]
+unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
 The Vector `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
