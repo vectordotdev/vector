@@ -4,7 +4,7 @@
 #
 # SUMMARY
 #
-#   Pushes new versions produced by `make release` to the repository
+#   Pushes new versions produced by `make release-prepare` to the repository
 
 set -euo pipefail
 

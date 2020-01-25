@@ -197,8 +197,9 @@ always run `make generate` before attempting to merge your commits.
 #### Changelog
 
 Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
-automatically generated via the `make release` command. This is made possible
-by the use of [conventional commit](#what-is-conventioonal-commits) titles.
+automatically generated via the `make release-prepare` command. This is made
+possible by the use of [conventional commit](#what-is-conventioonal-commits)
+titles.
 
 ### Building a sink
 

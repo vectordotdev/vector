@@ -58,12 +58,12 @@ fmt: ## Format code
 	@scripts/check-style.sh --fix
 	@cargo fmt
 
-release: ## Release a new Vector version
+release-prepare: ## Prepare a new Vector release
 	@$(MAKE) release-meta
 	@$(MAKE) generate CHECK_URLS=false
 	@$(MAKE) release-commit
 
-release-push: ## Push new Vector version
+release-push: ## Push a prepared Vector release
 	@scripts/release-push.sh
 
 run: ## Starts Vector in development mode
