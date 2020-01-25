@@ -1,41 +1,47 @@
 [[redirects]]
+  from = "https://vector-project.netlify.com/*"
+  to = "https://vector.dev/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/"
   to = "/docs/about/what-is-vector/"
   status = 302
-  force = false
+  force = true
 
 [[redirects]]
   from = "/docs/reference/sinks/tcp/"
   to = "/docs/reference/sinks/socket/"
   status = 301
-  force = false
+  force = true
 
 [[redirects]]
   from = "/docs/reference/sources/tcp/"
   to = "/docs/reference/sources/socket/"
   status = 301
-  force = false
+  force = true
 
 [[redirects]]
   from = "/docs/reference/sources/udp/"
   to = "/docs/reference/sources/socket/"
   status = 301
-  force = false
+  force = true
 
 [[redirects]]
   from = "/download/"
   to = "/releases/latest/download/"
   status = 302
-  force = false
+  force = true
 
 [[redirects]]
   from = "/mailing_list/"
   to = "/community/"
   status = 301
-  force = false
+  force = true
 
   [[redirects]]
   from = "/releases/"
   to = "/releases/latest/download/"
   status = 302
-  force = false
+  force = true

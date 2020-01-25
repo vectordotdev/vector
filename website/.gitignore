@@ -2,8 +2,7 @@
 /node_modules
 
 # production
-/build/*
-!/build/_redirects
+/build
 
 # generated files
 .docusaurus
