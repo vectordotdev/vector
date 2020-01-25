@@ -116,7 +116,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to connect to, this must include some &lt;host&gt;:&lt;port&gt; pair.
+The address to connect to. The address _must_ include a port.
 
 
 </Field>
@@ -203,7 +203,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -471,7 +471,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 #### verify_hostname
 
-If `true` (the default), Vector will validate the configured remote host name against the remote host&#39;s TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 
 </Field>

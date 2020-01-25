@@ -376,7 +376,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -425,7 +425,7 @@ The behavior when the buffer becomes full.
 
 ### doc_type
 
-The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch &lt;= 6.X. If you are using &gt;= 7.0 you do not need to set this option since Elasticsearch has removed it.
+The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.
 
 
 </Field>
@@ -517,7 +517,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the [`provider`](#provider) is not `&quot;aws&quot;`
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the [`provider`](#provider) is not `"aws"`
 
 
 </Field>
@@ -806,7 +806,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -964,7 +964,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 #### verify_hostname
 
-If `true` (the default), Vector will validate the configured remote host name against the remote host&#39;s TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 
 </Field>

@@ -124,7 +124,7 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
 
 ### bootstrap_servers
 
-A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a &quot;bootstrap&quot; Kafka cluster that a Kafka client connects to initially to bootstrap itself.
+A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
 
 
 </Field>
