@@ -4,7 +4,6 @@ allow_you_to_description = "transform events with a full embedded [Lua][urls.lua
 beta = true
 common = true
 function_category = "program"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = [

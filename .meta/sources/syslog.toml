@@ -3,7 +3,6 @@ title = "Syslog"
 common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
-guides = []
 output_types = ["log"]
 resources = []
 through_description = "the Syslog 5424 protocol"

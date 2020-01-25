@@ -3,7 +3,6 @@ title = "Add Fields"
 allow_you_to_description = "add one or more log fields"
 common = false
 function_category = "shape"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = []

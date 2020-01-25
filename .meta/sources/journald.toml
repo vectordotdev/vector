@@ -4,7 +4,6 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
-guides = []
 only_operating_systems = ["linux"]
 output_types = ["log"]
 resources = []

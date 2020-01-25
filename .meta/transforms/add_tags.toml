@@ -3,7 +3,6 @@ title = "Add Tags"
 allow_you_to_description = "add one or more metric tags"
 common = false
 function_category = "shape"
-guides = []
 input_types = ["metric"]
 output_types = ["metric"]
 resources = []

@@ -4,7 +4,6 @@ beta = true
 common = false
 delivery_guarantee = "best_effort"
 function_category = "proxy"
-guides = []
 output_types = ["log", "metric"]
 resources = []
 through_description = "another upstream [`vector` sink][docs.sinks.vector]"
