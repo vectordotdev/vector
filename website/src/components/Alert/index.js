@@ -7,6 +7,10 @@ function Alert({children, fill, icon, type}) {
   let typeIcon = null;
 
   switch (type) {
+    case 'danger':
+      typeIcon = 'alert-triangle';
+      break;
+      
     case 'success':
       typeIcon = 'check-circle';
       break;

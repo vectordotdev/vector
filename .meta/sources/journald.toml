@@ -8,6 +8,11 @@ only_operating_systems = ["Linux"]
 output_types = ["log"]
 resources = []
 through_description = "log records from journald"
+requirements = """\
+The `journald` source requires the presence of the `journalctl` binary. This \
+ensures that this source works across all platforms. For more information, \
+please see [issue 1473][urls.issue_1473].\
+"""
 
 [sources.journald.options.current_boot_only]
 type = "bool"

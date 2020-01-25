@@ -74,6 +74,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </Tabs>
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="danger" fill={true} icon={false}>
+
+The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. For more information, please see [issue 1473][urls.issue_1473].
+
+</Alert>
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -352,3 +362,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.issue_1473]: https://github.com/timberio/vector/issues/1473

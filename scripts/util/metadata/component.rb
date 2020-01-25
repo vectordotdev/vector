@@ -18,6 +18,7 @@ class Component
     :operating_systems,
     :options,
     :posts,
+    :requirements,
     :resources,
     :title,
     :type,
@@ -30,6 +31,7 @@ class Component
     @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
+    @requirements = hash["requirements"]
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
