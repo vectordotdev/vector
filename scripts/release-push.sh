@@ -8,16 +8,10 @@
 
 set -euo pipefail
 
-if ! [ -x "$(command -v netlify)" ]; then
-  error 'Error: netlify is not installed. (npm install netlify-cli -g)' >&2
-  exit 1
-fi
-
 cd $(dirname $0)/..
 version=$(./scripts/version.sh | sed 's/-nightly$//')
 version_minor=$(echo $version | grep -o '^[0-9]*\.[0-9]*')
 current_branch_name=$(git branch | awk '{ print $2 }')
-netlify_site_id="abeaffe6-d38a-4f03-8b6c-c6909e94918e"
 
 echo "Preparing the branch and the tag..."
 set -x
@@ -32,7 +26,16 @@ git push origin v$version_minor
 git push origin v$version
 set +x
 
-echo "Updating Netlify to point to the v$version_minor branch"
-netlify login
-netlify api updateSite --data '{ "site_id": "$netlify_site_id", "repo": { "repo_branch": "v$version_minor" } }'
-netlify api createSiteDeploy --data '{ "site_id": "$netlify_site_id" }'
+echo "Would you overwrite the `latest` branch with this version?"
+echo "Note: this will update the website to point to this branch"
+print "(y/n) "
+read update_website
+
+if [ $update_website = "y" ]; then
+  echo "Updating the `latest` branch to reflect this version..."
+  set -x
+  git checkout v$version_minor
+  git merge -s ours latest
+  git push origin latest --force
+  git checkout $current_branch_name
+fi
