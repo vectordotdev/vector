@@ -1,0 +1,2 @@
+# Redirect default Netlify subdomain to primary domain
+https://vector-project.netlify.com/* https://vector.dev/:splat 301!
