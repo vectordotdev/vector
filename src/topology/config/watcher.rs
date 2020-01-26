@@ -113,6 +113,7 @@ mod tests {
     use tokio::timer::Delay;
     use tokio_signal::unix::{Signal, SIGHUP};
 
+    #[cfg(unix)]
     #[test]
     fn file_update() {
         crate::test_util::trace_init();
@@ -123,7 +124,7 @@ mod tests {
         let mut config = Config::empty();
         config.global.reload_config = true;
 
-        config_watcher(&config, file_path, delay);
+        let _ = config_watcher(&config, file_path, delay).unwrap();
 
         file.write_all(&[0]).unwrap();
         std::mem::drop(file);
