@@ -11,19 +11,28 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use bytes::Bytes;
-use futures03::{compat::Future01CompatExt, stream::StreamExt};
+use futures::stream::Stream;
+use futures03::{compat::Future01CompatExt};
 use http::{
     header,
     uri::{self, Scheme},
-    Request, Response, Uri,
+    Request, Uri,
 };
-use hyper::Body;
-use k8s_openapi::{self as k8s, api::core::v1 as api, api::core::v1::Pod, ListResponse};
+use hyper::{Body, StatusCode};
+use k8s_openapi::{
+    self as k8s,
+    api::core::v1 as api,
+    api::core::v1::{ListPodForAllNamespacesResponse, Pod, WatchPodForAllNamespacesResponse},
+    apimachinery::pkg::apis::meta::v1::WatchEvent,
+    Response,
+};
 // use kube::{
 //     self,
 //     api::{Api, WatchEvent},
 //     client::APIClient,
 // };
+use hyper::client::HttpConnector;
+use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -89,7 +98,7 @@ impl TransformConfig for KubePodMetadata {
             kubernetes_host()?,
             kubernetes_port()?,
             tls_settings()?,
-        );
+        )?;
         // Dry run
         client.list_pods_request()?;
 
@@ -101,8 +110,8 @@ impl TransformConfig for KubePodMetadata {
             match client.run().await {
                 Ok(_) => unreachable!(),
                 Err(error) => error!(
-                    message = "Kubernetes background metadata client errored.",
-                    ?error
+                    message = "Kubernetes background metadata client stoped.",
+                    cause = ?error
                 ),
             }
         });
@@ -196,12 +205,10 @@ struct MetadataClient {
     token: Option<String>,
     host: String,
     port: String,
-    tls_settings: TlsSettings,
-    resolver: Resolver,
+    client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
 }
 
 impl MetadataClient {
-    /// Stream of regets of list.
     fn new(
         trans_config: &KubePodMetadata,
         resolver: Resolver,
@@ -210,8 +217,8 @@ impl MetadataClient {
         host: String,
         port: String,
         tls_settings: TlsSettings,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, BuildError> {
+        Ok(Self {
             fields: all_fields()
                 .into_iter()
                 .filter(|(key, _)| {
@@ -227,9 +234,8 @@ impl MetadataClient {
             token,
             host,
             port,
-            tls_settings,
-            resolver,
-        }
+            client: https_client(resolver, tls_settings).context(HttpError)?,
+        })
     }
 
     fn field_selector(&self) -> String {
@@ -243,10 +249,12 @@ impl MetadataClient {
     /// Errors only if it would always error
     async fn run(self) -> Result<(), BuildError> {
         loop {
+            info!(message = "Fetching Pod list.");
             // Initialize metadata
             let list_version = self.fetch_pod_list().await?;
 
-            self.watch(list_version).await;
+            info!(message = "Watching Pod list for changes.");
+            self.watch(list_version).await?;
         }
     }
 
@@ -254,121 +262,170 @@ impl MetadataClient {
     ///  /// Ok(list_version)
     async fn fetch_pod_list(&self) -> Result<String, BuildError> {
         loop {
-            info!(message = "Fetching Pod list.");
-            // Construct client
-            let client = https_client(self.resolver.clone(), self.tls_settings.clone())
-                .context(HttpError)?;
-
-            match client.request(self.list_pods_request()?).compat().await {
-                Ok(response) => {
-                    match <ListResponse<Pod> as Response>::try_from_parts(
-                        response.status(),
-                        response.body(),
-                    ) {
-                        ListResponse::Ok(pod_list) => {
-                            for pod in pod_list.items {
-                                let _ = self.update(pod);
-                            }
-
-                            if let Some(metadata) = pod_list.metadata {
-                                if let Some(version) = metadata.resource_version {
-                                    return Ok(version);
-                                }
-                                debug!(message = "Missing pod list resource_version.")
-                            } else {
-                                debug!(message = "Missing pod list metadata.")
-                            }
-                        }
-                        ListResponse::Other(Ok(_)) => {
-                            debug!(message = "Received wrong object from Kubernetes API.")
-                        }
-                        ListResponse::Other(Err(error)) => {
-                            debug!(message = "Failed parsing list of Pods.",error = ?error)
-                        }
-                    }
-                }
-                Err(error) => debug!(message = "Failed fetching list of Pods.",error = ?error),
+            let result = self
+                .request(self.list_pods_request()?, |status, body| {
+                    self.list_process(status, body)
+                })
+                .await;
+            if let Err(version) = result {
+                return Ok(version);
             }
 
-            info!(message = "Waiting.");
+            debug!(message = "Waiting.");
             // Retry with delay
             Delay::new(Instant::now() + Duration::from_secs(1))
                 .compat()
                 .await
                 .expect("Timer not set.");
-            info!(message = "Re fetching list of Pods.");
+            debug!(message = "Re fetching list of Pods.");
         }
     }
-    // async fn fetch_pod_list(&self) -> String {
-    //     loop {
-    //         info!(message = "Fetching Pod list.");
-    //         let r_list = Api::v1Pod(self.kube.clone())
-    //             .list(&kube::api::ListParams {
-    //                 field_selector: Some(self.field_selector()),
-    //                 ..Default::default()
-    //             })
-    //             .await;
 
-    //         match r_list {
-    //             Ok(pod_list) => {
-    //                 for pod in pod_list.items {
-    //                     let _ = self.update(pod);
-    //                 }
+    async fn watch(&self, mut version: String) -> Result<(), BuildError> {
+        while self
+            .request(
+                self.watch_pods_request(version.as_str())?,
+                |status, body| self.watch_process(&mut version, status, body),
+            )
+            .await
+            .is_ok()
+        {
+            // Repeat
+        }
+        Ok(())
+    }
 
-    //                 if let Some(version) = pod_list.metadata.resourceVersion {
-    //                     info!("Inital pod list fetched.");
-    //                     return version;
-    //                 }
-    //                 debug!(message = "Missing pod list resource_version.")
-    //             }
-    //             Err(error) => debug!(message = "Failed fetching list of Pods.",error = ?error),
-    //         }
+    /// Err with version.
+    fn list_process(&self, status: StatusCode, body: &[u8]) -> Result<usize, String> {
+        match <ListPodForAllNamespacesResponse as Response>::try_from_parts(status, body) {
+            Ok((ListPodForAllNamespacesResponse::Ok(pod_list), used_bytes)) => {
+                for pod in pod_list.items {
+                    let _ = self.update(&pod);
+                }
 
-    //         // Retry with delay
-    //         info!(message = "Waiting.");
-    //         Delay::new(Instant::now() + Duration::from_secs(1))
-    //             .compat()
-    //             .await
-    //             .expect("Timer not set.");
+                if let Some(metadata) = pod_list.metadata {
+                    if let Some(version) = metadata.resource_version {
+                        return Err(version);
+                    } else {
+                        debug!(message = "Using default pod list resource_version.");
+                        return Err("0".to_owned());
+                    }
+                } else {
+                    debug!(message = "Missing pod list metadata.")
+                }
 
-    //         info!(message = "Re fetching list of Pods.");
-    //     }
-    // }
+                Ok(used_bytes)
+            }
+            Ok((ListPodForAllNamespacesResponse::Other(Ok(_)), used_bytes)) => {
+                debug!(message = "Received wrong object from Kubernetes API.");
+                Ok(used_bytes)
+            }
+            Ok((ListPodForAllNamespacesResponse::Other(Err(error)), used_bytes)) => {
+                debug!(message = "Failed parsing list of Pods.",error = ?error);
+                Ok(used_bytes)
+            }
+            Err(error) => {
+                debug!(message = "Request error.", ?error);
+                Ok(0)
+            }
+        }
+    }
 
-    async fn watch(&self, version: String) {
-        // Watch
-        // let informer = kube::api::Informer::new(Api::v1Pod(self.kube.clone()))
-        //     .fields(&self.field_selector())
-        //     .init_from(version);
-        // .compat();
+    /// Err when metadata should be refetched.
+    fn watch_process(
+        &self,
+        version: &mut String,
+        status: StatusCode,
+        body: &[u8],
+    ) -> Result<usize, ()> {
+        match WatchPodForAllNamespacesResponse::try_from_parts(status, body) {
+            Ok((WatchPodForAllNamespacesResponse::Ok(event), used_bytes)) => {
+                match event {
+                    WatchEvent::Added(pod)
+                    | WatchEvent::Modified(pod)
+                    | WatchEvent::Bookmark(pod)
+                    | WatchEvent::Deleted(pod) => {
+                        // In the case of Delteted, we don't delete it's data, as there could still exist unprocessed logs from that pod.
+                        // Not deleteing will cause "memory leakage" in a sense that the data won't be used ever
+                        // again after some point, but the catch is that we don't know when that point is.
 
-        // info!("Watching pod list.");
-        // loop {
-        //     let polled = informer.await;
-        //     match polled {
-        //         Ok(stream) => {
-        //             for event in stream.collect::<Vec<_>>().await {
-        //                 match event {
-        //                     Ok(WatchEvent::Added(pod)) | Ok(WatchEvent::Modified(pod)) => {
-        //                         let _ = self.update(pod);
-        //                     }
-        //                     // We do nothing, as there could still exist unprocessed logs from that pod.
-        //                     Ok(WatchEvent::Deleted(_)) => (),
-        //                     Ok(WatchEvent::Error(error)) => {
-        //                         // 410 Gone, restart with new list.
-        //                         if error.code == 410 {
-        //                             warn!("Reseting metadata because: {:?}", error);
-        //                             return;
-        //                         }
-        //                         debug!(?error)
-        //                     }
-        //                     Err(error) => debug!(?error),
-        //                 }
-        //             }
-        //         }
-        //         Err(error) => debug!(?error),
-        //     }
-        // }
+                        let _ = self.update(&pod);
+                        // Store last resourceVersion
+                        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                        if let Some(metadata) = pod.metadata {
+                            if let Some(new_version) = metadata.resource_version {
+                                *version = new_version;
+                            } else {
+                                debug!(message = "Missing pod list resource_version.")
+                            }
+                        } else {
+                            debug!(message = "Missing pod list metadata.")
+                        }
+                    }
+                    WatchEvent::ErrorStatus(status) => {
+                        // 410 Gone, restart with new list.
+                        if status.code == Some(410) {
+                            warn!(message = "Pod list desynced. Reseting list.", cause = ?status);
+                            return Err(());
+                        }
+                        debug!(?status);
+                    }
+                    WatchEvent::ErrorOther(value) => {
+                        debug!(?value);
+                    }
+                }
+                Ok(used_bytes)
+            }
+            Ok((WatchPodForAllNamespacesResponse::Other(Ok(_)), used_bytes)) => {
+                debug!(message = "Received wrong object from Kubernetes API.");
+                Ok(used_bytes)
+            }
+            Ok((WatchPodForAllNamespacesResponse::Other(Err(error)), used_bytes)) => {
+                debug!(message = "Failed parsing watch list of Pods.",error = ?error);
+                Ok(used_bytes)
+            }
+            Err(error) => {
+                debug!(message = "Request error.", ?error);
+                Ok(0)
+            }
+        }
+    }
+
+    /// Process should parse given slice and return the amount of used bytes.
+    async fn request<E>(
+        &self,
+        request: Request<Body>,
+        mut process: impl FnMut(StatusCode, &[u8]) -> Result<usize, E>,
+    ) -> Result<(), E> {
+        let response = self.client.request(request).compat().await;
+
+        match response {
+            Ok(response) => {
+                let status = response.status();
+                let body = response.into_body().concat2().compat().await;
+
+                match body {
+                    Ok(buffer) => {
+                        let mut at = 0;
+                        while at < buffer.len() {
+                            let slice = &buffer[at..];
+                            let used_bytes = process(status, slice)?;
+                            if used_bytes == 0 {
+                                debug!("Detected unusable bytes: {} .", slice.len());
+                                break;
+                            }
+
+                            at += used_bytes;
+                        }
+                    }
+                    Err(error) => {
+                        debug!(message = "Failed collecting response body.",error = ?error)
+                    }
+                }
+            }
+            Err(error) => debug!(message = "Failed resolving request.",error = ?error),
+        }
+        Ok(())
     }
 
     fn list_pods_request(&self) -> Result<Request<Body>, BuildError> {
@@ -379,7 +436,30 @@ impl MetadataClient {
         })
         .context(K8SOpenapiError)?;
 
-        // Authorize
+        self.authorize(&mut request)?;
+        self.fill_uri(&mut request)?;
+
+        let (parts, body) = request.into_parts();
+        Ok(Request::from_parts(parts, body.into()))
+    }
+
+    fn watch_pods_request(&self, list_version: &str) -> Result<Request<Body>, BuildError> {
+        // Prepare request
+        let (mut request, _) = api::Pod::watch_pod_for_all_namespaces(k8s::WatchOptional {
+            field_selector: Some(self.field_selector().as_str()),
+            resource_version: Some(list_version),
+            ..Default::default()
+        })
+        .context(K8SOpenapiError)?;
+
+        self.authorize(&mut request)?;
+        self.fill_uri(&mut request)?;
+
+        let (parts, body) = request.into_parts();
+        Ok(Request::from_parts(parts, body.into()))
+    }
+
+    fn authorize(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
         if let Some(token) = self.token.as_ref() {
             request.headers_mut().insert(
                 header::AUTHORIZATION,
@@ -388,7 +468,10 @@ impl MetadataClient {
             );
         }
 
-        // Fill Uri
+        Ok(())
+    }
+
+    fn fill_uri(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
         let mut uri = request.uri().clone().into_parts();
         uri.scheme = Some(Scheme::HTTPS);
         uri.authority = Some(
@@ -398,11 +481,10 @@ impl MetadataClient {
         );
         *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
 
-        let (parts, body) = request.into_parts();
-        Ok(Request::from_parts(parts, body.into()))
+        Ok(())
     }
 
-    fn update(&self, pod: Pod) -> Option<()> {
+    fn update(&self, pod: &Pod) -> Option<()> {
         trace!(message = "Trying to update Pod metadata.");
         let uid: Bytes = pod.metadata.as_ref()?.uid.as_ref()?.as_str().into();
 
@@ -417,8 +499,8 @@ impl MetadataClient {
         Some(())
     }
 
-    fn fields(&self, pod: Pod) -> Vec<(Atom, ValueKind)> {
-        self.fields.iter().flat_map(|fun| fun(&pod)).collect()
+    fn fields(&self, pod: &Pod) -> Vec<(Atom, ValueKind)> {
+        self.fields.iter().flat_map(|fun| fun(pod)).collect()
     }
 }
 
@@ -461,12 +543,12 @@ fn all_fields() -> Vec<(
         // ------------------------ ObjectMeta ------------------------ //
         field("name", |pod| pod.metadata.as_ref()?.name.clone()),
         field("namespace", |pod| pod.metadata.as_ref()?.namespace.clone()),
-        // field("creation_timestamp", |pod| {
-        //     pod.metadata.creation_timestamp.clone().map(|time| time.0)
-        // }),
-        // field("deletion_timestamp", |pod| {
-        //     pod.metadata.deletion_timestamp.clone().map(|time| time.0)
-        // }),
+        field("creation_timestamp", |pod| {
+            pod.metadata.as_ref()?.creation_timestamp.clone().map(|time| time.0)
+        }),
+        field("deletion_timestamp", |pod| {
+            pod.metadata.as_ref()?.deletion_timestamp.clone().map(|time| time.0)
+        }),
         collection_field("labels", |pod| pod.metadata.as_ref()?.labels.as_ref()),
         collection_field("annotations", |pod| {
             pod.metadata.as_ref()?.annotations.as_ref()
