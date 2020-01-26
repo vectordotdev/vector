@@ -7,6 +7,12 @@
   force = true
 
 [[redirects]]
+  from = "https://chat.vector.dev/*"
+  to = "https://gitter.im/timberio-vector/community"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "https://docs.vector.dev/usage/administration/stopping"
   to = "https://vector.dev/docs/administration/process-management/#stopping"
   status = 301
@@ -43,9 +49,9 @@
   force = true
 
 [[redirects]]
-  from = "https://chat.vector.dev/*"
-  to = "https://gitter.im/timberio-vector/community"
-  status = 302
+  from = "https://test-results.vector.dev/*"
+  to = "http://test-results.vector.dev.s3-website-us-east-1.amazonaws.com/:splat"
+  status = 200
   force = true
 
 # Internal page redirects
