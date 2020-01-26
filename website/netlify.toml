@@ -75,6 +75,12 @@
   force = true
 
 [[redirects]]
+  from = "/docs/v0.7/*"
+  to = "https://v0-7--vector-project.netlify.com/docs/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/download/"
   to = "/releases/latest/download/"
   status = 302
