@@ -4158,7 +4158,7 @@ end
   healthcheck = true
   healthcheck = false
 
-# Streams `log` events to a socket, such as a TCP or Unix Domain Socket.
+# Streams `log` events to a socket, such as a TCP or Unix domain socket.
 [sinks.socket]
   #
   # General
@@ -4193,7 +4193,7 @@ end
   mode = "tcp"
   mode = "unix"
 
-  # The unix socket path. *This should be absolute path*.
+  # The unix socket path. This should be the absolute path.
   #
   # * required
   # * type: string
