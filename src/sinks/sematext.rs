@@ -5,14 +5,16 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextConfig {
     cloud: Cloud,
-    #[serde(flatten)]
-    inner: ElasticSearchConfig,
+    token: String,
+
+    #[serde(skip)]
+    host: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Cloud {
     NorthAmerica,
@@ -22,35 +24,42 @@ pub enum Cloud {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let mut es_config = self.inner.clone();
-
-        let host = match &self.cloud {
-            Cloud::NorthAmerica => "https://logsene-receiver.sematext.com",
-            Cloud::Europe => "https://logsene-receiver.sematext.com",
+        let mut host = match &self.cloud {
+            Cloud::NorthAmerica => "https://logsene-receiver.sematext.com".to_string(),
+            Cloud::Europe => "https://logsene-receiver.sematext.com".to_string(),
         };
 
-        // Custom config overrides
-        if es_config.host.is_none() {
-            es_config.host = Some(host.to_string());
+        // // Custom config overrides
+        // if es_config.host.is_none() {
+        //     es_config.host = Some(host.to_string());
+        // }
+
+        // if es_config.index.is_none() {
+        //     Err(format!("`index` field is required"))?;
+        // }
+
+        // if es_config.doc_type.is_none() {
+        //     es_config.doc_type = Some("logs".to_string());
+        // }
+
+        // if es_config.compression.is_none() {
+        //     es_config.compression = Some(Compression::None);
+        // }
+        if let Some(h) = &self.host {
+            host = h.clone();
         }
 
-        if es_config.index.is_none() {
-            Err(format!("`index` field is required"))?;
+        ElasticSearchConfig {
+            host: Some(host),
+            compression: Some(Compression::None),
+            doc_type: Some("logs".to_string()),
+            ..Default::default()
         }
-
-        if es_config.doc_type.is_none() {
-            es_config.doc_type = Some("logs".to_string());
-        }
-
-        if es_config.compression.is_none() {
-            es_config.compression = Some(Compression::None);
-        }
-
-        es_config.build(cx)
+        .build(cx)
     }
 
     fn input_type(&self) -> DataType {
-        self.inner.input_type()
+        DataType::Log
     }
 
     fn sink_type(&self) -> &'static str {
@@ -71,8 +80,8 @@ mod tests {
     fn smoke() {
         let (mut config, cx, mut rt) = load_sink::<SematextConfig>(
             r#"
-           cloud = "north_america"
-            index = "mylogtoken"
+            cloud = "north_america"
+            token = "mylogtoken"
         "#,
         )
         .unwrap();
@@ -83,7 +92,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        config.inner.host = Some(format!("http://{}", addr));
+        config.host = Some(format!("http://{}", addr));
 
         let (sink, _) = config.build(cx).unwrap();
 
