@@ -250,9 +250,9 @@ module.exports = {
         "deletions_count": 1,
         "description": "Make sorting of blog posts stable",
         "files_count": 1,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 1,
-        "message": "fix(operations): Make sorting of blog posts stable (#1566)",
+        "message": "chore(operations): Make sorting of blog posts stable (#1566)",
         "pr_number": 1566,
         "scope": {
           "category": "core",
@@ -261,7 +261,7 @@ module.exports = {
           "name": "operations"
         },
         "sha": "e5096d0ad09333cdcbf7f7b8fdea71764c61b940",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Alexander Rodin",
@@ -270,9 +270,9 @@ module.exports = {
         "deletions_count": 1,
         "description": "Add AWS API key for Windows tests in CI",
         "files_count": 1,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 5,
-        "message": "fix(operations): Add AWS API key for Windows tests in CI (#1565)",
+        "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
         "pr_number": 1565,
         "scope": {
           "category": "core",
@@ -281,7 +281,7 @@ module.exports = {
           "name": "operations"
         },
         "sha": "ed11b854a21f8f8f4d0b532d2b946ed0d3a91718",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Alexander Rodin",
@@ -290,9 +290,9 @@ module.exports = {
         "deletions_count": 0,
         "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
         "files_count": 1,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 1,
-        "message": "fix(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
+        "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
         "pr_number": 1567,
         "scope": {
           "category": "core",
@@ -301,18 +301,18 @@ module.exports = {
           "name": "operations"
         },
         "sha": "e7bd9180249751dcef6299f4836b0a82274ec2f9",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Lucio Franco",
         "breaking_change": false,
         "date": "2020-01-22 11:36:26 +0000",
         "deletions_count": 1,
-        "description": "Poll inner service in `Map` svc",
+        "description": "Fix crash when `in_flight_limit` is set to `1`",
         "files_count": 1,
         "group": "fix",
         "insertions_count": 31,
-        "message": "fix(aws_s3 sink): Poll inner service in `Map` svc (#1569)",
+        "message": "fix(aws_s3 sink): Fix crash when `in_flight_limit` is set to `1` (#1569)",
         "pr_number": 1569,
         "scope": {
           "category": "sink",
@@ -328,11 +328,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-01-22 19:30:47 +0000",
         "deletions_count": 118,
-        "description": "Improve DNS resolution",
+        "description": "Fix error when socket addresses do not use `IPV4` or `IPV6` addresses",
         "files_count": 9,
         "group": "fix",
         "insertions_count": 117,
-        "message": "fix(socket sink): Improve DNS resolution (#1575)",
+        "message": "fix(socket sink): Fix error when socket addresses do not use `IPV4` or `IPV6` addresses (#1575)",
         "pr_number": 1575,
         "scope": {
           "category": "sink",
@@ -370,9 +370,9 @@ module.exports = {
         "deletions_count": 53,
         "description": "Escape special characters in options descriptions",
         "files_count": 26,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 53,
-        "message": "fix(website): Escape special characters in options descriptions (#1580)",
+        "message": "chore(website): Escape special characters in options descriptions (#1580)",
         "pr_number": 1580,
         "scope": {
           "category": "core",
@@ -381,7 +381,7 @@ module.exports = {
           "name": "website"
         },
         "sha": "e5a3113f0ddfbcb08c6ce70dda374abbfdbc867d",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Alexander Rodin",
@@ -392,13 +392,13 @@ module.exports = {
         "files_count": 1,
         "group": "fix",
         "insertions_count": 11,
-        "message": "fix(platforms): Create `vector` user when installing RPM package (#1583)",
+        "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
         "pr_number": 1583,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "platforms"
+          "name": "rpm platform"
         },
         "sha": "e1b6bc834a94066313c2de58e540845476289789",
         "type": "fix"
@@ -430,9 +430,9 @@ module.exports = {
         "deletions_count": 1,
         "description": "Add all generated files to the release commit",
         "files_count": 1,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 1,
-        "message": "fix(operations): Add all generated files to the release commit (#1588)",
+        "message": "chore(operations): Add all generated files to the release commit (#1588)",
         "pr_number": 1588,
         "scope": {
           "category": "core",
@@ -441,7 +441,7 @@ module.exports = {
           "name": "operations"
         },
         "sha": "8287f0535d1ddd5e6fadaf1368623dbe3d7579b0",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Alexander Rodin",
@@ -452,13 +452,13 @@ module.exports = {
         "files_count": 1,
         "group": "fix",
         "insertions_count": 0,
-        "message": "fix(operations): Do not require `systemd` as an RPM dependency (#1590)",
+        "message": "fix(rpm platform): Do not require `systemd` as an RPM dependency (#1590)",
         "pr_number": 1590,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "operations"
+          "name": "rpm platform"
         },
         "sha": "18b2d2f0d3b4f6df22883550dd106c2ec8c051d4",
         "type": "fix"
@@ -16493,9 +16493,9 @@ module.exports = {
           "deletions_count": 1,
           "description": "Make sorting of blog posts stable",
           "files_count": 1,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 1,
-          "message": "fix(operations): Make sorting of blog posts stable (#1566)",
+          "message": "chore(operations): Make sorting of blog posts stable (#1566)",
           "pr_number": 1566,
           "scope": {
             "category": "core",
@@ -16504,7 +16504,7 @@ module.exports = {
             "name": "operations"
           },
           "sha": "e5096d0ad09333cdcbf7f7b8fdea71764c61b940",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Alexander Rodin",
@@ -16513,9 +16513,9 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add AWS API key for Windows tests in CI",
           "files_count": 1,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 5,
-          "message": "fix(operations): Add AWS API key for Windows tests in CI (#1565)",
+          "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
           "pr_number": 1565,
           "scope": {
             "category": "core",
@@ -16524,7 +16524,7 @@ module.exports = {
             "name": "operations"
           },
           "sha": "ed11b854a21f8f8f4d0b532d2b946ed0d3a91718",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Alexander Rodin",
@@ -16533,9 +16533,9 @@ module.exports = {
           "deletions_count": 0,
           "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
           "files_count": 1,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 1,
-          "message": "fix(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
+          "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
           "pr_number": 1567,
           "scope": {
             "category": "core",
@@ -16544,18 +16544,18 @@ module.exports = {
             "name": "operations"
           },
           "sha": "e7bd9180249751dcef6299f4836b0a82274ec2f9",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Lucio Franco",
           "breaking_change": false,
           "date": "2020-01-22 11:36:26 +0000",
           "deletions_count": 1,
-          "description": "Poll inner service in `Map` svc",
+          "description": "Fix crash when `in_flight_limit` is set to `1`",
           "files_count": 1,
           "group": "fix",
           "insertions_count": 31,
-          "message": "fix(aws_s3 sink): Poll inner service in `Map` svc (#1569)",
+          "message": "fix(aws_s3 sink): Fix crash when `in_flight_limit` is set to `1` (#1569)",
           "pr_number": 1569,
           "scope": {
             "category": "sink",
@@ -16571,11 +16571,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2020-01-22 19:30:47 +0000",
           "deletions_count": 118,
-          "description": "Improve DNS resolution",
+          "description": "Fix error when socket addresses do not use `IPV4` or `IPV6` addresses",
           "files_count": 9,
           "group": "fix",
           "insertions_count": 117,
-          "message": "fix(socket sink): Improve DNS resolution (#1575)",
+          "message": "fix(socket sink): Fix error when socket addresses do not use `IPV4` or `IPV6` addresses (#1575)",
           "pr_number": 1575,
           "scope": {
             "category": "sink",
@@ -16613,9 +16613,9 @@ module.exports = {
           "deletions_count": 53,
           "description": "Escape special characters in options descriptions",
           "files_count": 26,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 53,
-          "message": "fix(website): Escape special characters in options descriptions (#1580)",
+          "message": "chore(website): Escape special characters in options descriptions (#1580)",
           "pr_number": 1580,
           "scope": {
             "category": "core",
@@ -16624,7 +16624,7 @@ module.exports = {
             "name": "website"
           },
           "sha": "e5a3113f0ddfbcb08c6ce70dda374abbfdbc867d",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Alexander Rodin",
@@ -16635,13 +16635,13 @@ module.exports = {
           "files_count": 1,
           "group": "fix",
           "insertions_count": 11,
-          "message": "fix(platforms): Create `vector` user when installing RPM package (#1583)",
+          "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
           "pr_number": 1583,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "platforms"
+            "name": "rpm platform"
           },
           "sha": "e1b6bc834a94066313c2de58e540845476289789",
           "type": "fix"
@@ -16673,9 +16673,9 @@ module.exports = {
           "deletions_count": 1,
           "description": "Add all generated files to the release commit",
           "files_count": 1,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 1,
-          "message": "fix(operations): Add all generated files to the release commit (#1588)",
+          "message": "chore(operations): Add all generated files to the release commit (#1588)",
           "pr_number": 1588,
           "scope": {
             "category": "core",
@@ -16684,7 +16684,7 @@ module.exports = {
             "name": "operations"
           },
           "sha": "8287f0535d1ddd5e6fadaf1368623dbe3d7579b0",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Alexander Rodin",
@@ -16695,13 +16695,13 @@ module.exports = {
           "files_count": 1,
           "group": "fix",
           "insertions_count": 0,
-          "message": "fix(operations): Do not require `systemd` as an RPM dependency (#1590)",
+          "message": "fix(rpm platform): Do not require `systemd` as an RPM dependency (#1590)",
           "pr_number": 1590,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "operations"
+            "name": "rpm platform"
           },
           "sha": "18b2d2f0d3b4f6df22883550dd106c2ec8c051d4",
           "type": "fix"
