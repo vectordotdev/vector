@@ -1,16 +1,117 @@
 {
-  "$id": "https://example.com/person.schema.json",
-  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://raw.githubusercontent.com/timberio/vector/master/.meta/schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Vector Meta Schema",
   "type": "object",
   "required": [ "sinks" ],
   "properties": {
     "sinks": {
-      "type": "array",
-      "description": "List of Vector sinks",
-      "items": { "$ref": "schema/sink.json#sink" },
-      "minItems": 1,
-      "uniqueItems": true
+      "type": "object",
+      "description": "Object of Vector sinks keyed by their ID",
+      "patternProperties": {
+        "^[a-z0-9_]+$": { "$ref": "#/definitions/sink" }
+      }
+    }
+  },
+  "definitions": {
+    "sink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "beta", "title" ],
+      "properties": {
+        "batch_is_simple": {
+          "type": "boolean"
+        },
+        "batch_max_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "batch_timeout_secs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "beta": {
+          "type": "boolean"
+        },
+        "common": {
+          "type": "boolean"
+        },
+        "delivery_guarantee": {
+          "type": "string",
+          "enum": ["at_least_once", "best_effort"]
+        },
+        "egress_method": {
+          "type": "string",
+          "enum": ["batching", "streaming"]
+        },
+        "encodings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["json", "ndjson", "text"]
+          },
+          "enum": ["batching", "streaming"]
+        },
+        "function_category": {
+          "type": "string",
+          "enum": ["collect", "convert", "enrich", "filter", "parse", "program", "proxy", "receive", "sanitize", "shape", "test", "transmit"]
+        },
+        "healthcheck": {
+          "type": "boolean"
+        },
+        "input_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["log", "metric"]
+          }
+        },
+        "request_rate_limit_duration_secs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "request_rate_limit_num": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "request_retry_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "request_retry_initial_backoff_secs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "request_retry_max_duration_secs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "request_in_flight_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "request_timeout_secs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "service_limits_short_link": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_providers": {
+          "type": "string",
+          "enum": ["AWS", "Confluent", "Datadog", "Elastic", "Google", "New Relic", "Splunk"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "max_lenfth": 50
+        },
+        "write_to_description": {
+          "type": "string",
+          "minLength": 50
+        }
+      }
     }
   }
 }
