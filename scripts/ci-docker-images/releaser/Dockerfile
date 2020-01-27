@@ -1,4 +1,4 @@
-FROM ruby:2.6
+FROM ruby:2.7
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
