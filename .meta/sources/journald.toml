@@ -11,8 +11,7 @@ through_description = "log records from journald"
 requirements = """\
 1. The `journald` source requires the presence of the `journalctl` binary. \
 This ensures that this source works across all platforms. Please see the \
-["Communicating with systemd journal"](#communication-with-systemd-journal) \
-section for more info.
+["Communication strategy"](#communication-strategy) section for more info.
 2. If you run Vector from a non-root user, you need to add that user to the \
 `systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
 section for more info.\
