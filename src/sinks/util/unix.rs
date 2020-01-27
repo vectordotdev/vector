@@ -1,6 +1,6 @@
 use crate::sinks::util::SinkExt;
 use crate::{
-    event::{self, Event},
+    sinks::util::{encode_event, Encoding},
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
@@ -26,13 +26,6 @@ pub struct UnixSinkConfig {
     pub encoding: Encoding,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
 impl UnixSinkConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
@@ -47,7 +40,7 @@ impl UnixSinkConfig {
         let sink = Box::new(
             UnixSink::new(self.path.clone())
                 .stream_ack(cx.acker())
-                .with_flat_map(move |event| iter_ok(Some(encode_event(event, &encoding)))),
+                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
         );
         let healthcheck = unix_healthcheck(self.path.clone());
 
@@ -70,24 +63,6 @@ fn unix_healthcheck(path: PathBuf) -> Healthcheck {
     });
 
     Box::new(check)
-}
-
-fn encode_event(event: Event, encoding: &Encoding) -> Bytes {
-    let log = event.into_log();
-
-    let mut bytes = match encoding {
-        Encoding::Json => serde_json::to_vec(&log.unflatten())
-            .map(Bytes::from)
-            .expect("Unable to encode event as JSON."),
-        Encoding::Text => log
-            .get(&event::MESSAGE)
-            .map(|v| v.as_bytes())
-            .unwrap_or_default(),
-    };
-
-    // Add newline
-    bytes.extend(b"\n");
-    bytes
 }
 
 pub struct UnixSink {
