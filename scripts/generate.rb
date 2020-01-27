@@ -155,19 +155,12 @@ metadata.releases_list.each do |release|
       <<~EOF
       import React from 'react';
 
-      import Layout from '@theme/Layout';
       import ReleaseNotes from '@site/src/components/ReleaseNotes';
 
       function ReleaseNotesPage() {
         const version = "#{release.version}";
 
-        return (
-          <Layout title={`Vector v${version} Release Notes`} description={`Vector v${version} release notes. Highlights, changes, and updates.`}>
-            <main>
-              <ReleaseNotes version={version} />
-            </main>
-          </Layout>
-        );
+        return <ReleaseNotes version={version} />;
       }
 
       export default ReleaseNotesPage;

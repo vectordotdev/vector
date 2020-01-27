@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "file|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 status: "prod-ready"
@@ -200,6 +200,28 @@ Configuration for how the file source should identify files.
 
 
 <Field
+  common={false}
+  defaultValue={"checksum"}
+  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
+  examples={["checksum","device_and_inode"]}
+  name={"strategy"}
+  path={"fingerprinting"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
+
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={256}
   enumValues={null}
@@ -238,28 +260,6 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 #### ignored_header_bytes
 
 The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"checksum"}
-  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
-  examples={["checksum","device_and_inode"]}
-  name={"strategy"}
-  path={"fingerprinting"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### strategy
-
-The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
 
 
 </Field>
@@ -603,7 +603,7 @@ read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
 [global [`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
-overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) sink directly.
+overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) source directly.
 
 ### Compressed Files
 

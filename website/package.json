@@ -5,7 +5,7 @@
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
-    "build": "docusaurus build",
+    "build": "docusaurus build && cp netlify.toml build/netlify.toml",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy"
   },

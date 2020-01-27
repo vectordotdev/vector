@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `kafka` source ingests data through Kafka 0.9 or later and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
 status: "beta"

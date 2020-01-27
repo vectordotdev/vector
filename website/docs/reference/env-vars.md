@@ -31,6 +31,50 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
@@ -123,3 +167,4 @@ Enables backtraces when errors are logged. Use this when debugging only since it
 
 [docs.global-options]: /docs/reference/global-options/
 [docs.monitoring#level]: /docs/administration/monitoring/#level
+[pages.aws_components]: /components?providers%5B%5D=aws/

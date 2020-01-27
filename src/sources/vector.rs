@@ -88,10 +88,9 @@ impl TcpSource for VectorSource {
 mod test {
     use super::VectorConfig;
     use crate::{
-        buffers::Acker,
-        sinks::vector::vector,
+        sinks::vector::VectorSinkConfig,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
-        topology::config::{GlobalOptions, SourceConfig},
+        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Event,
     };
     use futures::{stream, sync::mpsc, Future, Sink};
@@ -108,7 +107,13 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        let sink = vector("NONE".into(), addr, Acker::Null);
+        let cx = SinkContext::new_test(rt.executor());
+        let (sink, _) = VectorSinkConfig {
+            address: format!("localhost:{}", addr.port()),
+        }
+        .build(cx)
+        .unwrap();
+
         let events = vec![
             Event::from("test"),
             Event::from("events"),

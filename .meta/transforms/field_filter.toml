@@ -4,7 +4,6 @@ allow_you_to_description = "filter events by a log field's value"
 beta = true
 common = false
 function_category = "filter"
-guides = []
 input_types = ["log", "metric"]
 output_types = ["log", "metric"]
 resources = []

@@ -22,13 +22,6 @@ service_limits_short_link = "aws_kinesis_firehose_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)"
 
-[sinks.aws_kinesis_firehose.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-required = true
-description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis Firehose delivery stream resides."
-
 [sinks.aws_kinesis_firehose.options.stream_name]
 type = "string"
 common = true

@@ -5,6 +5,8 @@ class Release
   include Comparable
 
   attr_reader :commits,
+    :subtitle,
+    :description,
     :date,
     :last_date,
     :last_version,
@@ -16,6 +18,8 @@ class Release
     @last_date = last_date
     @last_version = last_version
     @date = release_hash.fetch("date").to_date
+    @subtitle = release_hash["subtitle"] || ""
+    @description = release_hash["description"] || ""
 
     @posts =
       all_posts.select do |p|
@@ -122,6 +126,8 @@ class Release
   def to_h
     {
       commits: commits.deep_to_h,
+      subtitle: subtitle,
+      description: description,
       compare_url: compare_url,
       deletions_count: deletions_count,
       date: date,
