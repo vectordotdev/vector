@@ -603,7 +603,7 @@ read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
 [global [`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
-overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) sink directly.
+overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) source directly.
 
 ### Compressed Files
 

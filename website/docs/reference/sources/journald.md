@@ -109,7 +109,7 @@ import Field from '@site/src/components/Field';
 
 ### batch_size
 
-The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
+The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch. See [Checkpointing](#checkpointing) for more info.
 
 
 </Field>
@@ -153,7 +153,7 @@ Include only entries from the current boot.
 
 ### data_dir
 
-The directory used to persist the journal checkpoint position. By default, the global [`data_dir`](#data_dir) is used. Please make sure the Vector project has write permissions to this dir.
+The directory used to persist the journal checkpoint position. By default, the global [`data_dir`](#data_dir) is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
 
 
 </Field>
@@ -175,7 +175,7 @@ The directory used to persist the journal checkpoint position. By default, the g
 
 ### journalctl_path
 
-The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search the path for [`journalctl`](#journalctl).
+The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search the path for [`journalctl`](#journalctl). See [Communication with systemd journal](#communication-with-systemd-journal) for more info.
 
 
 </Field>
@@ -350,6 +350,26 @@ The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
 
 ## How It Works
 
+### Checkpointing
+
+Vector checkpoints the journal position after every batch read. The size of
+the batch is controlled via the [`batch_size`](#batch_size) option. Checkpointing ensures that
+Vector resumes where it left off if restarted, preventing data from being read
+twice. The checkpoint positions are stored in the data directory which is
+specified via the [global [`data_dir`](#data_dir) option][docs.configuration#data-directory]
+but can be overridden via the [`data_dir`](#data_dir) option in the `journald` source
+directly.
+
+### Communication with systemd journal
+
+To ensure the `journald` source works across all platforms, Vector interacts
+with the Systemd journal via the [`journalctl`](#journalctl) command. This is accomplished by
+spawning a [subprocess][urls.rust_subprocess] that Vector diligently interacts
+with. If the [`journalctl`](#journalctl) command is not in the environment path you can
+specify the exact location via the [`journalctl_path`](#journalctl_path) option. For more
+information on this communication strategy please see
+[issue #1473][urls.issue_1473].
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -360,6 +380,8 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
+[docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.issue_1473]: https://github.com/timberio/vector/issues/1473
+[urls.rust_subprocess]: https://docs.rs/subprocess

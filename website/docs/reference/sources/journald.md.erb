@@ -34,7 +34,24 @@
 <%- end -%>
 ## How It Works [[sort]]
 
+### Checkpointing
+
+Vector checkpoints the journal position after every batch read. The size of
+the batch is controlled via the `batch_size` option. Checkpointing ensures that
+Vector resumes where it left off if restarted, preventing data from being read
+twice. The checkpoint positions are stored in the data directory which is
+specified via the [global `data_dir` option][docs.configuration#data-directory]
+but can be overridden via the `data_dir` option in the `journald` source
+directly.
+
+### Communication with systemd journal
+
+To ensure the `journald` source works across all platforms, Vector interacts
+with the Systemd journal via the `journalctl` command. This is accomplished by
+spawning a [subprocess][urls.rust_subprocess] that Vector diligently interacts
+with. If the `journalctl` command is not in the environment path you can
+specify the exact location via the `journalctl_path` option. For more
+information on this communication strategy please see
+[issue #1473][urls.issue_1473].
+
 <%= component_sections(component) %>
-
-
-
