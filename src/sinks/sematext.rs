@@ -1,6 +1,6 @@
 use crate::{
     sinks::elasticsearch::ElasticSearchConfig,
-    sinks::util::Compression,
+    sinks::util::{atchBytesConfig, Compression, TowerRequestConfig, B},
     topology::config::{DataType, SinkConfig, SinkContext},
 };
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,15 @@ pub struct SematextConfig {
     cloud: Cloud,
     token: String,
 
+    #[serde(default)]
+    request: TowerRequestConfig,
+
+    #[serde(default)]
+    batch: BatchBytesConfig,
+
+    // Used for testing, `serde` will skip this field
+    // and this can only be set manually once you
+    // have a copy of this struct.
     #[serde(skip)]
     host: Option<String>,
 }
@@ -29,22 +38,7 @@ impl SinkConfig for SematextConfig {
             Cloud::Europe => "https://logsene-receiver.sematext.com".to_string(),
         };
 
-        // // Custom config overrides
-        // if es_config.host.is_none() {
-        //     es_config.host = Some(host.to_string());
-        // }
-
-        // if es_config.index.is_none() {
-        //     Err(format!("`index` field is required"))?;
-        // }
-
-        // if es_config.doc_type.is_none() {
-        //     es_config.doc_type = Some("logs".to_string());
-        // }
-
-        // if es_config.compression.is_none() {
-        //     es_config.compression = Some(Compression::None);
-        // }
+        // Test workaround for settings a custom host so we can test the body manually
         if let Some(h) = &self.host {
             host = h.clone();
         }
@@ -53,6 +47,9 @@ impl SinkConfig for SematextConfig {
             host: Some(host),
             compression: Some(Compression::None),
             doc_type: Some("logs".to_string()),
+            index: Some(self.token.clone()),
+            batch: self.batch.clone(),
+            request: self.request.clone(),
             ..Default::default()
         }
         .build(cx)
