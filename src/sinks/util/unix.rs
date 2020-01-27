@@ -86,8 +86,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Bytes {
     };
 
     // Add newline
-    let newlinebytes = b"\n";
-    bytes.extend(newlinebytes.iter());
+    bytes.extend(b"\n");
     bytes
 }
 
