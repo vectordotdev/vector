@@ -102,17 +102,31 @@ mod tests {
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
 
-        let val = serde_json::Deserializer::from_slice(&output[0].1[..])
+        // A stream of `serde_json::Value`
+        let json = serde_json::Deserializer::from_slice(&output[0].1[..])
             .into_iter::<serde_json::Value>()
-            .enumerate()
-            .filter(|(i, _)| i % 2 == 1)
-            .map(|v| v.1.unwrap())
-            .map(|v| v.get("message").unwrap().as_str().unwrap().to_string())
-            .enumerate()
-            .collect::<Vec<_>>();
+            .map(|v| v.expect("decoding json"));
 
-        for (i, val) in val {
-            assert_eq!(expected[i], val);
+        let mut expected_message_idx = 0;
+        for (i, val) in json.enumerate() {
+            // Every even message is the index which contains the token for sematext
+            // Every odd message is the actual message in json format.
+            if i % 2 == 0 {
+                // Fetch {index: {_index: ""}}
+                let token = val
+                    .get("index")
+                    .unwrap()
+                    .get("_index")
+                    .unwrap()
+                    .as_str()
+                    .unwrap();
+
+                assert_eq!(token, "mylogtoken");
+            } else {
+                let message = val.get("message").unwrap().as_str().unwrap();
+                assert_eq!(message, &expected[expected_message_idx]);
+                expected_message_idx += 1;
+            }
         }
     }
 }
