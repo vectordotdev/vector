@@ -80,7 +80,8 @@ import Alert from '@site/src/components/Alert';
 
 <Alert type="danger" fill={true} icon={false}>
 
-The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. For more information, please see [issue 1473][urls.issue_1473].
+1. The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
+2. If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
 
 </Alert>
 
@@ -175,7 +176,7 @@ The directory used to persist the journal checkpoint position. By default, the g
 
 ### journalctl_path
 
-The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search the path for [`journalctl`](#journalctl). See [Communication with systemd journal](#communication-with-systemd-journal) for more info.
+The full path of the [`journalctl`](#journalctl) executable. If not set, Vector will search the path for [`journalctl`](#journalctl). See [Communication strategy](#communication-strategy) for more info.
 
 
 </Field>
@@ -360,7 +361,7 @@ specified via the [global [`data_dir`](#data_dir) option][docs.configuration#dat
 but can be overridden via the [`data_dir`](#data_dir) option in the `journald` source
 directly.
 
-### Communication with systemd journal
+### Communication strategy
 
 To ensure the `journald` source works across all platforms, Vector interacts
 with the Systemd journal via the [`journalctl`](#journalctl) command. This is accomplished by
@@ -378,6 +379,17 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
+
+### User permissions
+
+If you run Vector from a non-root user, you need to add that user to the
+`systemd-journal` group.
+
+For example, if the user is named `vector`, it can be done by running
+
+```sh
+usermod -aG systemd-journal vector
+```
 
 
 [docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
