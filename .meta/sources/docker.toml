@@ -4,7 +4,6 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
-guides = []
 output_types = ["log"]
 resources = []
 through_description = "the docker engine daemon"

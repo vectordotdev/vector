@@ -10,7 +10,7 @@ use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_firehose::{
-    KinesisFirehose, KinesisFirehoseClient, ListDeliveryStreamsInput, PutRecordBatchError,
+    DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
     PutRecordBatchInput, PutRecordBatchOutput, Record,
 };
 use serde::{Deserialize, Serialize};
@@ -151,17 +151,12 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
-    #[snafu(display("ListDeliveryStreams failed: {}", source))]
-    ListDeliveryStreamsFailed {
-        source: RusotoError<rusoto_firehose::ListDeliveryStreamsError>,
+    #[snafu(display("DescribeDeliveryStream failed: {}", source))]
+    DescribeDeliveryStreamFailed {
+        source: RusotoError<rusoto_firehose::DescribeDeliveryStreamError>,
     },
-    #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
+    #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
-    #[snafu(display(
-        "Stream returned does not contain any streams that match {}",
-        stream_name
-    ))]
-    NoMatchingStreamName { stream_name: String },
 }
 
 fn healthcheck(
@@ -172,22 +167,18 @@ fn healthcheck(
     let stream_name = config.stream_name;
 
     let fut = client
-        .list_delivery_streams(ListDeliveryStreamsInput {
-            exclusive_start_delivery_stream_name: Some(stream_name.clone()),
+        .describe_delivery_stream(DescribeDeliveryStreamInput {
+            delivery_stream_name: stream_name.clone(),
+            exclusive_start_destination_id: None,
             limit: Some(1),
-            delivery_stream_type: None,
         })
-        .map_err(|source| HealthcheckError::ListDeliveryStreamsFailed { source }.into())
-        .and_then(move |res| Ok(res.delivery_stream_names.into_iter().next()))
+        .map_err(|source| HealthcheckError::DescribeDeliveryStreamFailed { source }.into())
+        .and_then(move |res| Ok(res.delivery_stream_description.delivery_stream_name))
         .and_then(move |name| {
-            if let Some(name) = name {
-                if name == stream_name {
-                    Ok(())
-                } else {
-                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
-                }
+            if name == stream_name {
+                Ok(())
             } else {
-                Err(HealthcheckError::NoMatchingStreamName { stream_name }.into())
+                Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
             }
         });
 

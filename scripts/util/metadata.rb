@@ -68,7 +68,7 @@ class Metadata
     @posts ||=
       Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
         Post.new(path)
-      end.sort
+      end.sort_by { |post| [ post.date, post.id ] }
 
     # releases
 

@@ -3,12 +3,12 @@ delivery_guarantee: "best_effort"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
-operating_systems: ["linux"]
+operating_systems: ["Linux"]
 sidebar_label: "journald|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
 status: "beta"
 title: "Journald Source"
-unsupported_operating_systems: ["macos","windows"]
+unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
 The Vector `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
@@ -73,6 +73,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="danger" fill={true} icon={false}>
+
+The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. For more information, please see [issue 1473][urls.issue_1473].
+
+</Alert>
 
 ## Options
 
@@ -352,3 +362,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.issue_1473]: https://github.com/timberio/vector/issues/1473

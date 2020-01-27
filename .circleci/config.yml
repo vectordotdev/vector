@@ -20,7 +20,7 @@ install-rust-windows: &install-rust-windows
     shell: bash
     command: |
       curl https://sh.rustup.rs -sSf | sh -s -- -y \
-        --default-toolchain nightly-2019-11-19 \
+        --default-toolchain stable \
         --default-host x86_64-pc-windows-msvc
       # see https://github.com/rust-lang/cargo/issues/2078
       printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
@@ -93,6 +93,15 @@ jobs:
           command: |
             ./scripts/docker-run.sh checker make check-version
 
+  check-blog:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - run:
+          name: Check blog
+          command: |
+            ./scripts/docker-run.sh checker make check-blog
+
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
     steps:
@@ -129,10 +138,11 @@ jobs:
           name: Build and test
           shell: bash
           no_output_timeout: 30m
+          environment:
+            RUSTFLAGS: -Ctarget-feature=+crt-static
+            RUST_BACKTRACE: full
           command: |
-            RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            rm rust-toolchain
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1
 
   test-stable-kubernetes:
@@ -727,20 +737,21 @@ jobs:
           name: Release Github
           command: |
             export PASS_VERSION=$(make version)
+            export PASS_CIRCLE_SHA1="$CIRCLE_SHA1"
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
             ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Homebrew
           command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-homebrew
+            export PASS_VERSION=$(make version)
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
+            ./scripts/docker-run.sh releaser make release-homebrew
 
   release-s3:
     docker:
@@ -767,6 +778,11 @@ jobs:
 # Workflow Macros
 #
 
+prerelease-filters: &prerelease-filters
+  filters:
+    branches:
+      only: /prepare-.*/
+
 release-filters: &release-filters
   filters:
     branches:
@@ -785,6 +801,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-code
     - check-fmt
     - check-generate
+    - check-blog
     - test-stable
     - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -822,26 +839,36 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-blog
       - check-version:
           <<: *master-filters
       - test-stable
       - test-stable-kubernetes
-      - test-x86_64-pc-windows-msvc
+      - test-x86_64-pc-windows-msvc:
+          <<: *prerelease-filters
 
       # Build & verify
 
-      - build-x86_64-unknown-linux-musl-archive-and-deb-package
-      - build-aarch64-unknown-linux-musl-archive-and-deb-package
-      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - build-x86_64-apple-darwin-archive
-      - build-x86_64-pc-windows-msvc-archive-and-msi-package
+      - build-x86_64-unknown-linux-musl-archive-and-deb-package:
+          <<: *prerelease-filters
+      - build-aarch64-unknown-linux-musl-archive-and-deb-package:
+          <<: *prerelease-filters
+      - build-armv7-unknown-linux-musleabihf-archive-and-deb-package:
+          <<: *prerelease-filters
+      - build-x86_64-apple-darwin-archive:
+          <<: *prerelease-filters
+      - build-x86_64-pc-windows-msvc-archive-and-msi-package:
+          <<: *prerelease-filters
       - package-rpm-x86_64-unknown-linux-musl:
+          <<: *prerelease-filters
           requires:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
       - package-rpm-aarch64-unknown-linux-musl:
+          <<: *prerelease-filters
           requires:
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
       - package-rpm-armv7-unknown-linux-musleabihf:
+          <<: *prerelease-filters
           requires:
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
 
@@ -873,11 +900,11 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos
+      - verify-nixos:
+          <<: *prerelease-filters
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
-
       - verify-rpm-artifact-on-amazon-linux-2:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
@@ -895,6 +922,8 @@ workflows:
       - check-fmt:
           <<: *release-filters
       - check-generate:
+          <<: *release-filters
+      - check-blog:
           <<: *release-filters
       - test-stable:
           <<: *release-filters
@@ -1009,6 +1038,7 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-blog
       - test-stable
       - test-stable-kubernetes
 
@@ -1081,18 +1111,30 @@ workflows:
 
   install-script:
     jobs:
-      - test-install-script-on-amazon-linux-1
-      - test-install-script-on-amazon-linux-2
-      - test-install-script-on-centos-7
-      - test-install-script-on-deb-8
-      - test-install-script-on-deb-9
-      - test-install-script-on-deb-10
-      - test-install-script-on-mac-archive
-      - test-install-script-on-mac-homebrew
-      - test-install-script-on-unbuntu-16-04
-      - test-install-script-on-unbuntu-18-04
-      - test-install-script-on-unbuntu-19-04
-      - test-install-script-without-sudo
+      - test-install-script-on-amazon-linux-1:
+          <<: *prerelease-filters
+      - test-install-script-on-amazon-linux-2:
+          <<: *prerelease-filters
+      - test-install-script-on-centos-7:
+          <<: *prerelease-filters
+      - test-install-script-on-deb-8:
+          <<: *prerelease-filters
+      - test-install-script-on-deb-9:
+          <<: *prerelease-filters
+      - test-install-script-on-deb-10:
+          <<: *prerelease-filters
+      - test-install-script-on-mac-archive:
+          <<: *prerelease-filters
+      - test-install-script-on-mac-homebrew:
+          <<: *prerelease-filters
+      - test-install-script-on-unbuntu-16-04:
+          <<: *prerelease-filters
+      - test-install-script-on-unbuntu-18-04:
+          <<: *prerelease-filters
+      - test-install-script-on-unbuntu-19-04:
+          <<: *prerelease-filters
+      - test-install-script-without-sudo:
+          <<: *prerelease-filters
 
       - sync-install:
           <<: *master-filters

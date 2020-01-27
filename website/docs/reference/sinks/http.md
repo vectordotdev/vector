@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"
@@ -148,28 +148,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
-  name={"password"}
-  path={"auth"}
-  relevantWhen={{"strategy":"basic"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### password
-
-The basic authentication password.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["basic"]}
   name={"strategy"}
@@ -184,6 +162,28 @@ The basic authentication password.
 #### strategy
 
 The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
+  name={"password"}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### password
+
+The basic authentication password.
 
 
 </Field>

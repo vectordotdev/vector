@@ -29,7 +29,7 @@ class Sink < Component
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_providers = hash["service_provider"] || []
+    @service_providers = hash["service_providers"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -128,11 +128,22 @@ class Sink < Component
 
       @options.endpoint =
         Option.new({
-          "description" => "Custom endpoint for use with AWS-compatible services.",
+          "description" => "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot.",
           "examples" => ["127.0.0.0:5000"],
           "name" => "endpoint",
-          "null" => false,
-          "optional" => true,
+          "null" => true,
+          "required" => false,
+          "type" => "string"
+        })
+
+      @options.region =
+        Option.new({
+          "common" => only_service_provider?("AWS"),
+          "description" => "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region.",
+          "examples" => ["us-east-1"],
+          "name" => "region",
+          "null" => true,
+          "required" => only_service_provider?("AWS"),
           "type" => "string"
         })
     end
@@ -298,6 +309,10 @@ class Sink < Component
 
   def healthcheck?
     healthcheck == true
+  end
+
+  def only_service_provider?(provider_name)
+    service_providers.length == 1 && service_provider?(provider_name)
   end
 
   def plural_write_verb

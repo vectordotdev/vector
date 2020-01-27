@@ -102,7 +102,7 @@ impl Future for CloudwatchFuture {
                         .into_iter()
                         .next()
                     {
-                        trace!(message = "stream found", stream = ?stream.log_stream_name);
+                        debug!(message = "stream found", stream = ?stream.log_stream_name);
 
                         let events = self
                             .events
@@ -111,10 +111,10 @@ impl Future for CloudwatchFuture {
 
                         let token = stream.upload_sequence_token;
 
-                        trace!(message = "putting logs.", ?token);
+                        info!(message = "putting logs.", ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
                     } else if self.create_missing_stream {
-                        debug!("provided stream does not exist; creating a new one.");
+                        info!("provided stream does not exist; creating a new one.");
                         self.state = State::CreateStream(self.client.create_log_stream());
                     } else {
                         return Err(CloudwatchError::NoStreamsFound);
@@ -124,7 +124,7 @@ impl Future for CloudwatchFuture {
                 State::CreateGroup(fut) => {
                     try_ready!(fut.poll().map_err(CloudwatchError::CreateGroup));
 
-                    trace!("group created.");
+                    info!(message = "group created.", name = %self.client.group_name);
 
                     // This does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
@@ -135,7 +135,7 @@ impl Future for CloudwatchFuture {
                 State::CreateStream(fut) => {
                     try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
 
-                    trace!("stream created.");
+                    info!(message = "stream created.", name = %self.client.stream_name);
 
                     self.state = State::DescribeStream(self.client.describe_stream());
                 }
@@ -145,7 +145,7 @@ impl Future for CloudwatchFuture {
 
                     let next_token = res.next_sequence_token;
 
-                    trace!(message = "putting logs was successful.", ?next_token);
+                    info!(message = "putting logs was successful.", ?next_token);
 
                     self.token_tx
                         .take()

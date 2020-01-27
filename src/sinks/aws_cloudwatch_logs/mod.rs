@@ -308,7 +308,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
 
-            debug!(message = "Sending events.", events = %events.len());
+            info!(message = "Sending events.", events = %events.len());
             request::CloudwatchFuture::new(
                 self.client.clone(),
                 self.stream_name.clone(),

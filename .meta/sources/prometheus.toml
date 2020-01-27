@@ -4,7 +4,6 @@ beta = true
 common = false
 delivery_guarantee = "best_effort"
 function_category = "receive"
-guides = []
 output_types = ["metric"]
 resources = []
 through_description = "the Prometheus text exposition format"
