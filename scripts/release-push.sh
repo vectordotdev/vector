@@ -26,8 +26,8 @@ git push origin v$version_minor
 git push origin v$version
 set +x
 
-echo "Would you overwrite the `latest` branch with this version?"
-echo "Note: this will update the website to point to this branch"
+echo "Would you like to overwrite the `latest` branch with this version?"
+echo "Note: vector.dev is deployed from the `latest` branch"
 print "(y/n) "
 read update_website
 
@@ -38,4 +38,5 @@ if [ $update_website = "y" ]; then
   git merge -s ours latest
   git push origin latest --force
   git checkout $current_branch_name
+  set +x
 fi
