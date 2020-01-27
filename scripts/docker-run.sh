@@ -9,12 +9,6 @@
 
 set -eou pipefail
 
-if [ ! -z "${DOCKER:-}" ]; then
-  ${@:2}
-  exit 0
-fi
-
-export PASS_DOCKER="true"
 tag="$1"
 image="timberiodev/vector-$tag:latest"
 
