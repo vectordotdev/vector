@@ -30,19 +30,19 @@ scopes:
   - website             # Anything related to the website (not docs).
 
   # platforms
-  - Docker platform
-  - Amazon Linux platform
-  - CentOS platform
-  - Debian platform
-  - MacOS platform
-  - Raspbian platform
-  - RHEL platform
-  - Ubuntu platform
-  - Windows platform
-  - DPKG platform
-  - Homebrew platform
-  - RPM platform
-  - MSI platform
+  - docker platform
+  - amazon linux platform
+  - centos platform
+  - debian platform
+  - macos platform
+  - raspbian platform
+  - rhel platform
+  - ubuntu platform
+  - windows platform
+  - dpkg platform
+  - homebrew platform
+  - rpm platform
+  - msi platform
 
   # sources
   - docker source
