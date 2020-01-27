@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP or Unix Domain Socket."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+socket%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "socket|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/socket.rs
 status: "prod-ready"
@@ -118,7 +118,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to bind to.
+The address to connect to. The address _must_ include a port.
 
 
 </Field>

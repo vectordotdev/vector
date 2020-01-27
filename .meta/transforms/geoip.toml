@@ -3,7 +3,6 @@ title = "GeoIP"
 allow_you_to_description = "enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases"
 common = false
 function_category = "enrich"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = []

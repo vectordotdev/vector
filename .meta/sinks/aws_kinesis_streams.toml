@@ -28,13 +28,6 @@ common = true
 examples = ["user_id"]
 description = "The log field used as the Kinesis record's partition key value."
 
-[sinks.aws_kinesis_streams.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-required = true
-description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides."
-
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
 common = true

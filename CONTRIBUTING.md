@@ -111,7 +111,13 @@ docs: fix typos
 #### Merging
 
 At least one Vector team member must approve your work before merging. All
-pull requests are squashed and merged.
+pull requests are squashed and merged. We generally discourage large pull
+requests that are over 300-500 lines of diff. If you would like to propose
+a change that is larger we suggest coming onto our gitter channel and
+discuss it with one of our engineers. This way we can talk through the
+solution and discuss if a change that large is even needed! This overall
+will produce a quicker response to the change and likely produce code that
+aligns better with our process.
 
 ### CI
 

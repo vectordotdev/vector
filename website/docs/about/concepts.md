@@ -31,7 +31,7 @@ import Jump from '@site/src/components/Jump';
 
 ### Sources
 
-Vector would be junk if it couldn't injest data. A "source" defines where Vector
+Vector would be junk if it couldn't ingest data. A "source" defines where Vector
 should pull data from, or how it should receive data pushed to it. A pipeline
 can have any number of sources, and as they ingest data they proceed to
 normalize it into [events](#events) \(see next section\). This sets the stage

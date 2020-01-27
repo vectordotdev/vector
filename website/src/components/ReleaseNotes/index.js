@@ -58,7 +58,7 @@ function Highlight({post}) {
         <BlogPostTags tags={post.tags} valuesOnly={true} />
       </div>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
-      <Avatar id={post.author_id} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
+      <Avatar github={post.author_github} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
       <p>
         {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full post</Link>
       </p>
@@ -89,6 +89,8 @@ function ChangelogSentence({release}) {
 }
 
 function Notes({release, latest}) {
+  const subtitle = release.subtitle || (<>Released by <Link to="/community#team">Ben</Link></>);
+  const description = release.description || "";
   const date = Date.parse(release.date);
   const posts = release.posts;
   posts.reverse();
@@ -112,7 +114,7 @@ function Notes({release, latest}) {
             <h1>Vector v{release.version} Release Notes</h1>
             <div className="hero--subtitle">
               <div className={styles.heroSubTitle}>
-                Released by <Link to="/community#team">Ben</Link> on <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
+                {subtitle}, <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
               </div>
               <div>
                 <small>
@@ -135,6 +137,7 @@ function Notes({release, latest}) {
         <MailingListForm center={true} />
       </section>
       <section className="markdown">
+        {description.length > 0 && <p>{description}</p>}
         <p>
           We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community/">let us know what you think</Link>!
         </p>
@@ -193,7 +196,7 @@ function TableOfContents({release}) {
                 <ul>
                   {posts.map((post, idx) =>
                     <li key={idx}>
-                      <a href={`#${post.id}`} className="contents__link">{post.title}</a>
+                      <a href={`#${post.id}`} className="contents__link" title={post.title}>{post.title}</a>
                     </li>
                   )}
                 </ul>
@@ -205,7 +208,7 @@ function TableOfContents({release}) {
                 <ul>
                   {release.upgrade_guides.map((upgradeGuide, idx) =>
                     <li key={idx}>
-                      <a href={`#${upgradeGuide.id}`} className="contents__link">{upgradeGuide.title}</a>
+                      <a href={`#${upgradeGuide.id}`} className="contents__link" title={upgradeGuide.title}>{upgradeGuide.title}</a>
                     </li>
                   )}
                 </ul>

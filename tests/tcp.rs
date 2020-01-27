@@ -351,15 +351,25 @@ fn reconnect() {
 #[test]
 fn healthcheck() {
     let addr = next_addr();
+    let rt = vector::test_util::runtime();
+    let resolver = vector::dns::Resolver::new(Vec::new(), rt.executor()).unwrap();
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(addr);
+    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
+        addr.ip().to_string(),
+        addr.port(),
+        resolver.clone(),
+    );
 
     assert!(healthcheck.wait().is_ok());
 
     let bad_addr = next_addr();
-    let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(bad_addr);
+    let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
+        bad_addr.ip().to_string(),
+        bad_addr.port(),
+        resolver,
+    );
 
     assert!(bad_healthcheck.wait().is_err());
 }

@@ -27,7 +27,7 @@ common = true
 examples = ["92.12.333.224:5000"]
 required = true
 relevant_when = {mode = ["tcp"]}
-description = "The address to bind to."
+description = "The address to connect to. The address _must_ include a port."
 
 [sinks.socket.options.path]
 type = "string"

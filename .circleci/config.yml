@@ -20,7 +20,7 @@ install-rust-windows: &install-rust-windows
     shell: bash
     command: |
       curl https://sh.rustup.rs -sSf | sh -s -- -y \
-        --default-toolchain nightly-2019-11-19 \
+        --default-toolchain stable \
         --default-host x86_64-pc-windows-msvc
       # see https://github.com/rust-lang/cargo/issues/2078
       printf '[net]\ngit-fetch-with-cli = true\n' > "$HOME/.cargo/config"
@@ -93,6 +93,15 @@ jobs:
           command: |
             ./scripts/docker-run.sh checker make check-version
 
+  check-blog:
+    <<: *docker-machine
+    steps:
+      - checkout
+      - run:
+          name: Check blog
+          command: |
+            ./scripts/docker-run.sh checker make check-blog
+
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
     steps:
@@ -129,10 +138,11 @@ jobs:
           name: Build and test
           shell: bash
           no_output_timeout: 30m
+          environment:
+            RUSTFLAGS: -Ctarget-feature=+crt-static
+            RUST_BACKTRACE: full
           command: |
-            RUSTFLAGS=-Ctarget-feature=+crt-static
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-            rm rust-toolchain
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1
 
   test-stable-kubernetes:
@@ -727,20 +737,21 @@ jobs:
           name: Release Github
           command: |
             export PASS_VERSION=$(make version)
+            export PASS_CIRCLE_SHA1="$CIRCLE_SHA1"
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
             ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Homebrew
           command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-homebrew
+            export PASS_VERSION=$(make version)
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
+            ./scripts/docker-run.sh releaser make release-homebrew
 
   release-s3:
     docker:
@@ -790,6 +801,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-code
     - check-fmt
     - check-generate
+    - check-blog
     - test-stable
     - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
@@ -827,6 +839,7 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-blog
       - check-version:
           <<: *master-filters
       - test-stable
@@ -909,6 +922,8 @@ workflows:
       - check-fmt:
           <<: *release-filters
       - check-generate:
+          <<: *release-filters
+      - check-blog:
           <<: *release-filters
       - test-stable:
           <<: *release-filters
@@ -1023,6 +1038,7 @@ workflows:
       - check-code
       - check-fmt
       - check-generate
+      - check-blog
       - test-stable
       - test-stable-kubernetes
 

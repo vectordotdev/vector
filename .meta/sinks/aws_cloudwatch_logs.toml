@@ -35,13 +35,6 @@ partition_key = true
 templateable = true
 description = "The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream."
 
-[sinks.aws_cloudwatch_logs.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-required = true
-description = "The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
-
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
 common = true
