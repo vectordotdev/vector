@@ -109,7 +109,7 @@ import Field from '@site/src/components/Field';
 
 ### batch_size
 
-The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
+The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch. See [Checkpointing](#checkpointing) for more info.
 
 
 </Field>
@@ -352,22 +352,23 @@ The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
 
 ### Checkpointing
 
-Vector checkpoints the journal position after every successful read. This
-ensures that Vector resumes where it left off if restarted, preventing data
-from being read twice. The checkpoint positions are stored in the data
-directory which is specified via the
-[global [`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
-overridden via the [`data_dir`](#data_dir) option in the `journald` source directly.
+Vector checkpoints the journal position after every batch read. The size of
+the batch is controlled via the [`batch_size`](#batch_size) option. Checkpointing ensures that
+Vector resumes where it left off if restarted, preventing data from being read
+twice. The checkpoint positions are stored in the data directory which is
+specified via the [global [`data_dir`](#data_dir) option][docs.configuration#data-directory]
+but can be overridden via the [`data_dir`](#data_dir) option in the `journald` source
+directly.
 
 ### Communication with systemd journal
 
 To ensure the `journald` source works across all platforms, Vector interacts
-with the Systemd journal via the [`journalctl`](#journalctl) utility. This is accomplished by
+with the Systemd journal via the [`journalctl`](#journalctl) command. This is accomplished by
 spawning a [subprocess][urls.rust_subprocess] that Vector diligently interacts
-with. Taking care to restart the process and handle failures accordigly. If
-the [`journalctl`](#journalctl) is not in your environment path you can specify the exact
-location via the [`journalctl_path`](#journalctl_path) option. For more information on this
-strategy see [issue #1473][urls.issue_1473].
+with. If the [`journalctl`](#journalctl) command is not in the environment path you can
+specify the exact location via the [`journalctl_path`](#journalctl_path) option. For more
+information on this communication strategy please see
+[issue #1473][urls.issue_1473].
 
 ### Environment Variables
 
