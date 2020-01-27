@@ -1,6 +1,6 @@
 use crate::{
     sinks::elasticsearch::ElasticSearchConfig,
-    sinks::util::{atchBytesConfig, Compression, TowerRequestConfig, B},
+    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext},
 };
 use serde::{Deserialize, Serialize};
