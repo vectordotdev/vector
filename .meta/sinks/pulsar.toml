@@ -1,0 +1,57 @@
+[sinks.pulsar]
+title = "Apache Pulsar"
+beta = true
+common = true
+delivery_guarantee = "at_least_once"
+egress_method = "streaming"
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]"
+
+[sinks.pulsar.options.encoding.enum]
+json = "Each event is encoded into JSON and the payload is represented as a JSON array."
+text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+
+[sinks.pulsar.options.address]
+type = "string"
+common = true
+examples = ["127.0.0.1:6650"]
+required = true
+description = """\
+A host and port pair that the pulsar client should connect to.
+"""
+
+[sinks.pulsar.options.topic]
+type = "string"
+common = true
+examples = ["topic-1234"]
+required = true
+description = "The Pulsar topic name to write events to."
+
+[sinks.pulsar.options.batch_size]
+type = "string"
+common = false
+examples = ["1000", "5"]
+max_size = 4294967295
+required = false
+description = """\
+An optional batch size for sending messages
+"""
+
+[sinks.pulsar.options.pulsar]
+type = "table"
+common = true
+description = "An optional auth token that can be passed to pulsar"
+
+[sinks.pulsar.options.auth.children.auth_name]
+type = "string"
+examples = ["${NAME_ENV_VAR}", "name123"]
+required = true
+description = "The basic authentication name."
+
+[sinks.http.options.auth.children.auth_token]
+type = "string"
+examples = ["${TOKEN_ENV_VAR}", "123456789"]
+required = true
+description = "The basic authentication password."

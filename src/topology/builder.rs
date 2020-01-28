@@ -195,6 +195,7 @@ pub fn build_pieces(
         let cx = SinkContext {
             resolver: resolver.clone(),
             acker,
+            exec: exec.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx) {

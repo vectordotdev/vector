@@ -163,6 +163,7 @@ pub trait SinkConfig: core::fmt::Debug {
 pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) resolver: Resolver,
+    pub(super) exec: TaskExecutor,
 }
 
 impl SinkContext {
@@ -170,12 +171,17 @@ impl SinkContext {
     pub fn new_test(exec: TaskExecutor) -> Self {
         Self {
             acker: Acker::Null,
-            resolver: Resolver::new(Vec::new(), exec).unwrap(),
+            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            exec,
         }
     }
 
     pub fn acker(&self) -> Acker {
         self.acker.clone()
+    }
+
+    pub fn exec(&self) -> TaskExecutor {
+        self.exec.clone()
     }
 
     pub fn resolver(&self) -> Resolver {

@@ -7079,6 +7079,85 @@ end
   # * unit: seconds
   flush_period_secs = 60
 
+# Streams `log` events to Apache Pulsar via the Pulsar protocol.
+[sinks.pulsar]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `pulsar`.
+  #
+  # * required
+  # * type: string
+  # * must be: "pulsar"
+  type = "pulsar"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # A host and port pair that the pulsar client should connect to.
+  #
+  # * required
+  # * type: string
+  address = "127.0.0.1:6650"
+
+  # The Pulsar topic name to write events to.
+  #
+  # * required
+  # * type: string
+  topic = "topic-1234"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "us-east-1"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
+ #
+  # Auth
+  #
+
+  [sinks.pulsar.auth]
+    # The basic authentication token.
+    #
+    # * required
+    # * type: string
+    auth_token = "${TOKEN_ENV_VAR}"
+    auth_token = "token"
+
+    # The basic authentication user name.
+    #
+    # * required
+    # * type: string
+    auth_name = "${USERNAME_ENV_VAR}"
+    auth_name = "username"
+
 # Batches `log` events to Sematext via the Elasticsearch API.
 [sinks.sematext_logs]
   #
