@@ -22,6 +22,14 @@ service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest]"
 tls_options = []
 
+[sinks.gcp_pubsub.env_vars.GOOGLE_APPLICATION_CREDENTIALS]
+type = "string"
+required = false
+examples = ["/path/to/credentials.json"]
+description = """\
+The [GCP api key][urls.gcp_authentication_api_key] used for authentication.\
+"""
+
 [sinks.gcp_pubsub.options.api_key]
 type = "string"
 description = """\
