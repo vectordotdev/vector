@@ -16,6 +16,7 @@ pub mod gcp_pubsub;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod logdna;
 pub mod new_relic_logs;
 pub mod prometheus;
 pub mod socket;

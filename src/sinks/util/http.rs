@@ -1,10 +1,14 @@
 use super::{
     retries::RetryLogic,
+    service::TowerRequestSettings,
     tls::{TlsConnectorExt, TlsSettings},
+    BatchSettings, Buffer, SinkExt,
 };
 use crate::dns::Resolver;
+use crate::event::Event;
+use crate::topology::config::SinkContext;
 use bytes::Bytes;
-use futures::{Future, Poll, Stream};
+use futures::{stream::iter_ok, Future, Poll, Sink, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
@@ -56,6 +60,27 @@ impl HttpServiceBuilder {
             resolver,
             tls_settings: None,
         }
+    }
+
+    pub fn batched_encoded<R, E>(
+        cx: SinkContext,
+        request_settings: &TowerRequestSettings,
+        batch_settings: &BatchSettings,
+        request_builder: R,
+        encode_event: E,
+    ) -> crate::sinks::RouterSink
+    where
+        R: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+        E: Fn(Event) -> Option<Vec<u8>> + Sync + Send + 'static,
+    {
+        let svc = HttpService::new(cx.resolver(), request_builder);
+
+        let s = request_settings
+            .batch_sink(HttpRetryLogic, svc, cx.acker())
+            .batch_with_min(Buffer::new(false), batch_settings)
+            .with_flat_map(move |event| iter_ok(encode_event(event)));
+
+        Box::new(s)
     }
 
     /// Build the configured `HttpService`
