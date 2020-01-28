@@ -17048,11 +17048,13 @@ module.exports = {
       "id": "gcp_stackdriver_logging_sink",
       "name": "gcp_stackdriver_logging",
       "operating_systems": [
-        "linux",
-        "macos",
-        "windows"
+        "Linux",
+        "MacOS",
+        "Windows"
       ],
-      "service_provider": null,
+      "service_providers": [
+        "Google"
+      ],
       "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
