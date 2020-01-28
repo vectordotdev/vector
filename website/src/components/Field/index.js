@@ -83,6 +83,10 @@ function RelevantWhen({value}) {
   let relKey = Object.keys(value)[0];
   let relValue = Object.values(value)[0];
 
+  if (relValue == "") {
+    relValue = null;
+  }
+
   return (
     <span>
       <code><a href={`#${relKey}`}>{relKey}</a></code> = <code>{toTOML(relValue)}</code>

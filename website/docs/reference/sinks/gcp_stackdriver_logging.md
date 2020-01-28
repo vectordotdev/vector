@@ -46,7 +46,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
   inputs = ["my-source-id"] # example
-  credentials_path = "/path/to/credentials.json" # example
+  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
+  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
   log_id = "vector-logs" # example
   project_id = "vector-123456" # example
 ```
@@ -61,7 +62,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
   inputs = ["my-source-id"] # example
-  credentials_path = "/path/to/credentials.json" # example
+  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
+  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
   log_id = "vector-logs" # example
   project_id = "vector-123456" # example
 
@@ -120,6 +122,28 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AtvF23duxxmfFndnwvpegkbmfcjgvjabpg"]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={{"credentials_path":""}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### api_key
+
+The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+
+
+</Field>
 
 
 <Field
@@ -337,7 +361,7 @@ The behavior when the buffer becomes full.
   examples={["/path/to/credentials.json"]}
   name={"credentials_path"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"api_key":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -346,7 +370,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -883,6 +907,35 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 </Fields>
 
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  name={"GOOGLE_APPLICATION_CREDENTIALS"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### GOOGLE_APPLICATION_CREDENTIALS
+
+The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+
+
+</Field>
+
+
+</Fields>
+
 ## How It Works
 
 ### Buffers & Batches
@@ -912,6 +965,19 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+2. If the [`api_key`](#api_key) option is set.
+3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -960,6 +1026,10 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources

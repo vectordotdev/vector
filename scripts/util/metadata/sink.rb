@@ -105,7 +105,7 @@ class Sink < Component
         })
     end
 
-    # Endpoint option
+    # AWS
 
     if service_provider?("AWS")
       @env_vars.AWS_ACCESS_KEY_ID =

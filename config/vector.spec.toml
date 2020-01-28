@@ -3258,6 +3258,21 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The GCP api key used for authentication.
+  #
+  # * required
+  # * type: string
+  # * relevant when credentials_path = ""
+  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg"
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the stackdriver logging API.
+  #
+  # * required
+  # * type: string
+  # * relevant when api_key = ""
+  credentials_path = "/path/to/credentials.json"
+
   # The project name to which to publish logs.
   #
   # * required
@@ -3269,21 +3284,6 @@ end
   # * required
   # * type: string
   topic = "this-is-a-topic"
-
-  # A Google Cloud API key used to authenticate access the pubsub project and
-  # topic. Either this or `credentials_path` must be set.
-  #
-  # * optional
-  # * no default
-  # * type: string
-
-  # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the pubsub project and topic. Either this or `api_key`
-  # must be set.
-  #
-  # * optional
-  # * no default
-  # * type: string
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3498,11 +3498,19 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The GCP api key used for authentication.
+  #
+  # * required
+  # * type: string
+  # * relevant when credentials_path = ""
+  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg"
+
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the stackdriver logging API.
   #
   # * required
   # * type: string
+  # * relevant when api_key = ""
   credentials_path = "/path/to/credentials.json"
 
   # The log ID to which to publish logs. This is a name you create to identify

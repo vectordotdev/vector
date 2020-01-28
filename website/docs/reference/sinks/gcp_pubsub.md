@@ -46,6 +46,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "gcp_pubsub" # must be: "gcp_pubsub"
   inputs = ["my-source-id"] # example
+  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
+  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 ```
@@ -60,12 +62,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "gcp_pubsub" # must be: "gcp_pubsub"
   inputs = ["my-source-id"] # example
+  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
+  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 
   # OPTIONAL - General
-  api_key = nil # example, no default
-  credentials_path = nil # example, no default
   healthcheck = true # default
 
   # OPTIONAL - Batch
@@ -114,14 +116,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["AtvF23duxxmfFndnwvpegkbmfcjgvjabpg"]}
   name={"api_key"}
   path={null}
-  relevantWhen={null}
-  required={false}
+  relevantWhen={{"credentials_path":""}}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -129,7 +131,7 @@ import Field from '@site/src/components/Field';
 
 ### api_key
 
-A Google Cloud API key used to authenticate access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be set.
+The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -320,14 +322,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["/path/to/credentials.json"]}
   name={"credentials_path"}
   path={null}
-  relevantWhen={null}
-  required={false}
+  relevantWhen={{"api_key":""}}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -335,7 +337,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. Either this or [`api_key`](#api_key) must be set.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -747,6 +749,35 @@ The topic within the project to which to publish logs.
 
 </Fields>
 
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  name={"GOOGLE_APPLICATION_CREDENTIALS"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### GOOGLE_APPLICATION_CREDENTIALS
+
+The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+
+
+</Field>
+
+
+</Fields>
+
 ## How It Works
 
 ### Buffers & Batches
@@ -776,6 +807,19 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the [`credentials_path`](#credentials_path) option is set.
+2. If the [`api_key`](#api_key) option is set.
+3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
 
 ### Health Checks
 
@@ -824,6 +868,10 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
+[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
+[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_pubsub]: https://cloud.google.com/pubsub/
 [urls.gcp_pubsub_rest]: https://cloud.google.com/pubsub/docs/reference/rest/
 [urls.new_gcp_pubsub_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_pubsub
