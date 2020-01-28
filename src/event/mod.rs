@@ -170,7 +170,9 @@ impl Serialize for Value {
             Value::Integer(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Timestamp(t) => serializer.serialize_str(&t.to_rfc3339()),
+            Value::Timestamp(t) => {
+                serializer.serialize_str(&t.to_rfc3339_opts(SecondsFormat::Nanos, true))
+            }
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
         }
@@ -620,6 +622,10 @@ mod test {
         assert_eq!(expected_all, actual_all);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
+        println!(
+            "{:?}",
+            actual_all.pointer("/timestamp").unwrap().as_str().unwrap()
+        );
         assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
     }
 
