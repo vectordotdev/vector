@@ -3464,23 +3464,23 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The filename for a Google Cloud service account credentials JSON file
-  # used to authenticate access to the stackdriver logging API.
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the stackdriver logging API.
   #
   # * required
   # * type: string
   credentials_path = "/path/to/credentials.json"
 
-  # The log ID to which to publish logs.
-  # This is a name you create to identify this log stream.
+  # The log ID to which to publish logs. This is a name you create to identify
+  # this log stream.
   #
   # * required
   # * type: string
   log_id = "vector-logs"
 
-  # The project ID to which to publish logs.
-  # See the Google Cloud Platform project management documentation for more
-  # details.
+  # The project ID to which to publish logs. See the Google Cloud Platform
+  # project management documentation for more details.
+  #
   # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
   # `project_id` must be set.
   #
@@ -3489,6 +3489,7 @@ end
   project_id = "vector-123456"
 
   # The billing account ID to which to publish logs.
+  #
   # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
   # `project_id` must be set.
   #
@@ -3499,6 +3500,7 @@ end
 
   # The folder ID to which to publish logs.
   # See the Google Cloud Platform folder documentation for more details.
+  #
   # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
   # `project_id` must be set.
   #
@@ -3515,9 +3517,9 @@ end
   healthcheck = true
   healthcheck = false
 
-  # The organization ID to which to publish logs.
-  # This would be the identifier assigned to your organization on Google Cloud
-  # Platform.
+  # The organization ID to which to publish logs. This would be the identifier
+  # assigned to your organization on Google Cloud Platform.
+  #
   # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
   # `project_id` must be set.
   #
@@ -3658,8 +3660,9 @@ end
   #
 
   [sinks.gcp_stackdriver_logging.resource]
-    # The monitored resource type.
-    # For example, the type of a Compute Engine VM instance is gce_instance.
+    # The monitored resource type. For example, the type of a Compute Engine VM
+    # instance is gce_instance.
+    #
     # See the Google Cloud Platform monitored resource documentation for more
     # details.
     #
@@ -3671,8 +3674,9 @@ end
 
     # Values for all of the labels listed in the associated monitored resource
     # descriptor.
-    # For example, Compute Engine VM instances use the labels "projectId",
-    # "instanceId", and "zone".
+    #
+    # For example, Compute Engine VM instances use the labels `projectId`,
+    # `instanceId`, and `zone`.
     #
     # * optional
     # * no default

@@ -209,8 +209,8 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 ### billing_account_id
 
 The billing account ID to which to publish logs.
-Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
 
+Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
 
 
 </Field>
@@ -346,9 +346,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file
-used to authenticate access to the stackdriver logging API.
-
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API.
 
 
 </Field>
@@ -371,9 +369,9 @@ used to authenticate access to the stackdriver logging API.
 ### folder_id
 
 The folder ID to which to publish logs.
-See the [Google Cloud Platform folder documentation](https://cloud.google.com/resource-manager/docs/creating-managing-folders) for more details.
-Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
+See the [Google Cloud Platform folder documentation][urls.gcp_folders] for more details.
 
+Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
 
 
 </Field>
@@ -417,9 +415,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### log_id
 
-The log ID to which to publish logs.
-This is a name you create to identify this log stream.
-
+The log ID to which to publish logs. This is a name you create to identify this log stream.
 
 
 </Field>
@@ -441,10 +437,9 @@ This is a name you create to identify this log stream.
 
 ### organization_id
 
-The organization ID to which to publish logs.
-This would be the identifier assigned to your organization on Google Cloud Platform.
-Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
+The organization ID to which to publish logs. This would be the identifier assigned to your organization on Google Cloud Platform.
 
+Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
 
 
 </Field>
@@ -466,10 +461,9 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
 
 ### project_id
 
-The project ID to which to publish logs.
-See the [Google Cloud Platform project management documentation](https://cloud.google.com/resource-manager/docs/creating-managing-projects) for more details.
-Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
+The project ID to which to publish logs. See the [Google Cloud Platform project management documentation][urls.gcp_projects] for more details.
 
+Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folder_id), [`organization_id`](#organization_id), or [`project_id`](#project_id) must be set.
 
 
 </Field>
@@ -693,8 +687,8 @@ Options for describing the logging resource.
 #### `[label]`
 
 Values for all of the labels listed in the associated monitored resource descriptor.
-For example, Compute Engine VM instances use the labels &quot;projectId&quot;, &quot;instanceId&quot;, and &quot;zone&quot;.
 
+For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`.
 
 
 </Field>
@@ -716,10 +710,9 @@ For example, Compute Engine VM instances use the labels &quot;projectId&quot;, &
 
 #### type
 
-The monitored resource type.
-For example, the type of a Compute Engine VM instance is gce_instance.
-See the [Google Cloud Platform monitored resource documentation](https://cloud.google.com/monitoring/api/resources) for more details.
+The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.
 
+See the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details.
 
 
 </Field>
@@ -967,6 +960,9 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.guarantees]: /docs/about/guarantees/
+[urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
+[urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
+[urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
 [urls.gcp_stackdriver_logging]: https://cloud.google.com/logging/docs/reference/v2/rest/
 [urls.gcp_stackdriver_logging_rest]: https://cloud.google.com/logging/
 [urls.new_gcp_stackdriver_logging_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logging
