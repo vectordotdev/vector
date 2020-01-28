@@ -3278,8 +3278,9 @@ end
   # * type: string
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the pubsub project and topic. Either this or `api_key`
-  # must be set.
+  # authenticate access to the pubsub project and topic. If this is unset, Vector
+  # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+  # filename. Either this or `api_key` must be set.
   #
   # * optional
   # * no default
@@ -3499,7 +3500,9 @@ end
   inputs = ["my-source-id"]
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the stackdriver logging API.
+  # authenticate access to the stackdriver logging API. If this is unset, Vector
+  # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+  # filename.
   #
   # * required
   # * type: string

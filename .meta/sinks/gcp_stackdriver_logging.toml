@@ -35,7 +35,8 @@ required = true
 examples = ["/path/to/credentials.json"]
 description = """\
 The filename for a Google Cloud service account credentials JSON file \
-used to authenticate access to the stackdriver logging API.\
+used to authenticate access to the stackdriver logging API. \
+If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\
 """
 
 [sinks.gcp_stackdriver_logging.options.project_id]

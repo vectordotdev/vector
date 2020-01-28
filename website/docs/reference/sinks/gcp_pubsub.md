@@ -335,7 +335,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. Either this or [`api_key`](#api_key) must be set. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. Either this or [`api_key`](#api_key) must be set. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>

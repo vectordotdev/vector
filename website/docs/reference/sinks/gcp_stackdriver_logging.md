@@ -346,7 +346,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
