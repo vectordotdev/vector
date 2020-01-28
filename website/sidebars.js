@@ -216,6 +216,8 @@ module.exports = {
             
               "reference/sinks/gcp_pubsub",
             
+              "reference/sinks/gcp_stackdriver_logging",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",

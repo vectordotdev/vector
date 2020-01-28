@@ -85,7 +85,7 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # GCP
-goauth = "0.6.0"
+goauth = "0.6.1"
 smpl_jwt = "0.4.0"
 
 # External libs
