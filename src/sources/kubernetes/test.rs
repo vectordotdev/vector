@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::borrow::Borrow;
 use std::thread;
 use std::time::Duration;
+use uuid::Uuid;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
@@ -361,7 +362,7 @@ fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
 
 #[test]
 fn kube_one_log() {
-    let namespace = "vector-test-one-log";
+    let namespace = format!("vector-test-one-log-{}", Uuid::new_v4());
     let message = "12";
     let user_namespace = user_namespace(namespace);
 
@@ -389,7 +390,7 @@ fn kube_one_log() {
 
 #[test]
 fn kube_old_log() {
-    let namespace = "vector-test-old-log";
+    let namespace = format!("vector-test-old-log-{}", Uuid::new_v4());
     let message_old = "13";
     let message_new = "14";
     let user_namespace = user_namespace(namespace);
@@ -428,7 +429,7 @@ fn kube_old_log() {
 
 #[test]
 fn kube_multi_log() {
-    let namespace = "vector-test-multi-log";
+    let namespace = format!("vector-test-multi-log-{}", Uuid::new_v4());
     let mut messages = vec!["15", "16", "17", "18"];
     let user_namespace = user_namespace(namespace);
 
@@ -459,7 +460,7 @@ fn kube_multi_log() {
 
 #[test]
 fn kube_object_uid() {
-    let namespace = "vector-test-object-uid";
+    let namespace = format!("vector-test-object-uid-{}", Uuid::new_v4());
     let message = "19";
     let user_namespace = user_namespace(namespace);
 
