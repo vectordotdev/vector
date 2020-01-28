@@ -46,8 +46,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "gcp_pubsub" # must be: "gcp_pubsub"
   inputs = ["my-source-id"] # example
-  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
-  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 ```
@@ -62,12 +60,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "gcp_pubsub" # must be: "gcp_pubsub"
   inputs = ["my-source-id"] # example
-  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
-  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 
   # OPTIONAL - General
+  api_key = nil # example, no default
+  credentials_path = nil # example, no default
   healthcheck = true # default
 
   # OPTIONAL - Batch
@@ -116,14 +114,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["AtvF23duxxmfFndnwvpegkbmfcjgvjabpg"]}
+  examples={[]}
   name={"api_key"}
   path={null}
-  relevantWhen={{"credentials_path":""}}
-  required={true}
+  relevantWhen={null}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -131,7 +129,7 @@ import Field from '@site/src/components/Field';
 
 ### api_key
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+A Google Cloud API key used to authenticate access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be set. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -322,14 +320,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["/path/to/credentials.json"]}
+  examples={[]}
   name={"credentials_path"}
   path={null}
-  relevantWhen={{"api_key":""}}
-  required={true}
+  relevantWhen={null}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -337,7 +335,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. Either this or [`api_key`](#api_key) must be set. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>

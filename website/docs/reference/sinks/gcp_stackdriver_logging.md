@@ -46,8 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
   inputs = ["my-source-id"] # example
-  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
-  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
+  credentials_path = "/path/to/credentials.json" # example
   log_id = "vector-logs" # example
   project_id = "vector-123456" # example
 ```
@@ -62,8 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
   inputs = ["my-source-id"] # example
-  api_key = "AtvF23duxxmfFndnwvpegkbmfcjgvjabpg" # example, relevant when credentials_path = ""
-  credentials_path = "/path/to/credentials.json" # example, relevant when api_key = ""
+  credentials_path = "/path/to/credentials.json" # example
   log_id = "vector-logs" # example
   project_id = "vector-123456" # example
 
@@ -122,28 +120,6 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["AtvF23duxxmfFndnwvpegkbmfcjgvjabpg"]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={{"credentials_path":""}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### api_key
-
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
-
-
-</Field>
 
 
 <Field
@@ -361,7 +337,7 @@ The behavior when the buffer becomes full.
   examples={["/path/to/credentials.json"]}
   name={"credentials_path"}
   path={null}
-  relevantWhen={{"api_key":""}}
+  relevantWhen={null}
   required={true}
   templateable={false}
   type={"string"}
@@ -972,7 +948,7 @@ Vector is concerned with the [server to server methods][urls.gcp_authentication_
 and will find credentials in the following order:
 
 1. If the [`credentials_path`](#credentials_path) option is set.
-2. If the [`api_key`](#api_key) option is set.
+2. If the `api_key` option is set.
 3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
