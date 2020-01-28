@@ -23,6 +23,12 @@ pub struct Unflatten {
     map: HashMap<Atom, MapValue>,
 }
 
+impl Unflatten {
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+}
+
 impl From<HashMap<Atom, Value>> for Unflatten {
     fn from(log: HashMap<Atom, Value>) -> Self {
         let log = log.into_iter().collect::<HashMap<_, _>>();
