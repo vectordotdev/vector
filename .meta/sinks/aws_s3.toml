@@ -75,15 +75,3 @@ examples = [
 partition_key = true
 templateable = true
 description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
-
-[sinks.aws_s3.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-description = "The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either \"region\" or \"endpoint\" must be specified."
-
-[sinks.aws_s3.options.endpoint]
-type = "string"
-common = false
-examples = ["https://s3.us-east-1.amazonaws.com"]
-description = "The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either \"endpoint\" or \"region\" must be specified."

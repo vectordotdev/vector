@@ -36,7 +36,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.0)', value: 'latest'},
+        { label: 'Latest (0.7.1)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -81,7 +81,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.0)', value: 'latest'},
+        { label: 'Latest (0.7.1)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -126,7 +126,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.0)', value: 'latest'},
+        { label: 'Latest (0.7.1)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 

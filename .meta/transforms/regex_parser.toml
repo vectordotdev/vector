@@ -5,7 +5,6 @@ parse a log field's value with a [Regular Expression][urls.regex]\
 """
 common = true
 function_category = "parse"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = []

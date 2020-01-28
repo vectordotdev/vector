@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `kafka` source ingests data through Kafka 0.9 or later and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
 status: "beta"
@@ -124,7 +124,7 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
 
 ### bootstrap_servers
 
-A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a &quot;bootstrap&quot; Kafka cluster that a Kafka client connects to initially to bootstrap itself.
+A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
 
 
 </Field>

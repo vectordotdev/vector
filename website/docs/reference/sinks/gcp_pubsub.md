@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_pubsub%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "gcp_pubsub|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp_pubsub.rs
 status: "beta"
@@ -286,7 +286,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -554,7 +554,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -712,7 +712,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 #### verify_hostname
 
-If `true` (the default), Vector will validate the configured remote host name against the remote host&#39;s TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 
 </Field>

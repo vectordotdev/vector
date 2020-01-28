@@ -4,7 +4,6 @@ beta = true
 common = true
 delivery_guarantee = "at_least_once"
 function_category = "collect"
-guides = []
 output_types = ["log"]
 resources = []
 through_description = "Kafka 0.9 or later"

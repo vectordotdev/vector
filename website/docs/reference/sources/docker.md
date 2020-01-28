@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `docker` source ingests data through the docker engine daemon and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "docker|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/docker.rs
 status: "beta"
@@ -108,7 +108,7 @@ A list of image names to match against. If not provided, all images will be incl
 
 ### include_labels
 
-A list of container object labels to match against when filtering running containers. This should follow the described label&#39;s synatx in [docker object labels docs][urls.docker_object_labels].
+A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].
 
 
 </Field>

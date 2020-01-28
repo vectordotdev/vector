@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.7.0<a/>
+    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.7.1<a/>
   </strong>
 </p>
 
@@ -72,7 +72,7 @@ of your observability data with Vector.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [twitter][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.7.0 (latest)][urls.v0.7.0]
+* [**Releases**][urls.vector_releases] - [v0.7.1 (latest)][urls.v0.7.1]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -198,7 +198,7 @@ Or use your own [preferred method][docs.installation].
 [urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.7.0]: https://vector.dev/releases/0.7.0/download
+[urls.v0.7.1]: https://vector.dev/releases/0.7.1/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

@@ -3,7 +3,6 @@ title = "AWS EC2 Metadata"
 allow_you_to_description = "enrich logs with AWS EC2 instance metadata"
 common = false
 function_category = "enrich"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = []

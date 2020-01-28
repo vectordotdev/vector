@@ -3,7 +3,6 @@ title = "JSON Parser"
 allow_you_to_description = "parse a log field value as JSON"
 common = true
 function_category = "parse"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = []

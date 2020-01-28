@@ -28,6 +28,7 @@ description = "Options for the authentication strategy."
 
 [sinks.clickhouse.options.auth.options.strategy]
 type = "string"
+prioritize = true
 required = true
 description = "The authentication strategy to use."
 
