@@ -221,6 +221,42 @@ mod tests {
         }
     }
 
+    // converts an iterator over key-value pairs to an iterator with values sorted by keys
+    fn sort_kv_iter<K, V, I>(iter: I) -> impl Iterator<Item = (K, V)>
+    where
+        K: Ord,
+        I: Iterator<Item = (K, V)>,
+    {
+        let mut collected: Vec<_> = iter.collect();
+        collected.sort_by(|(k1, _), (k2, _)| k1.cmp(&k2));
+        collected.into_iter()
+    }
+
+    fn deep_cmp_ignore_order<'a, U, V>(first: U, second: V) -> bool
+    where
+        U: Iterator<Item = (&'a event::Atom, &'a event::Value)>,
+        V: Iterator<Item = (&'a String, &'a serde_json::Value)>,
+    {
+        let first = sort_kv_iter(first);
+        let second = sort_kv_iter(second);
+
+        for ((k1, v1), (k2, v2)) in first.zip(second) {
+            let matching = k1 == k2
+                && match (v1, v2) {
+                    (event::Value::Bytes(s1), serde_json::Value::String(s2)) => s1 == s2,
+                    (event::Value::Map(m1), serde_json::Value::Object(m2)) => {
+                        deep_cmp_ignore_order(m1.into_iter(), m2.into_iter())
+                    }
+                    _ => false,
+                };
+
+            if !matching {
+                return false;
+            }
+        }
+        true
+    }
+
     #[test]
     fn encode_json() {
         let path = temp_file();
@@ -228,25 +264,12 @@ mod tests {
         let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
 
         for (input, output) in input.into_iter().zip(output) {
-            // let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
-            //     serde_json::from_str(&output[..]).unwrap();
-            // let output: Result<HashMap<String, HashMap<String, HashMap<String, String>>>, _> =
-            // serde_json::from_str(&output[..]);
+            let input = input.into_log();
+            let output: serde_json::Map<String, serde_json::Value> =
+                serde_json::from_str(&output[..]).unwrap();
 
-            println!("input: {:?}, output: {:?}", input, output);
-
-            // let deeper = input.into_log().match_against(output).unwrap();
-            // for (input, output) in deeper {
-            //     let deeper = input.match_against_map(output).unwrap();
-            //     for (input, output) in deeper {
-            //         let deeper = input.match_against_map(output).unwrap();
-            //         for (input, output) in deeper {
-            //             assert!(input.equals(output))
-            //         }
-            //     }
-            // }
+            assert!(deep_cmp_ignore_order(input.all_fields(), output.iter()));
         }
-        panic!("end of test");
     }
 
     #[test]
