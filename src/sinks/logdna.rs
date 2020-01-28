@@ -1,11 +1,13 @@
 use crate::{
     event::{self, Event},
-    sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::http::HttpService,
     sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::sync::Arc;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct LogdnaConfig {
@@ -34,6 +36,15 @@ impl SinkConfig for LogdnaConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);
 
+        let host = self
+            .host
+            .unwrap_or("https://logs.logdna.com/logs/ingest".to_string());
+
+        let uri = Uri::from_shared(host.into())?;
+        let config = Arc::new(*self.clone());
+
+        let build_request = move |body| build_request(config.clone(), uri.clone(), body);
+
         let sink = HttpService::with_batched_encoded(
             cx,
             &request_settings,
@@ -55,16 +66,20 @@ impl SinkConfig for LogdnaConfig {
     }
 }
 
-fn build_request(body: Vec<u8>) -> http::Request<Vec<u8>> {
+fn build_request(config: Arc<LogdnaConfig>, host: Uri, body: Vec<u8>) -> http::Request<Vec<u8>> {
     let body = String::from_utf8(body).expect("unable to convert serde_json to string");
+    let raw_value = RawValue::from_string(body);
 
-    // #[derive(Serialize)]
-    // struct Body<'a> {
-    //    #[serde(borrow)] 
-    //    lines: Vec<
-    // }
+    let body = serde_json::to_vec(json!({
+        "line": raw_value,
+    }))
+    .unwrap();
 
-    todo!()
+    Request::builder()
+        .uri(host)
+        .method("POST")
+        .body(body)
+        .unwrap()
 }
 
 fn encode_event(event: Event) -> Option<Vec<u8>> {
@@ -79,10 +94,20 @@ fn encode_event(event: Event) -> Option<Vec<u8>> {
 
     let mut map = serde_json::map::Map::new();
 
-    use serde_json::json;
-
     map.insert("line".to_string(), json!(line));
     map.insert("timestamp".to_string(), json!(timestamp));
+
+    if let Some(app) = log.remove(&"app".into()) {
+        map.insert("app".to_string(), json!(app));
+    }
+
+    if let Some(file) = log.remove(&"file".into()) {
+        map.insert("file".to_string(), json!(file));
+    }
+
+    if !map.contains_key("app") || !map.contains_key("file") {
+        map.insert("app".to_string(), json!("vector"));
+    }
 
     let unflatten = log.unflatten();
     if !unflatten.is_empty() {
@@ -90,10 +115,6 @@ fn encode_event(event: Event) -> Option<Vec<u8>> {
     }
 
     serde_json::to_vec(&map)
-        .map(|mut v| {
-            v.push(b',');
-            v
-        })
         .map_err(|e| panic!("Unable to encode into JSON: {}", e))
         .ok()
 }
