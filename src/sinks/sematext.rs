@@ -1,11 +1,11 @@
 use crate::{
     sinks::elasticsearch::ElasticSearchConfig,
     sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
-    topology::config::{DataType, SinkConfig, SinkContext},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct SematextConfig {
     cloud: Cloud,
     token: String,
@@ -23,11 +23,21 @@ pub struct SematextConfig {
     host: Option<String>,
 }
 
+inventory::submit! {
+    SinkDescription::new::<SematextConfig>("sematext")
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Cloud {
     NorthAmerica,
     Europe,
+}
+
+impl Default for Cloud {
+    fn default() -> Self {
+        Cloud::NorthAmerica
+    }
 }
 
 #[typetag::serde(name = "sematext")]
