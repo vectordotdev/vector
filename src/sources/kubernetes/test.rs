@@ -8,7 +8,7 @@ use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
     api::{
         Api, DeleteParams, KubeObject, ListParams, Log, LogParams, Object, PostParams,
-        PropagationPolicy,
+        PropagationPolicy, RawApi,
     },
     client::APIClient,
     config,
@@ -110,6 +110,7 @@ spec:
       - name: vector
         image: ktff/vector-kube-metadata:latest
         imagePullPolicy: Always
+        args: ["-vv"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
@@ -192,6 +193,35 @@ impl Kube {
                 })
                 .ok()
         })
+    }
+
+    /// Will substitute NAMESPACE_MARKER
+    fn create_raw_with<K, S: Borrow<str>>(&self, api: &RawApi, yaml: S) -> K
+    where
+        K: DeserializeOwned,
+    {
+        let yaml = yaml
+            .borrow()
+            .replace(NAMESPACE_MARKER, self.namespace.as_str());
+        let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
+        let json = serde_json::to_vec(&map).unwrap();
+        retry(|| {
+            api.create(&PostParams::default(), json.clone())
+                .and_then(|request| self.client.request(request))
+                .map_err(|error| {
+                    error!(message = "Failed creating Kubernetes object", ?error);
+                })
+                .ok()
+        })
+    }
+
+    /// Deleter will delete given resource on drop.
+    fn deleter<S: Borrow<str>>(&self, api: RawApi, name: S) -> Deleter {
+        Deleter {
+            client: self.client.clone(),
+            api,
+            name: name.borrow().to_owned(),
+        }
     }
 
     fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
@@ -296,6 +326,30 @@ impl Kube {
 impl Drop for Kube {
     fn drop(&mut self) {
         self.cleanup();
+    }
+}
+
+struct Deleter {
+    client: APIClient,
+    name: String,
+    api: RawApi,
+}
+
+impl Drop for Deleter {
+    fn drop(&mut self) {
+        let _ = self
+            .api
+            .delete(
+                self.name.as_str(),
+                &DeleteParams {
+                    propagation_policy: Some(PropagationPolicy::Background),
+                    ..DeleteParams::default()
+                },
+            )
+            .and_then(|request| self.client.request_text(request))
+            .map_err(|error| {
+                error!(message = "Failed deleting Kubernetes object", ?error);
+            });
     }
 }
 
@@ -489,6 +543,8 @@ fn kube_object_uid() {
 
 // ************************** kubernetes_pod_metadata TESTS ************************* //
 
+static NAME_MARKER: &'static str = "$(NAME)";
+
 static ROLE_BINDING_YAML: &'static str = r#"
 # Permissions to use Kubernetes API.
 # Necessary for kubernetes_pod_metadata transform.
@@ -496,11 +552,11 @@ static ROLE_BINDING_YAML: &'static str = r#"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: vector-view-access
+  name: $(NAME)
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: telemetry
+  namespace: $(TEST_NAMESPACE)
 roleRef:
   kind: ClusterRole
   name: view
@@ -529,7 +585,6 @@ data:
     [transforms.kube_metadata]
       type = "kubernetes_pod_metadata"
       inputs = ["kubernetes_logs"]
-      fields = ["name"]
 
     [sinks.out]
       type = "console"
@@ -542,18 +597,44 @@ data:
   # This line is not in VECTOR.TOML
 "#;
 
+fn cluster_role_binding_api() -> RawApi {
+    RawApi {
+        group: "rbac.authorization.k8s.io".into(),
+        resource: "clusterrolebindings".into(),
+        prefix: "apis".into(),
+        version: "v1".into(),
+        ..Default::default()
+    }
+}
+
+fn binding_name(namespace: &str) -> String {
+    "binding-".to_owned() + namespace
+}
+
 #[test]
 fn kube_metadata() {
-    let namespace = "vector-test-kube_metadata";
+    let namespace = "vector-test-kube-metadata";
     let message = "20";
-    let field = "pod.name";
+    let field = "pod_name";
     let user_namespace = user_namespace(namespace);
+    let binding_name = binding_name(namespace);
 
     let kube = Kube::new(namespace);
     let user = Kube::new(user_namespace.clone());
 
+    // Cluster role binding
+    kube.create_raw_with::<k8s_openapi::api::rbac::v1::ClusterRoleBinding, _>(
+        &cluster_role_binding_api(),
+        ROLE_BINDING_YAML.replace(NAME_MARKER, binding_name.as_str()),
+    );
+    let _binding = kube.deleter(cluster_role_binding_api(), binding_name);
+
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str());
+    kube.create(Api::v1ConfigMap, CONFIG_MAP_YAML_WITH_METADATA);
+    let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
+
+    // Wait for running state
+    kube.wait_for_running(vector.clone());
 
     // Start echo
     let _echo = echo(&user, "echo", message);

@@ -141,7 +141,7 @@ colored = "1.9"
 warp = "0.1.20"
 evmap = { version = "7", features = ["bytes"] }
 logfmt = "0.0.2"
-k8s-openapi = { version = "0.6.0", features = ["v1_15"] }
+k8s-openapi = { version = "0.5.1", features = ["v1_15"] }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -165,7 +165,7 @@ proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
 kube = { version = "0.16.1", features = ["openapi"] }
-k8s-openapi = { version = "0.6.0", default-features = false, features = ["v1_15"] }
+# k8s-openapi = { version = "0.6.0", default-features = false, features = ["v1_15"] }
 serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"

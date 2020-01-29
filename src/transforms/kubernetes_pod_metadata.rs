@@ -1,13 +1,13 @@
 use super::Transform;
 use crate::{
     dns::Resolver,
-    event::{Event, ValueKind},
+    event::{Event, Value},
     runtime::TaskExecutor,
     sinks::util::{
         http::https_client,
         tls::{TlsOptions, TlsSettings},
     },
-    sources::kubernetes::POD_UID,
+    sources::kubernetes::OBJECT_UID,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use bytes::Bytes;
@@ -60,7 +60,7 @@ const CA_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
 /// Prefiks for all metadata fields
-const FIELD_PREFIX: &str = "pod.";
+const FIELD_PREFIX: &str = "pod_";
 
 // type Pod = kube::api::Object<PodSpec, k8s_openapi::api::core::v1::PodStatus>;
 
@@ -68,7 +68,7 @@ const FIELD_PREFIX: &str = "pod.";
 /// Joined on key - pod_uid field.
 ///
 /// Mutex should work fine for this case.
-type JoinMap = Arc<RwLock<HashMap<Bytes, Vec<(Atom, ValueKind)>>>>;
+type JoinMap = Arc<RwLock<HashMap<Bytes, Vec<(Atom, Value)>>>>;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -197,7 +197,7 @@ enum BuildError {
 }
 
 struct MetadataClient {
-    fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>>,
+    fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>>,
     metadata: JoinMap,
     node_name: String,
     token: Option<String>,
@@ -441,7 +441,7 @@ impl MetadataClient {
         Some(())
     }
 
-    fn fields(&self, pod: &Pod) -> Vec<(Atom, ValueKind)> {
+    fn fields(&self, pod: &Pod) -> Vec<(Atom, Value)> {
         self.fields.iter().flat_map(|fun| fun(pod)).collect()
     }
 }
@@ -467,16 +467,31 @@ pub struct KubernetesPodMetadata {
 impl Transform for KubernetesPodMetadata {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
+        trace!("Enrichment");
 
-        if let Some(ValueKind::Bytes(pod_uid)) = log.get(&POD_UID) {
+        if let Some(Value::Bytes(pod_uid)) = log.get(&OBJECT_UID) {
             // TODO: This is blocking
             if let Some(metadata) = self.metadata.read().ok() {
                 if let Some(fields) = metadata.get(pod_uid) {
                     for (key, value) in fields {
-                        log.insert_implicit(key.clone(), value.clone());
+                        log.insert(key.clone(), value.clone());
                     }
+                } else {
+                    warn!(
+                        message = "Metadata for pod not yet available.",
+                        pod_uid = ?std::str::from_utf8(pod_uid.as_ref()),
+                        rate_limit_secs = 10
+                    );
                 }
+            } else {
+                error!(message = "Metadata map corrupted.", rate_limit_secs = 10);
             }
+        } else {
+            warn!(
+                message = "Event without field.",
+                field = OBJECT_UID.as_ref(),
+                rate_limit_secs = 10
+            );
         }
 
         Some(event)
@@ -493,7 +508,7 @@ fn default_fields() -> Vec<String> {
 /// Returns list of all supported fields and their extraction function.
 fn all_fields() -> Vec<(
     &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
+    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
 )> {
     vec![
         // ------------------------ ObjectMeta ------------------------ //
@@ -534,12 +549,12 @@ fn all_fields() -> Vec<(
     ]
 }
 
-fn field<T: Into<ValueKind>>(
+fn field<T: Into<Value>>(
     name: &'static str,
     fun: impl Fn(&Pod) -> Option<T> + Send + Sync + 'static,
 ) -> (
     &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
+    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
 ) {
     let key: Atom = with_prefix(name).into();
     let fun = move |pod: &Pod| {
@@ -555,7 +570,7 @@ fn collection_field(
     fun: impl Fn(&Pod) -> Option<&BTreeMap<String, String>> + Send + Sync + 'static,
 ) -> (
     &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, ValueKind)> + Send + Sync + 'static>,
+    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
 ) {
     let prefix_key = with_prefix(name) + ".";
     let fun = move |pod: &Pod| {

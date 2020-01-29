@@ -31,6 +31,7 @@ const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
 lazy_static! {
     pub static ref POD_UID: Atom = Atom::from("pod_uid");
+    pub static ref OBJECT_UID: Atom = Atom::from("object_uid");
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -391,7 +392,7 @@ mod tests {
         has(&event, "container_name", "busybox");
         has(
             &event,
-            POD_UID.as_str(),
+            POD_UID.as_ref(),
             "default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e",
         );
     }
@@ -423,8 +424,8 @@ mod tests {
     #[test]
     fn pod_uid_transform_namespace_name_uid() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
-            POD_UID.as_str(),
+        event.as_mut_log().insert(
+            POD_UID.as_ref(),
             "kube-system_kube-apiserver-minikube_8f6b5d95bfe4bcf4cc9c4d8435f0668b".to_owned(),
         );
 
@@ -440,8 +441,8 @@ mod tests {
     #[test]
     fn pod_uid_transform_uid() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert_explicit(
-            POD_UID.as_str(),
+        event.as_mut_log().insert(
+            POD_UID.as_ref(),
             "306cd636-0c6d-11ea-9079-1c1b0de4d755".to_owned(),
         );
 

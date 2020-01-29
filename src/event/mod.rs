@@ -193,13 +193,13 @@ impl From<String> for Value {
     }
 }
 
-impl From<&String> for ValueKind {
-    fn from(s: &String) -> Self {
-        ValueKind::Bytes(s.as_str().into())
+impl From<&String> for Value {
+    fn from(string: &String) -> Self {
+        Value::Bytes(string.as_str().into())
     }
 }
 
-impl From<&str> for ValueKind {
+impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(s.into())
     }
