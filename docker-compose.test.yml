@@ -1,0 +1,81 @@
+version: '3'
+
+services:
+  build-archive:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+      FEATURES: default-musl
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: make build-archive
+
+  package-deb:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: builder-x86_64-unknown-linux-musl/Dockerfile
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: make package-deb
+
+  package-rpm:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: packager-rpm/Dockerfile
+    environment:
+      TARGET: x86_64-unknown-linux-musl
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: make package-rpm
+
+  verify-rpm-amazonlinux-1:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-amazonlinux-1/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: "rpm -i target/artifacts/*-x86_64.rpm && vector --version"
+
+  verify-rpm-amazonlinux-2:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-amazonlinux-2/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: "rpm -i target/artifacts/*-x86_64.rpm && vector --version"
+
+  verify-rpm-centos-7:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-centos-7/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: "rpm -i target/artifacts/*-x86_64.rpm && vector --version"
+
+  verify-deb-artifact-on-deb-10:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-deb-10/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: sh -c "dpkg -i target/artifacts/*-amd64.deb && vector --version"
+
+  target-graph:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: target-graph/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: sh -c "make -f Makefile.test -Bnd | make2graph | graph-easy --as=boxart"
