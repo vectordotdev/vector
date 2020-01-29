@@ -15,9 +15,8 @@ use kube::{
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use std::borrow::Borrow;
-use std::thread;
 use std::time::Duration;
+use uuid::Uuid;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
@@ -149,13 +148,13 @@ struct Kube {
 
 impl Kube {
     // Also immedietely creates namespace
-    fn new<S: Borrow<str>>(namespace: S) -> Self {
+    fn new(namespace: &str) -> Self {
         trace_init();
         let config = config::load_kube_config().expect("failed to load kubeconfig");
         let client = APIClient::new(config);
         let kube = Kube {
             client,
-            namespace: namespace.borrow().to_owned(),
+            namespace: namespace.to_string(),
         };
         kube.create_with(&Api::v1Namespace(kube.client.clone()), NAMESPACE_YAML);
         kube
@@ -166,7 +165,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create<K, S: Borrow<str>, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: S) -> K
+    fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
@@ -174,13 +173,11 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create_with<K, S: Borrow<str>>(&self, api: &Api<K>, yaml: S) -> K
+    fn create_with<K>(&self, api: &Api<K>, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
-        let yaml = yaml
-            .borrow()
-            .replace(NAMESPACE_MARKER, self.namespace.as_str());
+        let yaml = yaml.replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
         retry(|| {
@@ -319,7 +316,7 @@ fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
     // Start echo
     let echo = kube.create(
         Api::v1Pod,
-        ECHO_YAML
+        &ECHO_YAML
             .replace(ECHO_NAME, name)
             .replace(ARGS_MARKER, format!("[{:?}]", message).as_str()),
     );
@@ -334,7 +331,7 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
     // Start vector
     kube.create(
         Api::v1ConfigMap,
-        CONFIG_MAP_YAML.replace(USER_NAMESPACE_MARKER, user_namespace),
+        &CONFIG_MAP_YAML.replace(USER_NAMESPACE_MARKER, user_namespace),
     );
     let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
 
@@ -346,7 +343,7 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
 
 fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
     // Wait for logs to propagate
-    thread::sleep(Duration::from_secs(4));
+    std::thread::sleep(Duration::from_secs(4));
     let mut logs = Vec::new();
     for daemon_instance in kube.list(&vector) {
         debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
@@ -361,12 +358,12 @@ fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
 
 #[test]
 fn kube_one_log() {
-    let namespace = "vector-test-one-log";
+    let namespace = format!("vector-test-one-log-{}", Uuid::new_v4());
     let message = "12";
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let kube = Kube::new(namespace);
-    let user = Kube::new(user_namespace.clone());
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
 
     // Start vector
     let vector = start_vector(&kube, user_namespace.as_str());
@@ -381,7 +378,7 @@ fn kube_one_log() {
             // DONE
             return;
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
     panic!("Vector didn't log message: {:?}", message);
@@ -389,13 +386,13 @@ fn kube_one_log() {
 
 #[test]
 fn kube_old_log() {
-    let namespace = "vector-test-old-log";
+    let namespace = format!("vector-test-old-log-{}", Uuid::new_v4());
     let message_old = "13";
     let message_new = "14";
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let user = Kube::new(user_namespace.clone());
-    let kube = Kube::new(namespace);
+    let user = Kube::new(&user_namespace);
+    let kube = Kube::new(&namespace);
 
     // echo old
     let _echo_old = echo(&user, "echo-old", message_old);
@@ -416,7 +413,7 @@ fn kube_old_log() {
             // OK
             logged = true;
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
     if logged {
@@ -428,12 +425,12 @@ fn kube_old_log() {
 
 #[test]
 fn kube_multi_log() {
-    let namespace = "vector-test-multi-log";
+    let namespace = format!("vector-test-multi-log-{}", Uuid::new_v4());
     let mut messages = vec!["15", "16", "17", "18"];
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let kube = Kube::new(namespace);
-    let user = Kube::new(user_namespace.clone());
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
 
     // Start vector
     let vector = start_vector(&kube, user_namespace.as_str());
@@ -447,7 +444,7 @@ fn kube_multi_log() {
         if Some(&line["message"].as_str().unwrap()) == messages.first() {
             messages.remove(0);
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
     if messages.is_empty() {
@@ -459,19 +456,18 @@ fn kube_multi_log() {
 
 #[test]
 fn kube_object_uid() {
-    let namespace = "vector-test-object-uid";
+    let namespace = format!("vector-test-object-uid-{}", Uuid::new_v4());
     let message = "19";
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let kube = Kube::new(namespace);
-    let user = Kube::new(user_namespace.clone());
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
 
     // Start vector
     let vector = start_vector(&kube, user_namespace.as_str());
 
     // Start echo
     let _echo = echo(&user, "echo", message);
-
     // Verify logs
     // If any daemon has object uid, done.
     for line in logs(&kube, &vector) {
@@ -479,7 +475,7 @@ fn kube_object_uid() {
             // DONE
             return;
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
 
