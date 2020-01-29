@@ -489,6 +489,24 @@ fn kube_object_uid() {
 
 // ************************** kubernetes_pod_metadata TESTS ************************* //
 
+static ROLE_BINDING_YAML: &'static str = r#"
+# Permissions to use Kubernetes API.
+# Necessary for kubernetes_pod_metadata transform.
+# Requires that RBAC authorization is enabled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector-view-access
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: telemetry
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+"#;
+
 static CONFIG_MAP_YAML_WITH_METADATA: &'static str = r#"
 # ConfigMap which contains vector.toml configuration for pods.
 apiVersion: v1

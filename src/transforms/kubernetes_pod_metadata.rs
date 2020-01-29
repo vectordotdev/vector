@@ -12,39 +12,37 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::stream::Stream;
-use futures03::{compat::Future01CompatExt};
+use futures03::compat::Future01CompatExt;
 use http::{
     header,
     uri::{self, Scheme},
     Request, Uri,
 };
-use hyper::{Body, StatusCode};
+use hyper::client::HttpConnector;
+use hyper::Body;
+use hyper_tls::HttpsConnector;
 use k8s_openapi::{
     self as k8s,
     api::core::v1 as api,
-    api::core::v1::{ListPodForAllNamespacesResponse, Pod, WatchPodForAllNamespacesResponse},
+    api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
     apimachinery::pkg::apis::meta::v1::WatchEvent,
-    Response,
+    Response, ResponseError,
 };
-// use kube::{
-//     self,
-//     api::{Api, WatchEvent},
-//     client::APIClient,
-// };
-use hyper::client::HttpConnector;
-use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
-use tokio::timer::Delay;
-// use
 
 // ************************ Defined by Kubernetes *********************** //
+// API access is mostly defined with
+// https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
+//
+// And Kubernetes service data with
+// https://kubernetes.io/docs/concepts/containers/container-environment-variables/#cluster-information
+
 /// File in which Kubernetes stores service account token.
 const TOKEN_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 
@@ -54,8 +52,8 @@ const HOST_ENV: &str = "KUBERNETES_SERVICE_HOST";
 /// Enviroment variable which contains port to Kubernetes API.
 const PORT_ENV: &str = "KUBERNETES_SERVICE_PORT";
 
-/// Path to certificate bundle
-const CRT_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+/// Path to certificate authority certificate
+const CA_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
 // *********************** Defined by Vector **************************** //
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
@@ -100,7 +98,7 @@ impl TransformConfig for KubePodMetadata {
             tls_settings()?,
         )?;
         // Dry run
-        client.list_pods_request()?;
+        client.watch_pods_request(None)?;
 
         let transform = KubernetesPodMetadata {
             metadata: client.metadata(),
@@ -138,13 +136,13 @@ fn node_name() -> Result<String, BuildError> {
 
 fn kubernetes_host() -> Result<String, BuildError> {
     std::env::var(HOST_ENV).map_err(|_| BuildError::NoKubernetes {
-        reason: "Missing Kubernetes API host",
+        reason: format!("Missing Kubernetes API host defined with {}", HOST_ENV),
     })
 }
 
 fn kubernetes_port() -> Result<String, BuildError> {
     std::env::var(PORT_ENV).map_err(|_| BuildError::NoKubernetes {
-        reason: "Missing Kubernetes API port",
+        reason: format!("Missing Kubernetes API port defined with {}", PORT_ENV),
     })
 }
 
@@ -171,14 +169,14 @@ fn account_token() -> Option<String> {
 
 fn tls_settings() -> Result<TlsSettings, BuildError> {
     let mut options = TlsOptions::default();
-    options.crt_path = Some(CRT_PATH.into());
+    options.ca_path = Some(CA_PATH.into());
     TlsSettings::from_options(&Some(options)).context(TlsError)
 }
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("{}, probably because Vector isn't in Kubernetes Pod.", reason))]
-    NoKubernetes { reason: &'static str },
+    NoKubernetes { reason: String },
     #[snafu(display("TLS construction errored {}", source))]
     TlsError { source: crate::Error },
     #[snafu(display("Http client construction errored {}", source))]
@@ -238,216 +236,156 @@ impl MetadataClient {
         })
     }
 
-    fn field_selector(&self) -> String {
-        format!("spec.nodeName={}", self.node_name)
-    }
-
     fn metadata(&self) -> JoinMap {
         self.metadata.clone()
     }
 
     /// Errors only if it would always error
-    async fn run(self) -> Result<(), BuildError> {
-        loop {
-            info!(message = "Fetching Pod list.");
-            // Initialize metadata
-            let list_version = self.fetch_pod_list().await?;
+    async fn run(&self) -> Result<(), BuildError> {
+        // If watch is initiated with None resource_version, we will receive initial
+        // list of pods as synthetic "Added" events.
+        // https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
+        let mut version = None;
 
-            info!(message = "Watching Pod list for changes.");
-            self.watch(list_version).await?;
-        }
-    }
-
-    /// list_version
-    ///  /// Ok(list_version)
-    async fn fetch_pod_list(&self) -> Result<String, BuildError> {
+        // Restarts watch request
         loop {
-            let result = self
-                .request(self.list_pods_request()?, |status, body| {
-                    self.list_process(status, body)
-                })
+            // We could clear Metadata map at this point, as Kubernets documentation suggests,
+            // but then we would have a time gap during which events wouldn't be enriched
+            // with metadata.
+            version = self
+                .request(
+                    version.clone(),
+                    self.watch_pods_request(version)?,
+                    |response| self.watch_process(response),
+                )
                 .await;
-            if let Err(version) = result {
-                return Ok(version);
-            }
-
-            debug!(message = "Waiting.");
-            // Retry with delay
-            Delay::new(Instant::now() + Duration::from_secs(1))
-                .compat()
-                .await
-                .expect("Timer not set.");
-            debug!(message = "Re fetching list of Pods.");
         }
     }
 
-    async fn watch(&self, mut version: String) -> Result<(), BuildError> {
-        while self
-            .request(
-                self.watch_pods_request(version.as_str())?,
-                |status, body| self.watch_process(&mut version, status, body),
-            )
-            .await
-            .is_ok()
-        {
-            // Repeat
-        }
-        Ok(())
-    }
+    /// Resolves request to multiple R data.
+    async fn request<R: Response>(
+        &self,
+        mut version: Option<Version>,
+        request: Request<Body>,
+        process: impl Fn(R) -> VersionResult,
+    ) -> Option<Version> {
+        let response = self.client.request(request).compat().await;
+        match response {
+            Ok(response) => {
+                info!(message = "Watching Pod list for changes.");
+                let status = response.status();
+                let mut unused = Vec::new();
+                let mut body = response.into_body();
+                'watch: loop {
+                    // We need to process Chunks as they come because watch behaves like
+                    // a never ending stream of Chunks.
+                    match body.into_future().compat().await {
+                        Ok((chunk, tmp_body)) => {
+                            body = tmp_body;
 
-    /// Err with version.
-    fn list_process(&self, status: StatusCode, body: &[u8]) -> Result<usize, String> {
-        match <ListPodForAllNamespacesResponse as Response>::try_from_parts(status, body) {
-            Ok((ListPodForAllNamespacesResponse::Ok(pod_list), used_bytes)) => {
-                for pod in pod_list.items {
-                    let _ = self.update(&pod);
-                }
+                            if let Some(chunk) = chunk {
+                                unused.extend_from_slice(chunk.as_ref());
 
-                if let Some(metadata) = pod_list.metadata {
-                    if let Some(version) = metadata.resource_version {
-                        return Err(version);
-                    } else {
-                        debug!(message = "Using default pod list resource_version.");
-                        return Err("0".to_owned());
+                                // Parse then process, recieved unused data
+                                'process: loop {
+                                    match R::try_from_parts(status, &unused) {
+                                        Ok((data, used_bytes)) => {
+                                            match process(data) {
+                                                VersionResult::New(new_version) => {
+                                                    // Store last resourceVersion
+                                                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+                                                    version = new_version.or(version);
+
+                                                    assert!(
+                                                        used_bytes > 0,
+                                                        "Parser must consume some data"
+                                                    );
+
+                                                    let _ = unused.drain(..used_bytes);
+                                                    continue 'process;
+                                                }
+                                                VersionResult::Reload => (),
+                                                VersionResult::Restart => return None,
+                                            }
+                                        }
+                                        Err(ResponseError::NeedMoreData) => continue 'watch,
+                                        Err(error) => debug!(
+                                            "Unable to parse {:?} from response. Error: {:?}",
+                                            std::any::type_name::<R>(),
+                                            error
+                                        ),
+                                    }
+                                    break 'watch;
+                                }
+                            }
+                        }
+                        Err(error) => debug!(message = "Watch request failed.", ?error),
                     }
-                } else {
-                    debug!(message = "Missing pod list metadata.")
+                    break 'watch;
                 }
-
-                Ok(used_bytes)
             }
-            Ok((ListPodForAllNamespacesResponse::Other(Ok(_)), used_bytes)) => {
-                debug!(message = "Received wrong object from Kubernetes API.");
-                Ok(used_bytes)
-            }
-            Ok((ListPodForAllNamespacesResponse::Other(Err(error)), used_bytes)) => {
-                debug!(message = "Failed parsing list of Pods.",error = ?error);
-                Ok(used_bytes)
-            }
-            Err(error) => {
-                debug!(message = "Request error.", ?error);
-                Ok(0)
-            }
+            Err(error) => debug!(message = "Failed resolving request.", ?error),
         }
+
+        version
     }
 
     /// Err when metadata should be refetched.
-    fn watch_process(
-        &self,
-        version: &mut String,
-        status: StatusCode,
-        body: &[u8],
-    ) -> Result<usize, ()> {
-        match WatchPodForAllNamespacesResponse::try_from_parts(status, body) {
-            Ok((WatchPodForAllNamespacesResponse::Ok(event), used_bytes)) => {
+    fn watch_process(&self, response: WatchPodForAllNamespacesResponse) -> VersionResult {
+        match response {
+            WatchPodForAllNamespacesResponse::Ok(event) => {
                 match event {
                     WatchEvent::Added(pod)
                     | WatchEvent::Modified(pod)
                     | WatchEvent::Bookmark(pod)
                     | WatchEvent::Deleted(pod) => {
-                        // In the case of Delteted, we don't delete it's data, as there could still exist unprocessed logs from that pod.
+                        // In the case of Deleted, we don't delete it's data, as there could still exist unprocessed logs from that pod.
                         // Not deleteing will cause "memory leakage" in a sense that the data won't be used ever
                         // again after some point, but the catch is that we don't know when that point is.
 
                         let _ = self.update(&pod);
-                        // Store last resourceVersion
-                        // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                        if let Some(metadata) = pod.metadata {
-                            if let Some(new_version) = metadata.resource_version {
-                                *version = new_version;
-                            } else {
-                                debug!(message = "Missing pod list resource_version.")
-                            }
-                        } else {
-                            debug!(message = "Missing pod list metadata.")
-                        }
+
+                        VersionResult::New(
+                            pod.metadata.as_ref().and_then(|metadata| {
+                                metadata.resource_version.clone().map(Version)
+                            }),
+                        )
                     }
                     WatchEvent::ErrorStatus(status) => {
                         // 410 Gone, restart with new list.
                         if status.code == Some(410) {
                             warn!(message = "Pod list desynced. Reseting list.", cause = ?status);
-                            return Err(());
+                            VersionResult::Restart
+                        } else {
+                            debug!("Watch event with error status: {:?}", status);
+                            VersionResult::New(None)
                         }
-                        debug!(?status);
                     }
                     WatchEvent::ErrorOther(value) => {
                         debug!(?value);
+                        VersionResult::New(None)
                     }
                 }
-                Ok(used_bytes)
             }
-            Ok((WatchPodForAllNamespacesResponse::Other(Ok(_)), used_bytes)) => {
+            WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
                 debug!(message = "Received wrong object from Kubernetes API.");
-                Ok(used_bytes)
+                VersionResult::New(None)
             }
-            Ok((WatchPodForAllNamespacesResponse::Other(Err(error)), used_bytes)) => {
-                debug!(message = "Failed parsing watch list of Pods.",error = ?error);
-                Ok(used_bytes)
-            }
-            Err(error) => {
-                debug!(message = "Request error.", ?error);
-                Ok(0)
+            WatchPodForAllNamespacesResponse::Other(Err(error)) => {
+                debug!(message = "Failed parsing watch list of Pods.", ?error);
+                VersionResult::Reload
             }
         }
     }
 
-    /// Process should parse given slice and return the amount of used bytes.
-    async fn request<E>(
+    fn watch_pods_request(
         &self,
-        request: Request<Body>,
-        mut process: impl FnMut(StatusCode, &[u8]) -> Result<usize, E>,
-    ) -> Result<(), E> {
-        let response = self.client.request(request).compat().await;
-
-        match response {
-            Ok(response) => {
-                let status = response.status();
-                let body = response.into_body().concat2().compat().await;
-
-                match body {
-                    Ok(buffer) => {
-                        let mut at = 0;
-                        while at < buffer.len() {
-                            let slice = &buffer[at..];
-                            let used_bytes = process(status, slice)?;
-                            if used_bytes == 0 {
-                                debug!("Detected unusable bytes: {} .", slice.len());
-                                break;
-                            }
-
-                            at += used_bytes;
-                        }
-                    }
-                    Err(error) => {
-                        debug!(message = "Failed collecting response body.",error = ?error)
-                    }
-                }
-            }
-            Err(error) => debug!(message = "Failed resolving request.",error = ?error),
-        }
-        Ok(())
-    }
-
-    fn list_pods_request(&self) -> Result<Request<Body>, BuildError> {
-        // Prepare request
-        let (mut request, _) = api::Pod::list_pod_for_all_namespaces(k8s::ListOptional {
-            field_selector: Some(self.field_selector().as_str()),
-            ..Default::default()
-        })
-        .context(K8SOpenapiError)?;
-
-        self.authorize(&mut request)?;
-        self.fill_uri(&mut request)?;
-
-        let (parts, body) = request.into_parts();
-        Ok(Request::from_parts(parts, body.into()))
-    }
-
-    fn watch_pods_request(&self, list_version: &str) -> Result<Request<Body>, BuildError> {
+        resource_version: Option<Version>,
+    ) -> Result<Request<Body>, BuildError> {
         // Prepare request
         let (mut request, _) = api::Pod::watch_pod_for_all_namespaces(k8s::WatchOptional {
             field_selector: Some(self.field_selector().as_str()),
-            resource_version: Some(list_version),
+            resource_version: resource_version.as_ref().map(|v| v.0.as_str()),
             ..Default::default()
         })
         .context(K8SOpenapiError)?;
@@ -484,8 +422,12 @@ impl MetadataClient {
         Ok(())
     }
 
+    fn field_selector(&self) -> String {
+        format!("spec.nodeName={}", self.node_name)
+    }
+
     fn update(&self, pod: &Pod) -> Option<()> {
-        trace!(message = "Trying to update Pod metadata.");
+        // trace!(message = "Trying to update Pod metadata.");
         let uid: Bytes = pod.metadata.as_ref()?.uid.as_ref()?.as_str().into();
 
         let fields = self.fields(pod);
@@ -502,6 +444,20 @@ impl MetadataClient {
     fn fields(&self, pod: &Pod) -> Vec<(Atom, ValueKind)> {
         self.fields.iter().flat_map(|fun| fun(pod)).collect()
     }
+}
+
+/// Version of Kubernetes resource
+#[derive(Clone, Debug)]
+struct Version(String);
+
+#[derive(Clone, Debug)]
+enum VersionResult {
+    /// Potentialy newer version
+    New(Option<Version>),
+    /// Start new request with current version.
+    Reload,
+    /// Start new request with None version.
+    Restart,
 }
 
 pub struct KubernetesPodMetadata {
@@ -544,10 +500,18 @@ fn all_fields() -> Vec<(
         field("name", |pod| pod.metadata.as_ref()?.name.clone()),
         field("namespace", |pod| pod.metadata.as_ref()?.namespace.clone()),
         field("creation_timestamp", |pod| {
-            pod.metadata.as_ref()?.creation_timestamp.clone().map(|time| time.0)
+            pod.metadata
+                .as_ref()?
+                .creation_timestamp
+                .clone()
+                .map(|time| time.0)
         }),
         field("deletion_timestamp", |pod| {
-            pod.metadata.as_ref()?.deletion_timestamp.clone().map(|time| time.0)
+            pod.metadata
+                .as_ref()?
+                .deletion_timestamp
+                .clone()
+                .map(|time| time.0)
         }),
         collection_field("labels", |pod| pod.metadata.as_ref()?.labels.as_ref()),
         collection_field("annotations", |pod| {
