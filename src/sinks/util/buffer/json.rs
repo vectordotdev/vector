@@ -1,38 +1,28 @@
 use crate::sinks::util::Batch;
-use serde_json::value::RawValue;
+use serde_json::value::{RawValue, Value};
 
-type BoxedRawValue = Box<RawValue>;
+pub type BoxedRawValue = Box<RawValue>;
 
-/// A `batch` implementation for storing an array of serialized
-/// json values.
-///
-/// To ensure that `push` does not panic pair it with the use of
-/// `JsonArray::encode` to produce the correct `Vec<u8>`.
+/// A `batch` implementation for storing an array of json
+/// values.
 #[derive(Default, Debug)]
 pub struct JsonArrayBuffer {
     buffer: Vec<BoxedRawValue>,
-    size: usize,
-}
-
-impl JsonArrayBuffer {
-    /// Encoding via this will ensure that pushing into this batch will
-    // not panic.
-    pub fn encode(value: impl serde::Serialize) -> Result<Vec<u8>, crate::Error> {
-        serde_json::to_vec(&value).map_err(Into::into)
-    }
+    total_bytes: usize,
 }
 
 impl Batch for JsonArrayBuffer {
-    type Input = Vec<u8>;
+    type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
     fn len(&self) -> usize {
-        self.size
+        self.total_bytes
     }
 
     fn push(&mut self, item: Self::Input) {
-        self.size += item.len();
-        let item = RawValue::from_string(String::from_utf8(item).unwrap()).unwrap();
+        let encoded = serde_json::to_string(&item).expect("Value should be valid json");
+        self.total_bytes += encoded.len();
+        let item = RawValue::from_string(encoded).expect("Encoded value should be valid json");
         self.buffer.push(item);
     }
 
@@ -62,19 +52,13 @@ mod tests {
     fn multi_object_array() {
         let mut buffer = JsonArrayBuffer::default();
 
-        buffer.push(
-            JsonArrayBuffer::encode(json!({
-                "key1": "value1"
-            }))
-            .unwrap(),
-        );
+        buffer.push(json!({
+            "key1": "value1"
+        }));
 
-        buffer.push(
-            JsonArrayBuffer::encode(json!({
-                "key2": "value2"
-            }))
-            .unwrap(),
-        );
+        buffer.push(json!({
+            "key2": "value2"
+        }));
 
         assert_eq!(buffer.num_items(), 2);
         assert_eq!(buffer.len(), 34);
