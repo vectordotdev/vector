@@ -803,7 +803,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-generate
     - check-blog
     - test-stable
-    - test-stable-kubernetes
+    # - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
@@ -843,7 +843,7 @@ workflows:
       - check-version:
           <<: *master-filters
       - test-stable
-      - test-stable-kubernetes
+      # - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc:
           <<: *prerelease-filters
 
@@ -927,8 +927,8 @@ workflows:
           <<: *release-filters
       - test-stable:
           <<: *release-filters
-      - test-stable-kubernetes:
-          <<: *release-filters
+      # - test-stable-kubernetes:
+          # <<: *release-filters
 
       # Build & verify
 
@@ -1040,7 +1040,7 @@ workflows:
       - check-generate
       - check-blog
       - test-stable
-      - test-stable-kubernetes
+      # - test-stable-kubernetes
 
       # Build & verify
 
