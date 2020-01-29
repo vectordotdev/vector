@@ -19,7 +19,17 @@
 set -eou pipefail
 
 if [ "$USE_DOCKER" == "true" ]; then
+  echo "Executing within Docker. To disable set USE_DOCKER to false"
+  echo ""
+  echo "  make ... USE_DOCKER=false"
+  echo ""
+
   scripts/docker-run.sh "$@"
 else
+  echo "Executing locally. To use Docker set USE_DOCKER to true"
+  echo ""
+  echo "  make ... USE_DOCKER=true"
+  echo ""
+
   ${@:2}
 fi
