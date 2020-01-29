@@ -51,7 +51,8 @@ check-blog: ## Checks that all blog articles are signed by their authors
 CHECK_URLS=false
 export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
-	scripts/docker-run.sh checker scripts/generate.rb
+	@bundle install --gemfile=scripts/Gemfile --quiet
+	@scripts/generate.rb
 
 fmt: ## Format code
 	@scripts/check-style.sh --fix
