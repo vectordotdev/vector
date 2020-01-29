@@ -134,15 +134,20 @@ impl std::ops::Index<&Atom> for LogEvent {
     }
 }
 
+impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
+    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
+        for (k, v) in iter {
+            self.insert(k.into(), v.into());
+        }
+    }
+}
+
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        Self {
-            fields: iter
-                .into_iter()
-                .map(|(key, value)| (key.into(), value.into()))
-                .collect(),
-        }
+        let mut log_event = Event::new_empty_log().into_log();
+        log_event.extend(iter);
+        log_event
     }
 }
 
@@ -523,14 +528,7 @@ impl<'a> Iterator for FieldsIter<'a> {
     type Item = (&'a Atom, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (key, value) = match self.inner.next() {
-                Some(next) => next,
-                None => return None,
-            };
-
-            return Some((key, &value));
-        }
+        self.inner.next()
     }
 }
 
