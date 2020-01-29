@@ -4,7 +4,7 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
 use serde::{Serialize, Serializer};
-use std::collections::HashMap;
+use std::collections::{hash_map::Drain, HashMap};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
@@ -123,6 +123,10 @@ impl LogEvent {
 
     pub fn unflatten(self) -> unflatten::Unflatten {
         unflatten::Unflatten::from(self.fields)
+    }
+
+    pub fn drain(&mut self) -> Drain<Atom, Value> {
+        self.fields.drain()
     }
 }
 
