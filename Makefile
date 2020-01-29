@@ -2,6 +2,7 @@
 .DEFAULT_GOAL := help
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
+export USE_DOCKER ?= true
 
 
 help:
@@ -48,11 +49,9 @@ check-blog: ## Checks that all blog articles are signed by their authors
 	@bundle install --gemfile=scripts/Gemfile --quiet
 	@scripts/check-blog-signatures.rb
 
-CHECK_URLS=false
-export CHECK_URLS
+export CHECK_URLS ?= false
 generate: ## Generates files across the repo using the data in /.meta
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/generate.rb
+	@scripts/run.sh checker scripts/generate.rb
 
 fmt: ## Format code
 	@scripts/check-style.sh --fix
