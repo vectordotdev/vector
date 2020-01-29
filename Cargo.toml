@@ -77,7 +77,7 @@ tower-hyper = "0.1"
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
-serde_json = "1.0.33"
+serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Prost
 prost = "0.5"
@@ -85,7 +85,7 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # GCP
-goauth = "0.6.0"
+goauth = "0.6.1"
 smpl_jwt = "0.4.0"
 
 # External libs

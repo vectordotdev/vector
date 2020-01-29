@@ -12,7 +12,7 @@ pub mod console;
 pub mod datadog_metrics;
 pub mod elasticsearch;
 pub mod file;
-pub mod gcp_pubsub;
+pub mod gcp;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
