@@ -2841,6 +2841,15 @@ end
   healthcheck = true
   healthcheck = false
 
+  # Optionally convert timestamps into a format that can be parsed as a
+  # Clickhouse DateTime. This loses precision as DateTimes are defined in seconds.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * must be: "unix" (if supplied)
+  timestamp_format = "unix"
+
   #
   # requests
   #

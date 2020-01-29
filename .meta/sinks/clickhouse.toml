@@ -93,3 +93,12 @@ type = "string"
 common = true
 examples = ["mydatabase"]
 description = "The database that contains the stable that data will be inserted into."
+
+[sinks.clickhouse.options.timestamp_format]
+type = "string"
+common = true
+required = false
+description = "Optionally convert timestamps into a format that can be parsed as a Clickhouse DateTime. This loses precision as DateTimes are defined in seconds."
+
+[sinks.clickhouse.options.timestamp_format.enum]
+unix = "Format as a unix timestamp"

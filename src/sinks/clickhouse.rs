@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    event::Event,
+    event::{Event, Value, TIMESTAMP},
     sinks::util::{
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
@@ -17,6 +17,12 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum TimestampFormat {
+    Unix,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
@@ -24,6 +30,7 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
+    pub timestamp_format: Option<TimestampFormat>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
@@ -109,12 +116,23 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
             cx.acker(),
         )
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
+        .with_flat_map(move |event: Event| iter_ok(encode_event(&config, event)));
 
     Ok(Box::new(sink))
 }
 
-fn encode_event(event: Event) -> Option<Vec<u8>> {
+fn encode_event(config: &ClickhouseConfig, mut event: Event) -> Option<Vec<u8>> {
+    match config.timestamp_format {
+        Some(TimestampFormat::Unix) => {
+            if let Some(unix) = match event.as_log().get(&TIMESTAMP) {
+                Some(Value::Timestamp(ts)) => Some(ts.timestamp()),
+                _ => None,
+            } {
+                event.as_mut_log().insert(TIMESTAMP.clone(), unix);
+            }
+        }
+        None => {}
+    }
     let mut body =
         serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
     body.push(b'\n');
@@ -277,6 +295,65 @@ mod integration_tests {
     }
 
     #[test]
+    fn insert_events_unix_timestamps() {
+        crate::test_util::trace_init();
+        let mut rt = runtime();
+
+        let table = gen_table();
+        let host = String::from("http://localhost:8123");
+
+        let config = ClickhouseConfig {
+            host: host.clone(),
+            table: table.clone(),
+            compression: Some(Compression::None),
+            timestamp_format: Some(TimestampFormat::Unix),
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
+            },
+            request: TowerRequestConfig {
+                retry_attempts: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let client = ClickhouseClient::new(host);
+        client.create_table(
+            &table,
+            "host String, timestamp DateTime('Europe/London'), message String",
+        );
+
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+
+        let mut input_event = Event::from("raw log line");
+        input_event.as_mut_log().insert("host", "example.com");
+
+        let pump = sink.send(input_event.clone());
+        rt.block_on(pump).unwrap();
+
+        let output = client.select_all(&table);
+        assert_eq!(1, output.rows);
+
+        let exp_event = input_event.as_mut_log();
+        exp_event.insert(
+            TIMESTAMP.clone(),
+            format!(
+                "{}",
+                exp_event
+                    .get(&TIMESTAMP)
+                    .unwrap()
+                    .as_timestamp()
+                    .unwrap()
+                    .format("%Y-%m-%d %H:%M:%S")
+            ),
+        );
+
+        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        assert_eq!(expected, output.data[0]);
+    }
+
+    #[test]
     fn no_retry_on_incorrect_data() {
         crate::test_util::trace_init();
         let mut rt = runtime();
@@ -334,7 +411,6 @@ mod integration_tests {
                     "CREATE TABLE {}
                      ({})
                      ENGINE = MergeTree()
-                     PARTITION BY substring(timestamp, 1, 7)
                      ORDER BY (host, timestamp);",
                     table, schema
                 ))
