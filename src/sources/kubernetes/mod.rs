@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
 
 use crate::{
     event::{self, Event, Value},
@@ -30,7 +30,9 @@ use string_cache::DefaultAtom as Atom;
 const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
 lazy_static! {
+    // TODO: Rename to pod_directory_uid
     pub static ref POD_UID: Atom = Atom::from("pod_uid");
+    // TODO: Rename to pod_uid
     pub static ref OBJECT_UID: Atom = Atom::from("object_uid");
 }
 

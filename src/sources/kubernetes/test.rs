@@ -71,7 +71,7 @@ data:
 "#;
 
 // TODO: use localy builded image of vector
-static VECTOR_YAML: &'static str = r#"
+pub static VECTOR_YAML: &'static str = r#"
 # Vector agent runned on each Node where it collects logs from pods.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -144,10 +144,10 @@ spec:
   restartPolicy: Never
 "#;
 
-type KubePod = Object<PodSpec, PodStatus>;
-type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
+pub type KubePod = Object<PodSpec, PodStatus>;
+pub type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
 
-struct Kube {
+pub struct Kube {
     client: APIClient,
     namespace: String,
 }
@@ -166,7 +166,7 @@ impl Kube {
         kube
     }
 
-    fn api<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F) -> Api<K> {
+    pub fn api<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F) -> Api<K> {
         f(self.client.clone()).within(self.namespace.as_str())
     }
 
@@ -196,7 +196,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create_raw_with<K, S: Borrow<str>>(&self, api: &RawApi, yaml: S) -> K
+    pub fn create_raw_with<K, S: Borrow<str>>(&self, api: &RawApi, yaml: S) -> K
     where
         K: DeserializeOwned,
     {
@@ -216,7 +216,7 @@ impl Kube {
     }
 
     /// Deleter will delete given resource on drop.
-    fn deleter<S: Borrow<str>>(&self, api: RawApi, name: S) -> Deleter {
+    pub fn deleter<S: Borrow<str>>(&self, api: RawApi, name: S) -> Deleter {
         Deleter {
             client: self.client.clone(),
             api,
@@ -224,7 +224,7 @@ impl Kube {
         }
     }
 
-    fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
+    pub fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
         retry(|| {
             self.api(Api::v1Pod)
                 .list(&ListParams {
@@ -247,7 +247,7 @@ impl Kube {
         .collect()
     }
 
-    fn logs(&self, pod_name: &str) -> Vec<String> {
+    pub fn logs(&self, pod_name: &str) -> Vec<String> {
         retry(|| {
             self.api(Api::v1Pod)
                 .log(pod_name, &LogParams::default())
@@ -261,7 +261,7 @@ impl Kube {
         .collect()
     }
 
-    fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
+    pub fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
         retry(move || {
             object = api
@@ -284,7 +284,7 @@ impl Kube {
         })
     }
 
-    fn wait_for_success(&self, mut object: KubePod) -> KubePod {
+    pub fn wait_for_success(&self, mut object: KubePod) -> KubePod {
         let api = self.api(Api::v1Pod);
         let legal = ["Pending", "Running", "Succeeded"];
         let goal = "Succeeded";
@@ -329,7 +329,7 @@ impl Drop for Kube {
     }
 }
 
-struct Deleter {
+pub struct Deleter {
     client: APIClient,
     name: String,
     api: RawApi,
@@ -366,12 +366,12 @@ fn retry<F: FnMut() -> Option<R>, R>(mut f: F) -> R {
     panic!("timed out while waiting");
 }
 
-fn user_namespace(namespace: &str) -> String {
+pub fn user_namespace(namespace: &str) -> String {
     "user-".to_owned() + namespace
 }
 
 #[must_use]
-fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
+pub fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
     // Start echo
     let echo = kube.create(
         Api::v1Pod,
@@ -386,7 +386,7 @@ fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
     echo
 }
 
-fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
+pub fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
     // Start vector
     kube.create(
         Api::v1ConfigMap,
@@ -400,7 +400,7 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
     vector
 }
 
-fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
+pub fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
     // Wait for logs to propagate
     std::thread::sleep(Duration::from_secs(4));
     let mut logs = Vec::new();
@@ -540,116 +540,3 @@ fn kube_object_uid() {
 
     panic!("Vector didn't log message: {:?}", message);
 }
-
-// ************************** kubernetes_pod_metadata TESTS ************************* //
-
-static NAME_MARKER: &'static str = "$(NAME)";
-
-static ROLE_BINDING_YAML: &'static str = r#"
-# Permissions to use Kubernetes API.
-# Necessary for kubernetes_pod_metadata transform.
-# Requires that RBAC authorization is enabled.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: $(NAME)
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: $(TEST_NAMESPACE)
-roleRef:
-  kind: ClusterRole
-  name: view
-  apiGroup: rbac.authorization.k8s.io
-"#;
-
-static CONFIG_MAP_YAML_WITH_METADATA: &'static str = r#"
-# ConfigMap which contains vector.toml configuration for pods.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: vector-config
-  namespace: $(TEST_NAMESPACE)
-data:
-  vector-agent-config: |
-    # VECTOR.TOML
-    # Configuration for vector-agent
-
-    # Set global options
-    data_dir = "/tmp/vector/"
-
-    # Ingest logs from Kubernetes
-    [sources.kubernetes_logs]
-      type = "kubernetes"
-
-    [transforms.kube_metadata]
-      type = "kubernetes_pod_metadata"
-      inputs = ["kubernetes_logs"]
-
-    [sinks.out]
-      type = "console"
-      inputs = ["kube_metadata"]
-      target = "stdout"
-
-      encoding = "json"
-      healthcheck = true
-
-  # This line is not in VECTOR.TOML
-"#;
-
-fn cluster_role_binding_api() -> RawApi {
-    RawApi {
-        group: "rbac.authorization.k8s.io".into(),
-        resource: "clusterrolebindings".into(),
-        prefix: "apis".into(),
-        version: "v1".into(),
-        ..Default::default()
-    }
-}
-
-fn binding_name(namespace: &str) -> String {
-    "binding-".to_owned() + namespace
-}
-
-#[test]
-fn kube_metadata() {
-    let namespace = "vector-test-kube-metadata";
-    let message = "20";
-    let field = "pod_name";
-    let user_namespace = user_namespace(namespace);
-    let binding_name = binding_name(namespace);
-
-    let kube = Kube::new(namespace);
-    let user = Kube::new(user_namespace.clone());
-
-    // Cluster role binding
-    kube.create_raw_with::<k8s_openapi::api::rbac::v1::ClusterRoleBinding, _>(
-        &cluster_role_binding_api(),
-        ROLE_BINDING_YAML.replace(NAME_MARKER, binding_name.as_str()),
-    );
-    let _binding = kube.deleter(cluster_role_binding_api(), binding_name);
-
-    // Start vector
-    kube.create(Api::v1ConfigMap, CONFIG_MAP_YAML_WITH_METADATA);
-    let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
-
-    // Wait for running state
-    kube.wait_for_running(vector.clone());
-
-    // Start echo
-    let _echo = echo(&user, "echo", message);
-
-    // Verify logs
-    // If any daemon logged message, done.
-    for line in logs(&kube, &vector) {
-        if line.get(field).is_some() {
-            // DONE
-            return;
-        } else {
-            debug!(namespace,log=%line);
-        }
-    }
-    panic!("Vector didn't find field: {:?}", field);
-}
-
-// fn kube_metadata_running() {

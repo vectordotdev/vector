@@ -253,22 +253,14 @@ impl MetadataClient {
             // but then we would have a time gap during which events wouldn't be enriched
             // with metadata.
             version = self
-                .request(
-                    version.clone(),
-                    self.watch_pods_request(version)?,
-                    |response| self.watch_process(response),
-                )
+                .request(version.clone(), self.watch_pods_request(version)?)
                 .await;
         }
     }
 
-    /// Resolves request to multiple R data.
-    async fn request<R: Response>(
-        &self,
-        mut version: Option<Version>,
-        request: Request<Body>,
-        process: impl Fn(R) -> VersionResult,
-    ) -> Option<Version> {
+    /// Watches for pods metadata with given watch request.
+    async fn watch(&self, mut version: Option<Version>, request: Request<Body>) -> Option<Version> {
+        // Start watching
         let response = self.client.request(request).compat().await;
         match response {
             Ok(response) => {
@@ -288,9 +280,12 @@ impl MetadataClient {
 
                                 // Parse then process, recieved unused data
                                 'process: loop {
-                                    match R::try_from_parts(status, &unused) {
+                                    match WatchPodForAllNamespacesResponse::try_from_parts(
+                                        status, &unused,
+                                    ) {
                                         Ok((data, used_bytes)) => {
-                                            match process(data) {
+                                            // Process watch event
+                                            match self.watch_process(response) {
                                                 VersionResult::New(new_version) => {
                                                     // Store last resourceVersion
                                                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
@@ -340,8 +335,12 @@ impl MetadataClient {
                     | WatchEvent::Bookmark(pod)
                     | WatchEvent::Deleted(pod) => {
                         // In the case of Deleted, we don't delete it's data, as there could still exist unprocessed logs from that pod.
-                        // Not deleteing will cause "memory leakage" in a sense that the data won't be used ever
+                        // Not deleteing it will cause "memory leakage" in a sense that the data won't be used ever
                         // again after some point, but the catch is that we don't know when that point is.
+                        // Also considering that, on average, an entry occupies ~232B, so to 'leak' 1MB of memory, ~4500 pods would need to be
+                        // created and destroyed on the same node, which is highly unlikely.
+                        //
+                        // An alternative would be to delay deletions of entrys by 1min. Which is a safe guess.
 
                         let _ = self.update(&pod);
 
@@ -352,8 +351,9 @@ impl MetadataClient {
                         )
                     }
                     WatchEvent::ErrorStatus(status) => {
-                        // 410 Gone, restart with new list.
                         if status.code == Some(410) {
+                            // 410 Gone, restart with new list.
+                            // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
                             warn!(message = "Pod list desynced. Reseting list.", cause = ?status);
                             VersionResult::Restart
                         } else {
@@ -470,7 +470,7 @@ impl Transform for KubernetesPodMetadata {
         trace!("Enrichment");
 
         if let Some(Value::Bytes(pod_uid)) = log.get(&OBJECT_UID) {
-            // TODO: This is blocking
+            // TODO: This is potentialy blocking
             if let Some(metadata) = self.metadata.read().ok() {
                 if let Some(fields) = metadata.get(pod_uid) {
                     for (key, value) in fields {
@@ -587,4 +587,121 @@ fn collection_field(
 
 fn with_prefix(name: &str) -> String {
     FIELD_PREFIX.to_owned() + name
+}
+
+#[cfg(test)]
+mod tests {
+    #![cfg(feature = "kubernetes-integration-tests")]
+
+    use crate::sources::kubernetes::test::{echo, logs, user_namespace, Kube, VECTOR_YAML};
+    use kube::api::{Api, RawApi};
+
+    static NAME_MARKER: &'static str = "$(NAME)";
+
+    static ROLE_BINDING_YAML: &'static str = r#"
+# Permissions to use Kubernetes API.
+# Necessary for kubernetes_pod_metadata transform.
+# Requires that RBAC authorization is enabled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: $(NAME)
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: $(TEST_NAMESPACE)
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+"#;
+
+    static CONFIG_MAP_YAML_WITH_METADATA: &'static str = r#"
+# ConfigMap which contains vector.toml configuration for pods.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: $(TEST_NAMESPACE)
+data:
+  vector-agent-config: |
+    # VECTOR.TOML
+    # Configuration for vector-agent
+
+    # Set global options
+    data_dir = "/tmp/vector/"
+
+    # Ingest logs from Kubernetes
+    [sources.kubernetes_logs]
+      type = "kubernetes"
+
+    [transforms.kube_metadata]
+      type = "kubernetes_pod_metadata"
+      inputs = ["kubernetes_logs"]
+
+    [sinks.out]
+      type = "console"
+      inputs = ["kube_metadata"]
+      target = "stdout"
+
+      encoding = "json"
+      healthcheck = true
+
+  # This line is not in VECTOR.TOML
+"#;
+
+    fn cluster_role_binding_api() -> RawApi {
+        RawApi {
+            group: "rbac.authorization.k8s.io".into(),
+            resource: "clusterrolebindings".into(),
+            prefix: "apis".into(),
+            version: "v1".into(),
+            ..Default::default()
+        }
+    }
+
+    fn binding_name(namespace: &str) -> String {
+        "binding-".to_owned() + namespace
+    }
+
+    #[test]
+    fn kube_metadata() {
+        let namespace = "vector-test-kube-metadata";
+        let message = "20";
+        let field = "pod_name";
+        let user_namespace = user_namespace(namespace);
+        let binding_name = binding_name(namespace);
+
+        let kube = Kube::new(namespace);
+        let user = Kube::new(user_namespace.clone());
+
+        // Cluster role binding
+        kube.create_raw_with::<k8s_openapi::api::rbac::v1::ClusterRoleBinding, _>(
+            &cluster_role_binding_api(),
+            ROLE_BINDING_YAML.replace(NAME_MARKER, binding_name.as_str()),
+        );
+        let _binding = kube.deleter(cluster_role_binding_api(), binding_name);
+
+        // Start vector
+        kube.create(Api::v1ConfigMap, CONFIG_MAP_YAML_WITH_METADATA);
+        let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
+
+        // Wait for running state
+        kube.wait_for_running(vector.clone());
+
+        // Start echo
+        let _echo = echo(&user, "echo", message);
+
+        // Verify logs
+        // If any daemon logged message, done.
+        for line in logs(&kube, &vector) {
+            if line.get(field).is_some() {
+                // DONE
+                return;
+            } else {
+                debug!(namespace,log=%line);
+            }
+        }
+        panic!("Vector didn't find field: {:?}", field);
+    }
 }
