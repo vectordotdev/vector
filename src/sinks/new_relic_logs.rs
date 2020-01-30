@@ -102,6 +102,8 @@ impl NewRelicLogsConfig {
             request,
 
             tls: None,
+
+            ..Default::default()
         })
     }
 }
