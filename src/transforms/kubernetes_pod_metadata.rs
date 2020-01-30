@@ -630,6 +630,7 @@ mod tests {
 
     use crate::sources::kubernetes::test::{echo, logs, user_namespace, Kube, VECTOR_YAML};
     use kube::api::{Api, RawApi};
+    use uuid::Uuid;
 
     static NAME_MARKER: &'static str = "$(NAME)";
     static FIELD_MARKER: &'static str = "$(FIELD)";
@@ -720,24 +721,29 @@ data:
 
     #[test]
     fn kube_metadata() {
-        let namespace = "vector-test-kube-metadata";
+        let namespace = format!("kube-metadata-{}", Uuid::new_v4());
         let message = "20";
         let field = "node_name";
-        let user_namespace = user_namespace(namespace);
-        let binding_name = binding_name(namespace);
+        let user_namespace = user_namespace(namespace.as_str());
+        let binding_name = binding_name(namespace.as_str());
 
-        let kube = Kube::new(namespace);
-        let user = Kube::new(user_namespace.clone());
+        let kube = Kube::new(namespace.as_str());
+        let user = Kube::new(user_namespace.clone().as_str());
 
         // Cluster role binding
-        kube.create_raw_with::<k8s_openapi::api::rbac::v1::ClusterRoleBinding, _>(
+        kube.create_raw_with::<k8s_openapi::api::rbac::v1::ClusterRoleBinding>(
             &cluster_role_binding_api(),
-            ROLE_BINDING_YAML.replace(NAME_MARKER, binding_name.as_str()),
+            ROLE_BINDING_YAML
+                .replace(NAME_MARKER, binding_name.as_str())
+                .as_str(),
         );
-        let _binding = kube.deleter(cluster_role_binding_api(), binding_name);
+        let _binding = kube.deleter(cluster_role_binding_api(), binding_name.as_str());
 
         // Start vector
-        kube.create(Api::v1ConfigMap, metadata_config_map(Some(vec![field])));
+        kube.create(
+            Api::v1ConfigMap,
+            metadata_config_map(Some(vec![field])).as_str(),
+        );
         let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
 
         // Wait for running state
@@ -753,7 +759,7 @@ data:
                 // DONE
                 return;
             } else {
-                debug!(namespace,log=%line);
+                debug!(namespace=namespace.as_str(),log=%line);
             }
         }
         panic!("Vector didn't find field: {:?}", field);

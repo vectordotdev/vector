@@ -154,7 +154,7 @@ pub struct Kube {
 
 impl Kube {
     // Also immedietely creates namespace
-    fn new(namespace: &str) -> Self {
+    pub fn new(namespace: &str) -> Self {
         trace_init();
         let config = config::load_kube_config().expect("failed to load kubeconfig");
         let client = APIClient::new(config);
@@ -171,7 +171,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
+    pub fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
@@ -179,7 +179,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create_with<K>(&self, api: &Api<K>, yaml: &str) -> K
+    pub fn create_with<K>(&self, api: &Api<K>, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
@@ -196,13 +196,11 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    pub fn create_raw_with<K, S: Borrow<str>>(&self, api: &RawApi, yaml: S) -> K
+    pub fn create_raw_with<K>(&self, api: &RawApi, yaml: &str) -> K
     where
         K: DeserializeOwned,
     {
-        let yaml = yaml
-            .borrow()
-            .replace(NAMESPACE_MARKER, self.namespace.as_str());
+        let yaml = yaml.replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
         retry(|| {
@@ -216,11 +214,11 @@ impl Kube {
     }
 
     /// Deleter will delete given resource on drop.
-    pub fn deleter<S: Borrow<str>>(&self, api: RawApi, name: S) -> Deleter {
+    pub fn deleter(&self, api: RawApi, name: &str) -> Deleter {
         Deleter {
             client: self.client.clone(),
             api,
-            name: name.borrow().to_owned(),
+            name: name.to_owned(),
         }
     }
 
