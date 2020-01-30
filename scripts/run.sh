@@ -4,17 +4,12 @@
 #
 # SUMMARY
 #
-#   A simple utility script that run the passed command in a Docker environment
-#   or locally based on the presence of the `USE_DOCKER` environment variable.
+#   A simple script that runs commands in a Docker environment based on the
+#   presence of the `USE_DOCKER` environment variable.
 #
-#   * If set to `false` then all `make` targets will execute on the local
-#     machine.
-#   * If set to `true` then all `make` targets will execute in their respective
-#     Docker images.
-#
-#   We offer this to reduce the user frustration when running `make` command.
-#   For example, `make generate` requires the user to isntall Ruby and other
-#   dependencies. Docker makes this process much simpler for new contributors.
+#   This helps to reduce the friction running various `make` commands. For
+#   example, the `make generate` command requires Ruby and other dependencies
+#   to be installed. Routing this command through a Docker images removes this.
 
 set -eou pipefail
 
