@@ -92,6 +92,7 @@ scopes:
   - elasticsearch sink
   - file sink
   - gcp_pubsub sink
+  - gcp_stackdriver_logging sink
   - http sink
   - kafka sink
   - new_relic_logs sink

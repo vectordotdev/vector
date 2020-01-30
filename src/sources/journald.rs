@@ -206,7 +206,7 @@ impl JournalSource for Journalctl {
             command.arg(format!("--after-cursor={}", cursor));
         } else {
             // journalctl --follow only outputs a few lines without a starting point
-            command.arg("--since=1970-01-01");
+            command.arg("--since=2000-01-01");
         }
 
         let mut child = command.spawn().context(JournalctlSpawn)?;

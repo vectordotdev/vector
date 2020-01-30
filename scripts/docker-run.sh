@@ -1,21 +1,43 @@
 #!/usr/bin/env bash
 
-# run-docker.sh
+# docker-run.sh
 #
 # SUMMARY
 #
-#   Builds given CI Docker image and runs a command inside of a container
-#   based on this image.
+#   Builds given `scripts/ci-docker-images/*` and runs a command inside of
+#   the provided container based on this image.
 
 set -eou pipefail
+
+#
+# Requirements
+#
+
+if [ -z "${1:-}" ]; then
+  echo "You must pass the docker image tag as the first argument"
+  exit 1
+fi
+
+if [ -z "${2:-}" ]; then
+  echo "You must pass a command to execute as the second argument"
+  exit 1
+fi
+
+#
+# Variables
+#
 
 tag="$1"
 image="timberiodev/vector-$tag:latest"
 
+#
+# Execute
+#
+
 docker build \
   -t $image \
   -f scripts/ci-docker-images/$tag/Dockerfile \
-  scripts/ci-docker-images
+  scripts
 
 # Set flags for "docker run".
 # Note that the `--privileged` flags is set by default because it is
