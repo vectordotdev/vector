@@ -17559,6 +17559,12 @@ module.exports = {
       "name": "Alexey"
     },
     {
+      "avatar": "https://github.com/hoverbear.png",
+      "github": "https://github.com/hoverbear",
+      "id": "ana",
+      "name": "Ana"
+    },
+    {
       "avatar": "https://github.com/Jeffail.png",
       "github": "https://github.com/Jeffail",
       "id": "ashley",
