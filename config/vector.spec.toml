@@ -810,6 +810,17 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # Set to `true` to drop all fields that are not specified in the `types` table.
+  # Make sure both `message` and `timestamp` are specified in the `types` table
+  # as their absense will cause the original message data to be dropped along
+  # with other extraneous fields.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  drop_unspecified = false
+  drop_unspecified = true
+
   #
   # Types
   #
