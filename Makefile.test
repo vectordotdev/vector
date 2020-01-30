@@ -41,7 +41,7 @@ verify: verify-rpm verify-deb
 
 # display dependencies between all targets in this Makefile
 target-graph:
-	docker-compose -f docker-compose.test.yml run --rm target-graph
+	@docker-compose -f docker-compose.test.yml run --rm target-graph $(TARGET)
 
 # clean everything
 clean:

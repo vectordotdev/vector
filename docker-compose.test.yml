@@ -82,7 +82,6 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
-    command: ["sh", "-ec", "make -f Makefile.test -Bnd | make2graph | graph-easy --as=boxart"]
 
   clean:
     image: ubuntu:18.04
