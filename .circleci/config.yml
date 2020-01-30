@@ -61,8 +61,7 @@ jobs:
           name: Check generate
           environment:
             PASS_RUSTFLAGS: "-D warnings"
-          command: |
-            ./scripts/docker-run.sh checker make check-code
+          command: make check-code
 
   check-fmt:
     <<: *docker-machine
@@ -72,8 +71,7 @@ jobs:
           name: Check fmt
           environment:
             PASS_RUSTFLAGS: "-D warnings"
-          command: |
-            ./scripts/docker-run.sh checker make check-fmt
+          command: make check-fmt
 
   check-generate:
     <<: *docker-machine
@@ -81,8 +79,7 @@ jobs:
       - checkout
       - run:
           name: Check generate
-          command: |
-            ./scripts/docker-run.sh checker make check-generate
+          command: make check-generate
 
   check-version:
     <<: *docker-machine
@@ -90,8 +87,7 @@ jobs:
       - checkout
       - run:
           name: Check version
-          command: |
-            ./scripts/docker-run.sh checker make check-version
+          command: make check-version
 
   check-blog:
     <<: *docker-machine
@@ -99,8 +95,7 @@ jobs:
       - checkout
       - run:
           name: Check blog
-          command: |
-            ./scripts/docker-run.sh checker make check-blog
+          command: make check-blog
 
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019

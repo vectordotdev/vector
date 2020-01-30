@@ -9,8 +9,30 @@
 
 set -eou pipefail
 
+#
+# Requirements
+#
+
+if [ -z "${1:-}" ]; then
+  echo "You must pass the docker image tag as the first argument"
+  exit 1
+fi
+
+if [ -z "${2:-}" ]; then
+  echo "You must pass a command to execute as the second argument"
+  exit 1
+fi
+
+#
+# Variables
+#
+
 tag="$1"
 image="timberiodev/vector-$tag:latest"
+
+#
+# Execute
+#
 
 docker build \
   -t $image \
