@@ -77,6 +77,9 @@ impl TransformConfig for KubePodMetadata {
     fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         // Main idea is to have a background task which will premptively
         // acquire metadata for all pods on this node, and then maintaine that.
+        //
+        // Background task is sending newest versions of metadata to Transform
+        // through a channel.
 
         let (sender, receiver) = mpsc::channel(100);
 
@@ -91,7 +94,7 @@ impl TransformConfig for KubePodMetadata {
             kubernetes_port()?,
             tls_settings()?,
         )?;
-        // Dry run
+        // Dry request build
         client.watch_pods_request(None)?;
 
         exec.spawn_std(async move {
@@ -167,25 +170,26 @@ fn tls_settings() -> Result<TlsSettings, BuildError> {
 enum BuildError {
     #[snafu(display("{}, probably because Vector isn't in Kubernetes Pod.", reason))]
     NoKubernetes { reason: String },
-    #[snafu(display("TLS construction errored {}", source))]
+    #[snafu(display("TLS construction errored {}.", source))]
     TlsError { source: crate::Error },
-    #[snafu(display("Http client construction errored {}", source))]
+    #[snafu(display("Http client construction errored {}.", source))]
     HttpError { source: crate::Error },
     #[snafu(display(
         "Missing environment variable {:?} containing node name `spec.nodeName`.",
         env
     ))]
     MissingNodeName { env: &'static str },
-    #[snafu(display("Failed constructing request: {}", source))]
+    #[snafu(display("Failed constructing request: {}.", source))]
     K8SOpenapiError { source: k8s::RequestError },
-    #[snafu(display("Uri gotten from Kubernetes is invalid: {}", source))]
+    #[snafu(display("Uri gotten from Kubernetes is invalid: {}.", source))]
     InvalidUri { source: uri::InvalidUri },
-    #[snafu(display("Uri gotten from Kubernetes is invalid: {}", source))]
+    #[snafu(display("Uri gotten from Kubernetes is invalid: {}.", source))]
     InvalidUriParts { source: uri::InvalidUriParts },
-    #[snafu(display("Authorization token gotten from Kubernetes is invalid: {}", source))]
+    #[snafu(display("Authorization token gotten from Kubernetes is invalid: {}.", source))]
     InvalidToken { source: header::InvalidHeaderValue },
 }
 
+/// Background client which watches for Pod metadata changes and propagates them to Transform.
 struct MetadataClient {
     fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>>,
     sender: Option<mpsc::Sender<(Bytes, Vec<(Atom, Value)>)>>,
@@ -207,17 +211,20 @@ impl MetadataClient {
         port: String,
         tls_settings: TlsSettings,
     ) -> Result<Self, BuildError> {
+        // Select Pod metadata fields which are extracted and then added to Events.
+        let fields = all_fields()
+            .into_iter()
+            .filter(|(key, _)| {
+                trans_config
+                    .fields
+                    .iter()
+                    .any(|field| field.as_str() == *key)
+            })
+            .map(|(_, fun)| fun)
+            .collect();
+
         Ok(Self {
-            fields: all_fields()
-                .into_iter()
-                .filter(|(key, _)| {
-                    trans_config
-                        .fields
-                        .iter()
-                        .any(|field| field.as_str() == *key)
-                })
-                .map(|(_, fun)| fun)
-                .collect(),
+            fields,
             sender: Some(sender),
             node_name,
             token,
@@ -227,7 +234,9 @@ impl MetadataClient {
         })
     }
 
-    /// Errors only if it would always error
+    /// Watches for metadata changes and propagates them to Transform.
+    /// Ok only if Transform/Receiver has been droped.
+    /// Err only if it would always error
     async fn run(&mut self) -> Result<(), BuildError> {
         // If watch is initiated with None resource_version, we will receive initial
         // list of pods as synthetic "Added" events.
@@ -243,20 +252,16 @@ impl MetadataClient {
                 .watch(version.clone(), self.watch_pods_request(version.clone())?)
                 .await
             {
-                VersionResult::New(new_version) => version = new_version.or(version),
-                VersionResult::Reload => (),
-                VersionResult::Restart => version = None,
-                VersionResult::Shutdown => return Ok(()),
+                WatchResult::New(new_version) => version = new_version.or(version),
+                WatchResult::Reload => (),
+                WatchResult::Restart => version = None,
+                WatchResult::Shutdown => return Ok(()),
             }
         }
     }
 
     /// Watches for pods metadata with given watch request.
-    async fn watch(
-        &mut self,
-        mut version: Option<Version>,
-        request: Request<Body>,
-    ) -> VersionResult {
+    async fn watch(&mut self, mut version: Option<Version>, request: Request<Body>) -> WatchResult {
         // Start watching
         let response = self.client.request(request).compat().await;
         match response {
@@ -282,8 +287,8 @@ impl MetadataClient {
                                     ) {
                                         Ok((data, used_bytes)) => {
                                             // Process watch event
-                                            match self.watch_process(data).await {
-                                                VersionResult::New(new_version) => {
+                                            match self.process_event(data).await {
+                                                WatchResult::New(new_version) => {
                                                     // Store last resourceVersion
                                                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
                                                     version = new_version.or(version);
@@ -296,7 +301,7 @@ impl MetadataClient {
                                                     let _ = unused.drain(..used_bytes);
                                                     continue 'process;
                                                 }
-                                                VersionResult::Reload => (),
+                                                WatchResult::Reload => (),
                                                 vr => return vr,
                                             }
                                         }
@@ -318,11 +323,11 @@ impl MetadataClient {
             Err(error) => debug!(message = "Failed resolving request.", ?error),
         }
 
-        VersionResult::New(version)
+        WatchResult::New(version)
     }
 
-    /// Err when metadata should be refetched.
-    async fn watch_process(&mut self, response: WatchPodForAllNamespacesResponse) -> VersionResult {
+    /// Processes watch event comming from Kubernetes API server.
+    async fn process_event(&mut self, response: WatchPodForAllNamespacesResponse) -> WatchResult {
         match response {
             WatchPodForAllNamespacesResponse::Ok(event) => {
                 match event {
@@ -345,29 +350,30 @@ impl MetadataClient {
                             // 410 Gone, restart with new list.
                             // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
                             warn!(message = "Pod list desynced. Reseting list.", cause = ?status);
-                            VersionResult::Restart
+                            WatchResult::Restart
                         } else {
                             debug!("Watch event with error status: {:?}", status);
-                            VersionResult::New(None)
+                            WatchResult::New(None)
                         }
                     }
                     WatchEvent::ErrorOther(value) => {
                         debug!(?value);
-                        VersionResult::New(None)
+                        WatchResult::New(None)
                     }
                 }
             }
             WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
                 debug!(message = "Received wrong object from Kubernetes API.");
-                VersionResult::New(None)
+                WatchResult::New(None)
             }
             WatchPodForAllNamespacesResponse::Other(Err(error)) => {
                 debug!(message = "Failed parsing watch list of Pods.", ?error);
-                VersionResult::Reload
+                WatchResult::Reload
             }
         }
     }
 
+    // Builds request to watch pods.
     fn watch_pods_request(
         &self,
         resource_version: Option<Version>,
@@ -412,11 +418,13 @@ impl MetadataClient {
         Ok(())
     }
 
+    // Selector for current Node.
     fn field_selector(&self) -> String {
         format!("spec.nodeName={}", self.node_name)
     }
 
-    async fn update(&mut self, pod: Pod) -> VersionResult {
+    /// Extracts metadata from pod and sends them to Transform.
+    async fn update(&mut self, pod: Pod) -> WatchResult {
         if let Some(uid) = pod.metadata.as_ref().and_then(|md| md.uid.as_ref()) {
             let uid: Bytes = uid.as_str().into();
             let fields = self.fields(&pod);
@@ -434,15 +442,15 @@ impl MetadataClient {
                 match sender.send((uid, fields)).compat().await {
                     Ok(sender) => self.sender = Some(sender),
                     // Channel closed
-                    Err(_) => return VersionResult::Shutdown,
+                    Err(_) => return WatchResult::Shutdown,
                 }
             } else {
                 // Channel has already been closed
-                return VersionResult::Shutdown;
+                return WatchResult::Shutdown;
             }
         }
 
-        VersionResult::New(
+        WatchResult::New(
             pod.metadata
                 .as_ref()
                 .and_then(|metadata| metadata.resource_version.clone().map(Version)),
@@ -460,7 +468,7 @@ impl MetadataClient {
 struct Version(String);
 
 #[derive(Clone, Debug)]
-enum VersionResult {
+enum WatchResult {
     /// Potentialy newer version
     New(Option<Version>),
     /// Start new request with current version.
