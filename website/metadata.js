@@ -17158,6 +17158,30 @@ module.exports = {
 
       ]
     },
+    "sematext": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "sematext_sink",
+      "name": "sematext",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "socket": {
       "beta": false,
       "delivery_guarantee": "best_effort",
