@@ -1,4 +1,4 @@
-RUN=docker-compose -f docker-compose.test.yml run --rm
+RUN=./scripts/docker-compose-run.sh
 
 # default target
 
@@ -41,4 +41,8 @@ verify: verify-rpm verify-deb
 
 # display dependencies between all targets in this Makefile
 target-graph:
-	$(RUN) target-graph
+	docker-compose -f docker-compose.test.yml run --rm target-graph
+
+# clean everything
+clean:
+	$(RUN) clean

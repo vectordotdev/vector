@@ -10,6 +10,8 @@ services:
       FEATURES: default-musl
     volumes:
       - $PWD:$PWD
+      - ./target/cargo/registry:/opt/rust/cargo/registry
+      - ./target/cargo/git:/opt/rust/cargo/git
     working_dir: $PWD
     command: make build-archive
 
@@ -21,6 +23,8 @@ services:
       TARGET: x86_64-unknown-linux-musl
     volumes:
       - $PWD:$PWD
+      - ./target/cargo/registry:/opt/rust/cargo/registry
+      - ./target/cargo/git:/opt/rust/cargo/git
     working_dir: $PWD
     command: make package-deb
 
@@ -42,7 +46,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
-    command: "rpm -i target/artifacts/*-x86_64.rpm && vector --version"
+    command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
   verify-rpm-amazonlinux-2:
     build:
@@ -51,7 +55,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
-    command: "rpm -i target/artifacts/*-x86_64.rpm && vector --version"
+    command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
   verify-rpm-centos-7:
     build:
@@ -60,7 +64,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
-    command: "rpm -i target/artifacts/*-x86_64.rpm && vector --version"
+    command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
   verify-deb-artifact-on-deb-10:
     build:
@@ -69,7 +73,7 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
-    command: sh -c "dpkg -i target/artifacts/*-amd64.deb && vector --version"
+    command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
   target-graph:
     build:
@@ -78,4 +82,11 @@ services:
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
-    command: sh -c "make -f Makefile.test -Bnd | make2graph | graph-easy --as=boxart"
+    command: ["sh", "-ec", "make -f Makefile.test -Bnd | make2graph | graph-easy --as=boxart"]
+
+  clean:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "rm -rf target"]
