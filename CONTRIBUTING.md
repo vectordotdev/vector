@@ -12,10 +12,13 @@ expanding into more specifics.
    - [Git Branches](#git-branches)
    - [Git Commits](#git-commits)
       - [Style](#style)
-      - [Signing](#signing)
+      - [Cryptographically Signing](#cryptographically-signing)
+      - [Signing-off](#signing-off)
    - [Github Pull Requests](#github-pull-requests)
       - [Title](#title)
-      - [Merging](#merging)
+      - [Single Concern](#single-concern)
+      - [Reviews & Approvals](#reviews--approvals)
+      - [Merge Style](#merge-style)
    - [CI](#ci)
 - [Development](#development)
    - [Setup](#setup)
@@ -25,20 +28,18 @@ expanding into more specifics.
       - [Code Style](#code-style)
       - [Documentation](#documentation)
       - [Changelog](#changelog)
-   - [Building a sink](#building-a-sink)
-      - [Healthchecks](#healthchecks)
-         - [Guidelines for writing healthchecks](#guidelines-for-writing-healthchecks)
+   - [Dependencies](#dependencies)
+   - [Guidelines](#guidelines)
+      - [Sink Healthchecks](#sink-healthchecks)
    - [Testing](#testing)
       - [Sample Logs](#sample-logs)
    - [Benchmarking](#benchmarking)
-- [FAQ](#faq)
-   - [What is conventional commits?](#what-is-conventional-commits)
-   - [Do I need to update the changelog?](#do-i-need-to-update-the-changelog)
-   - [What is a DCO?](#what-is-a-dco)
-   - [Why does Vector adopt the DCO?](#why-does-vector-adopt-the-dco)
-   - [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-   - [What about trivial changes?](#what-about-trivial-changes)
+- [Security](#security)
+- [Legal](#legal)
+   - [DCO](#dco)
+      - [Trivial changes](#trivial-changes)
    - [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
+   - [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
    - [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
    - [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
 
@@ -46,9 +47,11 @@ expanding into more specifics.
 
 ## Assumptions
 
-1. **You are familiar with the [docs](https://vector.dev/docs/).**
-2. **You know about the [Vector community](https://vector.dev/community/),
-   use this for help.**
+1. **You're familiar with [Github](https://github.com) and the pull request
+   workflow.**
+2. **You've read Vector's [docs](https://vector.dev/docs/).**
+3. **You know about the [Vector community](https://vector.dev/community/).
+   Please use this for help.**
 
 ## Workflow
 
@@ -66,7 +69,13 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
-#### Signing
+#### Cryptographically Signing
+
+Vector requires all commits to be cryptographically signed as part of our
+[security policy](/SECURITY.md). You can read more about how to do that
+on [Githubs signing commits guide][urls.github_sign_commits].
+
+#### Signing-off
 
 Your commits must include a [DCO](https://developercertificate.org/) signature.
 This is simpler than it sounds; it just means that all of your commits
@@ -93,9 +102,15 @@ request](https://github.com/timberio/vector/pulls).
 #### Title
 
 The pull request title must follow the format outlined in the [conventional \
-commits spec](https://www.conventionalcommits.org) (see the ["What is
-conventional commits?" FAQ](#what-is-conventional-commits)). A list of allowed
-sub categories is defined
+commits spec](https://www.conventionalcommits.org).
+[Conventional commits](https://www.conventionalcommits.org) is a standardized
+format for commit messages. Vector only requires this format for commits on
+the `master` branch. And because Vector squashes commits before merging
+branches, this means that only the pull request title must conform to this
+format. Vector performs a pull request check to verify the pull request title
+in case you forget.
+
+A list of allowed sub categories is defined
 [here](https://github.com/timberio/vector/tree/master/.github).
 
 The follow are all good examples of pull request titles:
@@ -108,10 +123,24 @@ chore: improve build process
 docs: fix typos
 ```
 
-#### Merging
+#### Single Concern
 
-At least one Vector team member must approve your work before merging. All
-pull requests are squashed and merged. We generally discourage large pull
+We generally discourage large pull requests that are over 300-500 lines of diff.
+This is usually a sign that the pull request is addressing multiple concerns.
+If you would like to propose a change that is larger we suggest coming onto our
+[chat channel](https://chat.vector.dev) and discuss it with one of our
+engineers. This way we can talk through the solution and discuss if a change
+that large is even needed! This overall will produce a quicker response to the
+change and likely produce code that aligns better with our process.
+
+#### Reviews & Approvals
+
+All pull requests must be reviewed and approved by at least one Vector team
+member. The review process is outlined in the [Review guide](REVIEWING.md).
+
+#### Merge Style
+
+All pull requests are squashed and merged. We generally discourage large pull
 requests that are over 300-500 lines of diff. If you would like to propose
 a change that is larger we suggest coming onto our gitter channel and
 discuss it with one of our engineers. This way we can talk through the
@@ -153,11 +182,12 @@ updated versions of Vector through various channels.
 * [`/benches`](/benches) - Internal benchmarks.
 * [`/config`](/config) - Public facing Vector config, included in releases.
 * [`/distribution`](/distribution) - Distribution artifacts for various targets.
-* [`/docs`](/docs) - https://vector.dev/docs/ source.
 * [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 * [`/proto`](/proto) - Protobuf definitions.
 * [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
+* [`/src`](/src) - Vector source.
 * [`/tests`](/tests) - Various high-level test cases.
+* [`/website`](/website) - Website and documentation files.
 
 #### Makefile
 
@@ -200,17 +230,21 @@ Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
 automatically generated via the `make release` command. This is made possible
 by the use of [conventional commit](#what-is-conventioonal-commits) titles.
 
-### Building a sink
+### Dependencies
 
-#### Healthchecks
+Dependencies should be _carefully_ selected and avoided if possible. You can
+see how dependencies are reviewed in the
+[Reviewing guide](/REVIEWING.md#dependencies)
+
+### Guidelines
+
+#### Sink Healthchecks
 
 Sinks may implement a healthcheck as a means for validating their configuration
 against the envionment and external systems. Ideally, this allows the system to
 inform users of problems such as insufficient credentials, unreachable
 endpoints, non-existant tables, etc. They're not perfect, however, since it's
 impossible to exhaustively check for issues that may happen at runtime.
-
-##### Guidelines for writing healthchecks
 
 When implementing healthchecks, we prefer false positives to false negatives.
 This means we would prefer that a healthcheck pass and the sink then fail than
@@ -280,47 +314,27 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 ### Benchmarking
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
-run benchmarks via the `make benchmarks` command.
+run benchmarks via the `make benchmarks` command. In addition, Vector
+maintains a full [test hardness][urls.vector_test_harness] for complex
+end-to-end integration and performance testing.
 
-## FAQ
+## Security
 
-### What is conventional commits?
+Please see the [`SECURITY.md` file](/security.md).
 
-[Conventional commits](https://www.conventionalcommits.org) is a standardized
-format for commit messages. Vector only requires this format for commits on
-the `master` branch. And because Vector squashes commits before merging
-branches, this means that only the pull request title must conform to this
-format. Vector performs a pull request check to verify the pull request title
-in case you forget.
+## Legal
 
-### Do I need to update the changelog?
+To protect all users of Vector, the follow legal requirements are made.
 
-Nope! This is one of the primary reasons we use the conventional commits style.
-Before releasing Vector we'll automatically generate a changelog for the
-release.
+### DCO
 
-### What is a DCO?
-
-DCO stands for Developer Certificate of Origin and is maintained by the
+Vector requires all contributors to agree to the DCO. DCO stands for Developer
+Certificate of Origin and is maintained by the
 [Linux Foundation](https://www.linuxfoundation.org). It is an attestation
 attached to every commit made by every developer. It ensures that all committed
 code adheres to the [Vector license](LICENSE.md) (Apache 2.0).
 
-### Why does Vector adopt the DCO?
-
-To protect the users of Vector. It ensures that all Vector contributors, and
-committed code, agree to the [Vector license](LICENSE.md).
-
-### Why a DCO instead of a CLA?
-
-It's simpler, clearer, and still protects users of Vector. We believe the DCO
-more accurately embodies the principles of open-source. More info can be found
-here:
-
-* [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
-* [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
-
-### What about trivial changes?
+#### Trivial changes
 
 Trivial changes, such as spelling fixes, do not need to be signed.
 
@@ -337,6 +351,15 @@ open source, with all the legal rights that implies, but it is the open source
 license that provides this. The Apache License provides very generous
 copyright permissions from contributors, and contributors explicitly grant
 patent licenses as well. These rights are granted to everyone.
+
+### Why a DCO instead of a CLA?
+
+It's simpler, clearer, and still protects users of Vector. We believe the DCO
+more accurately embodies the principles of open-source. More info can be found
+here:
+
+* [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
+* [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
 
 ### If I’m contributing while an employee, do I still need my employer to sign something?
 

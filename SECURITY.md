@@ -1,31 +1,218 @@
 # Security Policy
 
+---
+
+<p align="center">
+  <strong>Reporting a vulnerability? See the ["Vulnerability Reporting" section](#vulnerability-reporting)</strong>
+</p>
+
+---
+
 We understand that many users place a high level of trust in Vector to collect
 and ship mission critical data. The security of Vector is a top priority.
 That's why we apply widely accepted best practices when it comes to security.
+This document will describe these practices and aims to be as transparent as
+possible on our security efforts.
 
-## Technical Measures
+<!-- MarkdownTOC -->
 
-The base of Vector's security lies in our choice of underlying technology. The
-Rust programming language is memory safe and will catch many common sources of
-vulnerabilities at compile time. On top of the language itself, we routinely
-employ security-oriented techniques like fuzz testing to probe our code for
-other sources of potential vulnerabilities. To cover our dependencies, we have
-tooling that automatically checks each library we depend on against a database
-of known vulnerabilities. If it finds we are including a vulnerable version of
-a library, we are notified so that we can evaluate the effect and take
-appropriate action.
+- Project Structure
+  - Transparency
+    - Open Source
+    - Workflow
+  - Version Control
+    - Git
+    - Signed Commits
+    - Protected Branches
+- Personnel
+  - Background Checks
+  - Education
+  - Policies
+  - Two-factor Authentication
+- Development
+  - Design & Architecture
+    - Rust
+    - Unsafe Code
+    - User Privileges
+  - Dependencies
+  - Change Control
+    - Pull Requests
+    - Reviews & Approvals
+    - Merge Policies
+    - Automated Checks
+      - Vulnerability Scans
+      - Fuzz Testing
+- Building & Releasing
+  - Network Security
+  - Runtime Isolation
+  - Asset Encryption
+  - Asset Audit Logging
+  - Asset Signatures & Checksums
+- Vulnerability Reporting
 
-## Change Control
+<!-- /MarkdownTOC -->
 
-In addition to those technology choices, we employ a change control and release
-process to secure our builds and artifact distribution. First, all code changes
-go through a Pull Request process where they are approved by at least one member
-of the Vector team that was not involved in authoring the change (in exceptional
-circumstances, this approval can be retroactive). This helps to ensure the
-integrity of the code base itself. We then use automated tooling to build and
-distribute the Vector installable artifacts, ensuring they include only
-authorized changes.
+## Project Structure
+
+Project structure plays an important role in security. It creates gaurdrails
+that prevent common security issues. This section will outline our deliberate
+structural decisions that impact security.
+
+### Transparency
+
+We believe transparency is a strong deterrent of nefarious behavior that could
+otherwise undermine security.
+
+#### Open Source
+
+Vector and it's dependencies are open source. All code and changes are publicly
+available at [our Github repo][urls.vector_repo]. While the transparent nature
+open source helps to improve security, so does the large colalborative
+community behind Vector.
+
+#### Workflow
+
+All of Vector's workflow is transparent.
+[Pull requests][urls.vector_pull_requests], [issues][urls.vector_issues],
+[chats][urls.vector_chat], and [our roadmap][urls.vector_roadmap]
+are all publicly available.
+
+### Version Control
+
+Version control ensures that all code changes are audited and authentic.
+
+#### Git
+
+Vector leverages the [Git][urls.git] version-control system. This ensures all
+changes are audited and traceable.
+
+#### Signed Commits
+
+All commits within Vector must be cryptographically signed. This ensures all
+commits are verified, trusted, and authentic.
+
+#### Protected Branches
+
+Vector cuts releases from the `master` and `v*` branches _only_. These branches
+are [protected][urls.github_protected]. The exact requirements are:
+
+* Cannot be deleted.
+* Force pushes are not allowed.
+* A linear history is required.
+* Signed commits are required.
+* Administrators are included in these checks.
+
+## Personnel
+
+### Background Checks
+
+All Vector team members undergo background checks before access is permitted.
+
+### Education
+
+Vector team members are required to review this security document as well as
+the [contributing](CONTRIBUTING.md) and [reviewing](REVIEWING.md) documents.
+
+### Policies
+
+Vector maintains this security policy. Changed are communicated to all Vector
+team members.
+
+### Two-factor Authentication
+
+All Vector team members are required to enable two-factor authentication
+on their work machines as well as their Github accounts.
+
+## Development
+
+### Design & Architecture
+
+The base of Vector's security lies in our choice of underlying technology and
+decisions around design and architecture.
+
+#### Rust
+
+The [Rust programming language][urls.rust] is memory and thread safe; it will
+catch many common sources of vulnerabilities at compile time.
+
+#### Unsafe Code
+
+Vector does not allow the use of unsafe code except in circumstances where it
+is required, such as dealing with CFFI.
+
+#### User Privileges
+
+Vector is always designed to run under non-`sudo` privileges, and our
+documentation always defaults to non-`sudo` use.
+
+### Dependencies
+
+Vector aims to reduce the number of dependencies it relies on. If a depency
+is added it goes through a comprehensive review process that is detailed in
+the [Reviewing guide](REVIEWING.md#dependencies).
+
+### Change Control
+
+As noted above Vector uses the Git version-control system on Github.
+
+#### Pull Requests
+
+All changes to Vector must go through a pull request review process.
+
+#### Reviews & Approvals
+
+All pull requests must be reviewed by at least one Vector team member. The
+review process takes into account many factors, all of which are detailed in
+our [Reviewing guide](REVIEWING.md). In exceptional circumstances, this
+approval can be retroactive.
+
+#### Merge Policies
+
+Vector requires pull requests to pass all [automated checks](#automated-checks).
+Once passed, the pull request must be squashed and merged. This creates a clean
+linear history with a Vector team member's co-sign.
+
+#### Automated Checks
+
+When possible, we'll create automated checks to enforce security policies.
+
+##### Vulnerability Scans
+
+Vector implements an automated [`cargo audit` check][urls.cargo_audit]. This
+is part of the [Rust Security advisory database][urls.rust_sec].
+
+##### Fuzz Testing
+
+Vector implements automated fuzz testing to probe our code for other sources
+of potential vulnerabilities.
+
+## Building & Releasing
+
+Vector takes care to secure the build and relase process to prevent unintended
+modifications.
+
+### Network Security
+
+All network traffic is secured via TLS and SSH. This includes checking out
+Vector's code from the relevant [protected branch](#protected-branches),
+Docker image retrieval, and publishment of Vector's release artifacts.
+
+### Runtime Isolation
+
+All builds run in an isolated sandboxes that are destroyed after each use.
+
+### Asset Encryption
+
+Vector's artifacts are stored on S3 with SSE encryption enabled.
+
+### Asset Audit Logging
+
+Changes to Vector's assets are logged through S3's audit logging feature.
+
+### Asset Signatures & Checksums
+
+All assets are signed with checksums allowing users to verify asset authenticity
+upon download. This verifies that assets have not been modified at rest.
 
 ## Vulnerability Reporting
 
