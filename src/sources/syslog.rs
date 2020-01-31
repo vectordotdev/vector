@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    event::{self, Event, Value},
+    event::{self, Atom, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 
@@ -11,9 +11,9 @@ use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::{collections::HashMap, net::SocketAddr};
 use syslog_rfc5424::{self, message::ProcId::*, SyslogMessage};
 use tokio::{
     self,
@@ -243,18 +243,20 @@ fn insert_fields_from_rfc5424(event: &mut Event, parsed: SyslogMessage) {
     }
 
     for (id, data) in parsed.sd.iter() {
+        let mut map: HashMap<Atom, Value> = HashMap::new();
         for (name, value) in data.iter() {
-            let key = format!("{}.{}", id, name);
-            log.insert(key, value.clone());
+            map.insert(Atom::from(name.clone()), Value::from(value.clone()));
         }
+        log.insert(id.clone(), Value::from(map));
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::{event_from_str, SyslogConfig};
-    use crate::event::{self, Event};
+    use crate::event::{self, Atom, Event, Value};
     use chrono::TimeZone;
+    use std::collections::HashMap;
 
     #[test]
     fn config_tcp() {
@@ -315,11 +317,16 @@ mod test {
             );
             expected.insert("host", "74794bfb6795");
 
-            expected.insert("meta.sequenceId", "1");
-            expected.insert("meta.sysUpTime", "37");
-            expected.insert("meta.language", "EN");
-            expected.insert("origin.software", "test");
-            expected.insert("origin.ip", "192.168.0.1");
+            let mut meta: HashMap<Atom, Value> = HashMap::new();
+            meta.insert(Atom::from("sequenceId"), Value::from("1"));
+            meta.insert(Atom::from("sysUpTime"), Value::from("37"));
+            meta.insert(Atom::from("language"), Value::from("EN"));
+            expected.insert(Atom::from("meta"), Value::from(meta));
+
+            let mut origin: HashMap<Atom, Value> = HashMap::new();
+            origin.insert(Atom::from("software"), Value::from("test"));
+            origin.insert(Atom::from("ip"), Value::from("192.168.0.1"));
+            expected.insert(Atom::from("origin"), Value::from(origin));
 
             expected.insert("severity", "notice");
             expected.insert("facility", "user");

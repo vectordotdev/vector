@@ -180,7 +180,7 @@ impl Serialize for Value {
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
             Value::Timestamp(t) => {
-                serializer.serialize_str(&t.to_rfc3339_opts(SecondsFormat::Nanos, true))
+                serializer.serialize_str(&t.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
@@ -233,6 +233,18 @@ impl From<f32> for Value {
 impl From<f64> for Value {
     fn from(value: f64) -> Self {
         Value::Float(value)
+    }
+}
+
+impl From<HashMap<Atom, Value>> for Value {
+    fn from(value: HashMap<Atom, Value>) -> Self {
+        Value::Map(value)
+    }
+}
+
+impl From<Vec<Value>> for Value {
+    fn from(value: Vec<Value>) -> Self {
+        Value::Array(value)
     }
 }
 
