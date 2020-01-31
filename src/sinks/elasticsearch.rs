@@ -1,7 +1,7 @@
 use crate::{
     dns::Resolver,
     event::Event,
-    region::{self, RegionOrEndpoint},
+    region::RegionOrEndpoint,
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
@@ -36,11 +36,7 @@ pub struct ElasticSearchConfig {
     pub compression: Option<Compression>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
-    // TODO: This should be an Option, but when combined with flatten we never seem to get back
-    // a None. For now, we get optionality by handling the error during parsing when nothing is
-    // passed. See https://github.com/timberio/vector/issues/1160
-    #[serde(flatten)]
-    pub region: RegionOrEndpoint,
+    pub aws: Option<RegionOrEndpoint>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub auth: Option<ElasticSearchAuth>,
@@ -100,7 +96,7 @@ impl SinkConfig for ElasticSearchConfig {
 pub struct ElasticSearchCommon {
     pub base_url: String,
     authorization: Option<String>,
-    region: Option<Region>,
+    aws_region: Option<Region>,
     credentials: Option<AwsCredentials>,
     tls_settings: TlsSettings,
 }
@@ -129,10 +125,12 @@ impl ElasticSearchCommon {
             _ => None,
         };
 
-        let region: Option<Region> = match (&config.region).try_into() {
-            Ok(region) => Some(region),
-            Err(region::ParseError::MissingRegionAndEndpoint) => None,
-            Err(error) => return Err(error.into()),
+        let aws_region: Option<Region> = match config.aws.as_ref() {
+            Some(region) => match region.try_into() {
+                Ok(region) => Some(region),
+                Err(error) => return Err(error.into()),
+            },
+            None => None,
         };
 
         // let provider = config.provider.unwrap_or(Provider::Default);
@@ -142,7 +140,7 @@ impl ElasticSearchCommon {
                 Some(ref host) => host.clone(),
                 None => return Err(ParseError::DefaultRequiresHost.into()),
             },
-            Some(ElasticSearchAuth::Aws) => match region {
+            Some(ElasticSearchAuth::Aws) => match aws_region {
                 None => return Err(ParseError::AWSRequiresRegion.into()),
                 Some(ref region) => match region {
                     // Adapted from rusoto_core::signature::build_hostname, which is unfortunately not pub
@@ -182,7 +180,7 @@ impl ElasticSearchCommon {
         Ok(Self {
             base_url,
             authorization,
-            region,
+            aws_region,
             credentials,
             tls_settings,
         })
@@ -263,7 +261,7 @@ fn es(
                     let mut request = SignedRequest::new(
                         "POST",
                         "es",
-                        common.region.as_ref().unwrap(),
+                        common.aws_region.as_ref().unwrap(),
                         uri.path(),
                     );
                     request.set_hostname(uri.host().map(|s| s.into()));
@@ -347,7 +345,7 @@ fn healthcheck(
         }
         Some(credentials) => {
             let mut signer =
-                SignedRequest::new("GET", "es", common.region.as_ref().unwrap(), uri.path());
+                SignedRequest::new("GET", "es", common.aws_region.as_ref().unwrap(), uri.path());
             signer.set_hostname(uri.host().map(|s| s.into()));
             finish_signer(&mut signer, &credentials, &mut builder);
         }
