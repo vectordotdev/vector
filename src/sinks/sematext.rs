@@ -45,7 +45,7 @@ impl SinkConfig for SematextConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let mut host = match &self.cloud {
             Cloud::NorthAmerica => "https://logsene-receiver.sematext.com".to_string(),
-            Cloud::Europe => "https://logsene-receiver.sematext.com".to_string(),
+            Cloud::Europe => "https://logsene-receiver.eu.sematext.com".to_string(),
         };
 
         // Test workaround for settings a custom host so we can test the body manually

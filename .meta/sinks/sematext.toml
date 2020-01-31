@@ -23,7 +23,7 @@ write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][ur
 type = "string"
 required = true
 examples = ["north_america", "europe"]
-description = "The cloud destination to send logs too."
+description = "The cloud destination to send logs to."
 
 [sinks.sematext.options.token]
 type = "string"

@@ -303,7 +303,7 @@ The behavior when the buffer becomes full.
 
 ### cloud
 
-The cloud destination to send logs too.
+The cloud destination to send logs to.
 
 
 </Field>

@@ -4490,7 +4490,7 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The cloud destination to send logs too.
+  # The cloud destination to send logs to.
   #
   # * required
   # * type: string
