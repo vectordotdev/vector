@@ -244,252 +244,252 @@ module.exports = {
   "latest_release": {
     "commits": [
       {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-01-24 09:40:28 +0000",
+        "deletions_count": 2,
+        "description": "Fix typo",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Fix typo",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "eee9300712181a6be96f894952bca55290f68947",
+        "type": "docs"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-01-24 05:10:35 +0000",
+        "deletions_count": 3,
+        "description": "Wrap failing test in feature flag",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 2,
+        "message": "chore(testing): Wrap failing test in feature flag (#1595)",
+        "pr_number": 1595,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "e1f71a59ab4d3839297938e5937bb2c60722844f",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-01-24 13:17:59 +0000",
+        "deletions_count": 59,
+        "description": "Ensure that own logs are always ignored",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 53,
+        "message": "fix(docker source): Ensure that own logs are always ignored (#1525)",
+        "pr_number": 1525,
+        "scope": {
+          "category": "source",
+          "component_name": "docker",
+          "component_type": "source",
+          "name": "docker source"
+        },
+        "sha": "dada48a66c814c0fd3e031a709e07db4b81b3e71",
+        "type": "fix"
+      },
+      {
         "author": "Alexander Rodin",
         "breaking_change": false,
-        "date": "2020-01-22 17:53:08 +0000",
-        "deletions_count": 1,
-        "description": "Make sorting of blog posts stable",
-        "files_count": 1,
+        "date": "2020-01-24 15:55:58 +0000",
+        "deletions_count": 2,
+        "description": "Fix `release-github` CI job",
+        "files_count": 2,
         "group": "chore",
-        "insertions_count": 1,
-        "message": "chore(operations): Make sorting of blog posts stable (#1566)",
-        "pr_number": 1566,
+        "insertions_count": 4,
+        "message": "chore(operations): Fix `release-github` CI job (#1600)",
+        "pr_number": 1600,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
           "name": "operations"
         },
-        "sha": "e5096d0ad09333cdcbf7f7b8fdea71764c61b940",
+        "sha": "eae248d09318af9f14319ee42c5a81a800dcce44",
         "type": "chore"
       },
       {
         "author": "Alexander Rodin",
         "breaking_change": false,
-        "date": "2020-01-22 18:00:10 +0000",
-        "deletions_count": 1,
-        "description": "Add AWS API key for Windows tests in CI",
-        "files_count": 1,
+        "date": "2020-01-24 21:32:15 +0000",
+        "deletions_count": 6,
+        "description": "Fix `release-homebrew` CI job",
+        "files_count": 2,
         "group": "chore",
         "insertions_count": 5,
-        "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
-        "pr_number": 1565,
+        "message": "chore(operations): Fix `release-homebrew` CI job (#1601)",
+        "pr_number": 1601,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
           "name": "operations"
         },
-        "sha": "ed11b854a21f8f8f4d0b532d2b946ed0d3a91718",
+        "sha": "fca31a736b4056f2150b6e4abfcea1d87b5a97db",
         "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-01-25 15:21:53 +0000",
+        "deletions_count": 65,
+        "description": "Fix socket address documentation",
+        "files_count": 31,
+        "group": "docs",
+        "insertions_count": 76,
+        "message": "docs: Fix socket address documentation (#1607)",
+        "pr_number": 1607,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "bf1386cc151b130efde27c60122baa98b69cab61",
+        "type": "docs"
       },
       {
         "author": "Alexander Rodin",
         "breaking_change": false,
-        "date": "2020-01-22 18:00:26 +0000",
-        "deletions_count": 0,
-        "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
+        "date": "2020-01-31 18:30:48 +0000",
+        "deletions_count": 1,
+        "description": "Fix group creation in the RPM package",
         "files_count": 1,
-        "group": "chore",
+        "group": "fix",
         "insertions_count": 1,
-        "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
-        "pr_number": 1567,
+        "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
+        "pr_number": 1654,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "platforms"
+        },
+        "sha": "201b9584d5c48d6bd687fa98749d9ab7ec46376d",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-31 21:56:09 +0000",
+        "deletions_count": 2,
+        "description": "Bump version in `Cargo.toml` and `Cargo.lock`",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 2,
+        "message": "chore(operations): Bump version in `Cargo.toml` and `Cargo.lock`",
+        "pr_number": null,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
           "name": "operations"
         },
-        "sha": "e7bd9180249751dcef6299f4836b0a82274ec2f9",
+        "sha": "3245ad9c62ed4dcebb8482d8a9ac0fa045e44a1c",
         "type": "chore"
       },
       {
         "author": "Lucio Franco",
         "breaking_change": false,
-        "date": "2020-01-22 11:36:26 +0000",
-        "deletions_count": 1,
-        "description": "Fix crash when `in_flight_limit` is set to `1`",
-        "files_count": 1,
-        "group": "fix",
-        "insertions_count": 31,
-        "message": "fix(aws_s3 sink): Fix crash when `in_flight_limit` is set to `1` (#1569)",
-        "pr_number": 1569,
-        "scope": {
-          "category": "sink",
-          "component_name": "aws_s3",
-          "component_type": "sink",
-          "name": "aws_s3 sink"
-        },
-        "sha": "95373bd03fa70d2bcbcfa9c6b02550bcd65d0623",
-        "type": "fix"
-      },
-      {
-        "author": "Lucio Franco",
-        "breaking_change": false,
-        "date": "2020-01-22 19:30:47 +0000",
-        "deletions_count": 118,
-        "description": "Fix error when socket addresses do not use `IPV4` or `IPV6` addresses",
-        "files_count": 9,
-        "group": "fix",
-        "insertions_count": 117,
-        "message": "fix(socket sink): Fix error when socket addresses do not use `IPV4` or `IPV6` addresses (#1575)",
-        "pr_number": 1575,
-        "scope": {
-          "category": "sink",
-          "component_name": "socket",
-          "component_type": "sink",
-          "name": "socket sink"
-        },
-        "sha": "678be7404a236bb6f5e596d117f8cadd16e5a690",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-01-23 13:28:37 +0000",
-        "deletions_count": 22,
-        "description": "Fix `aws_kinesis_firehose` sink healthcheck",
-        "files_count": 1,
-        "group": "fix",
-        "insertions_count": 13,
-        "message": "fix(aws_kinesis_firehose sink): Fix `aws_kinesis_firehose` sink healthcheck (#1573)",
-        "pr_number": 1573,
-        "scope": {
-          "category": "sink",
-          "component_name": "aws_kinesis_firehose",
-          "component_type": "sink",
-          "name": "aws_kinesis_firehose sink"
-        },
-        "sha": "c7de358cb72d38bc82544ba2c42c01a96be77961",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-01-23 14:51:32 +0000",
-        "deletions_count": 53,
-        "description": "Escape special characters in options descriptions",
-        "files_count": 26,
-        "group": "chore",
-        "insertions_count": 53,
-        "message": "chore(website): Escape special characters in options descriptions (#1580)",
-        "pr_number": 1580,
-        "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "website"
-        },
-        "sha": "e5a3113f0ddfbcb08c6ce70dda374abbfdbc867d",
-        "type": "chore"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-01-23 19:44:22 +0000",
-        "deletions_count": 2,
-        "description": "Create `vector` user when installing RPM package",
-        "files_count": 1,
-        "group": "fix",
-        "insertions_count": 11,
-        "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
-        "pr_number": 1583,
-        "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "rpm platform"
-        },
-        "sha": "e1b6bc834a94066313c2de58e540845476289789",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-01-23 21:44:23 +0000",
-        "deletions_count": 5,
-        "description": "Support bug fixing releases",
+        "date": "2020-01-29 11:08:27 +0000",
+        "deletions_count": 39,
+        "description": "Disable kuberenetes tests in CI temporarily",
         "files_count": 2,
         "group": "chore",
-        "insertions_count": 18,
-        "message": "chore(operations): Support bug fixing releases (#1587)",
-        "pr_number": 1587,
+        "insertions_count": 35,
+        "message": "chore(testing): Disable kuberenetes tests in CI temporarily (#1629)",
+        "pr_number": 1629,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "operations"
+          "name": "testing"
         },
-        "sha": "dc3275705489d55e86d10f609fd5caf090b65f5d",
+        "sha": "87f0f732e988c936093477ce6fe630b4b830b61a",
         "type": "chore"
       },
       {
         "author": "Alexander Rodin",
         "breaking_change": false,
-        "date": "2020-01-23 22:26:44 +0000",
+        "date": "2020-01-31 22:16:51 +0000",
         "deletions_count": 1,
-        "description": "Add all generated files to the release commit",
+        "description": "Fix creation of the tag in `make release`",
         "files_count": 1,
         "group": "chore",
         "insertions_count": 1,
-        "message": "chore(operations): Add all generated files to the release commit (#1588)",
-        "pr_number": 1588,
+        "message": "chore(operations): Fix creation of the tag in `make release`",
+        "pr_number": null,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
           "name": "operations"
         },
-        "sha": "8287f0535d1ddd5e6fadaf1368623dbe3d7579b0",
+        "sha": "c1b8f5ee96de2503cd10d2967d33131d99189ac1",
         "type": "chore"
       },
       {
         "author": "Alexander Rodin",
         "breaking_change": false,
-        "date": "2020-01-23 23:31:55 +0000",
-        "deletions_count": 2,
-        "description": "Do not require `systemd` as an RPM dependency",
+        "date": "2020-01-31 22:24:27 +0000",
+        "deletions_count": 1,
+        "description": "Use all tags in `make release`",
         "files_count": 1,
-        "group": "fix",
-        "insertions_count": 0,
-        "message": "fix(rpm platform): Do not require `systemd` as an RPM dependency (#1590)",
-        "pr_number": 1590,
-        "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "rpm platform"
-        },
-        "sha": "18b2d2f0d3b4f6df22883550dd106c2ec8c051d4",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-01-23 23:37:55 +0000",
-        "deletions_count": 0,
-        "description": "Add `release-push` target to the Makefile",
-        "files_count": 2,
         "group": "chore",
-        "insertions_count": 30,
-        "message": "chore(operations): Add `release-push` target to the Makefile (#1589)",
-        "pr_number": 1589,
+        "insertions_count": 1,
+        "message": "chore(operations): Use all tags in `make release`",
+        "pr_number": null,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
           "name": "operations"
         },
-        "sha": "d9052b84a872f6562dfd0318a6c6c887c92fda34",
+        "sha": "25d5fa64a565ac8ab26b5a10ddce9f24df1d5a62",
         "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-27 13:13:47 +0000",
+        "deletions_count": 73,
+        "description": "Improve 0.7.1 release notes",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 73,
+        "message": "docs: Improve 0.7.1 release notes",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "1020b033b2bb14ed2e135835abd4533ccd52f7ce",
+        "type": "docs"
       }
     ],
-    "compare_url": "https://github.com/timberio/vector/compare/v0.7.0...v0.7.1",
-    "date": "2020-01-23",
-    "deletions_count": 206,
+    "compare_url": "https://github.com/timberio/vector/compare/v0.7.1...v0.7.2",
+    "date": "2020-01-31",
+    "deletions_count": 114,
     "description": "",
-    "insertions_count": 281,
-    "last_version": "0.7.0",
+    "insertions_count": 104,
+    "last_version": "0.7.1",
     "posts": [
 
     ],
@@ -499,7 +499,7 @@ module.exports = {
     "upgrade_guides": [
 
     ],
-    "version": "0.7.1"
+    "version": "0.7.2"
   },
   "post_tags": [
     "type: announcement",
@@ -16743,6 +16743,266 @@ module.exports = {
 
       ],
       "version": "0.7.1"
+    },
+    "0.7.2": {
+      "commits": [
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-01-24 09:40:28 +0000",
+          "deletions_count": 2,
+          "description": "Fix typo",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Fix typo",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "eee9300712181a6be96f894952bca55290f68947",
+          "type": "docs"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-01-24 05:10:35 +0000",
+          "deletions_count": 3,
+          "description": "Wrap failing test in feature flag",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 2,
+          "message": "chore(testing): Wrap failing test in feature flag (#1595)",
+          "pr_number": 1595,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "e1f71a59ab4d3839297938e5937bb2c60722844f",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-01-24 13:17:59 +0000",
+          "deletions_count": 59,
+          "description": "Ensure that own logs are always ignored",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 53,
+          "message": "fix(docker source): Ensure that own logs are always ignored (#1525)",
+          "pr_number": 1525,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "dada48a66c814c0fd3e031a709e07db4b81b3e71",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-24 15:55:58 +0000",
+          "deletions_count": 2,
+          "description": "Fix `release-github` CI job",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 4,
+          "message": "chore(operations): Fix `release-github` CI job (#1600)",
+          "pr_number": 1600,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "eae248d09318af9f14319ee42c5a81a800dcce44",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-24 21:32:15 +0000",
+          "deletions_count": 6,
+          "description": "Fix `release-homebrew` CI job",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 5,
+          "message": "chore(operations): Fix `release-homebrew` CI job (#1601)",
+          "pr_number": 1601,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "fca31a736b4056f2150b6e4abfcea1d87b5a97db",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-25 15:21:53 +0000",
+          "deletions_count": 65,
+          "description": "Fix socket address documentation",
+          "files_count": 31,
+          "group": "docs",
+          "insertions_count": 76,
+          "message": "docs: Fix socket address documentation (#1607)",
+          "pr_number": 1607,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "bf1386cc151b130efde27c60122baa98b69cab61",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 18:30:48 +0000",
+          "deletions_count": 1,
+          "description": "Fix group creation in the RPM package",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
+          "pr_number": 1654,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "platforms"
+          },
+          "sha": "201b9584d5c48d6bd687fa98749d9ab7ec46376d",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 21:56:09 +0000",
+          "deletions_count": 2,
+          "description": "Bump version in `Cargo.toml` and `Cargo.lock`",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 2,
+          "message": "chore(operations): Bump version in `Cargo.toml` and `Cargo.lock`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "3245ad9c62ed4dcebb8482d8a9ac0fa045e44a1c",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-29 11:08:27 +0000",
+          "deletions_count": 39,
+          "description": "Disable kuberenetes tests in CI temporarily",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 35,
+          "message": "chore(testing): Disable kuberenetes tests in CI temporarily (#1629)",
+          "pr_number": 1629,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "87f0f732e988c936093477ce6fe630b4b830b61a",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 22:16:51 +0000",
+          "deletions_count": 1,
+          "description": "Fix creation of the tag in `make release`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Fix creation of the tag in `make release`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "c1b8f5ee96de2503cd10d2967d33131d99189ac1",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 22:24:27 +0000",
+          "deletions_count": 1,
+          "description": "Use all tags in `make release`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Use all tags in `make release`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "25d5fa64a565ac8ab26b5a10ddce9f24df1d5a62",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-27 13:13:47 +0000",
+          "deletions_count": 73,
+          "description": "Improve 0.7.1 release notes",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 73,
+          "message": "docs: Improve 0.7.1 release notes",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "1020b033b2bb14ed2e135835abd4533ccd52f7ce",
+          "type": "docs"
+        }
+      ],
+      "compare_url": "https://github.com/timberio/vector/compare/v0.7.1...v0.7.2",
+      "date": "2020-01-31",
+      "deletions_count": 114,
+      "description": "",
+      "insertions_count": 104,
+      "last_version": "0.7.1",
+      "posts": [
+
+      ],
+      "subtitle": "",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
+      "upgrade_guides": [
+
+      ],
+      "version": "0.7.2"
     }
   },
   "sinks": {
