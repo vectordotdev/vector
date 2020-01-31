@@ -464,7 +464,7 @@ mod tests {
     fn host_is_not_required_for_aws() {
         let result = parse_config(
             r#"
-            region = "us-east-1"
+            aws.region = "us-east-1"
 
             [auth]
             strategy = "aws"

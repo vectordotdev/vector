@@ -605,7 +605,7 @@ fn parses_sink_full_es_aws() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        region = "us-east-1"
+        aws.region = "us-east-1"
 
         [sinks.out.auth]
         strategy = "aws"
