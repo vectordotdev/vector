@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         tls::{TlsOptions, TlsSettings},
-        Batch, BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
+        Batch, BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -36,9 +36,9 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
-    pub uri: String,
+    pub uri: UriSerde,
     pub method: Option<HttpMethod>,
-    pub healthcheck_uri: Option<String>,
+    pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
@@ -48,13 +48,6 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-
-    // A parsed uri used once the original uri field has been
-    // parsed to allow access to the uri in `HttpSink::build_request`
-    // without having to have that function parse the uri each time. Users
-    // should not be able to construct this type and it has a default impl.
-    #[serde(skip)]
-    pub uri__: Option<Uri>,
 }
 
 lazy_static! {
@@ -97,7 +90,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let mut config = self.clone();
 
-        config.uri__ = Some(build_uri(&config.uri.clone())?);
+        config.uri = build_uri(config.uri.clone()).into();
         let gzip = match config.compression.unwrap_or(Compression::None) {
             Compression::None => false,
             Compression::Gzip => true,
@@ -187,11 +180,8 @@ impl HttpSink for HttpSinkConfig {
 
         builder.method(method);
 
-        builder.uri(
-            self.uri__
-                .clone()
-                .expect("Inner uri was not set, this is a bug!"),
-        );
+        let uri: Uri = self.uri.clone().into();
+        builder.uri(uri);
 
         match self.encoding {
             Encoding::Text => builder.header("Content-Type", "text/plain"),
@@ -225,12 +215,12 @@ impl HttpSink for HttpSinkConfig {
 }
 
 fn healthcheck(
-    uri: String,
+    uri: UriSerde,
     auth: Option<Auth>,
     resolver: Resolver,
     tls_settings: TlsSettings,
 ) -> crate::Result<super::Healthcheck> {
-    let uri = build_uri(&uri)?;
+    let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
@@ -265,9 +255,9 @@ fn validate_headers(headers: &Option<IndexMap<String, String>>) -> crate::Result
     Ok(())
 }
 
-fn build_uri(raw: &str) -> crate::Result<Uri> {
-    let base: Uri = raw.parse().context(super::UriParseError)?;
-    Ok(Uri::builder()
+fn build_uri(base: UriSerde) -> Uri {
+    let base: Uri = base.into();
+    Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))
         .authority(
             base.authority_part()
@@ -276,7 +266,7 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
         )
         .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
         .build()
-        .expect("bug building uri"))
+        .expect("bug building uri")
 }
 
 #[cfg(test)]
