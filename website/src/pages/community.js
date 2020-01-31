@@ -38,11 +38,11 @@ function Community() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/timberdotio" target="_blank" className="panel panel--link text--center">
+                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel panel--link text--center">
                   <div className="panel--icon">
                     <i className="feather icon-twitter" title="Twitter"></i>
                   </div>
-                  <div className="panel--title">@timberdotio via <code>#vectordev</code></div>
+                  <div className="panel--title">@vectordotdev</div>
                   <div className="panel--description">Follow us in real-time</div>
                 </a>
               </div>
