@@ -21,7 +21,7 @@ impl<'a> Deserialize<'a> for UriSerde {
     where
         D: Deserializer<'a>,
     {
-        deserializer.deserialize_string(UriVisitor)
+        deserializer.deserialize_str(UriVisitor)
     }
 }
 
@@ -37,10 +37,10 @@ impl<'a> Visitor<'a> for UriVisitor {
     type Value = UriSerde;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a string containing a HTTP")
+        write!(f, "a string containing a valid HTTP Uri")
     }
 
-    fn visit_string<E>(self, s: String) -> Result<Self::Value, E>
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
     where
         E: Error,
     {
