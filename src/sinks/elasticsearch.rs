@@ -484,7 +484,7 @@ mod tests {
     fn region_is_not_required_for_default() {
         let common = parse_config(r#"host = "https://example.com""#).unwrap();
 
-        assert_eq!(None, common.region);
+        assert_eq!(None, common.aws_region);
     }
 
     #[test]
@@ -601,7 +601,9 @@ mod integration_tests {
     fn insert_events_on_aws() {
         run_insert_tests(ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
+            aws: Some(RegionOrEndpoint::with_endpoint(
+                "http://localhost:4571".into(),
+            )),
             ..config()
         });
     }
