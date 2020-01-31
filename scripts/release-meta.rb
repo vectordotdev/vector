@@ -252,7 +252,7 @@ end
 
 title("Creating release meta file...")
 
-last_tag = `git describe --abbrev=0`.chomp
+last_tag = `git describe --tags --abbrev=0`.chomp
 last_version = Version.new(last_tag.gsub(/^v/, ''))
 commits = get_commits(last_version)
 new_version = get_new_version(last_version, commits)
