@@ -14,7 +14,6 @@ use vector::{runtime, sinks, sources, transforms};
 
 mod batch;
 mod buffering;
-mod event;
 mod files;
 mod http;
 mod lua;
@@ -38,7 +37,6 @@ criterion_main!(
     batch::batch,
     files::files,
     lua::lua,
-    event::event
 );
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
