@@ -654,7 +654,7 @@ mod integration_tests {
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(rec.into_log().unflatten()).unwrap())
+            .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
             let event = hit.into_document().unwrap();
