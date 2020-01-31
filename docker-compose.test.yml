@@ -8,11 +8,13 @@ services:
     environment:
       TARGET: x86_64-unknown-linux-musl
       FEATURES: default-musl
+      CARGO_TERM_COLOR: always
     volumes:
       - $PWD:$PWD
       - ./target/cargo/registry:/opt/rust/cargo/registry
       - ./target/cargo/git:/opt/rust/cargo/git
     working_dir: $PWD
+    user: $USER
     command: make build-archive
 
   package-deb:

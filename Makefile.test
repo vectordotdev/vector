@@ -7,6 +7,8 @@ all: verify
 # build artifacts
 
 build-archive:
+	# these dirs are created explictly to ensure that they have the current user as the owner
+	mkdir -p target/cargo/git target/cargo/registry
 	$(RUN) build-archive
 
 package-deb: build-archive
