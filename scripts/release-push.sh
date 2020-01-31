@@ -17,7 +17,7 @@ echo "Preparing the branch and the tag..."
 set -x
 git checkout -b v$version_minor 2>/dev/null || git checkout v$version_minor
 git merge --ff $current_branch_name
-git tag v$version
+git tag -a v$version -m v$version
 set +x
 
 echo "Pushing the branch and the tag..."

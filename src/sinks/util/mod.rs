@@ -5,7 +5,10 @@ pub mod retries;
 pub mod rusoto;
 pub mod service;
 pub mod tcp;
+#[cfg(test)]
+pub mod test;
 pub mod tls;
+pub mod uri;
 
 use crate::buffers::Acker;
 use futures::{
@@ -20,6 +23,7 @@ pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
+pub use uri::UriSerde;
 
 pub trait SinkExt<T>
 where
@@ -215,7 +219,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::BatchServiceSink;
     use crate::buffers::Acker;
     use crate::runtime::Runtime;

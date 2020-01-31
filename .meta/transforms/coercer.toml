@@ -8,6 +8,16 @@ output_types = ["log"]
 resources = []
 types_coercion = true
 
+[transforms.coercer.options.drop_unspecified]
+type = "bool"
+required = false
+default = false
+description = """\
+Set to `true` to drop all fields that are not specified in the `types` table. \
+Make sure both `message` and `timestamp` are specified in the `types` table \
+as their absense will cause the original message data to be dropped along \
+with other extraneous fields.\
+"""
 
 [[transforms.coercer.output.log.examples]]
 label = "Generic"

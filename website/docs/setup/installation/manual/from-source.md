@@ -69,7 +69,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -195,7 +195,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 

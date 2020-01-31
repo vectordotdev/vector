@@ -2,6 +2,7 @@
 .DEFAULT_GOAL := help
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
+export USE_DOCKER ?= true
 
 
 help:
@@ -27,32 +28,27 @@ build: ## Build the project
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors (only default features)
-	@cargo check --all --all-targets
+	@scripts/run.sh checker cargo check --all --all-targets
 
 check-fmt: ## Checks code formatting correctness
-	@scripts/check-style.sh
-	@cargo fmt -- --check
+	@scripts/run.sh checker scripts/check-style.sh
+	@scripts/run.sh checker cargo fmt -- --check
 
 check-generate: ## Checks for pending `make generate` changes
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/check-generate.sh
+	@scripts/run.sh checker scripts/check-generate.sh
 
 check-examples: ## Validates the config examples
 	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-version: ## Checks that the version in Cargo.toml is up-to-date
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/check-version.rb
+	@scripts/run.sh checker scripts/check-version.rb
 
 check-blog: ## Checks that all blog articles are signed by their authors
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/check-blog-signatures.rb
+	@scripts/run.sh checker scripts/check-blog-signatures.rb
 
-CHECK_URLS=false
-export CHECK_URLS
+export CHECK_URLS ?= false
 generate: ## Generates files across the repo using the data in /.meta
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/generate.rb
+	@scripts/run.sh checker scripts/generate.rb
 
 fmt: ## Format code
 	@scripts/check-style.sh --fix

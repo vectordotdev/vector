@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.7.1<a/>
+    <a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download 0.7.2<a/>
   </strong>
 </p>
 
@@ -60,7 +60,7 @@ of your observability data with Vector.
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [6 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [12 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [gcp_stackdriver_logging][docs.sinks.gcp_stackdriver_logging], [http][docs.sinks.http], and [14 more...][docs.sinks]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [gcp_stackdriver_logging][docs.sinks.gcp_stackdriver_logging], [http][docs.sinks.http], and [15 more...][docs.sinks]
 
 #### Administration
 
@@ -72,7 +72,7 @@ of your observability data with Vector.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [twitter][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.7.1 (latest)][urls.v0.7.1]
+* [**Releases**][urls.vector_releases] - [v0.7.2 (latest)][urls.v0.7.2]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -198,12 +198,12 @@ Or use your own [preferred method][docs.installation].
 [urls.mailing_list]: https://vector.dev/community/
 [urls.rust]: https://www.rust-lang.org/
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.7.1]: https://vector.dev/releases/0.7.1/download
+[urls.v0.7.2]: https://vector.dev/releases/0.7.2/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
-[urls.vector_twitter]: https://twitter.com/timberdotio
+[urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

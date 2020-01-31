@@ -11,6 +11,12 @@ github = "https://github.com/loony-bean"
 name = "Alexey"
 
 [[team]]
+id = "ana"
+avatar = "https://github.com/hoverbear.png"
+github = "https://github.com/hoverbear"
+name = "Ana"
+
+[[team]]
 id = "ashley"
 avatar = "https://github.com/Jeffail.png"
 github = "https://github.com/Jeffail"

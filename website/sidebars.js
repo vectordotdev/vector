@@ -226,6 +226,8 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
+              "reference/sinks/sematext",
+            
               "reference/sinks/socket",
             
               "reference/sinks/splunk_hec",

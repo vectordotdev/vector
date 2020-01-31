@@ -2,13 +2,13 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        http::{https_client, Auth, HttpRetryLogic, HttpService},
+        http::{https_client, Auth, BatchedHttpSink, HttpSink},
         tls::{TlsOptions, TlsSettings},
-        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        Batch, BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, stream::iter_ok, Future, Sink};
+use futures::{future, Future};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -36,9 +36,9 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
-    pub uri: String,
+    pub uri: UriSerde,
     pub method: Option<HttpMethod>,
-    pub healthcheck_uri: Option<String>,
+    pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
@@ -87,7 +87,27 @@ impl SinkConfig for HttpSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let sink = http(self.clone(), cx.clone(), tls.clone())?;
+
+        let mut config = self.clone();
+
+        config.uri = build_uri(config.uri.clone()).into();
+        let gzip = match config.compression.unwrap_or(Compression::None) {
+            Compression::None => false,
+            Compression::Gzip => true,
+        };
+        let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let sink = BatchedHttpSink::new(
+            config,
+            Buffer::new(gzip),
+            request,
+            batch,
+            Some(tls.clone()),
+            &cx,
+        );
+
+        let sink = Box::new(sink);
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
@@ -108,85 +128,99 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(
-    config: HttpSinkConfig,
-    cx: SinkContext,
-    tls_settings: TlsSettings,
-) -> crate::Result<super::RouterSink> {
-    let uri = build_uri(&config.uri)?;
+impl HttpSink for HttpSinkConfig {
+    type Input = <Buffer as Batch>::Input;
+    type Output = <Buffer as Batch>::Output;
 
-    let gzip = match config.compression.unwrap_or(Compression::None) {
-        Compression::None => false,
-        Compression::Gzip => true,
-    };
-    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
-    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+        let event = event.into_log();
 
-    let encoding = config.encoding.clone();
-    let headers = config.headers.clone();
-    let basic_auth = config.auth.clone();
-    let method = config.method.clone().unwrap_or(HttpMethod::Post);
-
-    let http_service = HttpService::builder(cx.resolver())
-        .tls_settings(tls_settings)
-        .build(move |mut body: Vec<u8>| {
-            let mut builder = hyper::Request::builder();
-
-            let method = match method {
-                HttpMethod::Post => Method::POST,
-                HttpMethod::Put => Method::PUT,
-            };
-
-            builder.method(method);
-
-            builder.uri(uri.clone());
-
-            match encoding {
-                Encoding::Text => builder.header("Content-Type", "text/plain"),
-                Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
-                Encoding::Json => {
-                    body.insert(0, b'[');
-                    body.pop(); // remove trailing comma from last record
-                    body.push(b']');
-                    builder.header("Content-Type", "application/json")
-                }
-            };
-
-            if gzip {
-                builder.header("Content-Encoding", "gzip");
-            }
-
-            if let Some(headers) = &headers {
-                for (header, value) in headers.iter() {
-                    builder.header(header.as_str(), value.as_str());
+        let body = match &self.encoding {
+            Encoding::Text => {
+                if let Some(v) = event.get(&event::MESSAGE) {
+                    let mut b = v.to_string_lossy().into_bytes();
+                    b.push(b'\n');
+                    b
+                } else {
+                    warn!(
+                        message = "Event missing the message key; Dropping event.",
+                        rate_limit_secs = 30,
+                    );
+                    return None;
                 }
             }
 
-            let mut request = builder.body(body).unwrap();
-
-            if let Some(auth) = &basic_auth {
-                auth.apply(&mut request);
+            Encoding::Ndjson => {
+                let mut b = serde_json::to_vec(&event.unflatten())
+                    .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                    .ok()?;
+                b.push(b'\n');
+                b
             }
 
-            request
-        });
+            Encoding::Json => {
+                let mut b = serde_json::to_vec(&event.unflatten())
+                    .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                    .ok()?;
+                b.push(b',');
+                b
+            }
+        };
 
-    let encoding = config.encoding;
-    let sink = request
-        .batch_sink(HttpRetryLogic, http_service, cx.acker())
-        .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+        Some(body)
+    }
 
-    Ok(Box::new(sink))
+    fn build_request(&self, mut body: Self::Output) -> http::Request<Vec<u8>> {
+        let mut builder = hyper::Request::builder();
+
+        let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+            HttpMethod::Post => Method::POST,
+            HttpMethod::Put => Method::PUT,
+        };
+
+        builder.method(method);
+
+        let uri: Uri = self.uri.clone().into();
+        builder.uri(uri);
+
+        match self.encoding {
+            Encoding::Text => builder.header("Content-Type", "text/plain"),
+            Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+            Encoding::Json => {
+                body.insert(0, b'[');
+                body.pop(); // remove trailing comma from last record
+                body.push(b']');
+                builder.header("Content-Type", "application/json")
+            }
+        };
+
+        if let Some(Compression::Gzip) = &self.compression {
+            builder.header("Content-Encoding", "gzip");
+        }
+
+        if let Some(headers) = &self.headers {
+            for (header, value) in headers.iter() {
+                builder.header(header.as_str(), value.as_str());
+            }
+        }
+
+        let mut request = builder.body(body).unwrap();
+
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
+
+        request
+    }
 }
 
 fn healthcheck(
-    uri: String,
+    uri: UriSerde,
     auth: Option<Auth>,
     resolver: Resolver,
     tls_settings: TlsSettings,
 ) -> crate::Result<super::Healthcheck> {
-    let uri = build_uri(&uri)?;
+    let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
@@ -221,9 +255,9 @@ fn validate_headers(headers: &Option<IndexMap<String, String>>) -> crate::Result
     Ok(())
 }
 
-fn build_uri(raw: &str) -> crate::Result<Uri> {
-    let base: Uri = raw.parse().context(super::UriParseError)?;
-    Ok(Uri::builder()
+fn build_uri(base: UriSerde) -> Uri {
+    let base: Uri = base.into();
+    Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))
         .authority(
             base.authority_part()
@@ -232,45 +266,7 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
         )
         .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
         .build()
-        .expect("bug building uri"))
-}
-
-fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
-    let event = event.into_log();
-
-    let body = match encoding {
-        Encoding::Text => {
-            if let Some(v) = event.get(&event::MESSAGE) {
-                let mut b = v.to_string_lossy().into_bytes();
-                b.push(b'\n');
-                b
-            } else {
-                warn!(
-                    message = "Event missing the message key; Dropping event.",
-                    rate_limit_secs = 30,
-                );
-                return None;
-            }
-        }
-
-        Encoding::Ndjson => {
-            let mut b = serde_json::to_vec(&event.unflatten())
-                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
-                .ok()?;
-            b.push(b'\n');
-            b
-        }
-
-        Encoding::Json => {
-            let mut b = serde_json::to_vec(&event.unflatten())
-                .map_err(|e| panic!("Unable to encode into JSON: {}", e))
-                .ok()?;
-            b.push(b',');
-            b
-        }
-    };
-
-    Some(body)
+        .expect("bug building uri")
 }
 
 #[cfg(test)]
@@ -280,6 +276,7 @@ mod tests {
         assert_downcast_matches,
         runtime::Runtime,
         sinks::http::HttpSinkConfig,
+        sinks::util::http::HttpSink,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkContext,
     };
@@ -296,7 +293,9 @@ mod tests {
         let encoding = Encoding::Text;
         let event = Event::from("hello world");
 
-        let bytes = encode_event(event, &encoding).unwrap();
+        let mut config = HttpSinkConfig::default();
+        config.encoding = encoding.clone();
+        let bytes = config.encode_event(event).unwrap();
 
         assert_eq!(bytes, Vec::from(&"hello world\n"[..]));
     }
@@ -306,7 +305,9 @@ mod tests {
         let encoding = Encoding::Ndjson;
         let event = Event::from("hello world");
 
-        let bytes = encode_event(event, &encoding).unwrap();
+        let mut config = HttpSinkConfig::default();
+        config.encoding = encoding.clone();
+        let bytes = config.encode_event(event).unwrap();
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
@@ -373,7 +374,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = http(config, cx, TlsSettings::default()).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -436,7 +437,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = http(config, cx, TlsSettings::default()).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -496,7 +497,7 @@ mod tests {
         let mut rt = Runtime::new().unwrap();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = http(config, cx, TlsSettings::default()).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
