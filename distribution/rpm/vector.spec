@@ -47,7 +47,7 @@ cp -a %{_builddir}/LICENSE %{buildroot}/LICENSE
 %post
 getent group %{_username} > /dev/null || groupadd -r %{_username}
 getent passwd %{_username} > /dev/null || \
-  useradd -r -d %{_sharedstatedir}/%{_name} -g  -s /sbin/nologin \
+  useradd -r -d %{_sharedstatedir}/%{_name} -g %{_username} -s /sbin/nologin \
   -c "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
 
