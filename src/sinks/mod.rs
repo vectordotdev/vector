@@ -18,6 +18,7 @@ pub mod http;
 pub mod kafka;
 pub mod new_relic_logs;
 pub mod prometheus;
+pub mod sematext;
 pub mod socket;
 pub mod splunk_hec;
 pub mod statsd;

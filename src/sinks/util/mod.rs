@@ -5,6 +5,8 @@ pub mod retries;
 pub mod rusoto;
 pub mod service;
 pub mod tcp;
+#[cfg(test)]
+pub mod test;
 pub mod tls;
 
 use crate::buffers::Acker;
@@ -215,7 +217,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::BatchServiceSink;
     use crate::buffers::Acker;
     use crate::runtime::Runtime;

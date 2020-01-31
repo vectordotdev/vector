@@ -1,4 +1,4 @@
-FROM ruby:2.6
+FROM ruby:2.7
 
 RUN apt-get update && \
   apt-get install -y \
@@ -13,7 +13,8 @@ RUN rustup component add rustfmt
 
 # Install Ruby dependencies
 ENV LC_ALL C.UTF-8
-RUN gem install bundler -v '~> 2.0.0'
-COPY checker/Gemfile Gemfile
+RUN gem install bundler -v '~> 2.1.4'
+COPY Gemfile Gemfile
+COPY Gemfile.lock Gemfile.lock
 RUN bundle install
 RUN rm Gemfile

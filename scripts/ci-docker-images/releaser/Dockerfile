@@ -1,4 +1,4 @@
-FROM ruby:2.6
+FROM ruby:2.7
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
@@ -38,7 +38,8 @@ RUN apt-get remove docker docker-engine docker.io
 RUN apt-get update && apt-get install -y docker.io
 
 # Install gems to reduce setup time
-RUN gem install bundler -v '~> 2.0.0'
-COPY checker/Gemfile Gemfile
+RUN gem install bundler -v '~> 2.1.4'
+COPY Gemfile Gemfile
+COPY Gemfile.lock Gemfile.lock
 RUN bundle install
 RUN rm Gemfile
