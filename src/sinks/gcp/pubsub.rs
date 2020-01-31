@@ -1,26 +1,22 @@
+use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
-    sinks::util::{
-        http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
-        BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+    sinks::{
+        util::{
+            http::{https_client, HttpRetryLogic, HttpService},
+            tls::{TlsOptions, TlsSettings},
+            BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, RouterSink, UriParseError,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::{BufMut, BytesMut};
-use futures::{stream::iter_ok, Future, Sink, Stream};
-use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr, scopes::Scope};
+use futures::{stream::iter_ok, Future, Sink};
 use http::{Method, Uri};
-use hyper::{
-    header::{HeaderValue, AUTHORIZATION},
-    Body, Request,
-};
+use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
-use smpl_jwt::Jwt;
-use snafu::{ResultExt, Snafu};
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
-use tokio::timer::Interval;
+use snafu::ResultExt;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -28,8 +24,8 @@ pub struct PubsubConfig {
     pub project: String,
     pub topic: String,
     pub emulator_host: Option<String>,
-    pub api_key: Option<String>,
-    pub credentials_path: Option<String>,
+    #[serde(flatten)]
+    pub auth: GcpAuthConfig,
 
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -39,37 +35,17 @@ pub struct PubsubConfig {
     pub tls: Option<TlsOptions>,
 }
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("GCP pubsub sink requires one of api_key or credentials_path to be defined"))]
-    MissingAuth,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials { source: GOErr },
-    #[snafu(display("Invalid RSA key in GCP credentials"))]
-    InvalidRsaKey { source: GOErr },
-    #[snafu(display("Failed to get OAuth token"))]
-    GetTokenFailed { source: GOErr },
-}
-
 inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         // We only need to load the credentials if we are not targetting an emulator.
-        let creds = if self.emulator_host.is_none() {
-            if self.api_key.is_none() && self.credentials_path.is_none() {
-                return Err(BuildError::MissingAuth.into());
-            }
-
-            match self.credentials_path.as_ref() {
-                Some(path) => Some(PubsubCreds::new(path)?),
-                None => None,
-            }
-        } else {
-            None
+        let creds = match self.emulator_host {
+            None => self.auth.make_credentials(Scope::PubSub)?,
+            Some(_) => None,
         };
 
         let sink = self.service(&cx, &creds)?;
@@ -91,8 +67,8 @@ impl PubsubConfig {
     fn service(
         &self,
         cx: &SinkContext,
-        creds: &Option<PubsubCreds>,
-    ) -> crate::Result<super::RouterSink> {
+        creds: &Option<GcpCredentials>,
+    ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&Default::default());
 
@@ -127,8 +103,8 @@ impl PubsubConfig {
     fn healthcheck(
         &self,
         cx: &SinkContext,
-        creds: &Option<PubsubCreds>,
-    ) -> crate::Result<super::Healthcheck> {
+        creds: &Option<GcpCredentials>,
+    ) -> crate::Result<Healthcheck> {
         let uri = self.uri("")?;
         let mut request = Request::get(uri).body(Body::empty()).unwrap();
         if let Some(creds) = creds.as_ref() {
@@ -151,7 +127,7 @@ impl PubsubConfig {
                     creds.map(|creds| creds.spawn_regenerate_token());
                     Ok(())
                 }
-                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
             });
 
         Ok(Box::new(healthcheck))
@@ -166,69 +142,14 @@ impl PubsubConfig {
             "{}/v1/projects/{}/topics/{}{}",
             base, self.project, self.topic, suffix
         );
-        let uri = match &self.api_key {
+        let uri = match &self.auth.api_key {
             Some(key) => format!("{}?key={}", uri, key),
             None => uri,
         };
         uri.parse::<Uri>()
-            .context(super::UriParseError)
+            .context(UriParseError)
             .map_err(Into::into)
     }
-}
-
-#[derive(Clone)]
-struct PubsubCreds {
-    creds: Credentials,
-    token: Arc<RwLock<Token>>,
-}
-
-impl PubsubCreds {
-    fn new(path: &str) -> crate::Result<Self> {
-        let creds = Credentials::from_file(path).context(InvalidCredentials)?;
-        let jwt = make_jwt(&creds)?;
-        let token = goauth::get_token_with_creds(&jwt, &creds).context(GetTokenFailed)?;
-        let token = Arc::new(RwLock::new(token));
-        Ok(Self { creds, token })
-    }
-
-    fn apply<T>(&self, request: &mut Request<T>) {
-        let token = self.token.read().unwrap();
-        let value = format!("{} {}", token.token_type(), token.access_token());
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, HeaderValue::from_str(&value).unwrap());
-    }
-
-    fn regenerate_token(&self) -> crate::Result<()> {
-        let jwt = make_jwt(&self.creds).unwrap(); // Errors caught above
-        let token = goauth::get_token_with_creds(&jwt, &self.creds)?;
-        *self.token.write().unwrap() = token;
-        Ok(())
-    }
-
-    fn spawn_regenerate_token(&self) {
-        let interval = self.token.read().unwrap().expires_in() as u64 / 2;
-        let copy = self.clone();
-        let renew_task = Interval::new_interval(Duration::from_secs(interval))
-            .for_each(move |_instant| {
-                debug!("Renewing GCP pubsub token");
-                if let Err(error) = copy.regenerate_token() {
-                    error!(message = "Failed to update GCP pubsub token", %error);
-                }
-                Ok(())
-            })
-            .map_err(
-                |error| error!(message = "GCP pubsub token regenerate interval failed", %error),
-            );
-
-        tokio::spawn(renew_task);
-    }
-}
-
-fn make_jwt(creds: &Credentials) -> crate::Result<Jwt<JwtClaims>> {
-    let claims = JwtClaims::new(creds.iss(), &Scope::PubSub, creds.token_uri(), None, None);
-    let rsa_key = creds.rsa_key().context(InvalidRsaKey)?;
-    Ok(Jwt::new(claims, rsa_key, None))
 }
 
 const BODY_PREFIX: &str = "{\"messages\":[";
@@ -258,7 +179,7 @@ fn encode_event(event: Event) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_downcast_matches, event::LogEvent, test_util::runtime};
+    use crate::{event::LogEvent, test_util::runtime};
     use std::iter::FromIterator;
 
     #[test]
@@ -295,9 +216,11 @@ mod tests {
         "#,
         )
         .unwrap();
-        match config.build(SinkContext::new_test(runtime().executor())) {
-            Ok(_) => panic!("config.build failed to error"),
-            Err(err) => assert_downcast_matches!(err, BuildError, BuildError::MissingAuth),
+        if config
+            .build(SinkContext::new_test(runtime().executor()))
+            .is_ok()
+        {
+            panic!("config.build failed to error");
         }
     }
 }

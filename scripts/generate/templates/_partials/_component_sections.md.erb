@@ -67,6 +67,21 @@ The `address` option determines the address and port the data is made available
 on. You'll need to configure your networking so that the configured port is
 accessible by the downstream service doing the scraping.
 <%- end -%>
+<%- if component.sink? && component.service_provider?("Google") -%>
+### GCP Authentication
+
+GCP offers a [variety of authentication methods][urls.gcp_authentication] and
+Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
+and will find credentials in the following order:
+
+1. If the `credentials_path` option is set.
+2. If the `api_key` option is set.
+3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
+<%- end -%>
 <% if component.sink? && component.healthcheck? -%>
 
 ### Health Checks

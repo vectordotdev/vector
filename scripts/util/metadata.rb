@@ -30,7 +30,7 @@ class Metadata
   end
 
   attr_reader :blog_posts,
-  :env_vars,
+    :env_vars,
     :installation,
     :links,
     :log_fields,
@@ -116,6 +116,12 @@ class Metadata
     hash["sinks"].collect do |sink_name, sink_hash|
       sink_hash["name"] = sink_name
       sink_hash["posts"] = posts.select { |post| post.sink?(sink_name) }
+
+      (sink_hash["service_providers"] || []).each do |service_provider|
+        provider_hash = (hash["service_providers"] || {})[service_provider.downcase] || {}
+        sink_hash["env_vars"] = (sink_hash["env_vars"] || {}).merge((provider_hash["env_vars"] || {}).clone)
+        sink_hash["options"] = sink_hash["options"].merge((provider_hash["options"] || {}).clone)
+      end
 
       sink =
         case sink_hash.fetch("egress_method")

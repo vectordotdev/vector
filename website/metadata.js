@@ -17037,6 +17037,30 @@ module.exports = {
 
       ]
     },
+    "gcp_stackdriver_logging": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "gcp_stackdriver_logging_sink",
+      "name": "gcp_stackdriver_logging",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "Google"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -17120,6 +17144,30 @@ module.exports = {
       "function_category": "transmit",
       "id": "prometheus_sink",
       "name": "prometheus",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "sematext": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "sematext_sink",
+      "name": "sematext",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -17509,6 +17557,12 @@ module.exports = {
       "github": "https://github.com/loony-bean",
       "id": "alexey",
       "name": "Alexey"
+    },
+    {
+      "avatar": "https://github.com/hoverbear.png",
+      "github": "https://github.com/hoverbear",
+      "id": "ana",
+      "name": "Ana"
     },
     {
       "avatar": "https://github.com/Jeffail.png",

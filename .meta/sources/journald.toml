@@ -9,9 +9,12 @@ output_types = ["log"]
 resources = []
 through_description = "log records from journald"
 requirements = """\
-The `journald` source requires the presence of the `journalctl` binary. This \
-ensures that this source works across all platforms. For more information, \
-please see [issue 1473][urls.issue_1473].\
+1. The `journald` source requires the presence of the `journalctl` binary. \
+This ensures that this source works across all platforms. Please see the \
+["Communication strategy"](#communication-strategy) section for more info.
+2. If you run Vector from a non-root user, you need to add that user to the \
+`systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
+section for more info.\
 """
 
 [sources.journald.options.current_boot_only]
