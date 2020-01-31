@@ -129,8 +129,8 @@ impl SinkConfig for HttpSinkConfig {
 }
 
 impl HttpSink for HttpSinkConfig {
-    type Input = <Buffer as Batch>::Input;
-    type Output = <Buffer as Batch>::Output;
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let event = event.into_log();

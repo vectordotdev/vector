@@ -117,27 +117,6 @@ impl HttpService<Vec<u8>> {
     {
         Self::builder(resolver).build(request_builder)
     }
-
-    pub fn with_batched_encoded<R, E>(
-        cx: SinkContext,
-        request_settings: &TowerRequestSettings,
-        batch_settings: &BatchSettings,
-        request_builder: R,
-        encode_event: E,
-    ) -> crate::sinks::RouterSink
-    where
-        R: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-        E: Fn(Event) -> Option<Vec<u8>> + Sync + Send + 'static,
-    {
-        let svc = HttpService::new(cx.resolver(), request_builder);
-
-        let s = request_settings.batch_sink(HttpRetryLogic, svc, cx.acker());
-
-        let s = SinkExt::batched_with_min(s, Buffer::new(false), batch_settings)
-            .with_flat_map(move |event| iter_ok(encode_event(event)));
-
-        Box::new(s)
-    }
 }
 
 impl<B> HttpService<B> {
