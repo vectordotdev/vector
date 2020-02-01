@@ -37,8 +37,7 @@ class String
   end
 
   def humanize
-    self.
-      gsub(/_/, ' ').
+    ActiveSupport::Inflector.humanize(self).
       gsub(/\bansi\b/i, 'ANSI').
       gsub(/\baws\b/i, 'AWS').
       gsub(/\bcloudwatch\b/i, 'Cloudwatch').
