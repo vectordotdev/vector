@@ -895,8 +895,7 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos:
-          <<: *prerelease-filters
+      - verify-nixos
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
