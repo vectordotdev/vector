@@ -269,7 +269,7 @@ module.exports = {
         {
           type: 'link',
           label: 'Security',
-          href: '"https://github.com/timberio/vector/security/policy"'
+          href: 'https://github.com/timberio/vector/security/policy'
         },
       ],
     },
