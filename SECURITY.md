@@ -14,41 +14,41 @@ That's why we apply widely accepted best practices when it comes to security.
 This document will describe these practices and aims to be as transparent as
 possible on our security efforts.
 
-<!-- MarkdownTOC -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-- Project Structure
-  - Transparency
-    - Open Source
-    - Workflow
-  - Version Control
-    - Git
-    - Signed Commits
-    - Protected Branches
-- Personnel
-  - Background Checks
-  - Education
-  - Policies
-  - Two-factor Authentication
-- Development
-  - Design & Architecture
-    - Rust
-    - Unsafe Code
-    - User Privileges
-  - Dependencies
-  - Change Control
-    - Pull Requests
-    - Reviews & Approvals
-    - Merge Policies
-    - Automated Checks
-      - Vulnerability Scans
-      - Fuzz Testing
-- Building & Releasing
-  - Network Security
-  - Runtime Isolation
-  - Asset Encryption
-  - Asset Audit Logging
-  - Asset Signatures & Checksums
-- Vulnerability Reporting
+1. [Project Structure](#project-structure)
+   1. [Transparency](#transparency)
+      1. [Open Source](#open-source)
+      1. [Workflow](#workflow)
+   1. [Version Control](#version-control)
+      1. [Git](#git)
+      1. [Signed Commits](#signed-commits)
+      1. [Protected Branches](#protected-branches)
+1. [Personnel](#personnel)
+   1. [Background Checks](#background-checks)
+   1. [Education](#education)
+   1. [Policies](#policies)
+   1. [Two-factor Authentication](#two-factor-authentication)
+1. [Development](#development)
+   1. [Design & Architecture](#design--architecture)
+      1. [Rust](#rust)
+      1. [Unsafe Code](#unsafe-code)
+      1. [User Privileges](#user-privileges)
+   1. [Dependencies](#dependencies)
+   1. [Change Control](#change-control)
+      1. [Pull Requests](#pull-requests)
+      1. [Reviews & Approvals](#reviews--approvals)
+      1. [Merge Policies](#merge-policies)
+      1. [Automated Checks](#automated-checks)
+         1. [Vulnerability Scans](#vulnerability-scans)
+         1. [Fuzz Testing](#fuzz-testing)
+1. [Building & Releasing](#building--releasing)
+   1. [Network Security](#network-security)
+   1. [Runtime Isolation](#runtime-isolation)
+   1. [Asset Encryption](#asset-encryption)
+   1. [Asset Audit Logging](#asset-audit-logging)
+   1. [Asset Signatures & Checksums](#asset-signatures--checksums)
+1. [Vulnerability Reporting](#vulnerability-reporting)
 
 <!-- /MarkdownTOC -->
 
