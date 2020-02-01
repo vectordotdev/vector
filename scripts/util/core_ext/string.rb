@@ -50,8 +50,7 @@ class String
       gsub(/\blua\b/i, 'LUA').
       gsub(/\bs3\b/i, 'S3').
       gsub(/\btcp\b/i, 'TCP').
-      gsub(/\budp\b/i, 'UDP').
-      capitalize
+      gsub(/\budp\b/i, 'UDP')
   end
 
   def remove_markdown_links
