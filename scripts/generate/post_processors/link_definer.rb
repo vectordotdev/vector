@@ -29,7 +29,7 @@ module PostProcessors
     end
 
     def define!
-      verify_no_direct_links!
+      #verify_no_direct_links!
 
       link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]\]\]/).flatten.uniq
 
