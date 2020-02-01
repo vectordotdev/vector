@@ -9,7 +9,7 @@
 ---
 
 We understand that many users place a high level of trust in Vector to collect
-and ship mission critical data. The security of Vector is a top priority.
+and ship mission-critical data. The security of Vector is a top priority.
 That's why we apply widely accepted best practices when it comes to security.
 This document will describe these practices and aims to be as transparent as
 possible on our security efforts.
@@ -54,7 +54,7 @@ possible on our security efforts.
 
 ## Project Structure
 
-Project structure plays an important role in security. It creates gaurdrails
+Project structure plays an important role in security. It creates guardrails
 that prevent common security issues. This section will outline our deliberate
 structural decisions that impact security.
 
@@ -65,9 +65,9 @@ otherwise undermine security.
 
 #### Open Source
 
-Vector and it's dependencies are open source. All code and changes are publicly
+Vector and its dependencies are open-source. All code and changes are publicly
 available at [our Github repo][urls.vector_repo]. While the transparent nature
-open source helps to improve security, so does the large colalborative
+open source helps to improve security, so does the large collaborative
 community behind Vector.
 
 #### Workflow
@@ -132,7 +132,7 @@ decisions around design and architecture.
 
 #### Rust
 
-The [Rust programming language][urls.rust] is memory and thread safe; it will
+The [Rust programming language][urls.rust] is memory and thread-safe; it will
 catch many common sources of vulnerabilities at compile time.
 
 #### Unsafe Code
@@ -147,13 +147,13 @@ documentation always defaults to non-`sudo` use.
 
 ### Dependencies
 
-Vector aims to reduce the number of dependencies it relies on. If a depency
+Vector aims to reduce the number of dependencies it relies on. If a dependency
 is added it goes through a comprehensive review process that is detailed in
 the [Reviewing guide](REVIEWING.md#dependencies).
 
 ### Change Control
 
-As noted above Vector uses the Git version-control system on Github.
+As noted above Vector uses the Git version control system on Github.
 
 #### Pull Requests
 
@@ -188,7 +188,7 @@ of potential vulnerabilities.
 
 ## Building & Releasing
 
-Vector takes care to secure the build and relase process to prevent unintended
+Vector takes care to secure the build and release process to prevent unintended
 modifications.
 
 ### Network Security
@@ -199,7 +199,7 @@ Docker image retrieval, and publishment of Vector's release artifacts.
 
 ### Runtime Isolation
 
-All builds run in an isolated sandboxes that are destroyed after each use.
+All builds run in an isolated sandbox that is destroyed after each use.
 
 ### Asset Encryption
 
@@ -219,11 +219,11 @@ upon download. This verifies that assets have not been modified at rest.
 We deeply appreciate any effort to discover and disclose security
 vulnerabilities responsibly.
 
-If you would like to report a vulnerability, or have any security concerns with
+If you would like to report a vulnerability or have any security concerns with
 Vector, please e-mail vector@timber.io.
 
 For non-critical matters, we prefer users [open an issue][urls.new_security_report].
-In order for us to best investigate your request, please include any of the
+For us to best investigate your request, please include any of the
 following when reporting:
 
 * Proof of concept

@@ -1,8 +1,8 @@
 # Contributing
 
 First, thank you for contributing to Vector! The goal of this document is to
-clearly provide everything you need to start contributing to Vector. The
-following TOC is sorted in a progressive fashion, starting with the basics and
+provide everything you need to start contributing to Vector. The
+following TOC is sorted progressively, starting with the basics and
 expanding into more specifics.
 
 <!-- MarkdownTOC autolink="true" indent="   " -->
@@ -110,10 +110,10 @@ branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
-A list of allowed sub categories is defined
+A list of allowed sub-categories is defined
 [here](https://github.com/timberio/vector/tree/master/.github).
 
-The follow are all good examples of pull request titles:
+The following are all good examples of pull request titles:
 
 ```
 feat(new sink): new `xyz` sink
@@ -127,7 +127,7 @@ docs: fix typos
 
 We generally discourage large pull requests that are over 300-500 lines of diff.
 This is usually a sign that the pull request is addressing multiple concerns.
-If you would like to propose a change that is larger we suggest coming onto our
+If you would like to propose a larger change we suggest coming onto our
 [chat channel](https://chat.vector.dev) and discuss it with one of our
 engineers. This way we can talk through the solution and discuss if a change
 that large is even needed! This overall will produce a quicker response to the
@@ -155,7 +155,7 @@ is defined in `/.circleci/config.yml`. This delegates heavily to the
 [`distribution/docker`](/distribution/docker) folder where Docker images are
 defined for all of our testing, building, verifying, and releasing.
 
-Tests are run for all changes, and Circleci is reponsible for releasing
+Tests are run for all changes, and Circleci is responsible for releasing
 updated versions of Vector through various channels.
 
 ## Development
@@ -228,7 +228,7 @@ always run `make generate` before attempting to merge your commits.
 
 Developers do not need to maintain the [`Changelog`](/CHANGELOG.md). This is
 automatically generated via the `make release` command. This is made possible
-by the use of [conventional commit](#what-is-conventioonal-commits) titles.
+by the use of [conventional commit](#what-is-conventional-commits) titles.
 
 ### Dependencies
 
@@ -240,33 +240,32 @@ see how dependencies are reviewed in the
 
 #### Sink Healthchecks
 
-Sinks may implement a healthcheck as a means for validating their configuration
-against the envionment and external systems. Ideally, this allows the system to
+Sinks may implement a health check as a means for validating their configuration
+against the environment and external systems. Ideally, this allows the system to
 inform users of problems such as insufficient credentials, unreachable
-endpoints, non-existant tables, etc. They're not perfect, however, since it's
+endpoints, non-existent tables, etc. They're not perfect, however, since it's
 impossible to exhaustively check for issues that may happen at runtime.
 
-When implementing healthchecks, we prefer false positives to false negatives.
-This means we would prefer that a healthcheck pass and the sink then fail than
-to have the healthcheck fail when the sink would have been able to run
+When implementing health checks, we prefer false positives to false negatives.
+This means we would prefer that a health check pass and the sink then fail than
+to have the health check fail when the sink would have been able to run
 successfully.
 
-A common cause of false negatives in healthchecks is performing an operation
+A common cause of false negatives in health checks is performing an operation
 that the sink itself does not need. For example, listing all of the available S3
-buckets and checking that the configured bucket is in that list. The S3 sink
+buckets and checking that the configured bucket is on that list. The S3 sink
 doesn't need the ability to list all buckets, and a user that knows that may not
-have given it permission to do so. In that case, the healthcheck will fail due
+have permitted it to do so. In that case, the health check will fail due
 to bad credentials even through its credentials are sufficient for normal
 operation.
 
 This leads to a general strategy of mimicking what the sink itself does.
-Unfortunately, the fact that healthchecks don't have real events available to
+Unfortunately, the fact that health checks don't have real events available to
 them leads to some limitations here. The most obvious example of this is with
 sinks where the exact target of a write depends on the value of some field in
 the event (e.g. an interpolated Kinesis stream name). It also pops up for sinks
 where incoming events are expected to conform to a specific schema. In both
-cases, random test data is reasonably likely to trigger a potentially false
-negative result. Even in simpler cases, we need to think about the effects of
+cases, random test data is reasonably likely to trigger a potentially false-negative result. Even in simpler cases, we need to think about the effects of
 writing test data and whether the user would find that surprising or invasive.
 The answer usually depends on the system we're interfacing with.
 
@@ -274,11 +273,11 @@ In some cases, like the Kinesis example above, the right thing to do might be
 nothing at all. If we require dynamic information to figure out what entity
 (i.e. Kinesis stream in this case) that we're even dealing with, odds are very
 low that we'll be able to come up with a way to meaningfully validate that it's
-in working order. It's perfectly valid to have a healthcheck that falls back to
+in working order. It's perfectly valid to have a health check that falls back to
 doing nothing when there is a data dependency like this.
 
 With all that in mind, here is a simple checklist to go over when writing a new
-healthcheck:
+health check:
 
 - [ ] Does this check perform different fallible operations from the sink itself?
 - [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
@@ -287,7 +286,7 @@ healthcheck:
 Not all of the answers need to be a hard "no", but we should think about the
 likelihood that any "yes" would lead to false negatives and balance that against
 the usefulness of the check as a whole for finding problems. Because we have the
-option to disable individual healthchecks, there's an escape hatch for users
+option to disable individual health checks, there's an escape hatch for users
 that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
@@ -324,7 +323,7 @@ Please see the [`SECURITY.md` file](/security.md).
 
 ## Legal
 
-To protect all users of Vector, the follow legal requirements are made.
+To protect all users of Vector, the following legal requirements are made.
 
 ### DCO
 
@@ -347,7 +346,7 @@ may be considered an alternate CLA.
 
 The existence of section 5 of the Apache License is proof that the Apache
 License is intended to be usable without CLAs. Users need for the code to be
-open source, with all the legal rights that implies, but it is the open source
+open-source, with all the legal rights that imply, but it is the open source
 license that provides this. The Apache License provides very generous
 copyright permissions from contributors, and contributors explicitly grant
 patent licenses as well. These rights are granted to everyone.
