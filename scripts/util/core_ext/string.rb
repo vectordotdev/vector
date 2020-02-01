@@ -37,7 +37,8 @@ class String
   end
 
   def humanize
-    ActiveSupport::Inflector.humanize(self).
+    self.
+      gsub(/_/, ' ').
       gsub(/\bansi\b/i, 'ANSI').
       gsub(/\baws\b/i, 'AWS').
       gsub(/\bcloudwatch\b/i, 'Cloudwatch').
@@ -50,7 +51,8 @@ class String
       gsub(/\blua\b/i, 'LUA').
       gsub(/\bs3\b/i, 'S3').
       gsub(/\btcp\b/i, 'TCP').
-      gsub(/\budp\b/i, 'UDP')
+      gsub(/\budp\b/i, 'UDP').
+      capitalize
   end
 
   def remove_markdown_links
