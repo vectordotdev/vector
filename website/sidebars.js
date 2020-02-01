@@ -266,8 +266,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
-        "https://github.com/timberio/vector/security/policy",
-
+        {
+          type: 'link',
+          label: 'Security',
+          href: '"https://github.com/timberio/vector/security/policy"'
+        },
       ],
     },
   ]
