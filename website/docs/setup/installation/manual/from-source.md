@@ -143,7 +143,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -151,7 +151,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     ```
     git clone https://github.com/timberio/vector
-    git checkout v0.7.1
+    git checkout v0.7.2
     cd vector
     ```
 
