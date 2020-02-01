@@ -1,7 +1,6 @@
 require "erb"
 
 require "active_support/core_ext/string/output_safety"
-require "action_view/helpers/number_helper"
 
 require_relative "templates/config_example"
 require_relative "templates/config_schema"
@@ -31,8 +30,6 @@ require_relative "templates/config_spec"
 # template with some global methods added to the `Templates` object will
 # generally suffice.
 class Templates
-  include ActionView::Helpers::NumberHelper
-
   attr_reader :metadata, :partials_path, :root_dir
 
   def initialize(root_dir, metadata)
