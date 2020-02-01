@@ -3,7 +3,7 @@
 ---
 
 <p align="center">
-  <strong>Reporting a vulnerability? See the ["Vulnerability Reporting" section](#vulnerability-reporting)</strong>
+  <strong>Reporting a vulnerability? See the <a href="#vulnerability-reporting">Vulnerability Reporting" section]</a></strong>
 </p>
 
 ---
