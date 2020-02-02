@@ -218,7 +218,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum number of [events][docs.data-model] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -801,8 +801,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/

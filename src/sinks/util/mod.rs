@@ -5,9 +5,12 @@ pub mod retries;
 pub mod rusoto;
 pub mod service;
 pub mod tcp;
+#[cfg(test)]
+pub mod test;
 pub mod tls;
 #[cfg(unix)]
 pub mod unix;
+pub mod uri;
 
 use crate::buffers::Acker;
 use crate::event::{self, Event};
@@ -25,6 +28,7 @@ pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
+pub use uri::UriSerde;
 
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
@@ -257,7 +261,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::BatchServiceSink;
     use crate::buffers::Acker;
     use crate::runtime::Runtime;

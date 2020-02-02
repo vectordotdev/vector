@@ -13,7 +13,7 @@ type = "string"
 examples = ["/var/lib/vector"]
 description = """\
 The directory used to persist file checkpoint positions. By default, the \
-[global `data_dir` option][docs.configuration#data_dir] is used. Please make \
+[global `data_dir` option][docs.global-options#data_dir] is used. Please make \
 sure the Vector project has write permissions to this dir.\
 """
 

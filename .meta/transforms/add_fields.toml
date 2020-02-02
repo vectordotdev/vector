@@ -77,6 +77,6 @@ A [`log` event][docs.data-model.log] will be output with the following structure
 ```
 
 While unrealistic, this example demonstrates the various accepted
-[types][docs.configuration#value-types] and how they're repsented in Vector's
+[types][docs.configuration#types] and how they're repsented in Vector's
 internal [log structure][docs.data-model.log].\
 """

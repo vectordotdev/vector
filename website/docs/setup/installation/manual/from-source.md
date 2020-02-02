@@ -69,7 +69,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -143,7 +143,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -151,7 +151,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     ```
     git clone https://github.com/timberio/vector
-    git checkout v0.7.1
+    git checkout v0.7.2
     cd vector
     ```
 
@@ -195,7 +195,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -286,7 +286,7 @@ Vector in the [Configuration][docs.configuration] section.
 
 ### Data Directory
 
-We highly recommend creating a [data directory][docs.global-options#data-directory]
+We highly recommend creating a [data directory][docs.global-options#data_dir]
 that Vector can use:
 
 ```
@@ -369,7 +369,6 @@ Alternatively, for finer control, it is possible to use specific features from t
 [docs.configuration]: /docs/setup/configuration/
 [docs.containers]: /docs/setup/installation/containers/
 [docs.from_archives]: /docs/setup/installation/manual/from-archives/
-[docs.global-options#data-directory]: /docs/reference/global-options/#data-directory
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary/#buffer
 [docs.package_managers]: /docs/setup/installation/package-managers/
