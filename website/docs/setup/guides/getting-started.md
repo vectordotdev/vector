@@ -5,7 +5,7 @@ description: Getting started with Vector
 ---
 
 Vector is a simple beast to tame, in this guide we'll send an
-[event][docs.data-model#event] through it and touch on some basic concepts.
+[event][docs.data-model] through it and touch on some basic concepts.
 
 ## 1. Install Vector
 
@@ -136,7 +136,7 @@ misfits trying to recruit you as their hacker.
 
 
 [docs.configuration]: /docs/setup/configuration/
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model]: /docs/about/data-model/
 [docs.installation]: /docs/setup/installation/
 [docs.sinks.console#encoding]: /docs/reference/sinks/console/#encoding
 [docs.sinks.console]: /docs/reference/sinks/console/

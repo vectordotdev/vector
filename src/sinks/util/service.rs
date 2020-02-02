@@ -16,6 +16,9 @@ use tower::{
     Service, ServiceBuilder,
 };
 
+pub type TowerBatchedSink<T, L, B, S> =
+    BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>;
+
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
     where
@@ -119,7 +122,7 @@ impl TowerRequestSettings {
         retry_logic: L,
         service: S,
         acker: Acker,
-    ) -> BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>
+    ) -> TowerBatchedSink<T, L, B, S>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
     // `trait SinkExt` above), as it is missing a bound on the

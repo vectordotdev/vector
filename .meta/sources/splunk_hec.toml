@@ -4,7 +4,6 @@ beta = true
 common = false
 delivery_guarantee = "at_least_once"
 function_category = "receive"
-guides = []
 output_types = ["log"]
 resources = []
 through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol]"

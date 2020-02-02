@@ -2,8 +2,8 @@
 id: prometheus-source
 title: "Prometheus Source"
 description: "Scrape prometheus metrics with Vector"
-author_id: "ashley"
-tags: ["type: announcement", "domain: metrics", "domain: sources"]
+author_github: https://github.com/Jeffail
+tags: ["type: announcement", "event type: metrics", "domain: sources", "source: prometheus"]
 ---
 
 We love [Prometheus][urls.prometheus], but we also love [options](https://www.mms.com/en-us/shop/single-color)

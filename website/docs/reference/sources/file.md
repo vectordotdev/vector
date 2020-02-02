@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "file|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 status: "prod-ready"
@@ -128,7 +128,7 @@ import Field from '@site/src/components/Field';
 
 ### data_dir
 
-The directory used to persist file checkpoint positions. By default, the [global [`data_dir`](#data_dir) option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
+The directory used to persist file checkpoint positions. By default, the [global [`data_dir`](#data_dir) option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
 
 
 </Field>
@@ -200,6 +200,28 @@ Configuration for how the file source should identify files.
 
 
 <Field
+  common={false}
+  defaultValue={"checksum"}
+  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
+  examples={["checksum","device_and_inode"]}
+  name={"strategy"}
+  path={"fingerprinting"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### strategy
+
+The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
+
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={256}
   enumValues={null}
@@ -238,28 +260,6 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 #### ignored_header_bytes
 
 The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"checksum"}
-  enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
-  examples={["checksum","device_and_inode"]}
-  name={"strategy"}
-  path={"fingerprinting"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### strategy
-
-The strategy used to uniquely identify files. This is important for [checkpointing](#checkpointing) when file rotation is used.
 
 
 </Field>
@@ -602,8 +602,8 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global [`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
-overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) sink directly.
+[global [`data_dir`](#data_dir) option][docs.global-options#data_dir] but can be
+overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) source directly.
 
 ### Compressed Files
 
@@ -721,10 +721,9 @@ Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
 
 
-[docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
-[docs.configuration#data_dir]: /docs/setup/configuration/#data_dir
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)

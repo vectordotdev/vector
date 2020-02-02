@@ -6,6 +6,16 @@
 
 <%= component_config_example(component) %>
 
+<%- if !component.requirements.nil? -%>
+## Requirements
+
+<Alert type="danger" fill={true} icon={false}>
+
+<%= component.requirements %>
+
+</Alert>
+
+<%- end -%>
 ## Options
 
 <%= options(component.specific_options_list, heading_depth: 3) %>

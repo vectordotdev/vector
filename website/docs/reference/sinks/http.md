@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"
@@ -148,28 +148,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
-  name={"password"}
-  path={"auth"}
-  relevantWhen={{"strategy":"basic"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### password
-
-The basic authentication password.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["basic"]}
   name={"strategy"}
@@ -184,6 +162,28 @@ The basic authentication password.
 #### strategy
 
 The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
+  name={"password"}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### password
+
+The basic authentication password.
 
 
 </Field>
@@ -323,7 +323,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -1025,8 +1025,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http

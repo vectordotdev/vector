@@ -40,7 +40,7 @@ within a configuration file, including:
 
 1. All [sources][docs.sources], [transforms][docs.transforms], and
 [sinks][docs.sinks] include all non-optional fields.
-2. All fields are of the proper [type][docs.configuration#value-types].
+2. All fields are of the proper [type][docs.configuration#types].
 
 If validation fails, Vector will exit with a `78`, and if validation succeeds
 Vector will exit with a `0`.
@@ -102,7 +102,7 @@ flag to also run health checks for all defined sinks.
 8. All [sinks][docs.sinks] are able to connect to their targets.
 
 
-[docs.configuration#value-types]: /docs/setup/configuration/#value-types
+[docs.configuration#types]: /docs/setup/configuration/#types
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms]: /docs/reference/transforms/

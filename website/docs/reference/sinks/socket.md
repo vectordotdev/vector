@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or Unix socket."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+socket%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "socket|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/socket.rs
 status: "prod-ready"
@@ -116,7 +116,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to bind to.
+The address to connect to. The address _must_ include a port.
 
 
 </Field>
@@ -159,7 +159,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -523,5 +523,5 @@ event-by-event basis. It does not batch data.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/

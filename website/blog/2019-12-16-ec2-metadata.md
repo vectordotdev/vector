@@ -2,8 +2,8 @@
 id: ec2-metadata
 title: "EC2 Metadata Enrichments"
 description: "Enrich your events with EC2 metadata"
-author_id: "ashley"
-tags: ["type: announcement", "domain: transforms"]
+author_github: https://github.com/Jeffail
+tags: ["type: announcement", "domain: transforms", "transform: ec2_metadata"]
 ---
 
 Are your events the laughing-stock of the data warehouse? Then enrich them with
