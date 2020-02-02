@@ -5,7 +5,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/
 status: "prod-ready"
 title: "File Sink"
 unsupported_operating_systems: []
@@ -198,7 +198,7 @@ event-by-event basis. It does not batch data.
 ### Template Syntax
 
 The [`path`](#path) options
-support [Vector's template syntax][docs.configuration#template-syntax],
+support [Vector's template syntax][docs.configuration#field-interpolation],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -214,10 +214,10 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration#template-syntax].
+[template syntax section][docs.configuration#field-interpolation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
+[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

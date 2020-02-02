@@ -216,7 +216,7 @@ class Templates
     description = option.description.strip
 
     if option.templateable?
-      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]."
+      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#field-interpolation]."
     end
 
     if option.relevant_when

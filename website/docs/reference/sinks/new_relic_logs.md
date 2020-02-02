@@ -214,7 +214,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -635,8 +635,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [urls.new_new_relic_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+new_relic_logs
 [urls.new_relic]: https://newrelic.com/

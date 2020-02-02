@@ -49,7 +49,7 @@ import TabItem from '@theme/TabItem';
     <TabItem value="nightly">
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/nightly/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     </TabItem>

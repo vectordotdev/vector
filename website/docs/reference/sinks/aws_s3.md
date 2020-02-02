@@ -250,7 +250,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -882,7 +882,7 @@ and [`filename_append_uuid`](#filename_append_uuid) options.
 
 Partitioning is controlled via the [`key_prefix`](#key_prefix)
 options and allows you to dynamically partition data on the fly.
-You'll notice that Vector's [template sytax](#template-syntax) is supported
+You'll notice that Vector's [template sytax](#field-interpolation) is supported
 for these options, enabling you to use field values as the partition's key.
 
 ### Rate Limits
@@ -909,7 +909,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 ### Template Syntax
 
 The [`key_prefix`](#key_prefix) options
-support [Vector's template syntax][docs.configuration#template-syntax],
+support [Vector's template syntax][docs.configuration#field-interpolation],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -927,13 +927,13 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration#template-syntax].
+[template syntax section][docs.configuration#field-interpolation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/

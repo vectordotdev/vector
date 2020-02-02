@@ -161,7 +161,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -617,8 +617,8 @@ event-by-event basis. It does not batch data.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html

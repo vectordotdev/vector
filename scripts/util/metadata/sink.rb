@@ -189,7 +189,7 @@ class Sink < Component
 
       buffer_options["max_events"] =
         {
-          "description" => "The maximum number of [events][docs.data-model#event] allowed in the buffer.",
+          "description" => "The maximum number of [events][docs.data-model] allowed in the buffer.",
           "default" => 500,
           "null" => true,
           "relevant_when" => {"type" => "memory"},

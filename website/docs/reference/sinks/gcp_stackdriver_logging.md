@@ -5,7 +5,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "gcp_stackdriver_logging|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp_stackdriver_logging.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logging.rs
 status: "beta"
 title: "GCP Stackdriver Logging Sink"
 unsupported_operating_systems: []
@@ -253,7 +253,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -999,8 +999,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
