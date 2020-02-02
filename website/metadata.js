@@ -17810,6 +17810,7 @@ module.exports = {
       "avatar": "https://github.com/a-rodin.png",
       "github": "https://github.com/a-rodin",
       "id": "alex",
+      "keybase": "https://keybase.io/arodin",
       "name": "Alexander"
     },
     {
@@ -17822,19 +17823,25 @@ module.exports = {
       "avatar": "https://github.com/hoverbear.png",
       "github": "https://github.com/hoverbear",
       "id": "ana",
-      "name": "Ana"
+      "keybase": "https://keybase.io/hoverbear",
+      "name": "Ana",
+      "twitter": "https://twitter.com/a_hoverbear"
     },
     {
       "avatar": "https://github.com/Jeffail.png",
       "github": "https://github.com/Jeffail",
       "id": "ashley",
-      "name": "Ashley"
+      "keybase": "https://keybase.io/jeffail",
+      "name": "Ashley",
+      "twitter": "https://twitter.com/jeffail"
     },
     {
       "avatar": "https://github.com/binarylogic.png",
       "github": "https://github.com/binarylogic",
       "id": "ben",
-      "name": "Ben"
+      "keybase": "https://keybase.io/binarylogic",
+      "name": "Ben",
+      "twitter": "https://twitter.com/binarylogic"
     },
     {
       "avatar": "https://github.com/bruceg.png",
@@ -17852,13 +17859,17 @@ module.exports = {
       "avatar": "https://github.com/LucioFranco.png",
       "github": "https://github.com/LucioFranco",
       "id": "lucio",
-      "name": "Lucio"
+      "keybase": "https://keybase.io/luciofranco",
+      "name": "Lucio",
+      "twitter": "https://twitter.com/lucio_d_franco"
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
       "github": "https://github.com/lukesteensen",
       "id": "luke",
-      "name": "Luke"
+      "keybase": "https://keybase.io/lukesteensen",
+      "name": "Luke",
+      "twitter": "https://twitter.com/lukesteensen"
     }
   ],
   "transforms": {

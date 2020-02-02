@@ -1057,7 +1057,6 @@ Content-Length: <byte_size>
 
 Vector checks for AWS credentials in the following order:
 
-
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 1. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 1. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
