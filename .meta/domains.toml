@@ -11,6 +11,9 @@ name = "cli"
 name = "config"
 
 [[domains]]
+name = "dependencies"
+
+[[domains]]
 name = "docs"
 
 [[domains]]

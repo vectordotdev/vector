@@ -16,6 +16,7 @@ scopes:
   - buffers
   - cli
   - config
+  - dependencies
   - docs
   - guides
   - marketing

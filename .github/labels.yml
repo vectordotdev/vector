@@ -10,6 +10,9 @@
 - name: "domain: config"
   description: Anything config related
   color: 212f3e
+- name: "domain: dependencies"
+  description: Anything dependencies related
+  color: 212f3e
 - name: "domain: docs"
   description: Anything docs related
   color: 212f3e
@@ -71,9 +74,6 @@
 - name: "meta: breaking change"
   description: A change that breaks backwards compatibility
   color: ee5353
-- name: "meta: dependencies"
-  description: Anything related to dependencies
-  color: c8d6e5
 - name: "meta: duplicate"
   description: Duplicate of another issue
   color: c8d6e5
@@ -88,7 +88,7 @@
   color: c8d6e5
 - name: "meta: ready for merge"
   description: PR is ready to be merged
-  color: c8d6e5
+  color: 1cd1a1
 - name: "meta: regression"
   description: This issue represents a regression
   color: c8d6e5
@@ -103,9 +103,6 @@
   color: feca57
 - name: "needs: outside help"
   description: Needs help outside of the Vector core team
-  color: feca57
-- name: "needs: reply"
-  description: Awaiting a reply from a core team member
   color: feca57
 - name: "needs: spec"
   description: Needs a specification before work can begin
