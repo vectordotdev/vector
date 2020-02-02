@@ -88,8 +88,8 @@ changes are audited and traceable.
 
 #### Signed Commits
 
-All commits within Vector must be cryptographically signed. This ensures all
-commits are verified, trusted, and authentic.
+When possible, commits on Vector's release branches must be cryptographically
+signed.
 
 #### Protected Branches
 
@@ -121,7 +121,7 @@ team members.
 ### Two-factor Authentication
 
 All Vector team members are required to enable two-factor authentication
-on their work machines as well as their Github accounts.
+for their Github accounts.
 
 ## Development
 
