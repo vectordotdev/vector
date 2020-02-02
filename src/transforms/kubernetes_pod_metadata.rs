@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     dns::Resolver,
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     runtime::TaskExecutor,
     sinks::util::{
         http::https_client,
@@ -11,7 +11,8 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use bytes::Bytes;
-use futures::{stream::Stream, sync::mpsc, Async, Sink};
+use evmap;
+use futures::stream::Stream;
 use futures03::compat::Future01CompatExt;
 use http::{
     header,
@@ -31,7 +32,6 @@ use k8s_openapi::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::fs;
 use string_cache::DefaultAtom as Atom;
 
@@ -78,15 +78,15 @@ impl TransformConfig for KubePodMetadata {
         // Main idea is to have a background task which will premptively
         // acquire metadata for all pods on this node, and then maintaine that.
         //
-        // Background task is sending newest versions of metadata to Transform
-        // through a channel.
+        // Background task is writing to map of metadata from which Transform
+        // is reading.
 
-        let (sender, receiver) = mpsc::channel(100);
+        let (map_read, map_write) = evmap::new();
 
         // TODO: use real Resolver
         let mut client = MetadataClient::new(
             self,
-            sender,
+            map_write,
             Resolver::new(vec![], exec.clone()).unwrap(),
             node_name()?,
             account_token(),
@@ -98,16 +98,14 @@ impl TransformConfig for KubePodMetadata {
         client.watch_pods_request(None)?;
 
         exec.spawn_std(async move {
-            match client.run().await {
-                Ok(()) => info!("Shuting down Kubernetes background metadata client."),
-                Err(error) => error!(
-                    message = "Kubernetes background metadata client stoped.",
-                    cause = ?error
-                ),
-            }
+            let error = client.run().await;
+            error!(
+                message = "Kubernetes background metadata client stoped.",
+                cause = ?error
+            );
         });
 
-        Ok(Box::new(KubernetesPodMetadata::new(receiver)))
+        Ok(Box::new(KubernetesPodMetadata::new(map_read)))
     }
 
     fn input_type(&self) -> DataType {
@@ -191,8 +189,10 @@ enum BuildError {
 
 /// Background client which watches for Pod metadata changes and propagates them to Transform.
 struct MetadataClient {
-    fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>>,
-    sender: Option<mpsc::Sender<(Bytes, Vec<(Atom, Value)>)>>,
+    fields: Vec<Box<dyn Fn(&Pod) -> Metadata + Send + Sync + 'static>>,
+    /// Box<_> is needed because WriteHandle requiers Value to implement ShallowCopy which
+    /// we won't implement ourselves as it require unsafe.
+    map: std::sync::Mutex<evmap::WriteHandle<Bytes, Box<Metadata>>>,
     node_name: String,
     token: Option<String>,
     host: String,
@@ -203,7 +203,7 @@ struct MetadataClient {
 impl MetadataClient {
     fn new(
         trans_config: &KubePodMetadata,
-        sender: mpsc::Sender<(Bytes, Vec<(Atom, Value)>)>,
+        map: evmap::WriteHandle<Bytes, Box<Metadata>>,
         resolver: Resolver,
         node_name: String,
         token: Option<String>,
@@ -225,7 +225,7 @@ impl MetadataClient {
 
         Ok(Self {
             fields,
-            sender: Some(sender),
+            map: std::sync::Mutex::new(map),
             node_name,
             token,
             host,
@@ -235,9 +235,8 @@ impl MetadataClient {
     }
 
     /// Watches for metadata changes and propagates them to Transform.
-    /// Ok only if Transform/Receiver has been droped.
-    /// Err only if it would always error
-    async fn run(&mut self) -> Result<(), BuildError> {
+    /// Returns only if it would always error.
+    async fn run(&mut self) -> BuildError {
         // If watch is initiated with None resource_version, we will receive initial
         // list of pods as synthetic "Added" events.
         // https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
@@ -248,20 +247,19 @@ impl MetadataClient {
             // We could clear Metadata map at this point, as Kubernets documentation suggests,
             // but then we would have a time gap during which events wouldn't be enriched
             // with metadata.
-            match self
-                .watch(version.clone(), self.watch_pods_request(version.clone())?)
-                .await
-            {
-                WatchResult::New(new_version) => version = new_version.or(version),
-                WatchResult::Reload => (),
-                WatchResult::Restart => version = None,
-                WatchResult::Shutdown => return Ok(()),
+            match self.watch_pods_request(version.clone()) {
+                Ok(request) => version = self.watch(version, request).await,
+                Err(error) => return error,
             }
         }
     }
 
     /// Watches for pods metadata with given watch request.
-    async fn watch(&mut self, mut version: Option<Version>, request: Request<Body>) -> WatchResult {
+    async fn watch(
+        &mut self,
+        mut version: Option<Version>,
+        request: Request<Body>,
+    ) -> Option<Version> {
         // Start watching
         let response = self.client.request(request).compat().await;
         match response {
@@ -287,7 +285,7 @@ impl MetadataClient {
                                     ) {
                                         Ok((data, used_bytes)) => {
                                             // Process watch event
-                                            match self.process_event(data).await {
+                                            match self.process_event(data) {
                                                 WatchResult::New(new_version) => {
                                                     // Store last resourceVersion
                                                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
@@ -302,7 +300,7 @@ impl MetadataClient {
                                                     continue 'process;
                                                 }
                                                 WatchResult::Reload => (),
-                                                vr => return vr,
+                                                WatchResult::Restart => return None,
                                             }
                                         }
                                         Err(ResponseError::NeedMoreData) => continue 'watch,
@@ -323,11 +321,11 @@ impl MetadataClient {
             Err(error) => debug!(message = "Failed resolving request.", ?error),
         }
 
-        WatchResult::New(version)
+        version
     }
 
     /// Processes watch event comming from Kubernetes API server.
-    async fn process_event(&mut self, response: WatchPodForAllNamespacesResponse) -> WatchResult {
+    fn process_event(&mut self, response: WatchPodForAllNamespacesResponse) -> WatchResult {
         match response {
             WatchPodForAllNamespacesResponse::Ok(event) => {
                 match event {
@@ -343,7 +341,7 @@ impl MetadataClient {
                         //
                         // An alternative would be to delay deletions of entrys by 1min. Which is a safe guess.
 
-                        self.update(pod).await
+                        WatchResult::New(self.update(pod))
                     }
                     WatchEvent::ErrorStatus(status) => {
                         if status.code == Some(410) {
@@ -423,43 +421,29 @@ impl MetadataClient {
         format!("spec.nodeName={}", self.node_name)
     }
 
-    /// Extracts metadata from pod and sends them to Transform.
-    async fn update(&mut self, pod: Pod) -> WatchResult {
+    /// Extracts metadata from pod and sets them to map.
+    fn update(&mut self, pod: Pod) -> Option<Version> {
         if let Some(uid) = pod.metadata.as_ref().and_then(|md| md.uid.as_ref()) {
             let uid: Bytes = uid.as_str().into();
             let fields = self.fields(&pod);
 
-            if let Some(sender) = self.sender.take() {
-                trace!(message = "Sending pod metadata.", uid = ?uid);
-                // It's good to be blocked on a full queue, because it will happen when
-                // the transform isn't using the metadata. And if blocked for enough of time,
-                // we will be disconnected from the API server.
-                //
-                // End result of this is:
-                // Metadata not needed => queue full => blocked => disconnected => we will have:
-                //  - less impact on API server
-                //  - have less network traffic
-                match sender.send((uid, fields)).compat().await {
-                    Ok(sender) => self.sender = Some(sender),
-                    // Channel closed
-                    Err(_) => return WatchResult::Shutdown,
-                }
-            } else {
-                // Channel has already been closed
-                return WatchResult::Shutdown;
-            }
+            // Update
+            let map = self
+                .map
+                .get_mut()
+                .expect("This is the only place making access.");
+            map.update(uid, Box::new(fields));
+            map.refresh();
         }
 
-        WatchResult::New(
-            pod.metadata
-                .as_ref()
-                .and_then(|metadata| metadata.resource_version.clone().map(Version)),
-        )
+        pod.metadata
+            .as_ref()
+            .and_then(|metadata| metadata.resource_version.clone().map(Version))
     }
 
     /// Returns field values for given pod.
-    fn fields(&self, pod: &Pod) -> Vec<(Atom, Value)> {
-        self.fields.iter().flat_map(|fun| fun(pod)).collect()
+    fn fields(&self, pod: &Pod) -> Metadata {
+        Metadata(self.fields.iter().flat_map(|fun| fun(pod).0).collect())
     }
 }
 
@@ -475,30 +459,28 @@ enum WatchResult {
     Reload,
     /// Start new request with None version.
     Restart,
-    /// Stop watching
-    Shutdown,
+}
+
+#[derive(Clone, PartialEq)]
+struct Metadata(Vec<(Atom, Value)>);
+
+impl Eq for Metadata {}
+
+impl Metadata {
+    fn enrich(&self, event: &mut LogEvent) {
+        for (key, value) in self.0.iter() {
+            event.insert(key.clone(), value.clone());
+        }
+    }
 }
 
 pub struct KubernetesPodMetadata {
-    metadata: HashMap<Bytes, Vec<(Atom, Value)>>,
-    updates: mpsc::Receiver<(Bytes, Vec<(Atom, Value)>)>,
+    metadata: evmap::ReadHandle<Bytes, Box<Metadata>>,
 }
 
 impl KubernetesPodMetadata {
-    fn new(updates: mpsc::Receiver<(Bytes, Vec<(Atom, Value)>)>) -> Self {
-        Self {
-            metadata: HashMap::new(),
-            updates,
-        }
-    }
-
-    fn update(&mut self) {
-        // Try_next is the function that we want, but futures 0.1.25 doesn't
-        // expose one, so we are using poll.
-        while let Ok(Async::Ready(Some((key, value)))) = self.updates.poll() {
-            trace!(message = "Updated pod metadata.", uid = ?key);
-            self.metadata.insert(key, value);
-        }
+    fn new(metadata: evmap::ReadHandle<Bytes, Box<Metadata>>) -> Self {
+        Self { metadata }
     }
 }
 
@@ -507,23 +489,21 @@ impl Transform for KubernetesPodMetadata {
         let log = event.as_mut_log();
 
         if let Some(Value::Bytes(pod_uid)) = log.get(&OBJECT_UID) {
-            // Now update metadata as we need the freshest version.
-            self.update();
-
-            if let Some(fields) = self.metadata.get(pod_uid) {
-                for (key, value) in fields {
-                    log.insert(key.clone(), value.clone());
-                }
-            } else {
+            let pod_uid = pod_uid.clone();
+            if self
+                .metadata
+                .get_and(&pod_uid, |fields| fields[0].enrich(log))
+                .is_none()
+            {
                 warn!(
-                    message = "Metadata for pod not yet available.",
+                    message = "Metadata for pod is not yet available.",
                     pod_uid = ?std::str::from_utf8(pod_uid.as_ref()),
                     rate_limit_secs = 10
                 );
             }
         } else {
             warn!(
-                message = "Event without field.",
+                message = "Event is without field.",
                 field = OBJECT_UID.as_ref(),
                 rate_limit_secs = 10
             );
@@ -543,7 +523,7 @@ fn default_fields() -> Vec<String> {
 /// Returns list of all supported fields and their extraction function.
 fn all_fields() -> Vec<(
     &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
+    Box<dyn Fn(&Pod) -> Metadata + Send + Sync + 'static>,
 )> {
     vec![
         // ------------------------ ObjectMeta ------------------------ //
@@ -589,13 +569,15 @@ fn field<T: Into<Value>>(
     fun: impl Fn(&Pod) -> Option<T> + Send + Sync + 'static,
 ) -> (
     &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
+    Box<dyn Fn(&Pod) -> Metadata + Send + Sync + 'static>,
 ) {
     let key: Atom = with_prefix(name).into();
     let fun = move |pod: &Pod| {
-        fun(pod)
-            .map(|data| vec![(key.clone(), data.into())])
-            .unwrap_or_default()
+        Metadata(
+            fun(pod)
+                .map(|data| vec![(key.clone(), data.into())])
+                .unwrap_or_default(),
+        )
     };
     (name, Box::new(fun) as Box<_>)
 }
@@ -605,17 +587,19 @@ fn collection_field(
     fun: impl Fn(&Pod) -> Option<&BTreeMap<String, String>> + Send + Sync + 'static,
 ) -> (
     &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
+    Box<dyn Fn(&Pod) -> Metadata + Send + Sync + 'static>,
 ) {
     let prefix_key = with_prefix(name) + ".";
     let fun = move |pod: &Pod| {
-        fun(pod)
-            .map(|map| {
-                map.iter()
-                    .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
-                    .collect()
-            })
-            .unwrap_or_default()
+        Metadata(
+            fun(pod)
+                .map(|map| {
+                    map.iter()
+                        .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        )
     };
     (name, Box::new(fun) as Box<_>)
 }
