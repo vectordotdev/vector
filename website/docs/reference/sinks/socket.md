@@ -109,7 +109,7 @@ import Field from '@site/src/components/Field';
   examples={["92.12.333.224:5000"]}
   name={"address"}
   path={null}
-  relevantWhen={{"mode":["tcp"]}}
+  relevantWhen={{"mode":"tcp"}}
   required={true}
   templateable={false}
   type={"string"}
