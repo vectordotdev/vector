@@ -8,12 +8,17 @@ pub mod tcp;
 #[cfg(test)]
 pub mod test;
 pub mod tls;
+#[cfg(unix)]
+pub mod unix;
 pub mod uri;
 
 use crate::buffers::Acker;
+use crate::event::{self, Event};
+use bytes::Bytes;
 use futures::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
 use tower::Service;
@@ -24,6 +29,43 @@ pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 pub use uri::UriSerde;
+
+/**
+ * Enum representing different ways to encode events as they are sent into a Sink.
+ */
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
+}
+
+/**
+* Encodes the given event into raw bytes that can be sent into a Sink, according to
+* the given encoding.  If there are any errors encoding the event, logs a warning
+* and returns None.
+**/
+pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
+    let log = event.into_log();
+
+    let b = match encoding {
+        Encoding::Json => serde_json::to_vec(&log.unflatten()),
+        Encoding::Text => {
+            let bytes = log
+                .get(&event::MESSAGE)
+                .map(|v| v.as_bytes().to_vec())
+                .unwrap_or_default();
+            Ok(bytes)
+        }
+    };
+
+    b.map(|mut b| {
+        b.push(b'\n');
+        Bytes::from(b)
+    })
+    .map_err(|error| error!(message = "Unable to encode.", %error))
+    .ok()
+}
 
 pub trait SinkExt<T>
 where
