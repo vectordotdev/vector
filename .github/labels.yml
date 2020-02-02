@@ -1,0 +1,336 @@
+- name: "domain: blog"
+  description: Anything blog related
+  color: 212f3e
+- name: "domain: buffers"
+  description: Anything buffers related
+  color: 212f3e
+- name: "domain: cli"
+  description: Anything cli related
+  color: 212f3e
+- name: "domain: config"
+  description: Anything config related
+  color: 212f3e
+- name: "domain: docs"
+  description: Anything docs related
+  color: 212f3e
+- name: "domain: guides"
+  description: Anything guides related
+  color: 212f3e
+- name: "domain: marketing"
+  description: Anything marketing related
+  color: 212f3e
+- name: "domain: networking"
+  description: Anything networking related
+  color: 212f3e
+- name: "domain: observability"
+  description: Anything observability related
+  color: 212f3e
+- name: "domain: operations"
+  description: Anything operations related
+  color: 212f3e
+- name: "domain: platforms"
+  description: Anything platforms related
+  color: 212f3e
+- name: "domain: security"
+  description: Anything security related
+  color: 212f3e
+- name: "domain: setup"
+  description: Anything setup related
+  color: 212f3e
+- name: "domain: sinks"
+  description: Anything sinks related
+  color: 212f3e
+- name: "domain: sources"
+  description: Anything sources related
+  color: 212f3e
+- name: "domain: testing"
+  description: Anything testing related
+  color: 212f3e
+- name: "domain: topology"
+  description: Anything topology related
+  color: 212f3e
+- name: "domain: transforms"
+  description: Anything transforms related
+  color: 212f3e
+- name: "domain: website"
+  description: Anything website related
+  color: 212f3e
+
+- name: "event type: log"
+  description: Anything log event related
+  color: 1cd1a1
+- name: "event type: metric"
+  description: Anything metric event related
+  color: 1cd1a1
+- name: "meta: announcement"
+  description: Any issues that serve as announcements (pinned issues)
+  color: c8d6e5
+- name: "meta: blocked"
+  description: This issue is blocked by other work
+  color: ee5353
+- name: "meta: breaking change"
+  description: A change that breaks backwards compatibility
+  color: ee5353
+- name: "meta: dependencies"
+  description: Anything related to dependencies
+  color: c8d6e5
+- name: "meta: duplicate"
+  description: Duplicate of another issue
+  color: c8d6e5
+- name: "meta: feedback"
+  description: Feedback requested by one or more users
+  color: c8d6e5
+- name: "meta: good first issue"
+  description: Simple issues to start contributing
+  color: c8d6e5
+- name: "meta: idea"
+  description: Initial idea, anything that requires further discussion
+  color: c8d6e5
+- name: "meta: ready for merge"
+  description: PR is ready to be merged
+  color: c8d6e5
+- name: "meta: regression"
+  description: This issue represents a regression
+  color: c8d6e5
+- name: "needs: approval"
+  description: Needs review & approval before work can begin (post spec)
+  color: feca57
+- name: "needs: docs"
+  description: Needs documentation updates
+  color: feca57
+- name: "needs: more demand"
+  description: A feature that needs more demand before we'll consider developing
+  color: feca57
+- name: "needs: outside help"
+  description: Needs help outside of the Vector core team
+  color: feca57
+- name: "needs: reply"
+  description: Awaiting a reply from a core team member
+  color: feca57
+- name: "needs: spec"
+  description: Needs a specification before work can begin
+  color: feca57
+
+- name: "platform: docker"
+  description: Anything Docker related
+  color: ff9ff3
+- name: "platform: amazon linux"
+  description: Anything Amazon Linux related
+  color: ff9ff3
+- name: "platform: centos"
+  description: Anything CentOS related
+  color: ff9ff3
+- name: "platform: debian"
+  description: Anything Debian related
+  color: ff9ff3
+- name: "platform: macos"
+  description: Anything MacOS related
+  color: ff9ff3
+- name: "platform: raspbian"
+  description: Anything Raspbian related
+  color: ff9ff3
+- name: "platform: rhel"
+  description: Anything RHEL related
+  color: ff9ff3
+- name: "platform: ubuntu"
+  description: Anything Ubuntu related
+  color: ff9ff3
+- name: "platform: windows"
+  description: Anything Windows related
+  color: ff9ff3
+- name: "platform: dpkg"
+  description: Anything DPKG related
+  color: ff9ff3
+- name: "platform: homebrew"
+  description: Anything Homebrew related
+  color: ff9ff3
+- name: "platform: rpm"
+  description: Anything RPM related
+  color: ff9ff3
+- name: "platform: msi"
+  description: Anything MSI related
+  color: ff9ff3
+
+- name: "source: docker"
+  description: Anything `docker` source realted
+  color: ff9ff3
+- name: "source: file"
+  description: Anything `file` source realted
+  color: ff9ff3
+- name: "source: journald"
+  description: Anything `journald` source realted
+  color: ff9ff3
+- name: "source: kafka"
+  description: Anything `kafka` source realted
+  color: ff9ff3
+- name: "source: logplex"
+  description: Anything `logplex` source realted
+  color: ff9ff3
+- name: "source: prometheus"
+  description: Anything `prometheus` source realted
+  color: ff9ff3
+- name: "source: socket"
+  description: Anything `socket` source realted
+  color: ff9ff3
+- name: "source: splunk_hec"
+  description: Anything `splunk_hec` source realted
+  color: ff9ff3
+- name: "source: statsd"
+  description: Anything `statsd` source realted
+  color: ff9ff3
+- name: "source: stdin"
+  description: Anything `stdin` source realted
+  color: ff9ff3
+- name: "source: syslog"
+  description: Anything `syslog` source realted
+  color: ff9ff3
+- name: "source: vector"
+  description: Anything `vector` source realted
+  color: ff9ff3
+
+- name: "transform: add_fields"
+  description: Anything `add_fields` transform related
+  color: 54a0ff
+- name: "transform: add_tags"
+  description: Anything `add_tags` transform related
+  color: 54a0ff
+- name: "transform: ansi_stripper"
+  description: Anything `ansi_stripper` transform related
+  color: 54a0ff
+- name: "transform: aws_ec2_metadata"
+  description: Anything `aws_ec2_metadata` transform related
+  color: 54a0ff
+- name: "transform: coercer"
+  description: Anything `coercer` transform related
+  color: 54a0ff
+- name: "transform: concat"
+  description: Anything `concat` transform related
+  color: 54a0ff
+- name: "transform: field_filter"
+  description: Anything `field_filter` transform related
+  color: 54a0ff
+- name: "transform: geoip"
+  description: Anything `geoip` transform related
+  color: 54a0ff
+- name: "transform: grok_parser"
+  description: Anything `grok_parser` transform related
+  color: 54a0ff
+- name: "transform: json_parser"
+  description: Anything `json_parser` transform related
+  color: 54a0ff
+- name: "transform: log_to_metric"
+  description: Anything `log_to_metric` transform related
+  color: 54a0ff
+- name: "transform: logfmt_parser"
+  description: Anything `logfmt_parser` transform related
+  color: 54a0ff
+- name: "transform: lua"
+  description: Anything `lua` transform related
+  color: 54a0ff
+- name: "transform: regex_parser"
+  description: Anything `regex_parser` transform related
+  color: 54a0ff
+- name: "transform: remove_fields"
+  description: Anything `remove_fields` transform related
+  color: 54a0ff
+- name: "transform: remove_tags"
+  description: Anything `remove_tags` transform related
+  color: 54a0ff
+- name: "transform: sampler"
+  description: Anything `sampler` transform related
+  color: 54a0ff
+- name: "transform: split"
+  description: Anything `split` transform related
+  color: 54a0ff
+- name: "transform: tokenizer"
+  description: Anything `tokenizer` transform related
+  color: 54a0ff
+
+- name: "sink: aws_cloudwatch_logs"
+  description: Anything `aws_cloudwatch_logs` sink related
+  color: 4ddbfb
+- name: "sink: aws_cloudwatch_metrics"
+  description: Anything `aws_cloudwatch_metrics` sink related
+  color: 4ddbfb
+- name: "sink: aws_kinesis_firehose"
+  description: Anything `aws_kinesis_firehose` sink related
+  color: 4ddbfb
+- name: "sink: aws_kinesis_streams"
+  description: Anything `aws_kinesis_streams` sink related
+  color: 4ddbfb
+- name: "sink: aws_s3"
+  description: Anything `aws_s3` sink related
+  color: 4ddbfb
+- name: "sink: blackhole"
+  description: Anything `blackhole` sink related
+  color: 4ddbfb
+- name: "sink: clickhouse"
+  description: Anything `clickhouse` sink related
+  color: 4ddbfb
+- name: "sink: console"
+  description: Anything `console` sink related
+  color: 4ddbfb
+- name: "sink: datadog_metrics"
+  description: Anything `datadog_metrics` sink related
+  color: 4ddbfb
+- name: "sink: elasticsearch"
+  description: Anything `elasticsearch` sink related
+  color: 4ddbfb
+- name: "sink: file"
+  description: Anything `file` sink related
+  color: 4ddbfb
+- name: "sink: gcp_pubsub"
+  description: Anything `gcp_pubsub` sink related
+  color: 4ddbfb
+- name: "sink: gcp_stackdriver_logging"
+  description: Anything `gcp_stackdriver_logging` sink related
+  color: 4ddbfb
+- name: "sink: http"
+  description: Anything `http` sink related
+  color: 4ddbfb
+- name: "sink: kafka"
+  description: Anything `kafka` sink related
+  color: 4ddbfb
+- name: "sink: new_relic_logs"
+  description: Anything `new_relic_logs` sink related
+  color: 4ddbfb
+- name: "sink: prometheus"
+  description: Anything `prometheus` sink related
+  color: 4ddbfb
+- name: "sink: sematext"
+  description: Anything `sematext` sink related
+  color: 4ddbfb
+- name: "sink: socket"
+  description: Anything `socket` sink related
+  color: 4ddbfb
+- name: "sink: splunk_hec"
+  description: Anything `splunk_hec` sink related
+  color: 4ddbfb
+- name: "sink: statsd"
+  description: Anything `statsd` sink related
+  color: 4ddbfb
+- name: "sink: vector"
+  description: Anything `vector` sink related
+  color: 4ddbfb
+
+- name: "type: bug"
+  description: A user facing bug
+  color: ee5353
+- name: "type: enhancement"
+  description: Any change that enhances it's subject
+  color: 5f27cd
+- name: "type: help"
+  description: For general help. Also try https://chat.vector.dev.
+  color: 5f27cd
+- name: "type: new feature"
+  description: A new source, transform, sink, or entirely new feature.
+  color: 5f27cd
+- name: "type: performance"
+  description: Any change that significantly improves performance
+  color: 5f27cd
+- name: "type: task"
+  description: Generic tasks non-code related tasks
+  color: 5f27cd
+- name: "type: tech debt"
+  description: Anything internally focused that does not add external value to a user
+  color: 5f27cd

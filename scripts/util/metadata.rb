@@ -30,6 +30,7 @@ class Metadata
   end
 
   attr_reader :blog_posts,
+    :domains,
     :env_vars,
     :installation,
     :links,
@@ -54,6 +55,10 @@ class Metadata
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
     @testing = Option.build_struct(hash.fetch("testing"))
+
+    # domains
+
+    @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
 
     # installation
 
