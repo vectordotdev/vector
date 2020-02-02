@@ -132,7 +132,7 @@ import Field from '@site/src/components/Field';
 
 ### assume_role
 
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -790,6 +790,12 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
+
+#### Assuming Roles
+
+Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
+optional setting that is helpful for a variety of use cases, such as cross
+account access.
 
 ### Buffers & Batches
 

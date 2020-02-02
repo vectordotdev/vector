@@ -38,14 +38,19 @@ dry_run = ARGV.include?("--dry-run")
 # Functions
 #
 
-def doc_valid?(file_or_dir)
-  parts = file_or_dir.split("#", 2)
-  path = DOCS_ROOT + parts[0]
+def doc_valid?(url_path)
+  parts = url_path.split("#", 2)
+  file_or_dir_path = WEBSITE_ROOT + parts[0][0..-2]
   anchor = parts[1]
+  file_path =
+    if File.directory?(file_or_dir_path) && File.file?("#{file_or_dir_path}/README.md")
+      "#{file_or_dir_path}/README.md"
+    else
+      "#{file_or_dir_path}.md"
+    end
 
-  if File.exists?(path)
+  if File.exists?(file_path)
     if !anchor.nil?
-      file_path = File.directory?(path) ? "#{path}/README.md" : path
       content = File.read(file_path)
       headings = content.scan(/\n###?#?#? (.*)\n/).flatten.uniq
       anchors = headings.collect(&:parameterize)
