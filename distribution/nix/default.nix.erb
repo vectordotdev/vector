@@ -1,0 +1,67 @@
+# Taken from https://github.com/nixos/nixpkgs
+
+{ stdenv, lib, fetchFromGitHub, rustPlatform
+, openssl, pkgconfig, protobuf
+, Security, libiconv, rdkafka, cmake
+, tzdata
+
+, features ?
+    (if stdenv.isAarch64
+     then [ "shiplift/unix-socket" "jemallocator" "rdkafka" "rdkafka/dynamic_linking" ]
+     else [ "leveldb" "leveldb/leveldb-sys-2" "shiplift/unix-socket" "jemallocator" "rdkafka" "rdkafka/dynamic_linking" ])
+}:
+
+rustPlatform.buildRustPackage rec {
+  pname = "vector";
+  version = "<%=
+    require "toml-rb"
+    TomlRB.load_file("Cargo.toml")["package"]["version"]
+  %>";
+
+  src = <% if ENV.has_key?("GITHUB_SHA256") %>fetchFromGitHub {
+      owner  = "timberio";
+      repo   = pname;
+      rev    = "refs/tags/v${version}";
+      sha256 = "<%= ENV["GITHUB_SHA256"] %>";
+    }<% else %><%= Dir.getwd %><% end %>;
+
+  cargoSha256 = "<%=
+    # The only offical way to calculate `cargoSha256` is to set it arbitrarily,
+    # run the build, and then extract the correct checksum from the error
+    # message. See
+    # https://nixos.org/nixpkgs/manual/#compiling-rust-applications-with-cargo
+    # for details.
+
+    if ENV.has_key?("CARGO_SHA256")
+      ENV["CARGO_SHA256"]
+    else
+    require 'open3'
+
+      _, output, _ = Open3.capture3({ "CARGO_SHA256" => "1" * 52 }, "./scripts/verify-nix.sh")
+      expected_sha256 = output
+        .split("\n")
+        .select { |s| s =~ /got:.*sha256:/ }
+        .map { |s| s.split(":")[-1] }
+        .first
+
+      expected_sha256
+    end
+  %>";
+  buildInputs = [ openssl pkgconfig protobuf rdkafka cmake ]
+                ++ stdenv.lib.optional stdenv.isDarwin [ Security libiconv ];
+
+  # needed for internal protobuf c wrapper library
+  PROTOC="${protobuf}/bin/protoc";
+  PROTOC_INCLUDE="${protobuf}/include";
+
+  cargoBuildFlags = [ "--no-default-features" "--features" "${lib.concatStringsSep "," features}" ];
+  checkPhase = "TZDIR=${tzdata}/share/zoneinfo cargo test --no-default-features --features ${lib.concatStringsSep "," features}";
+
+  meta = with stdenv.lib; {
+    description = "A high-performance logs, metrics, and events router";
+    homepage    = "https://github.com/timberio/vector";
+    license     = with licenses; [ asl20 ];
+    maintainers = with maintainers; [ thoughtpolice ];
+    platforms   = platforms.all;
+  };
+}

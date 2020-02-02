@@ -1,4 +1,5 @@
 [sinks.prometheus]
+title = "Prometheus"
 beta = true
 buffer = false
 common = true
@@ -13,14 +14,14 @@ write_to_description = "[Prometheus][urls.prometheus] metrics service"
 type = "string"
 common = true
 examples = ["0.0.0.0:9598"]
-null = false
+required = true
 description = "The address to expose for scraping."
 
 [sinks.prometheus.options.namespace]
 type = "string"
 common = true
 examples = ["service"]
-null = false
+required = true
 description = """\
 A prefix that will be added to all metric names.
 It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].\
@@ -29,33 +30,52 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-null = false
+required = true
 unit = "seconds"
 description = """\
-Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics.\
+Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms.\
+"""
+
+[sinks.prometheus.options.flush_period_secs]
+type = "int"
+default = 60
+required = true
+unit = "seconds"
+description = """\
+Time interval between [set][docs.data-model.metric#set] values are reset.\
 """
 
 [[sinks.prometheus.output.examples]]
 label = "Histograms"
-input.type = "json"
-input.body = """\
+body = """\
+Given the following histogram metric events:
+
+```json
 [
   {
-    "histogram": {
-      "name": "response_time_s",
-      "val": 0.243
+    "name": "response_time_s",
+    "kind": "incremental",
+    "value": {
+      "type": "distribution",
+      "values": [0.243],
+      "sample_rates": [1.0]
     }
   },
   {
-    "histogram": {
-      "name": "response_time_s",
-      "val": 0.546
+    "name": "response_time_s",
+    "kind": "incremental",
+    "value": {
+      "type": "distribution",
+      "values": [0.546],
+      "sample_rates": [1.0]
     }
   }
-]\
-"""
-output.type = "text"
-output.body = """\
+]
+```
+
+This sink will output the following:
+
+```text
 # HELP response_time_s response_time_s
 # TYPE response_time_s histogram
 response_time_s_bucket{le="0.005"} 0
@@ -71,59 +91,75 @@ response_time_s_bucket{le="5.0"} 0
 response_time_s_bucket{le="10.0"} 0
 response_time_s_bucket{le="+Inf"} 0
 response_time_s_sum 0.789
-response_time_s_count 2\
+response_time_s_count 2
+```\
 """
 
 [[sinks.prometheus.output.examples]]
 label = "Counters"
-input.type = "json"
-input.body = """\
+body = """
+Given the following counter metric events:
+
+```json
 [
   {
-    "counter": {
-      "name": "logins",
-      "val": 1
+    "name": "logins",
+    "kind": "incremental",
+    "value": {
+      "type": "counter",
+      "value": 1.0
     }
   },
   {
-    "counter": {
-      "name": "logins",
-      "val": 3
+    "name": "logins",
+    "kind": "incremental",
+    "value": {
+      "type": "counter",
+      "value": 3.0
     }
   }
-]\
-"""
-output.type = "text"
-output.body = """\
+]
+
+This sink will output the following:
+
+```text
 # HELP logins logins
 # TYPE logins counter
 logins 4
+```\
 """
 
 [[sinks.prometheus.output.examples]]
 label = "Gauges"
-input.type = "json"
-input.body = """\
+body = """\
+Given the following gauge metric events:
+
+```json
 [
   {
-    "gauge": {
-      "name": "memory_rss",
-      "val": 250,
-      "direction": "plus"
+    "name": "memory_rss",
+    "kind": "incremental",
+    "value": {
+      "type": "gauge",
+      "value": 250.0
     }
   },
   {
-    "gauge": {
-      "name": "memory_rss",
-      "val": 25
-      "direction": "minus"
+    "name": "memory_rss",
+    "kind": "incremental",
+    "value": {
+      "type": "gauge",
+      "value": -25.0
     }
   }
-]\
-"""
-output.type = "text"
-output.body = """\
+]
+```
+
+This sink will output the following:
+
+```text
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225
+```\
 """

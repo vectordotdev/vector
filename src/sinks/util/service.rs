@@ -16,6 +16,9 @@ use tower::{
     Service, ServiceBuilder,
 };
 
+pub type TowerBatchedSink<T, L, B, S> =
+    BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>;
+
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
     where
@@ -52,42 +55,41 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig {
-    pub request_in_flight_limit: Option<usize>,        // 5
-    pub request_timeout_secs: Option<u64>,             // 60
-    pub request_rate_limit_duration_secs: Option<u64>, // 1
-    pub request_rate_limit_num: Option<u64>,           // 5
-    pub request_retry_attempts: Option<usize>,         // max_value()
-    pub request_retry_backoff_secs: Option<u64>,       // 1
+    pub in_flight_limit: Option<usize>,        // 5
+    pub timeout_secs: Option<u64>,             // 60
+    pub rate_limit_duration_secs: Option<u64>, // 1
+    pub rate_limit_num: Option<u64>,           // 5
+    pub retry_attempts: Option<usize>,         // max_value()
+    pub retry_max_duration_secs: Option<u64>,
+    pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
 impl TowerRequestConfig {
     pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
         TowerRequestSettings {
             in_flight_limit: self
-                .request_in_flight_limit
-                .or(defaults.request_in_flight_limit)
+                .in_flight_limit
+                .or(defaults.in_flight_limit)
                 .unwrap_or(5),
-            timeout: Duration::from_secs(
-                self.request_timeout_secs
-                    .or(defaults.request_timeout_secs)
-                    .unwrap_or(60),
-            ),
+            timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
-                self.request_rate_limit_duration_secs
-                    .or(defaults.request_rate_limit_duration_secs)
+                self.rate_limit_duration_secs
+                    .or(defaults.rate_limit_duration_secs)
                     .unwrap_or(1),
             ),
-            rate_limit_num: self
-                .request_rate_limit_num
-                .or(defaults.request_rate_limit_num)
-                .unwrap_or(5),
+            rate_limit_num: self.rate_limit_num.or(defaults.rate_limit_num).unwrap_or(5),
             retry_attempts: self
-                .request_retry_attempts
-                .or(defaults.request_retry_attempts)
+                .retry_attempts
+                .or(defaults.retry_attempts)
                 .unwrap_or(usize::max_value()),
-            retry_backoff: Duration::from_secs(
-                self.request_retry_backoff_secs
-                    .or(defaults.request_retry_backoff_secs)
+            retry_max_duration_secs: Duration::from_secs(
+                self.retry_max_duration_secs
+                    .or(defaults.retry_max_duration_secs)
+                    .unwrap_or(3600),
+            ),
+            retry_initial_backoff_secs: Duration::from_secs(
+                self.retry_initial_backoff_secs
+                    .or(defaults.retry_initial_backoff_secs)
                     .unwrap_or(1),
             ),
         }
@@ -101,12 +103,18 @@ pub struct TowerRequestSettings {
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
     pub retry_attempts: usize,
-    pub retry_backoff: Duration,
+    pub retry_max_duration_secs: Duration,
+    pub retry_initial_backoff_secs: Duration,
 }
 
 impl TowerRequestSettings {
     pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
-        FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
+        FixedRetryPolicy::new(
+            self.retry_attempts,
+            self.retry_initial_backoff_secs,
+            self.retry_max_duration_secs,
+            logic,
+        )
     }
 
     pub fn batch_sink<B, L, S, T>(
@@ -114,7 +122,7 @@ impl TowerRequestSettings {
         retry_logic: L,
         service: S,
         acker: Acker,
-    ) -> BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>
+    ) -> TowerBatchedSink<T, L, B, S>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
     // `trait SinkExt` above), as it is missing a bound on the
@@ -207,7 +215,7 @@ where
     type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+        self.inner.poll_ready().map_err(Into::into)
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
@@ -223,5 +231,35 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
             f: self.f.clone(),
             inner: self.inner.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::Future;
+    use std::sync::Arc;
+    use tokio01_test::{assert_ready, task::MockTask};
+    use tower::layer::Layer;
+    use tower_test::{assert_request_eq, mock};
+
+    #[test]
+    fn map() {
+        let mut task = MockTask::new();
+        let (mock, mut handle) = mock::pair();
+
+        let f = |r| r;
+
+        let map_layer = MapLayer { f: Arc::new(f) };
+
+        let mut svc = map_layer.layer(mock);
+
+        task.enter(|| assert_ready!(svc.poll_ready()));
+
+        let res = svc.call("hello world");
+
+        assert_request_eq!(handle, "hello world").send_response("world bye");
+
+        res.wait().unwrap();
     }
 }

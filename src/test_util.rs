@@ -42,6 +42,8 @@ pub fn trace_init() {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_env_filter(env)
         .finish();
+
+    let _ = tracing_log::LogTracer::init();
     let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
 }
 
@@ -106,7 +108,7 @@ pub fn random_nested_events_with_stream(
 
         let tree = random_pseudonested_map(len, breadth, depth);
         for (k, v) in tree.into_iter() {
-            log.insert_explicit(k.into(), v.into())
+            log.insert(k, v)
         }
 
         Event::Log(log)

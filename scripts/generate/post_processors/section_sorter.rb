@@ -42,8 +42,8 @@ module PostProcessors
             depth = matches.fetch(0)
             title = matches.fetch(1)
             sort_flag = matches.fetch(2)
-            
-            part = 
+
+            part =
               content.
                 split("\n#{depth} #{title} #{sort_flag}\n").
                 last.

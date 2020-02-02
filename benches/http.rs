@@ -22,12 +22,15 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+                config.add_source(
+                    "in",
+                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                );
                 config.add_sink(
                     "out",
                     &["in"],
                     sinks::http::HttpSinkConfig {
-                        uri: out_addr.to_string(),
+                        uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                         compression: Some(sinks::util::Compression::None),
                         ..Default::default()
                     },
@@ -52,7 +55,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("http", bench);
 }
@@ -70,12 +73,15 @@ fn benchmark_http_gzip(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut config = config::Config::empty();
-                config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+                config.add_source(
+                    "in",
+                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                );
                 config.add_sink(
                     "out",
                     &["in"],
                     sinks::http::HttpSinkConfig {
-                        uri: out_addr.to_string(),
+                        uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                         ..Default::default()
                     },
                 );
@@ -99,7 +105,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u32));
+    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("http", bench);
 }

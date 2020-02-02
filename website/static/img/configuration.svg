@@ -53,13 +53,13 @@
                     <tspan x="711" y="492" fill="#000000">4. Aggregate &amp; Search</tspan>
                     <tspan x="711" y="516" font-weight="normal" fill="#000000">Stream your data to Elasticsearch (or the storage of your </tspan>
                     <tspan x="711" y="540" font-weight="normal" fill="#000000">choice) to aggregate, search, and analyze.</tspan>
-                    <a href="/docs/reference/sinks/elasticsearch"><tspan x="711" y="564" font-weight="normal" fill="#10E7FF">View the elasticsearch sink</tspan></a>
+                    <a href="/docs/reference/sinks/elasticsearch"><tspan x="711" y="564" font-weight="normal" fill="#10E7FF">View the Elasticsearch sink</tspan></a>
                 </text>
                 <text font-size="16" font-weight="bold" line-spacing="24">
                     <tspan x="711" y="624" fill="#000000">5. Archive</tspan>
                     <tspan x="711" y="648" font-weight="normal" fill="#000000">Archive everything in a compressed format in a cheap </tspan>
                     <tspan x="711" y="672" font-weight="normal" fill="#000000">durable storage like S3.</tspan>
-                    <a href="/docs/reference/sinks/aws_s3"><tspan x="711" y="696" font-weight="normal" fill="#10E7FF">View the s3 sink</tspan></a>
+                    <a href="/docs/reference/sinks/aws_s3"><tspan x="711" y="696" font-weight="normal" fill="#10E7FF">View the AWS S3 sink</tspan></a>
                 </text>
                 <text font-family="Courier-Bold, Courier" font-size="14" font-weight="bold" line-spacing="26" letter-spacing="0.3">
                     <tspan x="67" y="48" fill="#B963CE">[sources.nginx_error_log]</tspan>
@@ -88,7 +88,7 @@
                     <tspan x="67" y="594" fill="#0092A8"></tspan>
                     <tspan x="67" y="620" fill="#0092A8">[sinks.s3_archive]</tspan>
                     <tspan x="67" y="646" fill="#0092A8">  inputs = ['nginx_error_parser']</tspan>
-                    <tspan x="67" y="672" fill="#0092A8">  type   = 's3'</tspan>
+                    <tspan x="67" y="672" fill="#0092A8">  type   = 'aws_s3'</tspan>
                     <tspan x="67" y="698" fill="#0092A8">  region = 'us-east-1'</tspan>
                     <tspan x="67" y="724" fill="#0092A8">  bucket = 'log-archives'</tspan>
                 </text>

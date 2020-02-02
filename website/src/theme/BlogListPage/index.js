@@ -36,25 +36,25 @@ function BlogListPage(props) {
         <div className="blog-list--filters">
           <a href="/blog/rss.xml" style={{float: 'right', fontSize: '1.5em', marginTop: '0px', marginLeft: '-30px', width: '30px'}}><i className="feather icon-rss"></i></a>
           <h1>The Vector Blog</h1>
-          <p>Thoughts on logs, metrics, and all things observability from the <Link to="/community#team">Vector & Timber.io team</Link>.</p>
+          <p>Thoughts on monitoring and observability from the <Link to="/community/#team">Vector & Timber.io team</Link>.</p>
 
           <h3>Types</h3>
 
           <ul className="filters unstyled">
             {typeTags.map((tag, idx) => (
-              <li><Link to={tag.permalink} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
+              <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--pink">{tag.value}</Link></li>
             ))}
           </ul>
 
           <h3>Domains</h3>
-          
+
           <ul className="filters unstyled">
             {domainTags.map((tag, idx) => (
-              <li><Link to={tag.permalink} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
+              <li key={idx}><Link to={tag.permalink + '/'} className="badge badge--rounded badge--blue">{tag.value}</Link></li>
             ))}
           </ul>
 
-          <MailingListForm block={true} />
+          <MailingListForm block={true} buttonClass="highlight" />
         </div>
         <div className="blog-list--items">
           {items.map(({content: BlogPostContent}) => (

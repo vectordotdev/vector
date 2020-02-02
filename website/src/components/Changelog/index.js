@@ -24,7 +24,7 @@ function Commit({commit, setSearchTerm}) {
         </span>)}
       </div>
       <AnchoredH4 id={commit.sha}>
-        <span className="badge badge--primary link" onClick={() => setSearchTerm(commit.scope.name)}>{commit.scope.name}</span>&nbsp;
+        <span className="badge badge--primary badge--small link" onClick={() => setSearchTerm(commit.scope.name)}>{commit.scope.name}</span>&nbsp;
         {commit.description}
       </AnchoredH4>
     </div>

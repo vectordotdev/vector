@@ -6,14 +6,16 @@
  */
 
 import React from 'react';
-import classnames from 'classnames';
 
 import Link from '@docusaurus/Link';
+import MailingListForm from '@site/src/components/MailingListForm';
 import SVG from 'react-inlinesvg';
 
+import classnames from 'classnames';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './styles.module.css';
+
 
 function FooterLink({to, href, label, ...props}) {
   const toUrl = useBaseUrl(to);
@@ -60,6 +62,23 @@ function Footer() {
       <div className="container">
         {links && links.length > 0 && (
           <div className="row footer__links">
+            <div className="col col--5 footer__col">
+              <div className="margin-bottom--md">
+                <SVG className="navbar__logo" src="/img/logo-light.svg" alt="Vector" width="150" height="auto" />
+              </div>
+              <div className="margin-bottom--md">
+                <MailingListForm description={false} width="150px" />
+              </div>
+              <div>
+                <a href="https://twitter.com/vectordotdev" target="_blank"><i className="feather icon-twitter" alt="Vector's Twitter"></i></a>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="https://chat.vector.dev" target="_blank"><i className="feather icon-message-circle" alt="Vector's Chat"></i></a>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="https://github.com/timberio/vector" target="_blank"><i className="feather icon-github" alt="Vector's Github Repo"></i></a>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="https://vector.dev/blog/atom.xml" target="_blank"><i className="feather icon-rss" alt="Vector's RSS feed"></i></a>
+              </div>
+            </div>
             {links.map((linkItem, i) => (
               <div key={i} className="col footer__col">
                 {linkItem.title != null ? (

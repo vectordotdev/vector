@@ -14,9 +14,9 @@ import './styles.css';
 
 function Component({delivery_guarantee, description, event_types, name, status, type}) {
   let path = null;
-  if(type == "source") path = `/docs/reference/sources/${name}`;
-  if(type == "transform") path = `/docs/reference/transforms/${name}`;
-  if(type == "sink") path = `/docs/reference/sinks/${name}`;
+  if(type == "source") path = `/docs/reference/sources/${name}/`;
+  if(type == "transform") path = `/docs/reference/transforms/${name}/`;
+  if(type == "sink") path = `/docs/reference/sinks/${name}/`;
 
   return (
     <Link to={path} className="vector-component">
@@ -163,7 +163,7 @@ function VectorComponents(props) {
   }
 
   if (onlyProviders.size > 0) {
-    components = components.filter(component => onlyProviders.has(component.service_provider) );
+    components = components.filter(component => Array.from(onlyProviders).every(x => component.service_providers && component.service_providers.includes(x)));
   }
 
   //
@@ -181,7 +181,8 @@ function VectorComponents(props) {
 
   const serviceProviders = new Set(
     _(components).
-      map(component => component.service_provider).
+      map(component => component.service_providers).
+      flatten().
       uniq().
       compact().
       sort().
@@ -210,7 +211,7 @@ function VectorComponents(props) {
         </div>
         <div className="filter">
           <div className="filter--label">
-            <Link to="/docs/about/data-model" title="Learn more about Vector's event types">
+            <Link to="/docs/about/data-model/" title="Learn more about Vector's event types">
               Event types <i className="feather icon-info"></i>
             </Link>
           </div>
@@ -231,7 +232,7 @@ function VectorComponents(props) {
         </div>
         <div className="filter">
           <div className="filter--label">
-            <Link to="/docs/about/guarantees" title="Learn more about Vector's guarantees">
+            <Link to="/docs/about/guarantees/" title="Learn more about Vector's guarantees">
               Guarantees <i className="feather icon-info"></i>
             </Link>
           </div>
@@ -252,10 +253,35 @@ function VectorComponents(props) {
             </label>
           </div>
         </div>
-        {operatingSystems.length > 0 && (
+        <div className="filter">
+          <div className="filter--label">Functions</div>
+          <div className="filter--choices">
+            <CheckboxList
+              label="Functions"
+              icon="settings"
+              values={functionCategories}
+              humanize={true}
+              currentState={onlyFunctions}
+              setState={setOnlyFunctions} />
+          </div>
+        </div>
+        {serviceProviders.size > 0 && (
+          <div className="filter">
+            <div className="filter--label">Providers</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Providers"
+                icon="cloud"
+                values={serviceProviders}
+                currentState={onlyProviders}
+                setState={setOnlyProviders} />
+            </div>
+          </div>
+        )}
+        {operatingSystems.size > 0 && (
           <div className="filter">
             <div className="filter--label">
-              <Link to="/docs/installation/operating-systems" title="Learn more about Vector's operating systems">
+              <Link to="/docs/setup/installation/operating-systems/" title="Learn more about Vector's operating systems">
                 Operating Systems
               </Link>
             </div>
@@ -269,30 +295,6 @@ function VectorComponents(props) {
             </div>
           </div>
         )}
-        {serviceProviders.length > 0 && (
-          <div className="filter">
-            <div className="filter--label">Providers</div>
-            <div className="filter--choices">
-              <CheckboxList
-                label="Providers"
-                icon="cloud"
-                values={serviceProviders}
-                currentState={onlyProviders}
-                setState={setOnlyProviders} />
-            </div>
-          </div>
-        )}
-        <div className="filter">
-          <div className="filter--label">Functions</div>
-          <div className="filter--choices">
-            <CheckboxList
-              label="Functions"
-              icon="code"
-              values={functionCategories}
-              currentState={onlyFunctions}
-              setState={setOnlyFunctions} />
-          </div>
-        </div>
       </div>
       <div className="vector-components--results">
         <Components components={components} headingLevel={props.headingLevel} titles={titles} />

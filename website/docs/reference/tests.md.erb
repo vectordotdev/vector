@@ -1,6 +1,6 @@
 ---
 title: Unit Tests
-description: Unit test configuration options
+description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
 ---
 

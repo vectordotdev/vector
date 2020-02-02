@@ -2,7 +2,7 @@
 id: how-we-test-vector
 title: "How we test Vector"
 description: "A survey of techniques we've found useful"
-author_id: "luke"
+author_github: https://github.com/lukesteensen
 tags: ["type: post", "domain: testing"]
 ---
 

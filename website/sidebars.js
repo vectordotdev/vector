@@ -9,7 +9,7 @@ module.exports = {
         "about/concepts",
         {
           type: 'category',
-          label: 'Data Model',
+          label: 'Data Model (Event)',
           items: [
             "about/data-model",
             "about/data-model/log",
@@ -68,7 +68,7 @@ module.exports = {
               items: [
                 "setup/installation/manual",
                 "setup/installation/manual/from-archives",
-                "setup/installation/manual/from-source",              
+                "setup/installation/manual/from-source",
               ],
             },
           ],
@@ -97,8 +97,8 @@ module.exports = {
           items: [
             "setup/guides",
             "setup/guides/getting-started",
-            "setup/guides/troubleshooting",
             "setup/guides/unit-testing",
+            "setup/guides/troubleshooting",
           ]
         },
       ],
@@ -122,6 +122,12 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/logplex",
+            
+              "reference/sources/prometheus",
+            
+              "reference/sources/socket",
+            
               "reference/sources/splunk_hec",
             
               "reference/sources/statsd",
@@ -129,10 +135,6 @@ module.exports = {
               "reference/sources/stdin",
             
               "reference/sources/syslog",
-            
-              "reference/sources/tcp",
-            
-              "reference/sources/udp",
             
               "reference/sources/vector",
             
@@ -150,7 +152,11 @@ module.exports = {
             
               "reference/transforms/ansi_stripper",
             
+              "reference/transforms/aws_ec2_metadata",
+            
               "reference/transforms/coercer",
+            
+              "reference/transforms/concat",
             
               "reference/transforms/field_filter",
             
@@ -161,6 +167,8 @@ module.exports = {
               "reference/transforms/json_parser",
             
               "reference/transforms/log_to_metric",
+            
+              "reference/transforms/logfmt_parser",
             
               "reference/transforms/lua",
             
@@ -188,6 +196,8 @@ module.exports = {
             
               "reference/sinks/aws_cloudwatch_metrics",
             
+              "reference/sinks/aws_kinesis_firehose",
+            
               "reference/sinks/aws_kinesis_streams",
             
               "reference/sinks/aws_s3",
@@ -204,6 +214,10 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_pubsub",
+            
+              "reference/sinks/gcp_stackdriver_logging",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",
@@ -212,11 +226,13 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
+              "reference/sinks/sematext",
+            
+              "reference/sinks/socket",
+            
               "reference/sinks/splunk_hec",
             
               "reference/sinks/statsd",
-            
-              "reference/sinks/tcp",
             
               "reference/sinks/vector",
             
@@ -250,6 +266,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Security',
+          href: 'https://github.com/timberio/vector/security/policy'
+        },
       ],
     },
   ]

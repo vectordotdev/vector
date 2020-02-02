@@ -43,13 +43,17 @@ docker buildx create --use --name vector-builder
 docker buildx install
 
 if [[ "$CHANNEL" == "latest" ]]; then
-  build alpine latest
-  build alpine $VERSION
-  build debian latest
-  build debian $VERSION
+  version_exact=$VERSION
+  version_minor_x=$(echo $VERSION | sed 's/\.[0-9]*$/.X/g')
+  version_major_x=$(echo $VERSION | sed 's/\.[0-9]*\.[0-9]*$/.X/g')
+
+  for i in $version_exact $version_minor_x $version_major_x latest; do
+    build alpine $i
+    build debian $i
+  done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  build alpine nightly
-  build alpine nightly-$DATE
-  build debian nightly
-  build debian nightly-$DATE
+  for i in nightly-$DATE nightly; do
+    build alpine $i
+    build debian $i
+  done
 fi

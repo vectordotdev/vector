@@ -33,13 +33,12 @@ const AnchoredH2 = Heading('h2');
 
 const features = [
   {
-    title: 'Blistering Fast',
+    title: 'Fast. Really.',
     icon: 'zap',
     description: (
       <>
-        Built in Rust, Vector is <a href="#performance">blistering fast and
-        memory efficient</a>. It's designed to handle the most demanding
-        environments.
+        Built in <a href="https://www.rust-lang.org/">Rust</a>, Vector is <a href="#performance">blistering fast and
+        memory efficient</a>. It's designed to handle the most demanding environments.
       </>
     ),
   },
@@ -48,12 +47,12 @@ const features = [
     icon: 'unlock',
     description: (
       <>
-        Vector does not favor any specific storage. It fosters a fair, open ecosystem with the user's best interest in mind.
+        Vector does not favor any storage and fosters a fair, open ecosystem with your best interest in mind. Lock-in free and future proof.
       </>
     ),
   },
   {
-    title: 'Agent or Service',
+    title: 'One Tool',
     icon: 'codepen',
     description: (
       <>
@@ -62,11 +61,11 @@ const features = [
     ),
   },
   {
-    title: 'Logs, Metrics, & Events',
+    title: 'All Data',
     icon: 'shuffle',
     description: (
       <>
-        Vector unifies <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link> at the source, making it easy to collect and ship all observability data.
+        Vector supports <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link>, making it easy to collect and process <i>all</i> observability data.
       </>
     ),
   },
@@ -75,7 +74,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of a programmable runtime. Handle complex use cases with ease!
+        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of programmable runtimes. Handle complex use cases without limitation.
       </>
     ),
   },
@@ -84,7 +83,7 @@ const features = [
     icon: 'shield',
     description: (
       <>
-        Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
+        Guarantees matter, and Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
       </>
     ),
   },
@@ -96,7 +95,7 @@ function Features({features}) {
   let i,j,temparray,chunk = 3;
   for (i=0,j=features.length; i<j; i+=chunk) {
     let featuresChunk = features.slice(i,i+chunk);
-    
+
     rows.push(
       <div key={`features${i}`} className="row">
         {featuresChunk.map((props, idx) => (
@@ -109,7 +108,7 @@ function Features({features}) {
   return (
     <section className={styles.features}>
       <div className="container">
-        <AnchoredH2 id="features">Features</AnchoredH2>
+        <AnchoredH2 id="features">Why Vector?</AnchoredH2>
         {rows}
       </div>
     </section>
@@ -132,8 +131,8 @@ function Performance() {
   return (
     <section className={styles.performance}>
       <div className="container">
-        <AnchoredH2 id="performance">Outperforms</AnchoredH2>
-        <div className="sub-title">Higher throughout with a lower memory footprint</div>
+        <AnchoredH2 id="performance">Performance That Doesn't Deter</AnchoredH2>
+        <div className="sub-title">Built for the most demanding production environments</div>
 
         <PerformanceTests />
       </div>
@@ -145,8 +144,8 @@ function Correctness() {
   return (
     <section className={styles.correctness}>
       <div className="container">
-        <AnchoredH2 id="correctness">Correct</AnchoredH2>
-        <div className="sub-title">Obsessed with the details and getting it right</div>
+        <AnchoredH2 id="correctness">Correct To The Smallest Details</AnchoredH2>
+        <div className="sub-title">We're obsessed with getting the details right</div>
 
         <div className="table-responsive">
           <table className="comparison">
@@ -258,14 +257,15 @@ function Integrations() {
     'lua_transform': 'medium',
     'prometheus_sink': 'large',
     'regex_parser': 'medium',
+    'socket_sink': 'medium',
     'syslog_source': 'medium',
   }
 
   return (
     <section className={classnames(styles.integrations, 'integrations')}>
       <div className="container">
-        <AnchoredH2 id="integrations">Integrates With Everything</AnchoredH2>
-        <div className="sub-title">Sources, transforms, and sinks make it easy to compose pipelines</div>
+        <AnchoredH2 id="integrations">Quality Integrations Built Into The Core</AnchoredH2>
+        <div className="sub-title">Actively maintained integrations. Gone are the days of dormant low-quality plugins.</div>
 
         <div className={classnames(styles.components, 'components')}>
           <h3>
@@ -278,13 +278,13 @@ function Integrations() {
           <div className={styles.componentsCanvas} id="component-canvas"></div>
           <ul>
             {Object.keys(sources).map((key, index) => (
-              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}`}>{sources[key].name}</Link></li>
+              <li className={classes[`${key}_source`]} key={index}><Link to={`/docs/reference/sources/${key}/`}>{sources[key].name}</Link></li>
             ))}
             {Object.keys(transforms).map((key, index) => (
-              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}`}>{transforms[key].name}</Link></li>
+              <li className={classes[`${key}_transform`]} key={index}><Link to={`/docs/reference/transforms/${key}/`}>{transforms[key].name}</Link></li>
             ))}
             {Object.keys(sinks).map((key, index) => (
-              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}`}>{sinks[key].name}</Link></li>
+              <li className={classes[`${key}_sink`]} key={index}><Link to={`/docs/reference/sinks/${key}/`}>{sinks[key].name}</Link></li>
             ))}
           </ul>
         </div>
@@ -312,8 +312,8 @@ function Topologies() {
   return (
     <section className="topologies">
       <div className="container">
-        <AnchoredH2 id="topologies">One Tool For Any Topology</AnchoredH2>
-        <div className="sub-title">One tool, one mental model, gets data from A to B</div>
+        <AnchoredH2 id="topologies">One Tool For Your Entire Pipeline</AnchoredH2>
+        <div className="sub-title">Get data from A to B without patching tools together</div>
 
         <Tabs
           centered={true}
@@ -404,16 +404,16 @@ function Installation() {
 
         <div className="row">
           <div className="col">
-            <Jump to="/docs/setup/installation/containers">Containers</Jump>
+            <Jump to="/docs/setup/installation/containers/">Containers</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/package-managers">Package Managers</Jump>
+            <Jump to="/docs/setup/installation/package-managers/">Package Managers</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/operating-systems">Operating Systems</Jump>
+            <Jump to="/docs/setup/installation/operating-systems/">Operating Systems</Jump>
           </div>
           <div className="col">
-            <Jump to="/docs/setup/installation/manual">Manual</Jump>
+            <Jump to="/docs/setup/installation/manual/">Manual</Jump>
           </div>
         </div>
       </div>
@@ -433,10 +433,8 @@ function Home() {
   }, []);
 
   return (
-    <Layout
-      title={`${siteConfig.title}: ${siteConfig.tagline}`}
-      description={siteConfig.description}>
-      <header className={classnames('hero', styles.indexHeroBanner)}>
+    <Layout description={siteConfig.description}>
+      <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (
             <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>
@@ -450,16 +448,18 @@ function Home() {
               {newPost.title}
             </Link>
           )}
-          <h1>Vector Makes Observability Data Simple</h1>
-          <p className="hero__subtitle">
-            Vector is an <a href={repoUrl()}>open-source</a> utility for
-            collecting, transforming, and routing logs, metrics, and events.
+          <h1>Take Control Of Your Observability Data</h1>
+          <p className="hero--subtitle">
+            <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
           </p>
-          <div className="hero__buttons">
+          <div className="hero--buttons">
             <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
-            <Link to="/download" className="button button--primary">Download v{latest_release.version}</Link>
+            <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
+          <p className="hero--subsubtitle">
+            Vector is free and <a href="https://github.com/timberio/vector">open source</a>
+          </p>
         </div>
       </header>
       <main>

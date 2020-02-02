@@ -3,8 +3,6 @@
 #[macro_use]
 extern crate tracing;
 #[macro_use]
-extern crate prost_derive;
-#[macro_use]
 extern crate derivative;
 
 #[cfg(feature = "jemallocator")]

@@ -9,3 +9,4 @@ logs*/
 miniodat
 sample.log
 target
+node_modules

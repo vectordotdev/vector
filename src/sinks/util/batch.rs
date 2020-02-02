@@ -4,16 +4,31 @@ use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct BatchConfig {
-    pub batch_size: Option<usize>,
-    pub batch_timeout: Option<u64>,
+pub struct BatchBytesConfig {
+    pub max_size: Option<usize>,
+    pub timeout_secs: Option<u64>,
 }
 
-impl BatchConfig {
+impl BatchBytesConfig {
     pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
         BatchSettings {
-            size: self.batch_size.unwrap_or(size as usize),
-            timeout: Duration::from_secs(self.batch_timeout.unwrap_or(timeout)),
+            size: self.max_size.unwrap_or(size as usize),
+            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct BatchEventsConfig {
+    pub max_events: Option<usize>,
+    pub timeout_secs: Option<u64>,
+}
+
+impl BatchEventsConfig {
+    pub fn unwrap_or(&self, size: u64, timeout: u64) -> BatchSettings {
+        BatchSettings {
+            size: self.max_events.unwrap_or(size as usize),
+            timeout: Duration::from_secs(self.timeout_secs.unwrap_or(timeout)),
         }
     }
 }
@@ -84,6 +99,10 @@ where
 
     pub fn new_min(inner: S, batch: B, min_size: usize, max_linger: Option<Duration>) -> Self {
         Self::build(inner, batch, min_size, min_size, max_linger)
+    }
+
+    pub fn from_settings(inner: S, batch: B, settings: BatchSettings) -> Self {
+        Self::new_min(inner, batch, settings.size, settings.timeout.into())
     }
 
     fn build(

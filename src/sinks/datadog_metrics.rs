@@ -1,9 +1,8 @@
 use crate::{
-    buffers::Acker,
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        BatchConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -44,15 +43,15 @@ pub struct DatadogConfig {
     #[serde(default = "default_host")]
     pub host: String,
     pub api_key: String,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_retry_attempts: Some(5),
+        retry_attempts: Some(5),
         ..Default::default()
     };
 }
@@ -105,7 +104,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = DatadogSvc::new(self.clone(), cx.acker())?;
+        let sink = DatadogSvc::new(self.clone(), cx)?;
         let healthcheck = DatadogSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }
@@ -120,7 +119,7 @@ impl SinkConfig for DatadogConfig {
 }
 
 impl DatadogSvc {
-    pub fn new(config: DatadogConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+    pub fn new(config: DatadogConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
         let batch = config.batch.unwrap_or(20, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -128,7 +127,7 @@ impl DatadogSvc {
             .parse::<Uri>()
             .context(super::UriParseError)?;
 
-        let http_service = HttpService::new(move |body: Vec<u8>| {
+        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
@@ -146,7 +145,7 @@ impl DatadogSvc {
         };
 
         let sink = request
-            .batch_sink(HttpRetryLogic, datadog_http_service, acker)
+            .batch_sink(HttpRetryLogic, datadog_http_service, cx.acker())
             .batched_with_min(MetricBuffer::new(), &batch);
 
         Ok(Box::new(sink))
@@ -220,7 +219,7 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     }
 }
 
-fn stats(values: &Vec<f64>, counts: &Vec<u32>) -> Option<DatadogStats> {
+fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     if values.len() != counts.len() {
         return None;
     }
@@ -293,13 +292,15 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                         sample_rates,
                     } => {
                         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
-                        // <name>.avg
-                        // <name>.count
-                        // <name>.median
-                        // <name>.95percentile
-                        // <name>.max
                         if let Some(s) = stats(&values, &sample_rates) {
                             let mut result = vec![
+                                DatadogMetric {
+                                    metric: format!("{}.min", &fullname),
+                                    r#type: DatadogMetricType::Gauge,
+                                    interval: Some(interval),
+                                    points: vec![DatadogPoint(ts, s.min)],
+                                    tags: tags.clone(),
+                                },
                                 DatadogMetric {
                                     metric: format!("{}.avg", &fullname),
                                     r#type: DatadogMetricType::Gauge,
@@ -352,7 +353,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                         r#type: DatadogMetricType::Gauge,
                         interval: None,
                         points: vec![DatadogPoint(ts, values.len() as f64)],
-                        tags: tags.clone(),
+                        tags,
                     }]),
                     _ => None,
                 },
@@ -495,7 +496,7 @@ mod tests {
     #[test]
     fn test_dense_stats() {
         // https://github.com/DataDog/dd-agent/blob/master/tests/core/test_histogram.py
-        let values = (0..20).into_iter().map(f64::from).collect();
+        let values = (0..20).into_iter().map(f64::from).collect::<Vec<_>>();
         let counts = vec![1; 20];
 
         assert_eq!(
@@ -514,8 +515,8 @@ mod tests {
 
     #[test]
     fn test_sparse_stats() {
-        let values = (1..5).into_iter().map(f64::from).collect();
-        let counts = (1..5).into_iter().collect();
+        let values = (1..5).into_iter().map(f64::from).collect::<Vec<_>>();
+        let counts = (1..5).into_iter().collect::<Vec<_>>();
 
         assert_eq!(
             stats(&values, &counts),
@@ -595,7 +596,7 @@ mod tests {
 
         assert_eq!(
             json,
-            r#"{"series":[{"metric":"requests.avg","type":"gauge","interval":60,"points":[[1542182950,1.875]],"tags":null},{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,8.0]],"tags":null},{"metric":"requests.median","type":"gauge","interval":60,"points":[[1542182950,2.0]],"tags":null},{"metric":"requests.max","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null},{"metric":"requests.95percentile","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null}]}"#
+            r#"{"series":[{"metric":"requests.min","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null},{"metric":"requests.avg","type":"gauge","interval":60,"points":[[1542182950,1.875]],"tags":null},{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,8.0]],"tags":null},{"metric":"requests.median","type":"gauge","interval":60,"points":[[1542182950,2.0]],"tags":null},{"metric":"requests.max","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null},{"metric":"requests.95percentile","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null}]}"#
         );
     }
 }

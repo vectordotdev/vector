@@ -28,11 +28,12 @@ class Object
 
   def to_toml(hash_style: :expanded)
     if is_a?(Hash)
-      values = select { |_k, v| !v.nil? }.collect { |k, v| if k.include? "."
-        "\"#{k}\" = #{v.to_toml}"
-      else
-        "#{k} = #{v.to_toml}"
-      end}
+      values =
+        (hash_style == :flatten ? flatten : self).
+          select { |_k, v| !v.nil? }.
+          collect do |k, v|
+            "#{quote_toml_key(k)} = #{v.to_toml(hash_style: :inline)}"
+          end
 
       if hash_style == :inline
         "{#{values.join(", ")}}"
@@ -65,4 +66,13 @@ class Object
       raise "Unknown value type: #{self.class}"
     end
   end
+
+  private
+    def quote_toml_key(key)
+      if key.include?(".")
+        "\"#{key}\""
+      else
+        "#{key}"
+      end
+    end
 end

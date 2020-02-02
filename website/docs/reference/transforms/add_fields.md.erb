@@ -6,6 +6,16 @@
 
 <%= component_config_example(component) %>
 
+<%- if !component.requirements.nil? -%>
+## Requirements
+
+<Alert type="danger" fill={true} icon={false}>
+
+<%= component.requirements %>
+
+</Alert>
+
+<%- end -%>
 ## Options
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
@@ -16,49 +26,12 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output.log -%>
 ## Output
 
-Given the following configuration:
+<%= component_output(component, component.output.log, heading_depth: 3) %>
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[transforms.my_transform]
-  type = "add_fields"
-  inputs = [...]
-
-  [transforms.my_transform.fields]
-    field1 = "string value"
-    field2 = 1
-    field3 = 2.0
-    field4 = true
-    field5 = 2019-05-27T07:32:00Z
-    field6 = ["item 1", "item 2"]
-    field7.nested = "nested value",
-    field8 = "#{HOSTNAME}"
-```
-
-A [`log` event][docs.data-model.log] will be output with the following structure:
-
-```javascript
-{
-  // ... existing fields
-  "field1": "string value",
-  "field2": 1,
-  "field3": 2.0,
-  "field4": true,
-  "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6.0": "item1",
-  "field6.1": "item2",
-  "field7.nested": "nested value",
-  "field8": "my.hostname.com"
-}
-```
-
-While unrealistic, this example demonstrates the various accepted
-[types][docs.configuration#value-types] and how they're repsented in Vector's
-internal [log structure][docs.data-model.log].
-
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
@@ -72,7 +45,7 @@ same type. You cannot mix types:
 ```toml
 [transforms.<transform-id>]
   # ...
-  
+
   [transforms.<transform-id>.fields]
     my_array = ["first", "second", "third"]
 ```
@@ -108,7 +81,7 @@ verbose for this usecase:
 ```
 [transforms.<transform-id>]
   # ...
-  
+
   [transforms.<transform-id>.fields]
     parent.child.grandchild = "my_value"
 ```
@@ -127,16 +100,9 @@ Learn more about how [`log` events][docs.data-model.log] are structured.
 
 See the [`remove_fields` transform][docs.transforms.remove_fields].
 
-### Special Characters
-
-Aside from the [special characters][docs.data-model.log#special-characters]
-listed in the [Data Model][docs.data-model] doc, Vector does not restrict the
-characters allowed in keys. You can wrap key names in `" "` quote to preserve
-spaces and use `\` to escape quotes.
-
 ### Types
 
-All supported [configuration value types][docs.configuration#value-types] are accepted.
+All supported [configuration value types][docs.configuration#types] are accepted.
 This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 

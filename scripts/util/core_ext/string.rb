@@ -9,7 +9,7 @@ class String
   # Downcases the first letter, even if it has markdown syntax
   def continuize
     i = 0
-    
+
     loop do
       if i > self.length
         break
@@ -34,6 +34,23 @@ class String
 
   def html_escape
     ERB::Util.html_escape(self)
+  end
+
+  def humanize
+    ActiveSupport::Inflector.humanize(self).
+      gsub(/\bansi\b/i, 'ANSI').
+      gsub(/\baws\b/i, 'AWS').
+      gsub(/\bcloudwatch\b/i, 'Cloudwatch').
+      gsub(/\bec2\b/i, 'EC2').
+      gsub(/\bgcp\b/i, 'GCP').
+      gsub(/\bhec\b/i, 'HEC').
+      gsub(/\bhttp\b/i, 'HTTP').
+      gsub(/\bjson\b/i, 'JSON').
+      gsub(/\bkinesis\b/i, 'Kinesis').
+      gsub(/\blua\b/i, 'LUA').
+      gsub(/\bs3\b/i, 'S3').
+      gsub(/\btcp\b/i, 'TCP').
+      gsub(/\budp\b/i, 'UDP')
   end
 
   def remove_markdown_links

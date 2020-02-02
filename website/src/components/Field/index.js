@@ -83,6 +83,10 @@ function RelevantWhen({value}) {
   let relKey = Object.keys(value)[0];
   let relValue = Object.values(value)[0];
 
+  if (relValue == "") {
+    relValue = null;
+  }
+
   return (
     <span>
       <code><a href={`#${relKey}`}>{relKey}</a></code> = <code>{toTOML(relValue)}</code>
@@ -142,7 +146,7 @@ function Field({children, common, defaultValue, enumValues, examples, name, path
           <span className="badge badge--secondary">optional</span>}
       </div>
       {filteredChildren}
-      {!collapse && 
+      {!collapse &&
         <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} />}
     </div>
   );

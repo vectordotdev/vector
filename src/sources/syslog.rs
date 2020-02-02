@@ -1,24 +1,26 @@
 use super::util::{SocketListenAddr, TcpSource};
+#[cfg(unix)]
+use crate::sources::util::build_unix_source;
 use crate::{
-    event::{self, Event},
+    event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
+#[cfg(unix)]
+use std::path::PathBuf;
 use syslog_rfc5424::{self, message::ProcId::*, SyslogMessage};
 use tokio::{
     self,
-    codec::{BytesCodec, FramedRead, LinesCodec},
+    codec::{BytesCodec, LinesCodec},
     net::{UdpFramed, UdpSocket},
 };
-#[cfg(unix)]
-use tokio_uds::UnixListener;
 use tracing::field;
-use tracing_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -85,7 +87,13 @@ impl SourceConfig for SyslogConfig {
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
+            Mode::Unix { path } => Ok(build_unix_source(
+                path,
+                self.max_length,
+                host_key,
+                out,
+                event_from_str,
+            )),
         }
     }
 
@@ -112,7 +120,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
-        event_from_str(&self.host_key, host, frame).map(|event| {
+        event_from_str(&self.host_key, host, &frame).map(|event| {
             trace!(
                 message = "Received one event.",
                 event = field::debug(&event)
@@ -162,67 +170,16 @@ pub fn udp(
     )
 }
 
-#[cfg(unix)]
-pub fn unix(
-    path: PathBuf,
-    max_length: usize,
-    host_key: String,
-    out: mpsc::Sender<Event>,
-) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
-
-    Box::new(future::lazy(move || {
-        let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
-
-        info!(message = "listening.", ?path, r#type = "unix");
-
-        listener
-            .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
-            .for_each(move |socket| {
-                let out = out.clone();
-                let peer_addr = socket.peer_addr().ok();
-                let host_key = host_key.clone();
-
-                let span = info_span!("connection");
-                let path = if let Some(addr) = peer_addr.clone() {
-                    if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
-                        span.record("peer_path", &field::debug(&path));
-                        Some(path.clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-
-                let received_from: Option<Bytes> =
-                    path.map(|p| p.to_string_lossy().into_owned().into());
-                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(move |event| {
-                        event_from_str(&host_key.clone(), received_from.clone(), event)
-                    })
-                    .map_err(|e| error!("error reading line: {:?}", e));
-
-                let handler = lines_in.forward(out).map(|_| info!("finished sending"));
-
-                tokio::spawn(handler.instrument(span))
-            })
-    }))
-}
-
+/**
+* Function to pass to build_unix_source, specific to the Unix mode of the syslog source.
+* Handles the logic of parsing and decoding the syslog message format.
+**/
 // TODO: many more cases to handle:
 // handle parse errors instead of discarding
 // non-strict rfc5424 parsing (see ignored tests)
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
-
-fn event_from_str(
-    host_key: &str,
-    default_host: Option<Bytes>,
-    raw: impl AsRef<str>,
-) -> Option<Event> {
-    let line = raw.as_ref();
+fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
     trace!(
         message = "Received line.",
         bytes = &field::display(line.len())
@@ -236,11 +193,11 @@ fn event_from_str(
             if let Some(host) = &parsed.hostname {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.into(), host.clone().into());
+                    .insert(host_key, host.clone());
             } else if let Some(default_host) = default_host {
                 event
                     .as_mut_log()
-                    .insert_implicit(host_key.into(), default_host.into());
+                    .insert(host_key, default_host);
             }
 
             let timestamp = parsed
@@ -249,7 +206,7 @@ fn event_from_str(
                 .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
-                .insert_implicit(event::TIMESTAMP.clone(), timestamp.into());
+                .insert(event::TIMESTAMP.clone(), timestamp);
 
             insert_fields_from_rfc5424(&mut event, parsed);
 
@@ -267,28 +224,28 @@ fn event_from_str(
 fn insert_fields_from_rfc5424(event: &mut Event, parsed: SyslogMessage) {
     let log = event.as_mut_log();
 
-    log.insert_implicit("severity".into(), parsed.severity.as_str().into());
-    log.insert_implicit("facility".into(), parsed.facility.as_str().into());
-    log.insert_implicit("version".into(), parsed.version.into());
+    log.insert("severity", parsed.severity.as_str());
+    log.insert("facility", parsed.facility.as_str());
+    log.insert("version", parsed.version);
 
     if let Some(app_name) = parsed.appname {
-        log.insert_implicit("appname".into(), app_name.into());
+        log.insert("appname", app_name);
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert_implicit("msgid".into(), msg_id.into());
+        log.insert("msgid", msg_id);
     }
     if let Some(proc_id) = parsed.procid {
-        let value = match proc_id {
+        let value: Value = match proc_id {
             PID(pid) => pid.into(),
             Name(name) => name.into(),
         };
-        log.insert_implicit("procid".into(), value);
+        log.insert("procid", value);
     }
 
     for (id, data) in parsed.sd.iter() {
         for (name, value) in data.iter() {
             let key = format!("{}.{}", id, name);
-            log.insert_explicit(key.into(), value.clone().into());
+            log.insert(key, value.clone());
         }
     }
 }
@@ -352,27 +309,27 @@ mod test {
 
         {
             let expected = expected.as_mut_log();
-            expected.insert_implicit(
+            expected.insert(
                 event::TIMESTAMP.clone(),
-                chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
+                chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert_implicit("host".into(), "74794bfb6795".into());
+            expected.insert("host", "74794bfb6795");
 
-            expected.insert_explicit("meta.sequenceId".into(), "1".into());
-            expected.insert_explicit("meta.sysUpTime".into(), "37".into());
-            expected.insert_explicit("meta.language".into(), "EN".into());
-            expected.insert_explicit("origin.software".into(), "test".into());
-            expected.insert_explicit("origin.ip".into(), "192.168.0.1".into());
+            expected.insert("meta.sequenceId", "1");
+            expected.insert("meta.sysUpTime", "37");
+            expected.insert("meta.language", "EN");
+            expected.insert("origin.software", "test");
+            expected.insert("origin.ip", "192.168.0.1");
 
-            expected.insert_implicit("severity".into(), "notice".into());
-            expected.insert_implicit("facility".into(), "user".into());
-            expected.insert_implicit("version".into(), 1.into());
-            expected.insert_implicit("appname".into(), "root".into());
-            expected.insert_implicit("procid".into(), 8449.into());
+            expected.insert("severity", "notice");
+            expected.insert("facility", "user");
+            expected.insert("version", 1);
+            expected.insert("appname", "root");
+            expected.insert("procid", 8449);
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
+            event_from_str(&"host".to_string(), None, &raw).unwrap(),
             expected
         );
     }
@@ -384,7 +341,7 @@ mod test {
             r#"[incorrect x]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg);
+        let event = event_from_str(&"host".to_string(), None, &msg);
         assert_eq!(event, None);
 
         let msg = format!(
@@ -392,7 +349,7 @@ mod test {
             r#"[incorrect x=]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg);
+        let event = event_from_str(&"host".to_string(), None, &msg);
         assert_eq!(event, None);
     }
 
@@ -411,7 +368,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -419,7 +376,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -427,7 +384,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -435,7 +392,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, msg).unwrap();
+        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
         assert!(!there_is_map_called_empty(event));
     }
 
@@ -459,13 +416,11 @@ mod test {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
 
         let mut expected = Event::from(raw);
-        expected.as_mut_log().insert_implicit(
+        expected.as_mut_log().insert(
             event::TIMESTAMP.clone(),
-            chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
         );
-        expected
-            .as_mut_log()
-            .insert_implicit("host".into(), "74794bfb6795".into());
+        expected.as_mut_log().insert("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),
@@ -479,13 +434,11 @@ mod test {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
 
         let mut expected = Event::from(raw);
-        expected.as_mut_log().insert_implicit(
+        expected.as_mut_log().insert(
             event::TIMESTAMP.clone(),
-            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
         );
-        expected
-            .as_mut_log()
-            .insert_implicit("host".into(), "74794bfb6795".into());
+        expected.as_mut_log().insert("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),
@@ -499,13 +452,11 @@ mod test {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
 
         let mut expected = Event::from(raw);
-        expected.as_mut_log().insert_implicit(
+        expected.as_mut_log().insert(
             event::TIMESTAMP.clone(),
-            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
         );
-        expected
-            .as_mut_log()
-            .insert_implicit("host".into(), "74794bfb6795".into());
+        expected.as_mut_log().insert("host", "74794bfb6795");
 
         assert_eq!(
             event_from_str(&"host".to_string(), None, raw).unwrap(),

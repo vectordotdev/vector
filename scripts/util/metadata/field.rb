@@ -3,7 +3,7 @@
 class Field
   include Comparable
 
-  TYPES = ["*", "bool", "double", "int", "map", "string", "struct", "timestamp"].freeze
+  TYPES = ["*", "bool", "double", "[double]", "int", "[int]", "map", "string", "[string]", "struct", "timestamp"].freeze
 
   class << self
     def build_struct(hash)
@@ -27,7 +27,7 @@ class Field
     :enum,
     :examples,
     :fields,
-    :optional,
+    :required,
     :type
 
   def initialize(hash)
@@ -35,7 +35,7 @@ class Field
     @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
-    @optional = hash.fetch("optional")
+    @required = hash["required"] == true
     @type = hash.fetch("type")
 
     if @type == "bool"
@@ -90,14 +90,14 @@ class Field
   end
 
   def optional?
-    @optional ==  true
+    !required?
   end
 
   def required?
-    !optional?
+    @required == true
   end
 
   def wildcard?
-    name.start_with?("`<")
+    name.start_with?("`[")
   end
 end

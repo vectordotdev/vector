@@ -57,18 +57,15 @@ else
   bump_cargo_version(release.version)
 
   success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
-  
+
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
   commands =
     <<~EOF
-    git add . -A
+    git add #{ROOT_DIR} -A
     git commit -sam 'chore: Prepare v#{release.version} release'
-    git push origin master
     git tag -a v#{release.version} -m "v#{release.version}"
-    git push origin v#{release.version}
-    git branch v#{branch_name}
-    git push origin v#{branch_name}
+    git branch v#{branch_name} 2>/dev/null || true
     EOF
 
   commands.chomp!

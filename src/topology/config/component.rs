@@ -34,7 +34,7 @@ where
         B: Serialize + Deserialize<'de>,
     {
         ComponentDescription {
-            type_str: type_str,
+            type_str,
             example_value: || {
                 toml::from_str::<B>("")
                     .ok()
@@ -52,7 +52,7 @@ where
         B: Default + Serialize + Deserialize<'de>,
     {
         ComponentDescription {
-            type_str: type_str,
+            type_str,
             example_value: || Value::try_from(B::default()).ok(),
             component_type: PhantomData,
         }

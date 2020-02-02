@@ -1,4 +1,5 @@
 [sinks.console]
+title = "Console"
 buffer = false
 common = false
 delivery_guarantee = "best_effort"
@@ -13,7 +14,7 @@ write_to_description = "[standard output streams][urls.standard_streams], such a
 type = "string"
 common = true
 default = "stdout"
-null = false
+required = true
 description = "The [standard stream][urls.standard_streams] to write to."
 
 [sinks.console.options.target.enum]

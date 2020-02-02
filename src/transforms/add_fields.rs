@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::{Event, ValueKind},
+    event::{Event, Value},
     runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
@@ -8,16 +8,16 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
-use toml::value::Value;
+use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
-    pub fields: IndexMap<String, Value>,
+    pub fields: IndexMap<String, TomlValue>,
 }
 
 pub struct AddFields {
-    fields: IndexMap<Atom, ValueKind>,
+    fields: IndexMap<Atom, Value>,
 }
 
 inventory::submit! {
@@ -44,7 +44,7 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<String, Value>) -> Self {
+    pub fn new(fields: IndexMap<String, TomlValue>) -> Self {
         let mut new_fields = IndexMap::new();
 
         for (k, v) in fields {
@@ -58,20 +58,20 @@ impl AddFields {
 impl Transform for AddFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
-            event.as_mut_log().insert_explicit(key, value);
+            event.as_mut_log().insert(key, value);
         }
 
         Some(event)
     }
 }
 
-fn flatten_field(key: Atom, value: Value, new_fields: &mut IndexMap<Atom, ValueKind>) {
+fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, Value>) {
     match value {
-        Value::String(s) => new_fields.insert(key, s.into()),
-        Value::Integer(i) => new_fields.insert(key, i.into()),
-        Value::Float(f) => new_fields.insert(key, f.into()),
-        Value::Boolean(b) => new_fields.insert(key, b.into()),
-        Value::Datetime(dt) => {
+        TomlValue::String(s) => new_fields.insert(key, s.into()),
+        TomlValue::Integer(i) => new_fields.insert(key, i.into()),
+        TomlValue::Float(f) => new_fields.insert(key, f.into()),
+        TomlValue::Boolean(b) => new_fields.insert(key, b.into()),
+        TomlValue::Datetime(dt) => {
             let dt = dt.to_string();
             if let Ok(ts) = dt.parse::<DateTime<Utc>>() {
                 new_fields.insert(key, ts.into())
@@ -79,7 +79,7 @@ fn flatten_field(key: Atom, value: Value, new_fields: &mut IndexMap<Atom, ValueK
                 new_fields.insert(key, dt.into())
             }
         }
-        Value::Array(vals) => {
+        TomlValue::Array(vals) => {
             for (i, val) in vals.into_iter().enumerate() {
                 let key = format!("{}[{}]", key, i);
                 flatten_field(key.into(), val, new_fields);
@@ -87,7 +87,7 @@ fn flatten_field(key: Atom, value: Value, new_fields: &mut IndexMap<Atom, ValueK
 
             None
         }
-        Value::Table(map) => {
+        TomlValue::Table(map) => {
             for (table_key, value) in map {
                 let key = format!("{}.{}", key, table_key);
                 flatten_field(key.into(), value, new_fields);

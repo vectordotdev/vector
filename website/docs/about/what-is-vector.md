@@ -1,35 +1,37 @@
 ---
 title: "What is Vector?"
+description: "High-level description of the Vector observability data collector and router."
 ---
 
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
 
-Vector is a [high-performance][docs.performance], [open-source][urls.vector_repo]
-observability data router. It makes [collecting][docs.sources],
-[transforming][docs.transforms], and [sending][docs.sinks] logs, metrics, &
-events easy. It decouples data collection from your services, giving you data
-ownership and control, among [many other benefits][docs.use_cases].
+Vector is an [open-source][urls.vector_repo] utility for building observability
+pipelines. [Collect][docs.sources], [transform][docs.transforms], and
+[route][docs.sinks] log, metrics and events with one simple tool.
 
 Built in [Rust][urls.rust], Vector places high-value on
-[performance][docs.performance], [correctness][docs.correctness], and [operator
-friendliness][docs.administration]. It compiles to a single static binary and is
-designed to be [deployed][docs.deployment] across your entire infrastructure,
-serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
-[service][docs.roles.service], making it the single tool you need to get data
-from A to B.
+[performance][pages.index#performance], [correctness][pages.index#correctness],
+and [operator friendliness][docs.administration]. It compiles to a single static
+binary and is designed to be [deployed][docs.deployment] across your entire
+infrastructure, serving both as a light-weight [agent][docs.roles.agent] and a
+highly efficient [service][docs.roles.service]. Take back ownership and control
+of your observability data with Vector.
+
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/docs/setup/guides/getting-started/">Get started</Jump>
 
 
-[docs.administration]: /docs/administration
-[docs.correctness]: /docs/about/correctness
-[docs.deployment]: /docs/setup/deployment
-[docs.performance]: /docs/about/performance
-[docs.roles.agent]: /docs/setup/deployment/roles/agent
-[docs.roles.service]: /docs/setup/deployment/roles/service
-[docs.sinks]: /docs/reference/sinks
-[docs.sources]: /docs/reference/sources
-[docs.transforms]: /docs/reference/transforms
-[docs.use_cases]: /docs/use_cases
+[docs.administration]: /docs/administration/
+[docs.deployment]: /docs/setup/deployment/
+[docs.roles.agent]: /docs/setup/deployment/roles/agent/
+[docs.roles.service]: /docs/setup/deployment/roles/service/
+[docs.sinks]: /docs/reference/sinks/
+[docs.sources]: /docs/reference/sources/
+[docs.transforms]: /docs/reference/transforms/
+[pages.index#correctness]: /#correctness
+[pages.index#performance]: /#performance
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_repo]: https://github.com/timberio/vector

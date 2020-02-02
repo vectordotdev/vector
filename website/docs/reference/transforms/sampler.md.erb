@@ -6,6 +6,16 @@
 
 <%= component_config_example(component) %>
 
+<%- if !component.requirements.nil? -%>
+## Requirements
+
+<Alert type="danger" fill={true} icon={false}>
+
+<%= component.requirements %>
+
+</Alert>
+
+<%- end -%>
 ## Options
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
@@ -14,6 +24,12 @@
 ## Env Vars
 
 <%= options(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+<%- if component.output.log -%>
+## Output
+
+<%= component_output(component, component.output.log, heading_depth: 3) %>
 
 <%- end -%>
 ## How It Works [[sort]]

@@ -22,19 +22,21 @@ function BlogPostItem(props) {
     isBlogPostPage = false,
   } = props;
   const {date: dateString, description, permalink, tags} = metadata;
-  const {author_id, title} = frontMatter;
+  const {author_github, title} = frontMatter;
   const readingStats = readingTime(children.toString());
-  const date = Date.parse(dateString);
+  const date = new Date(Date.parse(dateString));
   const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
 
   return (
-    <div className={classnames('blog-post-item', 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
-      <h2><Link to={permalink}>{title}</Link></h2>
-      <div className="blog-post-item--subtitle">{description}</div>
-      <Avatar id={author_id} size="sm" subTitle={`${dateFormat(date, "mmm dS")} / ${readingStats.text}`} />
-      <BlogPostTags tags={tags} />
-    </div>
+    <Link to={permalink + '/'} className={classnames('blog-post-item', 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
+      <article>
+        <h2>{title}</h2>
+        <div className="blog-post-item--subtitle">{description}</div>
+        <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
+        <BlogPostTags tags={tags} />
+      </article>
+    </Link>
   );
 }
 

@@ -31,20 +31,20 @@ scopes:
 
   # platforms
   <%- metadata.platforms.each do |platform|  -%>
-  - <%= platform.name %> platform
+  - <%= platform.name.downcase %> platform
   <%- end -%>
 
   # sources
   <%- metadata.sources.to_h.values.sort.each do |source| -%>
-  - <%= source.name %> source
+  - <%= source.name.downcase %> source
   <%- end -%>
 
   # transforms
   <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
-  - <%= transform.name %> transform
+  - <%= transform.name.downcase %> transform
   <%- end -%>
 
   # sinks
   <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
-  - <%= sink.name %> sink
+  - <%= sink.name.downcase %> sink
   <%- end -%>

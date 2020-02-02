@@ -1,15 +1,21 @@
 ---
-title: Data Model
+title: Data Model (Event)
 sidebar_label: hidden
-description: A deep dive into Vector's data model
+description: Vector's internal data model -- event and it's subtypes.
 ---
 
 <SVG src="/img/data-model-event.svg" />
 
-## Event
+The individual pieces of data flowing through Vector are known as "events".
+Events are arbitrarily wide, and deep, structured pieces of data. They have no
+requirements or limitations. Ideally, events contain enough rich information
+to derive any type of monitoring data from it.
 
-All data flowing through Vector are considered an "events". Events 
-must be classified as a [`log`](#log) or [`metric`](#metric) event:
+## Subtypes
+
+Vector defines subtypes for events. This is necessary to establish domain
+specific requriements enabling interoperability with existing monitoring and
+observability systems.
 
 <%= subpages() %>
 
@@ -17,11 +23,10 @@ must be classified as a [`log`](#log) or [`metric`](#metric) event:
 
 ### Why Not _Just_ Events?
 
-Although Vector generalizes all data flowing through it as "events", we do
-not expose our data structure as such. Instead, we expose the specific event
-types (`log` and `metric`). Here's why:
+We, _very much_, like the idea of an event only world, one where every service
+is perfectly instrumented with events that contain rich data and context.
+Unfortunately, that is not the case; exisiting services emit metrics, traces,
+and logs of varying quality. By designing Vector to meet services where they are
+(current state), we serve as a bridge to newer standards. This is why we place
+"events" at the top of our data model, where logs and metrics are derived.
 
-1. We like the "everything is an event" philosophy a lot.
-2. We recognize that there's a large gap between that idea and a lot of existing tooling.
-3. By starting "simple" (from an integration perspective, i.e. meeting people where they are) and evolving our data model as we encounter the specific needs of new sources/sinks/transforms, we avoid overdesigning yet another grand unified data format.
-4. Starting with support for a little more "old school" model makes us a better tool for supporting incremental progress in existing infrastructures towards more event-based architectures.

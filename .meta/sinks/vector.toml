@@ -1,4 +1,5 @@
 [sinks.vector]
+title = "Vector"
 buffer = true
 common = false
 delivery_guarantee = "best_effort"
@@ -12,5 +13,7 @@ write_to_description = "another downstream [`vector` source][docs.sources.vector
 type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
-null = false
-description = "The downstream Vector address."
+required = true
+description = """\
+The downstream Vector address to connect to. The address _must_ include a port.\
+"""

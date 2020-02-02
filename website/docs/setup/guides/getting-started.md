@@ -5,7 +5,7 @@ description: Getting started with Vector
 ---
 
 Vector is a simple beast to tame, in this guide we'll send an
-[event][docs.data-model#event] through it and touch on some basic concepts.
+[event][docs.data-model] through it and touch on some basic concepts.
 
 ## 1. Install Vector
 
@@ -82,8 +82,8 @@ with [transforms][docs.transforms]. Let's parse our log into a structured format
 by capturing named regular expression groups with a
 [`regex_parser` transform][docs.transforms.regex_parser].
 
-A config can have any number of a transforms and it's entirely up to you how
-they are chained together. Similar to sinks, a transform requires you to specify
+A config can have any number of transforms and it's entirely up to you how they
+are chained together. Similar to sinks, a transform requires you to specify
 where its data comes from. When a sink is configured to accept data from a
 transform the pipeline is complete.
 
@@ -127,17 +127,19 @@ Firstly, our `message` field has been parsed out into structured fields.
 Secondly, we now see every field of the event printed to `stdout` by our sink in
 JSON format because we set `encoding = "json"`.
 
-Exit Vector again by pressing `ctrl+c`.
+Exit Vector again by pressing `ctrl+c`. Next, try experimenting by adding more
+[transforms][docs.transforms] to your pipeline before moving onto the next
+guide.
 
-Next, try experimenting by adding more [transforms][docs.transforms] to your
-pipeline before moving onto the next guide.
+Good luck, now that you're a Vector pro you'll have endless ragtag groups of
+misfits trying to recruit you as their hacker.
 
 
-[docs.configuration]: /docs/setup/configuration
-[docs.data-model#event]: /docs/about/data-model#event
-[docs.installation]: /docs/setup/installation
-[docs.sinks.console#encoding]: /docs/reference/sinks/console#encoding
-[docs.sinks.console]: /docs/reference/sinks/console
-[docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser
-[docs.transforms]: /docs/reference/transforms
+[docs.configuration]: /docs/setup/configuration/
+[docs.data-model]: /docs/about/data-model/
+[docs.installation]: /docs/setup/installation/
+[docs.sinks.console#encoding]: /docs/reference/sinks/console/#encoding
+[docs.sinks.console]: /docs/reference/sinks/console/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms]: /docs/reference/transforms/

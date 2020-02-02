@@ -4,7 +4,22 @@
 
 ## Configuration
 
-<%= component_config_example(component) %>
+import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+
+  [[transforms.log_to_metric.metrics]]
+    type = "histogram"
+    field = "time"
+    name = "time_ms" # optional
+    tags.status = "{{status}}" # optional
+    tags.host = "{{host}}" # optional
+    tags.env = "${ENV}" # optional
+```
 
 ## Options
 
@@ -43,12 +58,12 @@ This example demonstrates capturing timings in your logs.
 }
 ```
 
-You can convert the `time` field into a `histogram` metric:
+You can convert the `time` field into a `distribution` metric:
 
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "histogram"
     field = "time"
@@ -62,14 +77,16 @@ structure:
 
 ```javascript
 {
-  "histogram": {
-    "name": "time_ms",
-    "val": 52.2,
-    "smaple_rate": 1,
-    "tags": {
-      "status": "200",
-      "host": "10.22.11.222"
-    }
+  "name": "time_ms",
+  "kind": "incremental",
+  "tags": {
+    "status": "200",
+    "host": "10.22.11.222"
+  }
+  "value": {
+    "type": "distribution",
+    "values": [54.2],
+    "sample_rates": [1.0]
   }
 }
 ```
@@ -98,7 +115,7 @@ You can count the number of responses by status code:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "counter"
     field = "status"
@@ -112,13 +129,15 @@ structure:
 
 ```javascript
 {
-  "counter": {
-    "name": "response_total",
-    "val": 1.0,
-    "tags": {
-      "status": "200",
-      "host": "10.22.11.222"
-    }
+  "name": "response_total",
+  "kind": "incremental",
+  "tags": {
+    "status": "200",
+    "host": "10.22.11.222"
+  }
+  "value": {
+    "type": "counter",
+    "value": 1.0,
   }
 }
 ```
@@ -149,7 +168,7 @@ field's value:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "counter"
     field = "total"
@@ -163,12 +182,15 @@ structure:
 
 ```javascript
 {
-  "counter": {
-    "name": "order_total",
-    "val": 122.20,
-    "tags": {
-      "host": "10.22.11.222"
-    }
+  "name": "order_total",
+  "kind": "incremental",
+  "tags": {
+    "status": "200",
+    "host": "10.22.11.222"
+  }
+  "value": {
+    "type": "counter",
+    "value": 122.20,
   }
 }
 ```
@@ -200,7 +222,7 @@ You can reduce this logs into multiple `gauge` metrics:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "1m_load_avg"
@@ -223,30 +245,36 @@ structure:
 ```javascript
 [
   {
-    "gauge": {
-      "name": "1m_load_avg",
-      "val": 78.2,
-      "tags": {
-        "host": "10.22.11.222"
-      }
+    "name": "1m_load_avg",
+    "kind": "absolute",
+    "tags": {
+      "host": "10.22.11.222"
+    },
+    "value": {
+      "type": "gauge",
+      "value": 78.2
     }
   },
   {
-    "gauge": {
-      "name": "5m_load_avg",
-      "val": 56.2,
-      "tags": {
-        "host": "10.22.11.222"
-      }
+    "name": "5m_load_avg",
+    "kind": "absolute",
+    "tags": {
+      "host": "10.22.11.222"
+    },
+    "value": {
+      "type": "gauge",
+      "value": 56.2
     }
   },
   {
-    "gauge": {
-      "name": "15m_load_avg",
-      "val": 48.7,
-      "tags": {
-        "host": "10.22.11.222"
-      }
+    "name": "15m_load_avg",
+    "kind": "absolute",
+    "tags": {
+      "host": "10.22.11.222"
+    },
+    "value": {
+      "type": "gauge",
+      "value": 48.7
     }
   }
 ]
@@ -279,7 +307,7 @@ You can count the number of unique `remote_addr` values by using a set:
 ```toml
 [transforms.log_to_metric]
   type = "log_to_metric"
-  
+
   [[transforms.log_to_metric.metrics]]
     type = "set"
     field = "remote_addr"
@@ -291,12 +319,14 @@ structure:
 
 ```javascript
 {
-  "set": {
-    "name": "remote_addr",
-    "val": "233.221.232.22",
-    "tags": {
-      "host": "10.22.11.222"
-    }
+  "name": "remote_addr",
+  "kind": "incremental",
+  "tags": {
+    "host": "10.22.11.222"
+  },
+  "value": {
+    "type": "set",
+    "values": ["233.221.232.22"]
   }
 }
 ```

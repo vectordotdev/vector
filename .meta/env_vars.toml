@@ -1,17 +1,13 @@
 [env_vars.LOG]
 type = "string"
 examples = ["debug"]
-null = false
-optional = true
 description = """\
 Sets Vector's log level. See the [log section in the monitoring \
-guide][docs.monitoring#level] for more information on the available levels.\
+guide][docs.monitoring#levels] for more information on the available levels.\
 """
 
 [env_vars.RUST_BACKTRACE]
 type = "bool"
-null = false
-optional = true
 description = """\
 Enables backtraces when errors are logged. Use this when debugging only since \
 it can degrade performance.\

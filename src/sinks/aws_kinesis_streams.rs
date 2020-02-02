@@ -1,15 +1,15 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core::{RusotoError, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_kinesis::{
     Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
@@ -35,15 +35,15 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-    #[serde(flatten)]
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
     pub request: TowerRequestConfig,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        request_timeout_secs: Some(30),
+        timeout_secs: Some(30),
         ..Default::default()
     };
 }
@@ -65,8 +65,8 @@ inventory::submit! {
 impl SinkConfig for KinesisSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        let sink = KinesisService::new(config, cx.acker())?;
-        let healthcheck = healthcheck(self.clone())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+        let sink = KinesisService::new(config, cx)?;
         Ok((Box::new(sink), healthcheck))
     }
 
@@ -82,11 +82,14 @@ impl SinkConfig for KinesisSinkConfig {
 impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
-        acker: Acker,
+        cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
+        let client = Arc::new(create_client(
+            config.region.clone().try_into()?,
+            cx.resolver(),
+        )?);
 
-        let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
         let partition_key_field = config.partition_key_field.clone();
@@ -94,7 +97,7 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let sink = request
-            .batch_sink(KinesisRetryLogic, kinesis, acker)
+            .batch_sink(KinesisRetryLogic, kinesis, cx.acker())
             .batched_with_min(Vec::new(), &batch)
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
@@ -168,8 +171,8 @@ enum HealthcheckError {
     NoMatchingStreamName { stream_name: String },
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
-    let client = KinesisClient::new(config.region.try_into()?);
+fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
+    let client = create_client(config.region.try_into()?, resolver)?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -192,6 +195,15 @@ fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
         });
 
     Ok(Box::new(fut))
+}
+
+fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisClient> {
+    use rusoto_credential::DefaultCredentialsProvider;
+
+    let p = DefaultCredentialsProvider::new()?;
+    let d = crate::sinks::util::rusoto::client(resolver)?;
+
+    Ok(KinesisClient::new_with(d, p, region))
 }
 
 fn encode_event(
@@ -271,9 +283,7 @@ mod tests {
     fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("key".into(), "value".into());
+        event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &None, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
@@ -285,9 +295,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_custom_partition_key() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("key".into(), "some_key".into());
+        event.as_mut_log().insert("key", "some_key");
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
@@ -297,9 +305,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_custom_partition_key_limit() {
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_implicit("key".into(), random_string(300).into());
+        event.as_mut_log().insert("key", random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
@@ -312,10 +318,10 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        buffers::Acker,
         region::RegionOrEndpoint,
         runtime,
         test_util::{random_lines_with_stream, random_string},
+        topology::config::SinkContext,
     };
     use futures::{Future, Sink};
     use rusoto_core::Region;
@@ -336,16 +342,17 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
-            batch: BatchConfig {
-                batch_size: Some(2),
-                batch_timeout: None,
+            batch: BatchEventsConfig {
+                max_events: Some(2),
+                timeout_secs: None,
             },
             ..Default::default()
         };
 
         let mut rt = runtime::Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = KinesisService::new(config, Acker::Null).unwrap();
+        let sink = KinesisService::new(config, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 

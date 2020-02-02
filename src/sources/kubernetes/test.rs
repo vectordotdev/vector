@@ -14,9 +14,9 @@ use kube::{
     config,
 };
 use serde::de::DeserializeOwned;
-use std::borrow::Borrow;
-use std::thread;
+use serde_json::Value;
 use std::time::Duration;
+use uuid::Uuid;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
@@ -62,12 +62,12 @@ data:
     [sinks.out]
       type = "console"
       inputs = ["kubernetes_logs"]
-      target = "stdout" 
+      target = "stdout"
 
-    encoding = "text" 
-    healthcheck = true
+      encoding = "json"
+      healthcheck = true
 
-  # This line is not in VECTOR.TOML  
+  # This line is not in VECTOR.TOML
 "#;
 
 // TODO: use localy builded image of vector
@@ -108,17 +108,17 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector:latest
+        image: ktff/vector-improve:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
-          readOnly: true        
+          readOnly: true
         - name: var-lib
           mountPath: /var/lib
         - name: config-dir
           mountPath: /etc/vector
-          readOnly: true 
+          readOnly: true
         - name: tmp
           mountPath: /tmp/vector/
 "#;
@@ -148,13 +148,13 @@ struct Kube {
 
 impl Kube {
     // Also immedietely creates namespace
-    fn new<S: Borrow<str>>(namespace: S) -> Self {
+    fn new(namespace: &str) -> Self {
         trace_init();
         let config = config::load_kube_config().expect("failed to load kubeconfig");
         let client = APIClient::new(config);
         let kube = Kube {
             client,
-            namespace: namespace.borrow().to_owned(),
+            namespace: namespace.to_string(),
         };
         kube.create_with(&Api::v1Namespace(kube.client.clone()), NAMESPACE_YAML);
         kube
@@ -165,7 +165,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create<K, S: Borrow<str>, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: S) -> K
+    fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
@@ -173,91 +173,108 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create_with<K, S: Borrow<str>>(&self, api: &Api<K>, yaml: S) -> K
+    fn create_with<K>(&self, api: &Api<K>, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
-        let yaml = yaml
-            .borrow()
-            .replace(NAMESPACE_MARKER, self.namespace.as_str());
+        let yaml = yaml.replace(NAMESPACE_MARKER, self.namespace.as_str());
         let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
         let json = serde_json::to_vec(&map).unwrap();
-        api.create(&PostParams::default(), json).unwrap()
+        retry(|| {
+            api.create(&PostParams::default(), json.clone())
+                .map_err(|error| {
+                    error!(message = "Failed creating Kubernetes object", ?error);
+                })
+                .ok()
+        })
     }
 
     fn list(&self, object: &KubeDaemon) -> Vec<KubePod> {
-        self.api(Api::v1Pod)
-            .list(&ListParams {
-                field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
-                ..ListParams::default()
-            })
-            .unwrap()
-            .items
-            .into_iter()
-            .filter(|item| {
-                item.metadata
-                    .name
-                    .as_str()
-                    .starts_with(object.metadata.name.as_str())
-            })
-            .collect()
+        retry(|| {
+            self.api(Api::v1Pod)
+                .list(&ListParams {
+                    field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
+                    ..ListParams::default()
+                })
+                .map_err(|error| {
+                    error!(message = "Failed listing Pods", ?error);
+                })
+                .ok()
+        })
+        .items
+        .into_iter()
+        .filter(|item| {
+            item.metadata
+                .name
+                .as_str()
+                .starts_with(object.metadata.name.as_str())
+        })
+        .collect()
     }
 
     fn logs(&self, pod_name: &str) -> Vec<String> {
-        self.api(Api::v1Pod)
-            .log(pod_name, &LogParams::default())
-            .unwrap()
-            .lines()
-            .map(|s| s.to_owned())
-            .collect()
+        retry(|| {
+            self.api(Api::v1Pod)
+                .log(pod_name, &LogParams::default())
+                .map_err(|error| {
+                    error!(message = "Failed getting Pod logs", ?error);
+                })
+                .ok()
+        })
+        .lines()
+        .map(|s| s.to_owned())
+        .collect()
     }
 
-    fn wait_for_running(&self, mut object: KubeDaemon) -> Option<KubeDaemon> {
+    fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
-        for _ in 0..WAIT_LIMIT {
-            match object.status.clone() {
-                None => (),
-                Some(DaemonSetStatus {
+        retry(move || {
+            object = api
+                .get_status(object.meta().name.as_str())
+                .map_err(|error| {
+                    error!(message = "Failed getting object status", ?error);
+                })
+                .ok()?;
+            match object.status.clone()? {
+                DaemonSetStatus {
                     desired_number_scheduled,
                     number_available: Some(number_available),
                     ..
-                }) if number_available == desired_number_scheduled => {
-                    return Some(object);
-                }
-                Some(status) => {
+                } if number_available == desired_number_scheduled => Some(object.clone()),
+                status => {
                     debug!(message = "DaemonSet not yet ready", ?status);
+                    None
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            object = api.get_status(object.meta().name.as_str()).unwrap();
-        }
-        return None;
+        })
     }
 
-    fn wait_for_success(&self, mut object: KubePod) -> Option<KubePod> {
+    fn wait_for_success(&self, mut object: KubePod) -> KubePod {
         let api = self.api(Api::v1Pod);
         let legal = ["Pending", "Running", "Succeeded"];
         let goal = "Succeeded";
-        for _ in 0..WAIT_LIMIT {
-            match object.status.clone() {
-                None => (),
-                Some(PodStatus {
+        retry(move || {
+            object = api
+                .get_status(object.meta().name.as_str())
+                .map_err(|error| {
+                    error!(message = "Failed getting object status", ?error);
+                })
+                .ok()?;
+            match object.status.clone()? {
+                PodStatus {
                     phase: Some(ref phase),
                     ..
-                }) if phase.as_str() == goal => return Some(object),
-                Some(PodStatus {
+                } if phase.as_str() == goal => Some(object.clone()),
+                PodStatus {
                     phase: Some(ref phase),
                     ..
-                }) if legal.contains(&phase.as_str()) => (),
-                Some(PodStatus { phase, .. }) => {
+                } if legal.contains(&phase.as_str()) => None,
+                PodStatus { phase, .. } => {
                     error!(message = "Illegal pod phase", ?phase);
-                    return None;
+                    None
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            object = api.get_status(object.meta().name.as_str()).unwrap();
-        }
-        return None;
+        })
     }
 
     fn cleanup(&self) {
@@ -277,6 +294,19 @@ impl Drop for Kube {
     }
 }
 
+/// If F returns None, retries it after some time, for some count.
+/// Panics if all trys fail.
+fn retry<F: FnMut() -> Option<R>, R>(mut f: F) -> R {
+    for _ in 0..WAIT_LIMIT {
+        if let Some(data) = f() {
+            return data;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        debug!("Retrying");
+    }
+    panic!("timed out while waiting");
+}
+
 fn user_namespace(namespace: &str) -> String {
     "user-".to_owned() + namespace
 }
@@ -286,14 +316,13 @@ fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
     // Start echo
     let echo = kube.create(
         Api::v1Pod,
-        ECHO_YAML
+        &ECHO_YAML
             .replace(ECHO_NAME, name)
             .replace(ARGS_MARKER, format!("[{:?}]", message).as_str()),
     );
 
     // Wait for success state
-    kube.wait_for_success(echo.clone())
-        .expect("Running echo failed");
+    kube.wait_for_success(echo.clone());
 
     echo
 }
@@ -302,36 +331,39 @@ fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
     // Start vector
     kube.create(
         Api::v1ConfigMap,
-        CONFIG_MAP_YAML.replace(USER_NAMESPACE_MARKER, user_namespace),
+        &CONFIG_MAP_YAML.replace(USER_NAMESPACE_MARKER, user_namespace),
     );
     let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
 
     // Wait for running state
-    kube.wait_for_running(vector.clone())
-        .expect("Running Vector failed");
+    kube.wait_for_running(vector.clone());
 
     vector
 }
 
-fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<String> {
+fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
     // Wait for logs to propagate
-    thread::sleep(Duration::from_secs(4));
+    std::thread::sleep(Duration::from_secs(4));
     let mut logs = Vec::new();
     for daemon_instance in kube.list(&vector) {
         debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
-        logs.append(&mut kube.logs(daemon_instance.metadata.name.as_str()));
+        logs.extend(
+            kube.logs(daemon_instance.metadata.name.as_str())
+                .into_iter()
+                .filter_map(|s| serde_json::from_slice::<Value>(s.as_ref()).ok()),
+        );
     }
     logs
 }
 
 #[test]
 fn kube_one_log() {
-    let namespace = "vector-test-one-log";
+    let namespace = format!("vector-test-one-log-{}", Uuid::new_v4());
     let message = "12";
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let kube = Kube::new(namespace);
-    let user = Kube::new(user_namespace.clone());
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
 
     // Start vector
     let vector = start_vector(&kube, user_namespace.as_str());
@@ -342,11 +374,11 @@ fn kube_one_log() {
     // Verify logs
     // If any daemon logged message, done.
     for line in logs(&kube, &vector) {
-        if line == message {
+        if line["message"].as_str().unwrap() == message {
             // DONE
             return;
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
     panic!("Vector didn't log message: {:?}", message);
@@ -354,13 +386,13 @@ fn kube_one_log() {
 
 #[test]
 fn kube_old_log() {
-    let namespace = "vector-test-old-log";
+    let namespace = format!("vector-test-old-log-{}", Uuid::new_v4());
     let message_old = "13";
     let message_new = "14";
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let user = Kube::new(user_namespace.clone());
-    let kube = Kube::new(namespace);
+    let user = Kube::new(&user_namespace);
+    let kube = Kube::new(&namespace);
 
     // echo old
     let _echo_old = echo(&user, "echo-old", message_old);
@@ -375,13 +407,13 @@ fn kube_old_log() {
     // If any daemon logged message, done.
     let mut logged = false;
     for line in logs(&kube, &vector) {
-        if line == message_old {
+        if line["message"].as_str().unwrap() == message_old {
             panic!("Old message logged");
-        } else if line == message_new {
+        } else if line["message"].as_str().unwrap() == message_new {
             // OK
             logged = true;
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
     if logged {
@@ -393,12 +425,12 @@ fn kube_old_log() {
 
 #[test]
 fn kube_multi_log() {
-    let namespace = "vector-test-multi-log";
+    let namespace = format!("vector-test-multi-log-{}", Uuid::new_v4());
     let mut messages = vec!["15", "16", "17", "18"];
-    let user_namespace = user_namespace(namespace);
+    let user_namespace = user_namespace(&namespace);
 
-    let kube = Kube::new(namespace);
-    let user = Kube::new(user_namespace.clone());
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
 
     // Start vector
     let vector = start_vector(&kube, user_namespace.as_str());
@@ -409,10 +441,10 @@ fn kube_multi_log() {
     // Verify logs
     // If any daemon logged message, done.
     for line in logs(&kube, &vector) {
-        if Some(&line.as_str()) == messages.first() {
+        if Some(&line["message"].as_str().unwrap()) == messages.first() {
             messages.remove(0);
         } else {
-            debug!(namespace,log=%line);
+            debug!(namespace=%namespace,log=%line);
         }
     }
     if messages.is_empty() {
@@ -420,4 +452,32 @@ fn kube_multi_log() {
     } else {
         panic!("Vector didn't log messages: {:?}", messages);
     }
+}
+
+#[test]
+fn kube_object_uid() {
+    let namespace = format!("vector-test-object-uid-{}", Uuid::new_v4());
+    let message = "19";
+    let user_namespace = user_namespace(&namespace);
+
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
+
+    // Start vector
+    let vector = start_vector(&kube, user_namespace.as_str());
+
+    // Start echo
+    let _echo = echo(&user, "echo", message);
+    // Verify logs
+    // If any daemon has object uid, done.
+    for line in logs(&kube, &vector) {
+        if line.get("object_uid").is_some() {
+            // DONE
+            return;
+        } else {
+            debug!(namespace=%namespace,log=%line);
+        }
+    }
+
+    panic!("Vector didn't log message: {:?}", message);
 }

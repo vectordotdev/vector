@@ -5,7 +5,7 @@ require_relative "option"
 class Component
   DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
   EVENT_TYPES = ["log", "metric"].freeze
-  OPERATING_SYSTEMS = ["linux", "macos", "windows"].freeze
+  OPERATING_SYSTEMS = ["Linux", "MacOS", "Windows"].freeze
 
   include Comparable
 
@@ -17,7 +17,10 @@ class Component
     :name,
     :operating_systems,
     :options,
+    :posts,
+    :requirements,
     :resources,
+    :title,
     :type,
     :unsupported_operating_systems
 
@@ -27,6 +30,9 @@ class Component
     @env_vars = Option.build_struct(hash["env_vars"] || {})
     @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
+    @posts = hash.fetch("posts")
+    @requirements = hash["requirements"]
+    @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = Option.build_struct(hash["options"] || {})
@@ -45,9 +51,10 @@ class Component
 
     # Resources
 
-    @resources = (hash.delete("resources") || []).collect do |resource_hash|
-      OpenStruct.new(resource_hash)
-    end
+    @resources =
+      (hash.delete("resources") || []).collect do |resource_hash|
+        OpenStruct.new(resource_hash)
+      end
 
     # Default options
 
@@ -58,7 +65,7 @@ class Component
         "enum" => {
           name => "The name of this component"
         },
-        "null" => false,
+        "required" => true,
         "type" => "string"
       })
 
@@ -68,7 +75,7 @@ class Component
           "name" => "inputs",
           "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
           "examples" => [["my-source-id"]],
-          "null" => false,
+          "required" => true,
           "type" => "[string]"
         })
     end
@@ -152,7 +159,7 @@ class Component
       id: id,
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
-      service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
+      service_providers: (respond_to?(:service_providers, true) ? service_providers : nil),
       status: status,
       type: type,
       unsupported_operating_systems: unsupported_operating_systems

@@ -1,9 +1,9 @@
 [sources.vector]
+title = "Vector"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
 function_category = "proxy"
-guides = []
 output_types = ["log", "metric"]
 resources = []
 through_description = "another upstream [`vector` sink][docs.sinks.vector]"
@@ -12,15 +12,17 @@ through_description = "another upstream [`vector` sink][docs.sinks.vector]"
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#1"]
-null = false
-description = """The TCP address to listen for connections on, \
-or "systemd#N" to use the Nth socket passed by systemd socket activation. \
+required = true
+description = """\
+The TCP address to listen for connections on, or `systemd#N to use the Nth \
+socket passed by systemd socket activation. If an address is used it _must_ \
+include a port.
 """
 
 [sources.vector.options.shutdown_timeout_secs]
 type = "int"
 default = 30
-null = false
+required = true
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\

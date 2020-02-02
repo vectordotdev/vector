@@ -36,14 +36,14 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bat
-    powershell Invoke-WebRequest [[[urls.vector_downloads.<%= metadata.latest_version %>/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
+    powershell Invoke-WebRequest [[[urls.vector_downloads.<%= metadata.latest_version.minor_x %>/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
     ```bat
-    powershell Invoke-WebRequest [[[urls.vector_downloads.nightly/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
+    powershell Invoke-WebRequest [[[urls.vector_downloads.nightly/latest/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
     ```
 
     </TabItem>
@@ -85,11 +85,11 @@ Once you've found the version you'd like to install you can re-follow the
 The Vector configuration file is placed in:
 
 ```
-etc/vector/vector.toml
+%ProgramFiles%\Vector\config\vector.toml
 ```
 
-A full spec is located at `/etc/vector/vector.spec.toml` and examples are
-located in `/etc/vector/examples/*`. You can learn more about configuring
+A full spec is located at `%ProgramFiles%\Vector\config\vector.spec.toml` and examples are
+located in `%ProgramFiles%\Vector\config\examples\*`. You can learn more about configuring
 Vector in the [Configuration][docs.configuration] section.
 
 ## Administering

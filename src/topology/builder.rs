@@ -78,7 +78,7 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     }
 
     if config.contains_cycle() {
-        errors.push(format!("Configured topology contains a cycle"));
+        errors.push("Configured topology contains a cycle".to_string());
     } else if let Err(type_errors) = config.typecheck() {
         errors.extend(type_errors);
     }

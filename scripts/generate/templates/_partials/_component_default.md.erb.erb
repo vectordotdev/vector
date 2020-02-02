@@ -20,15 +20,15 @@
 ## Output
 
 <%- if component.output.log -%>
-<%%= component_output(:log, component.output.log, heading_depth: 3) %>
+<%%= component_output(component, component.output.log, heading_depth: 3) %>
 <%- else -%>
-<%%= component_output(:metric, component.output.metric, heading_depth: 3) %>
+<%%= component_output(component, component.output.metric, heading_depth: 3) %>
 <%- end -%>
 
 <%- elsif component.sink? && component.output -%>
 ## Output
 
-<%%= sink_output(component) %>
+<%%= component_output(component, component.output) %>
 
 <%- end -%>
 ## How It Works [[sort]]

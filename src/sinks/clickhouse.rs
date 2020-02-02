@@ -1,20 +1,18 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::Event,
     sinks::util::{
-        http::{HttpRetryLogic, HttpService, Response},
+        http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::RetryLogic,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
-use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
-use hyper::{Body, Client, Request};
-use hyper_tls::HttpsConnector;
+use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -27,9 +25,9 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
-    pub basic_auth: Option<ClickHouseBasicAuthConfig>,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
+    pub auth: Option<Auth>,
     #[serde(flatten)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -48,8 +46,8 @@ inventory::submit! {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = clickhouse(self.clone(), cx.acker())?;
-        let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
+        let healtcheck = healthcheck(cx.resolver(), &self)?;
+        let sink = clickhouse(self.clone(), cx)?;
 
         Ok((sink, healtcheck))
     }
@@ -63,21 +61,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ClickHouseBasicAuthConfig {
-    pub password: String,
-    pub user: String,
-}
-
-impl ClickHouseBasicAuthConfig {
-    fn apply(&self, header_map: &mut http::header::HeaderMap) {
-        let auth = headers::Authorization::basic(&self.user, &self.password);
-        header_map.typed_insert(auth)
-    }
-}
-
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -90,33 +74,32 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
     let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-    let basic_auth = config.basic_auth.clone();
+    let auth = config.auth.clone();
 
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
-                let mut builder = hyper::Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |body: Vec<u8>| {
+            let mut builder = hyper::Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
 
-                builder.header("Content-Type", "application/x-ndjson");
+            builder.header("Content-Type", "application/x-ndjson");
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
-                }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
 
-                let mut request = builder.body(body).unwrap();
+            let mut request = builder.body(body).unwrap();
 
-                if let Some(auth) = &basic_auth {
-                    auth.apply(request.headers_mut());
-                }
+            if let Some(auth) = &auth {
+                auth.apply(&mut request);
+            }
 
-                request
-            });
+            request
+        });
 
     let sink = request
         .batch_sink(
@@ -124,7 +107,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
                 inner: HttpRetryLogic,
             },
             http_service,
-            acker,
+            cx.acker(),
         )
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
@@ -139,17 +122,17 @@ fn encode_event(event: Event) -> Option<Vec<u8>> {
     Some(body)
 }
 
-fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> super::Healthcheck {
+fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<super::Healthcheck> {
     // TODO: check if table exists?
-    let uri = format!("{}/?query=SELECT%201", host);
+    let uri = format!("{}/?query=SELECT%201", config.host);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
-    if let Some(auth) = &basic_auth {
-        auth.apply(request.headers_mut());
+    if let Some(auth) = &config.auth {
+        auth.apply(&mut request);
     }
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let client = https_client(resolver, tls)?;
     let healthcheck = client
         .request(request)
         .map_err(|err| err.into())
@@ -158,7 +141,7 @@ fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> s
             status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
         });
 
-    Box::new(healthcheck)
+    Ok(Box::new(healthcheck))
 }
 
 fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
@@ -262,12 +245,12 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
             request: TowerRequestConfig {
-                request_retry_attempts: Some(1),
+                retry_attempts: Some(1),
                 ..Default::default()
             },
             ..Default::default()
@@ -279,9 +262,7 @@ mod integration_tests {
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event
-            .as_mut_log()
-            .insert_explicit("host".into(), "example.com".into());
+        input_event.as_mut_log().insert("host", "example.com");
 
         let pump = sink.send(input_event.clone());
         rt.block_on(pump).unwrap();
@@ -305,9 +286,9 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
             ..Default::default()
         };
@@ -320,9 +301,7 @@ mod integration_tests {
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event
-            .as_mut_log()
-            .insert_explicit("host".into(), "example.com".into());
+        input_event.as_mut_log().insert("host", "example.com");
 
         let pump = sink.send(input_event.clone());
 

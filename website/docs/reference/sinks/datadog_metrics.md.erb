@@ -6,6 +6,16 @@
 
 <%= component_config_example(component) %>
 
+<%- if !component.requirements.nil? -%>
+## Requirements
+
+<Alert type="danger" fill={true} icon={false}>
+
+<%= component.requirements %>
+
+</Alert>
+
+<%- end -%>
 ## Options
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
@@ -16,10 +26,12 @@
 <%= options(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.output -%>
 ## Output
 
-<%= sink_output(component) %>
+<%= component_output(component, component.output) %>
 
+<%- end -%>
 ## How It Works [[sort]]
 
 ### Metric Types
@@ -44,4 +56,4 @@ The following matrix outlines how Vector metric types are mapped into Datadog me
 <%= component_sections(component) %>
 
 
- 
+

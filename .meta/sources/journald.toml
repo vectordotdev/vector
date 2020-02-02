@@ -1,24 +1,30 @@
 [sources.journald]
+title = "Journald"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
-guides = []
-only_operating_systems = ["linux"]
+only_operating_systems = ["Linux"]
 output_types = ["log"]
 resources = []
 through_description = "log records from journald"
+requirements = """\
+1. The `journald` source requires the presence of the `journalctl` binary. \
+This ensures that this source works across all platforms. Please see the \
+["Communication strategy"](#communication-strategy) section for more info.
+2. If you run Vector from a non-root user, you need to add that user to the \
+`systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
+section for more info.\
+"""
 
 [sources.journald.options.current_boot_only]
 type = "bool"
 common = true
-null = true
 default = true
 description = "Include only entries from the current boot."
 
 [sources.journald.options.batch_size]
 type = "int"
-null = true
 default = 16
 description = """\
 The systemd journal is read in batches, and a checkpoint is set at the \
@@ -28,23 +34,24 @@ end of each batch. This option limits the size of the batch.\
 [sources.journald.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
-null = true
 description = """\
 The directory used to persist the journal checkpoint position. By \
 default, the global `data_dir` is used. Please make sure the Vector \
-project has write permissions to this dir. \
+project has write permissions to this dir.\
 """
 
-[sources.journald.options.local_only]
-type = "bool"
-null = true
-default = true
-description = "Include only entries from the local system"
+[sources.journald.options.journalctl_path]
+type = "string"
+examples = ["/usr/local/bin/journalctl"]
+default = "journalctl"
+description = """\
+The full path of the `journalctl` executable. \
+If not set, Vector will search the path for `journalctl`.\
+"""
 
 [sources.journald.options.units]
 type = "[string]"
 common = true
-null = true
 default = []
 examples = [["ntpd", "sysinit.target"]]
 description = """\
@@ -55,7 +62,10 @@ Unit names lacking a `"."` will have `".service"` appended to make them a valid 
 
 [[sources.journald.output.log.examples]]
 label = "Generic"
-input = """\
+body = """\
+Given the following input:
+
+```text
 __REALTIME_TIMESTAMP=1564173027000443
 __MONOTONIC_TIMESTAMP=98694000446
 _BOOT_ID=124c781146e841ae8d9b4590df8b9231
@@ -78,8 +88,11 @@ _SYSTEMD_UNIT=ntpd.service
 _SYSTEMD_SLICE=system.slice
 _SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
 MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
-"""
-output = """\
+```
+
+A log event will be output with the following structure:
+
+```json
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>,
   "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
@@ -105,6 +118,7 @@ output = """\
   "_SYSTEMD_SLICE": "system.slice",
   "_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
 }
+```\
 """
 
 [sources.journald.output.log.fields."`[record-key]`"]
@@ -113,7 +127,6 @@ examples = [
   {_SYSTEMD_UNIT = "ntpd.service"},
   {_BOOT_ID = "124c781146e841ae8d9b4590df8b9231"},
 ]
-optional = true
 description = """\
 Additional Journald fields are passed through as log fields.
 """
@@ -121,7 +134,7 @@ Additional Journald fields are passed through as log fields.
 [sources.journald.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-optional = false
+required = true
 description = """\
 The value of the journald `_HOSTNAME` field.\
 """
@@ -129,7 +142,7 @@ The value of the journald `_HOSTNAME` field.\
 [sources.journald.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The value of the journald `MESSAGE` field.\
 """
@@ -137,7 +150,7 @@ The value of the journald `MESSAGE` field.\
 [sources.journald.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.\
 """
