@@ -10,24 +10,27 @@ types:
   - perf                # A change that enhancements performance.
 
 scopes:
-  - buffers             # Anything related to Vector's buffers, serialization, etc.
-  - cli                 # Anything related to Vector's CLI.
-  - config              # Anything related to Vector's configuration as a whole.
-  - docs                # Anything related to documentation.
-  - log data model      # Anything related to the log event data model.
-  - metric data model   # Anything related to the metric event data model.
-  - networking          # Anything related to Vector's networking (DNS, HTTP, TCP, etc).
-  - new platform        # A new platform, operating system, architecture, etc.
-  - new source          # A new Vector source.
-  - new transform       # A new Vector transform.
-  - new sink            # A new Vector sink.
-  - observability       # Anything related to observing Vector (internal logs, metrics, etc).
-  - operations          # Anything related to /scripts, CI, etc.
-  - platforms           # Anything related to Vector's supported platforms.
-  - security            # Anything related to security.
-  - testing             # Anything related to testing.
-  - topology            # Anything related to Vector's topology code.
-  - website             # Anything related to the website (not docs).
+
+  # domains
+  - blog
+  - buffers
+  - cli
+  - config
+  - docs
+  - guides
+  - marketing
+  - networking
+  - observability
+  - operations
+  - platforms
+  - security
+  - setup
+  - sinks
+  - sources
+  - testing
+  - topology
+  - transforms
+  - website
 
   # platforms
   - docker platform

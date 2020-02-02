@@ -1,0 +1,11 @@
+name: labels
+on:
+  push:
+    branches:
+    - master
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label Syncer
+        uses: micnncim/action-label-syncer@v0.4.0

@@ -1,0 +1,56 @@
+[[domains]]
+name = "blog"
+
+[[domains]]
+name = "buffers"
+
+[[domains]]
+name = "cli"
+
+[[domains]]
+name = "config"
+
+[[domains]]
+name = "docs"
+
+[[domains]]
+name = "guides"
+
+[[domains]]
+name = "marketing"
+
+[[domains]]
+name = "networking"
+
+[[domains]]
+name = "observability"
+
+[[domains]]
+name = "operations"
+
+[[domains]]
+name = "platforms"
+
+[[domains]]
+name = "security"
+
+[[domains]]
+name = "setup"
+
+[[domains]]
+name = "sinks"
+
+[[domains]]
+name = "sources"
+
+[[domains]]
+name = "testing"
+
+[[domains]]
+name = "topology"
+
+[[domains]]
+name = "transforms"
+
+[[domains]]
+name = "website"
