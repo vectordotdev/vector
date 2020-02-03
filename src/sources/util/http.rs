@@ -53,8 +53,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let trigger = Arc::new(Mutex::new(Some(trigger)));
 
         let mut filter: BoxedFilter<()> = warp::post2().boxed();
-        if path.len() != 0 && path != "/" {
-            for s in string_to_static_str(path).split("/") {
+        if !path.is_empty() && path != "/" {
+            for s in string_to_static_str(path).split('/') {
                 filter = filter.and(warp::path(s)).boxed();
             }
         }

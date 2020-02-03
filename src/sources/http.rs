@@ -12,7 +12,7 @@ use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,
 };
-use warp::http::{HeaderMap, StatusCode};
+use warp::http::{HeaderMap, StatusCode, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -29,7 +29,7 @@ struct SimpleHttpSource {
     headers: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
@@ -45,7 +45,7 @@ impl HttpSource for SimpleHttpSource {
         body: impl Buf,
         header_map: HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_body(body, self.encoding.clone())
+        decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
     }
 }
@@ -76,14 +76,11 @@ impl SourceConfig for SimpleHttpConfig {
 
 fn add_headers(
     mut events: Vec<Event>,
-    headers_config: &Vec<String>,
+    headers_config: &[String],
     headers: HeaderMap,
 ) -> Vec<Event> {
     for header_name in headers_config {
-        let mut value: &[u8] = &[];
-        if headers.contains_key(header_name) {
-            value = headers[header_name].as_bytes();
-        }
+        let value = headers.get(header_name).map(HeaderValue::as_bytes).unwrap_or(b"");
         for event in events.iter_mut() {
             event.as_mut_log().insert(header_name as &str, value);
         }
@@ -139,11 +136,9 @@ fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
 fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
     match value {
         JsonValue::Array(v) => {
-            let mut out_vec = vec![];
-            for item in v {
-                out_vec.push(json_parse_object(item)?);
-            }
-            Ok(out_vec)
+            v.into_iter()
+                .map(json_parse_object)
+                .collect::<Result<_,_>>()
         }
         JsonValue::Object(map) => {
             //treat like an array of one object
