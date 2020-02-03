@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         tls::{TlsOptions, TlsSettings},
-        Batch, BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };

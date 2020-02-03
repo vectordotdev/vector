@@ -1,10 +1,7 @@
 use crate::{
     event::{self, Event},
-    sinks::util::http::{BatchedHttpSink, HttpSink},
-    sinks::util::{
-        Batch, BatchBytesConfig, BoxedRawValue, Compression, JsonArrayBuffer, TowerRequestConfig,
-        UriSerde,
-    },
+    sinks::util::http::{Auth, BatchedHttpSink, HttpSink},
+    sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::{Request, Uri};
@@ -21,7 +18,6 @@ pub struct LogdnaConfig {
     api_key: String,
     host: Option<UriSerde>,
 
-    // Tags
     hostname: String,
     mac: Option<String>,
     ip: Option<String>,
@@ -92,7 +88,7 @@ impl HttpSink for LogdnaConfig {
             map.insert("file".to_string(), json!(file));
         }
 
-        if !map.contains_key("app") || !map.contains_key("file") {
+        if !map.contains_key("app") && !map.contains_key("file") {
             map.insert("app".to_string(), json!("vector"));
         }
 
@@ -137,13 +133,23 @@ impl HttpSink for LogdnaConfig {
 
         let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
 
-        let uri = format!("{}{}", host, query);
+        let uri = format!("{}?{}", host, query);
 
-        Request::builder()
+        let mut request = Request::builder()
             .uri(uri)
             .method("POST")
+            .header("Content-Type", "application/json")
             .body(body)
-            .unwrap()
+            .unwrap();
+
+        let auth = Auth::Basic {
+            user: self.api_key.clone(),
+            password: "".to_string(),
+        };
+
+        auth.apply(&mut request);
+
+        request
     }
 }
 
@@ -155,13 +161,47 @@ mod tests {
     use crate::test_util;
     use crate::topology::config::SinkConfig;
     use futures::{Sink, Stream};
+    use serde_json::json;
+
+    #[test]
+    fn encode_event() {
+        let (config, _, _) = load_sink::<LogdnaConfig>(
+            r#"
+            api_key = "mylogtoken"
+            hostname = "vector"
+        "#,
+        )
+        .unwrap();
+
+        let mut event1 = Event::from("hello world");
+        event1.as_mut_log().insert("app", "notvector");
+
+        let mut event2 = Event::from("hello world");
+        event2.as_mut_log().insert("file", "log.txt");
+
+        let event3 = Event::from("hello world");
+
+        let event1_out = config.encode_event(event1).unwrap();
+        let event1_out = event1_out.as_object().unwrap();
+        let event2_out = config.encode_event(event2).unwrap();
+        let event2_out = event2_out.as_object().unwrap();
+        let event3_out = config.encode_event(event3).unwrap();
+        let event3_out = event3_out.as_object().unwrap();
+
+        assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));
+        assert_eq!(event2_out.get("file").unwrap(), &json!("log.txt"));
+        assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
+    }
 
     #[test]
     fn smoke() {
         let (mut config, cx, mut rt) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
+            ip = "127.0.0.1"
+            mac = "some-mac-addr"
             hostname = "vector"
+            tags = ["test","maybeanothertest"]
         "#,
         )
         .unwrap();
@@ -180,15 +220,60 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(&addr);
         rt.spawn(server);
 
-        let (expected, lines) = test_util::random_lines_with_stream(100, 10);
-        let pump = sink.send_all(lines.map(Event::from));
+        let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();
+        let mut events = Vec::new();
+
+        // Create 10 events where the first one contains custom
+        // fields that are not just `message`.
+        for (i, line) in lines.iter().enumerate() {
+            let event = if i == 0 {
+                let mut event = Event::from(line.as_str());
+                event.as_mut_log().insert("key1", "value1");
+                event
+            } else {
+                Event::from(line.as_str())
+            };
+
+            events.push(event);
+        }
+
+        let pump = sink.send_all(futures::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
 
-        let json: serde_json::Value = serde_json::from_slice(&output[0].1[..]).unwrap();
+        let request = &output[0].0;
+        let body: serde_json::Value = serde_json::from_slice(&output[0].1[..]).unwrap();
 
-        // TODO: write assertions
-        println!("json: {:?}", json);
+        let query = request.uri.query().unwrap();
+        assert!(query.contains("hostname=vector"));
+        assert!(query.contains("ip=127.0.0.1"));
+        assert!(query.contains("mac=some-mac-addr"));
+        assert!(query.contains("tags=test%2Cmaybeanothertest"));
+
+        let output = body
+            .as_object()
+            .unwrap()
+            .get("lines")
+            .unwrap()
+            .as_array()
+            .unwrap();
+
+        for (i, line) in output.iter().enumerate() {
+            // All lines are json objects
+            let line = line.as_object().unwrap();
+
+            assert_eq!(line.get("app").unwrap(), &json!("vector"));
+            assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
+
+            if i == 0 {
+                assert_eq!(
+                    line.get("meta").unwrap(),
+                    &json!({
+                        "key1": "value1"
+                    })
+                );
+            }
+        }
     }
 }
