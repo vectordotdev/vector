@@ -61,7 +61,7 @@ struct S3Options {
     server_side_encryption: Option<String>,
     ssekms_key_id: Option<String>,
     storage_class: Option<String>,
-    tags: HashMap<String, String>,
+    tags: Option<HashMap<String, String>>,
 }
 
 lazy_static! {
@@ -238,8 +238,10 @@ impl Service<Request> for S3Sink {
     fn call(&mut self, request: Request) -> Self::Future {
         let options = request.options;
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-        for (p, v) in options.tags {
-            tagging.append_pair(&p, &v);
+        if let Some(tags) = options.tags {
+            for (p, v) in tags {
+                tagging.append_pair(&p, &v);
+            }
         }
         let tagging = tagging.finish();
         self.client
