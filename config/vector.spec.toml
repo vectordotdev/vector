@@ -2260,6 +2260,75 @@ end
   key_prefix = "application_id={{ application_id }}/date=%F/"
 
   #
+  # Object Attributes
+  #
+
+  # Canned ACL to apply to the created objects. For more information, see Canned
+  # ACL.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  acl = "authenticated-read"
+
+  # Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the
+  # created objects.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # Allows the named grantee to read the created objects and their metadata.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # Allows the named grantee to read the created objects' ACL.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # Allows the named grantee to write the created objects' ACL.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The server-side encryption algorithm used when storing these objects.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  server_side_encryption = "AES256"
+  server_side_encryption = "aws:kms"
+
+  # If `server_side_encryption` has the value `"aws.kms"`, this specifies the ID
+  # of the AWS Key Management Service (AWS KMS) symmetrical customer managed
+  # customer master key (CMK) that will used for the created objects. If not
+  # specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the S3 Storage Classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  [sinks.aws_s3.tags]
+    # A custom tag to be added to the created objects.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    Tag1 = "Value1"
+
+  #
   # requests
   #
 

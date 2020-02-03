@@ -82,6 +82,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
   endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
 
+  # OPTIONAL - Object Attributes
+  acl = "authenticated-read" # example, no default
+  grant_full_control = nil # example, no default
+  grant_read = nil # example, no default
+  grant_read_acp = nil # example, no default
+  grant_write_acp = nil # example, no default
+  server_side_encryption = "AES256" # example, no default
+  ssekms_key_id = nil # example, no default
+  storage_class = nil # example, no default
+  [sinks.my_sink_id.tags]
+    Tag1 = "Value1" # example
+
   # OPTIONAL - requests
   encoding = "ndjson" # example, no default, enum
 
@@ -119,6 +131,28 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["authenticated-read"]}
+  name={"acl"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### acl
+
+Canned ACL to apply to the created objects. For more information, see [Canned ACL](https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl).
+
+
+</Field>
 
 
 <Field
@@ -461,6 +495,94 @@ The format of the resulting object file name. [`strftime` specifiers][urls.strpt
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"grant_full_control"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_full_control
+
+Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the created objects.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"grant_read"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_read
+
+Allows the named grantee to read the created objects and their metadata.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"grant_read_acp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_read_acp
+
+Allows the named grantee to read the created objects' ACL.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"grant_write_acp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_write_acp
+
+Allows the named grantee to write the created objects' ACL.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -695,6 +817,120 @@ The maximum amount of time to wait between retries.
 #### timeout_secs
 
 The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AES256","aws:kms"]}
+  name={"server_side_encryption"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### server_side_encryption
+
+The server-side encryption algorithm used when storing these objects.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"ssekms_key_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### ssekms_key_id
+
+If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`, this specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed customer master key (CMK) that will used for the created objects. If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"storage_class"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### storage_class
+
+The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### tags
+
+The tag-set for the object.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Tag1":"Value1"}]}
+  name={"`[tag-name]`"}
+  path={"tags"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[tag-name]`
+
+A custom tag to be added to the created objects.
 
 
 </Field>
