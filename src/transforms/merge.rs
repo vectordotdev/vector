@@ -16,7 +16,7 @@ pub struct MergeConfig {
     /// The field that indicates that the event is partial. A consequent stream
     /// of partial events along with the first non-partial event will be merged
     /// together.
-    pub partial_event_marker: Atom,
+    pub partial_event_marker_field: Atom,
     /// Fields to merge. The values of these fields will be merged into the
     /// first partial event. Fields not specified here will be ignored.
     /// Merging process takes the first partial event and the base, then it
@@ -38,7 +38,7 @@ inventory::submit! {
 impl Default for MergeConfig {
     fn default() -> Self {
         Self {
-            partial_event_marker: event::PARTIAL.clone(),
+            partial_event_marker_field: event::PARTIAL.clone(),
             merge_fields: vec![event::MESSAGE.clone()],
             stream_discriminant_fields: vec![],
         }
@@ -66,7 +66,7 @@ impl TransformConfig for MergeConfig {
 
 #[derive(Debug)]
 pub struct Merge {
-    partial_event_marker: Atom,
+    partial_event_marker_field: Atom,
     merge_fields: Vec<Atom>,
     stream_discriminant_fields: Vec<Atom>,
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
@@ -75,7 +75,7 @@ pub struct Merge {
 impl From<MergeConfig> for Merge {
     fn from(config: MergeConfig) -> Self {
         Self {
-            partial_event_marker: config.partial_event_marker,
+            partial_event_marker_field: config.partial_event_marker_field,
             merge_fields: config.merge_fields,
             stream_discriminant_fields: config.stream_discriminant_fields,
             log_event_merge_states: HashMap::new(),
@@ -100,7 +100,7 @@ impl Transform for Merge {
 
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
-        if event.remove(&self.partial_event_marker).is_some() {
+        if event.remove(&self.partial_event_marker_field).is_some() {
             // We got a perial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.
