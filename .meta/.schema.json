@@ -1,0 +1,532 @@
+{
+  "$id": "https://raw.githubusercontent.com/timberio/vector/master/.meta/schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vector Metadata Schema",
+  "type": "object",
+  "required": [ "sinks" ],
+  "properties": {
+    "sinks": {
+      "type": "object",
+      "description": "An object represeting all Vector sinks keyed by the sink's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/sink"
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "description": "An object represeting all Vector soures keyed by the source's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/source"
+        }
+      }
+    },
+    "transforms": {
+      "type": "object",
+      "description": "An object represeting all Vector transforms keyed by the transform's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/transform"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "event_types": {
+      "type": "array",
+      "description": "A list of allowed Vector event types.",
+      "items": {
+        "type": "string",
+        "enum": ["log", "metric"]
+      }
+    },
+    "operating_systems": {
+      "type": "string",
+      "description": "A list of Vector support operating systems.",
+      "enum": ["Linux", "MacOS", "Windows"]
+    },
+    "option": {
+      "type": "object",
+      "description": "A Vector option, such as a component option, environment variable, etc.",
+      "additionalProperties": false,
+      "required": ["description", "type"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "The object category. This will group the option with other related category options."
+        },
+        "common": {
+          "type": "boolean",
+          "description": "If this option is a common option. Common options are shown by default in the documentation. It's a way to reduce the noise in configuration examples."
+        },
+        "default": {
+          "description": "The default value of this option, if applicable."
+        },
+        "description": {
+          "type": "string",
+          "description": "The human friendly description of this option, markdown syntax is supported.",
+          "minLength": 10
+        },
+        "display": {
+          "type": "string",
+          "description": "Only relevant for `object` types. This determine the TOML display style.",
+          "enum": ["inline"]
+        },
+        "enum": {
+          "type": "object",
+          "description": "Enumeration values for this option.",
+          "patternProperties": {
+            "^[a-z0-9_]+$": {
+              "type": "string",
+              "minLength": 10
+            }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "description": "An array of example values used for documentation purposes."
+        },
+        "options": {
+          "$ref": "#/definitions/options"
+        },
+        "partition_key": {
+          "type": "boolean",
+          "description": "If this option can be used to partition data. For example, the `path` option in the `aws_s3` sink."
+        },
+        "prioritize": {
+          "type": "boolean",
+          "description": "Should this option be prioritized and moved to the top when displayed?"
+        },
+        "relevant_when": {
+          "type": "object",
+          "description": "An object representing the conditions when an option is relevant. This is commonly used in conjuntion with `type` or `strategy` options."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "If this option is required."
+        },
+        "templateable": {
+          "type": "boolean",
+          "description": "If this option support Vectors template/event field interpolation syntax."
+        },
+        "type": {
+          "type": "string",
+          "description": "The option value type.",
+          "enum": [
+            "bool",
+            "int",
+            "string",
+            "table",
+            "[float]",
+            "[string]",
+            "[table]"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "description": "The unit of measurement for the option value",
+          "enum": ["bytes", "milliseconds", "seconds"]
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "description": "An object of options keyed by the option's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/option"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "An array of output examples used to demonstrate a component's output.",
+      "additionalProperties": false,
+      "properties": {
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["body", "label"],
+            "properties": {
+              "body": {
+                "type": "string",
+                "description": "The output exmaple body. Markdown syntax is supported."
+              },
+              "label": {
+                "type": "string",
+                "description": "The output label. This will be used in the tab name if multiple output examples are provided."
+              }
+            }
+          }
+        }
+      }
+    },
+    "sink": {
+      "type": "object",
+      "description": "A component that outputs/sends data from Vector.",
+      "additionalProperties": false,
+      "required": [
+        "common",
+        "delivery_guarantee",
+        "egress_method",
+        "function_category",
+        "title",
+        "write_to_description"
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "egress_method": { "const": "batching" }
+          },
+          "required": [
+            "batch_timeout_secs"
+          ]
+        },
+        {
+          "properties": {
+            "egress_method": { "const": "exposing" }
+          },
+          "required": []
+        },
+        {
+          "properties": {
+            "egress_method": { "const": "streaming" }
+          },
+          "required": []
+        }
+      ],
+      "properties": {
+        "batch_is_common": {
+          "type": "boolean",
+          "description": "Should all of the batch option sbe set as `common`?"
+        },
+        "batch_max_events": {
+          "type": "integer",
+          "description": "The maximum number of events allowed in the batch.",
+          "minimum": 1
+        },
+        "batch_max_size": {
+          "type": "integer",
+          "description": "The maximum batch size in bytes.",
+          "minimum": 1
+        },
+        "batch_timeout_secs": {
+          "type": "integer",
+          "description": "The maximum time a batch can live before being flushed.",
+          "minimum": 1
+        },
+        "beta": {
+          "type": "boolean",
+          "description": "Is this component in beta status?"
+        },
+        "buffer": {
+          "type": "boolean",
+          "description": "Does this sink allow buffering?"
+        },
+        "common": {
+          "type": "boolean",
+          "description": "Is this sink common? Shold it be highlighted in a list of all sinks?"
+        },
+        "compressions": {
+          "type": "array",
+          "description": "The compression methods available, if applicable.",
+          "items": {
+            "type": "string",
+            "enum": ["gzip"]
+          }
+        },
+        "delivery_guarantee": {
+          "type": "string",
+          "description": "The sink's delivery guarantee.",
+          "enum": ["at_least_once", "best_effort"]
+        },
+        "egress_method": {
+          "type": "string",
+          "description": "The sink's egress method.",
+          "enum": ["batching", "exposing", "streaming"]
+        },
+        "encodings": {
+          "type": "array",
+          "description": "The encodings offered by the sink. How the output is encoded.",
+          "items": {
+            "type": "string",
+            "enum": ["json", "ndjson", "text"]
+          }
+        },
+        "env_vars": {
+          "$ref": "#/definitions/options",
+          "description": "The environment variables supported by this source, keyed by the variables's name."
+        },
+        "function_category": {
+          "type": "string",
+          "description": "The function category the sink serves. Used for filtering.",
+          "enum": [
+            "proxy",
+            "test",
+            "transmit"
+          ]
+        },
+        "healthcheck": {
+          "type": "boolean",
+          "description": "If the sink implements a healthcheck."
+        },
+        "input_types": {
+          "type": "array",
+          "description": "The allow event input types.",
+          "items": {
+            "type": "string",
+            "enum": ["log", "metric"]
+          }
+        },
+        "options": {
+          "$ref": "#/definitions/options",
+          "description": "The options provided by this sink, keyed by the option's name."
+        },
+        "output": {
+          "$ref": "#/definitions/output",
+          "description": "Output examples of this sink."
+        },
+        "request_rate_limit_duration_secs": {
+          "type": "integer",
+          "description": "The request rate limit duration window.",
+          "minimum": 1
+        },
+        "request_rate_limit_num": {
+          "type": "integer",
+          "description": "The request limit allow in the rate limit window.",
+          "minimum": 1
+        },
+        "request_retry_attempts": {
+          "type": "integer",
+          "description": "The number of retry attempts allowed.",
+          "minimum": 1
+        },
+        "request_retry_initial_backoff_secs": {
+          "type": "integer",
+          "description": "The number of seconds to backoff on the first retry.",
+          "minimum": 1
+        },
+        "request_retry_max_duration_secs": {
+          "type": "integer",
+          "description": "The maximum number of seconds to backoff after repeated retries.",
+          "minimum": 1
+        },
+        "request_in_flight_limit": {
+          "type": "integer",
+          "description": "The maximum number of requests allowed to be in-flight at one time.",
+          "minimum": 1
+        },
+        "request_timeout_secs": {
+          "type": "integer",
+          "description": "The maximum time a request can take to complete.",
+          "minimum": 1
+        },
+        "service_limits_short_link": {
+          "type": "string",
+          "description": "A link to the target service's limits, if applicable.",
+          "minLength": 1
+        },
+        "service_providers": {
+          "type": "array",
+          "description": "A list of providers that offer this service.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "AWS",
+              "Confluent",
+              "Datadog",
+              "Elastic",
+              "Google",
+              "New Relic",
+              "Splunk"
+            ]
+          }
+        },
+        "title": {
+          "type": "string",
+          "description": "Short title for the sink",
+          "minLength": 1,
+          "max_lenfth": 50
+        },
+        "tls_options": {
+          "type": "array",
+          "description": "Allowed TLS options, used for quick TLS option building.",
+          "items": {
+            "type": "string",
+            "enum": ["+enabled", "-verify"]
+          }
+        },
+        "write_to_description": {
+          "type": "string",
+          "description": "Short one sentence description of where the sink writes.",
+          "minLength": 5
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "A component that receives/ingests data.",
+      "additionalProperties": false,
+      "required": [
+        "common",
+        "delivery_guarantee",
+        "function_category",
+        "through_description",
+        "title"
+      ],
+      "properties": {
+        "beta": {
+          "type": "boolean",
+          "description": "Is the source in beta status?"
+        },
+        "common": {
+          "type": "boolean",
+          "description": "Is this a common source that should be highlighted in a full list of sources?"
+        },
+        "delivery_guarantee": {
+          "type": "string",
+          "description": "The source's delivery guarantee",
+          "enum": ["at_least_once", "best_effort"]
+        },
+        "env_vars": {
+          "$ref": "#/definitions/options",
+          "description": "The environment variables supported by this source, keyed by the variables's name."
+        },
+        "except_operating_systems": {
+          "#ref": "#/definitions/operating_systems",
+          "description": "A blacklist of operating systems not supported by this source."
+        },
+        "function_category": {
+          "type": "string",
+          "description": "The source's function category, used for filtering.",
+          "enum": [
+            "collect",
+            "proxy",
+            "receive"
+          ]
+        },
+        "only_operating_systems": {
+          "#ref": "#/definitions/operating_systems",
+          "description": "A whitelist of operating systems supported by this source."
+        },
+        "options": {
+          "$ref": "#/definitions/options",
+          "description": "Options provided by this source, keyed by the option name."
+        },
+        "output": {
+          "type": "object",
+          "description": "Output examples for this source.",
+          "additionalProperties": false,
+          "properties": {
+            "log": {
+              "#ref": "#/definitions/output"
+            },
+            "metric": {
+              "#ref": "#/definitions/output"
+            }
+          }
+        },
+        "output_types": {
+          "$ref": "#/definitions/event_types",
+          "description": "The types of events this source outputs."
+        },
+        "requirements": {
+          "type": "string",
+          "description": "A description of requirements needed for this source to operate correctly. Markdown syntax is supported."
+        },
+        "through_description": {
+          "type": "string",
+          "decription": "A short one sentence description describing how this source emits events.",
+          "minLength": 5
+        },
+        "title": {
+          "type": "string",
+          "description": "A simple title for this source, typically one word.",
+          "minLength": 1,
+          "max_lenfth": 50
+        }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_you_to_description",
+        "common",
+        "function_category",
+        "title"
+      ],
+      "properties": {
+        "allow_you_to_description": {
+          "type": "string",
+          "description": "A short one sentence description for this tramsform.",
+          "minLength": 5
+        },
+        "beta": {
+          "type": "boolean",
+          "description": "Is this transform in beta status?"
+        },
+        "common": {
+          "type": "boolean",
+          "description": "Is this a common transform that should be highlighted in a full list of transforms?"
+        },
+        "env_vars": {
+          "$ref": "#/definitions/options",
+          "description": "A list of supported environment variables by this transform."
+        },
+        "function_category": {
+          "type": "string",
+          "description": "The function category this transform performed. Used for filtering.",
+          "enum": [
+            "convert",
+            "enrich",
+            "filter",
+            "parse",
+            "program",
+            "sanitize",
+            "shape"
+          ]
+        },
+        "input_types": {
+          "$ref": "#/definitions/event_types",
+          "description": "The types of events that this transform can receive."
+        },
+        "options": {
+          "$ref": "#/definitions/options",
+          "description": "The options provided by this transform, keyed by the option name."
+        },
+        "output": {
+          "type": "object",
+          "description": "Output examples of this transform",
+          "additionalProperties": false,
+          "properties": {
+            "log": {
+              "#ref": "#/definitions/output"
+            },
+            "metric": {
+              "#ref": "#/definitions/output"
+            }
+          }
+        },
+        "output_types": {
+          "$ref": "#/definitions/event_types",
+          "description": "The types of events this transform outputs."
+        },
+        "title": {
+          "type": "string",
+          "description": "A simple title for this transform, typically one word.",
+          "minLength": 1,
+          "max_lenfth": 50
+        },
+        "types_coercion": {
+          "type": "boolean",
+          "description": "If this transform offers a `type` table for field coercion."
+        }
+      }
+    }
+  }
+}

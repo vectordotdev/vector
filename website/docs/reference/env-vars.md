@@ -156,7 +156,7 @@ The [GCP api key][urls.gcp_authentication_api_key] used for authentication.
 
 ### LOG
 
-Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#level] for more information on the available levels.
+Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#levels] for more information on the available levels.
 
 
 </Field>
@@ -188,6 +188,6 @@ Enables backtraces when errors are logged. Use this when debugging only since it
 
 
 [docs.global-options]: /docs/reference/global-options/
-[docs.monitoring#level]: /docs/administration/monitoring/#level
+[docs.monitoring#levels]: /docs/administration/monitoring/#levels
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys

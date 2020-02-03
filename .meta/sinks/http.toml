@@ -1,6 +1,6 @@
 [sinks.http]
 title = "HTTP"
-batch_is_simple = true
+batch_is_common = true
 batch_max_size = 1049000
 batch_timeout_secs = 1
 buffer = true

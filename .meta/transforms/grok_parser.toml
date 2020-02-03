@@ -5,10 +5,6 @@ common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-resources = [
-  {name = "Grok Debugger", short_link = "grok_debugger"},
-  {name = "Grok Patterns", short_link = "grok_patterns"}
-]
 types_coercion = true
 
 [transforms.grok_parser.options.drop_field]
@@ -19,7 +15,6 @@ required = true
 description = """\
 If `true` will drop the specified `field` after parsing.\
 """
-types_coercion = true
 
 [transforms.grok_parser.options.field]
 type = "string"

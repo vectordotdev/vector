@@ -238,7 +238,7 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
@@ -260,7 +260,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -323,7 +323,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -683,7 +683,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -1025,8 +1025,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http

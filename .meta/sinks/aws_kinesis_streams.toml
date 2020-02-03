@@ -37,8 +37,8 @@ description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kin
 
 [[sinks.aws_kinesis_streams.output.examples]]
 label = "Generic"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST / HTTP/1.1
 Host: kinesis.<region>.<domain>
 Content-Length: <byte_size>
@@ -61,5 +61,6 @@ X-Amz-Target: Kinesis_20131202.PutRecords
         },
     ],
     "StreamName": "<stream_name>"
-}\
+}
+```\
 """

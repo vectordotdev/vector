@@ -5,7 +5,6 @@ common = false
 function_category = "enrich"
 input_types = ["log"]
 output_types = ["log"]
-resources = []
 
 [transforms.aws_ec2_metadata.options.namespace]
 type = "string"

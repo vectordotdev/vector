@@ -218,7 +218,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum number of [events][docs.data-model] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -574,7 +574,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -667,6 +667,33 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
 For example:
+
+
+```http
+POST / HTTP/1.1
+Host: kinesis.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive
+X-Amz-Target: Kinesis_20131202.PutRecords
+{
+    "Records": [
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+    ],
+    "StreamName": "<stream_name>"
+}
+```
 
 ## How It Works
 
@@ -801,8 +828,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/

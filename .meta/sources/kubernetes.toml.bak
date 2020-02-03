@@ -4,7 +4,6 @@ beta = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
 output_types = ["log"]
-resources = []
 through_description = "kubernetes node's"
 
 [sources.kubernetes.output.log.fields.container_name]

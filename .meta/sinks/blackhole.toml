@@ -1,5 +1,5 @@
 [sinks.blackhole]
-title = "Blockhole"
+title = "Blackhole"
 buffer = false
 common = false
 delivery_guarantee = "best_effort"
