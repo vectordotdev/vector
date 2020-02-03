@@ -319,7 +319,7 @@ end-to-end integration and performance testing.
 
 ## Security
 
-Please see the [`SECURITY.md` file](/security.md).
+Please see the [`SECURITY.md` file](/SECURITY.md).
 
 ## Legal
 
