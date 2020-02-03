@@ -13,7 +13,7 @@ lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com/logs/ingest").into();
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LogdnaConfig {
     api_key: String,
     host: Option<UriSerde>,
@@ -23,6 +23,8 @@ pub struct LogdnaConfig {
     ip: Option<String>,
     tags: Option<Vec<String>>,
 
+    default_app: Option<String>,
+
     #[serde(default)]
     batch: BatchBytesConfig,
 
@@ -31,7 +33,7 @@ pub struct LogdnaConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new::<LogdnaConfig>("logdna")
+    SinkDescription::new_without_default::<LogdnaConfig>("logdna")
 }
 
 #[typetag::serde(name = "logdna")]
@@ -89,7 +91,11 @@ impl HttpSink for LogdnaConfig {
         }
 
         if !map.contains_key("app") && !map.contains_key("file") {
-            map.insert("app".to_string(), json!("vector"));
+            if let Some(default_app) = &self.default_app {
+                map.insert("app".to_string(), json!(default_app.as_str()));
+            } else {
+                map.insert("app".to_string(), json!("vector"));
+            }
         }
 
         let unflatten = log.unflatten();

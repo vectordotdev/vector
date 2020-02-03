@@ -99,6 +99,7 @@ scopes:
   - gcp_stackdriver_logging sink
   - http sink
   - kafka sink
+  - logdna sink
   - new_relic_logs sink
   - prometheus sink
   - sematext sink
