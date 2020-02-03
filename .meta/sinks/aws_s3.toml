@@ -1,6 +1,6 @@
 [sinks.aws_s3]
 title = "AWS S3"
-batch_is_simple = true
+batch_is_common = true
 batch_max_size = 10490000
 batch_timeout_secs = 300
 beta = true

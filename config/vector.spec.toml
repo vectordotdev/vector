@@ -3714,8 +3714,7 @@ end
     # See the Google Cloud Platform monitored resource documentation for more
     # details.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: string
     type = "global"
     type = "gce_instance"

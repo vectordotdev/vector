@@ -7,7 +7,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "blackhole|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
 status: "prod-ready"
-title: "Blockhole Sink"
+title: "Blackhole Sink"
 unsupported_operating_systems: []
 ---
 

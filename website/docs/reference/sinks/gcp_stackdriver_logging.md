@@ -95,7 +95,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Resource
   [sinks.my_sink_id.resource]
-    type = "global" # example, no default
+    # REQUIRED
+    type = "global" # example
+
+    # OPTIONAL
     projectId = "vector-123456" # example
     zone = "Twilight" # example
 
@@ -695,14 +698,14 @@ For example, Compute Engine VM instances use the labels `projectId`, `instanceId
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["global","gce_instance"]}
   name={"type"}
   path={"resource"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

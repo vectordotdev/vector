@@ -238,7 +238,7 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
@@ -260,7 +260,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}

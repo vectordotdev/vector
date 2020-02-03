@@ -641,6 +641,30 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
+
+```http
+POST / HTTP/1.1
+Host: firehose.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive
+X-Amz-Target: Firehose_20150804.PutRecordBatch
+{
+    "DeliveryStreamName": "<stream_name>",
+    "Records": [
+        {
+            "Data": "<base64_encoded_log>",
+        },
+        {
+            "Data": "<base64_encoded_log>",
+        },
+        {
+            "Data": "<base64_encoded_log>",
+        },
+    ]
+}
+```
+
 ## How It Works
 
 ### AWS Authentication
