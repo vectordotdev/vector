@@ -5,7 +5,6 @@ common = false
 delivery_guarantee = "at_least_once"
 function_category = "receive"
 output_types = ["log"]
-resources = []
 through_description = "the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol]"
 
 [sources.logplex.options.address]

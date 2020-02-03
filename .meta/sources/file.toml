@@ -5,7 +5,6 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
 output_types = ["log"]
-resources = []
 through_description = "one or more local files"
 
 [sources.file.options.data_dir]
@@ -39,7 +38,6 @@ type = "string"
 category = "Context"
 default = "file"
 required = true
-section = "context"
 description = """\
 The key name added to each event with the full path of the file.\
 """
@@ -55,12 +53,10 @@ Vector searches for files.\
 """
 
 [sources.file.options.host_key]
-name = "host_key"
 type = "string"
 category = "Context"
 default = "host"
 required = true
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """

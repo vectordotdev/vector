@@ -13,7 +13,6 @@ publish = false
 debug = true
 
 [package.metadata.deb]
-section = "utility"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
 assets = [

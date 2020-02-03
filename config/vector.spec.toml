@@ -444,6 +444,13 @@ dns_servers = ["0.0.0.0:53"]
   mode = "udp"
   mode = "unix"
 
+  # The unix socket path. *This should be absolute path*.
+  #
+  # * required
+  # * type: string
+  # * relevant when mode = "unix"
+  path = "/path/to/socket"
+
   # The timeout before a connection is forcefully closed during shutdown.
   #
   # * required
@@ -460,14 +467,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   # * unit: bytes
   max_length = 102400
-
-  # The unix socket path. *This should be absolute path*.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when mode = "unix"
-  path = "/path/to/socket"
 
   #
   # Context
@@ -3714,8 +3713,7 @@ end
     # See the Google Cloud Platform monitored resource documentation for more
     # details.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: string
     type = "global"
     type = "gce_instance"

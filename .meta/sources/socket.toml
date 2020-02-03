@@ -4,7 +4,6 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-resources = []
 through_description = "a socket, such as a TCP, UDP, or Unix socket"
 
 [sources.socket.options.mode]
@@ -22,7 +21,6 @@ unix = "Unix Domain Socket."
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#3"]
-null = false
 relevant_when = {mode = ["tcp", "udp"]}
 required = true
 description = """\
@@ -35,18 +33,16 @@ a port.
 type = "string"
 common = true
 examples = ["/path/to/socket"]
-null = false
+required = true
 relevant_when = {mode = "unix"}
 description = """The unix socket path. *This should be absolute path*.\
 """
 
 [sources.socket.options.host_key]
-name = "host_key"
 type = "string"
 category = "Context"
 required = true
 default = "host"
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """

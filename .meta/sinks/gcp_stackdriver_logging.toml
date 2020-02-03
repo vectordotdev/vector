@@ -105,7 +105,7 @@ description = "Options for describing the logging resource."
 
 [sinks.gcp_stackdriver_logging.options.resource.options.type]
 type = "string"
-required = "true"
+required = true
 examples = ["global", "gce_instance"]
 description = """\
 The monitored resource type. For example, the type of a Compute Engine VM \
