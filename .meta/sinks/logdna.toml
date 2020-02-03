@@ -27,7 +27,7 @@ description = "The Ingestion API key."
 
 [sinks.logdna.options.host]
 type = "string"
-required = false 
+required = false
 examples = ["http://127.0.0.1", "http://example.com"]
 description = "An optional host that will override the default one."
 
@@ -39,25 +39,25 @@ description = "The hostname that will be attached to each batch of events."
 
 [sinks.logdna.options.mac]
 type = "string"
-required = false 
+required = false
 examples = ["my-mac-address"]
 description = "The mac address that will be attached to each batch of events."
 
 [sinks.logdna.options.ip]
 type = "string"
-required = false 
+required = false
 examples = ["0.0.0.0"]
 description = "The IP address that will be attached to each batch of events."
 
 [sinks.logdna.options.tags]
 type = "[string]"
-required = false 
+required = false
 examples = [["tag1", "tag2"]]
 description = "The tags that will be attached to each batch of events."
 
 [sinks.logdna.options.default_app]
 type = "string"
-required = false 
+required = false
 examples = ["vector", "myapp"]
 default = "vector"
 description = "The default app that will be set for events that do not contain a `file` or `app` field."
