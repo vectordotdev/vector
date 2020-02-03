@@ -30,6 +30,7 @@ data_dir = "/var/lib/vector"
   type         = "aws_s3"
   region       = "us-east-1"
   bucket       = "my_log_archives"
-  batch_size   = 10000000 # 10mb uncompressed
   encoding     = "ndjson"
   compression  = "gzip"
+  [sinks.s3_archives.batch]
+    max_size   = 10000000 # 10mb uncompressed
