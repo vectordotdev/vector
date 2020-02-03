@@ -3239,6 +3239,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded-slab"
+version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae75d0445b5d3778c9da3d1f840faa16d0627c8607f78a74daf69e5b988c39a1"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "shiplift"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4178,20 +4187,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-subscriber"
-version = "0.1.6"
+name = "tracing-serde"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "192ca16595cdd0661ce319e8eede9c975f227cdaabc4faaefdc256f43d852e45"
+checksum = "d65dea8255e378ab7db9db2077a90cb3e051515e18eaa819a405c4eb129b9beb"
+dependencies = [
+ "serde",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.2.0-alpha.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4055f329d81a5948a02fb203bc51ab3579541cdca746631b0a3a8a7204d9ec96"
 dependencies = [
  "ansi_term",
  "chrono",
  "lazy_static",
  "matchers",
- "owning_ref",
  "regex",
- "smallvec 0.6.13",
+ "serde",
+ "serde_json",
+ "sharded-slab",
+ "smallvec 1.2.0",
  "tracing-core",
  "tracing-log",
+ "tracing-serde",
 ]
 
 [[package]]
