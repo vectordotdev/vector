@@ -19,7 +19,6 @@ class Component
     :options,
     :posts,
     :requirements,
-    :resources,
     :title,
     :type,
     :unsupported_operating_systems
@@ -48,13 +47,6 @@ class Component
     end
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
-
-    # Resources
-
-    @resources =
-      (hash.delete("resources") || []).collect do |resource_hash|
-        OpenStruct.new(resource_hash)
-      end
 
     # Default options
 

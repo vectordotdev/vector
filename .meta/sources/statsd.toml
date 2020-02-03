@@ -5,7 +5,6 @@ common = false
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["metric"]
-resources = []
 through_description = "the StatsD UDP protocol"
 
 [sources.statsd.options.address]

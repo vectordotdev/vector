@@ -9,11 +9,38 @@
       "type": "object",
       "description": "Object of Vector sinks keyed by their ID",
       "patternProperties": {
-        "^[a-z0-9_]+$": { "$ref": "#/definitions/sink" }
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/sink"
+        }
       }
-    }
+    },
+    "sources": {
+      "type": "object",
+      "description": "Object of Vector sinks keyed by their ID",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/source"
+        }
+      }
+    },
+    "transforms": {
+      "type": "object",
+      "description": "Object of Vector transforms keyed by their ID",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/transform"
+        }
+      }
+    },
   },
   "definitions": {
+    "event_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["log", "metric"]
+      }
+    },
     "option": {
       "type": "object",
       "additionalProperties": false,
@@ -31,6 +58,10 @@
           "type": "string",
           "minLength": 10
         },
+        "display": {
+          "type": "string",
+          "enum": ["inline"]
+        },
         "enum": {
           "type": "object",
           "patternProperties": {
@@ -44,10 +75,7 @@
           "type": "array"
         },
         "options": {
-          "type": "object",
-          "patternProperties": {
-            "^[a-z0-9_]+$": { "$ref": "#/definitions/option" }
-          }
+          "$ref": "#/definitions/options"
         },
         "partition_key": {
           "type": "boolean"
@@ -72,12 +100,21 @@
             "string",
             "table",
             "[float]",
-            "[string]"
+            "[string]",
+            "[table]"
           ]
         },
         "unit": {
           "type": "string",
           "enum": ["bytes", "milliseconds", "seconds"]
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/option"
         }
       }
     },
@@ -184,24 +221,12 @@
           }
         },
         "env_vars": {
-          "type": "object",
-          "patternProperties": {
-            "^[A-Z0-9_]+$": { "$ref": "#/definitions/option" }
-          }
+          "$ref": "#/definitions/options"
         },
         "function_category": {
           "type": "string",
           "enum": [
-            "collect",
-            "convert",
-            "enrich",
-            "filter",
-            "parse",
-            "program",
             "proxy",
-            "receive",
-            "sanitize",
-            "shape",
             "test",
             "transmit"
           ]
@@ -217,12 +242,11 @@
           }
         },
         "options": {
-          "type": "object",
-          "patternProperties": {
-            "^[a-z0-9_]+$": { "$ref": "#/definitions/option" }
-          }
+          "$ref": "#/definitions/options"
         },
-        "output": { "$ref": "#/definitions/output" },
+        "output": {
+          "$ref": "#/definitions/output"
+        },
         "request_rate_limit_duration_secs": {
           "type": "integer",
           "minimum": 1
@@ -285,6 +309,72 @@
         "write_to_description": {
           "type": "string",
           "minLength": 5
+        }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_you_to_description",
+        "common",
+        "function_category",
+        "title"
+      ],
+      "properties": {
+        "allow_you_to_description": {
+          "type": "string",
+          "minLength": 5
+        },
+        "beta": {
+          "type": "boolean"
+        },
+        "common": {
+          "type": "boolean"
+        },
+        "env_vars": {
+          "$ref": "#/definitions/options"
+        },
+        "function_category": {
+          "type": "string",
+          "enum": [
+            "convert",
+            "enrich",
+            "filter",
+            "parse",
+            "program",
+            "sanitize",
+            "shape"
+          ]
+        },
+        "input_types": {
+          "$ref": "#/definitions/event_types"
+        },
+        "options": {
+          "$ref": "#/definitions/options"
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "log": {
+              "#ref": "#/definitions/output"
+            },
+            "metric": {
+              "#ref": "#/definitions/output"
+            }
+          }
+        },
+        "output_types": {
+          "$ref": "#/definitions/event_types"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "max_lenfth": 50
+        },
+        "types_coercion": {
+          "type": "boolean"
         }
       }
     }

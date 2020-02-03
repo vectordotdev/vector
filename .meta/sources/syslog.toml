@@ -4,7 +4,6 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-resources = []
 through_description = "the Syslog 5424 protocol"
 
 [sources.syslog.options.address]

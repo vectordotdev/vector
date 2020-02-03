@@ -209,12 +209,6 @@ class Sink < Component
       @options.buffer = buffer_option
     end
 
-    # resources
-
-    if @service_limits_short_link
-      @resources << OpenStruct.new({"name" => "Service Limits", "short_link" => @service_limits_short_link})
-    end
-
     # An empty array means TLS options are supported
     if !tls_options.nil?
       # Standard TLS options
