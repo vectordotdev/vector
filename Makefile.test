@@ -4,11 +4,34 @@ RUN=./scripts/docker-compose-run.sh
 
 all: verify
 
+# checks
+
+check: check-code check-fmt check-style check-generate check-blog check-version check-examples
+
+check-code: init-target-dir
+	$(RUN) check-code
+
+check-fmt: init-target-dir
+	$(RUN) check-fmt
+
+check-style:
+	$(RUN) check-style
+
+check-generate:
+	$(RUN) check-generate
+
+check-blog:
+	$(RUN) check-blog
+
+check-version:
+	$(RUN) check-version
+
+check-examples: build-archive
+	$(RUN) check-examples
+
 # build artifacts
 
-build-archive:
-	# these dirs are created explictly to ensure that they have the current user as the owner
-	mkdir -p target/cargo/git target/cargo/registry
+build-archive: init-target-dir
 	$(RUN) build-archive
 
 package-deb: build-archive
@@ -45,6 +68,12 @@ verify: verify-rpm verify-deb
 target-graph:
 	@docker-compose -f docker-compose.test.yml run --rm target-graph $(TARGET)
 
+# misc
+
 # clean everything
 clean:
 	$(RUN) clean
+
+# create target directory with correct permissions
+init-target-dir:
+	$(RUN) init-target-dir

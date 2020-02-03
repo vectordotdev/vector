@@ -1,6 +1,80 @@
 version: '3'
 
 services:
+  check-code:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    environment:
+      RUSTFLAGS: "-D warnings"
+    volumes:
+      - $PWD:$PWD
+      - ./target/cargo/registry:/root/.cargo/registry
+      - ./target/cargo/git:/root/.cargo/git
+    working_dir: $PWD
+    user: root
+    command: cargo check --all --all-targets
+
+  check-fmt:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+      - ./target/cargo/registry:/root/.cargo/registry
+      - ./target/cargo/git:/root/.cargo/git
+    working_dir: $PWD
+    user: root
+    command: cargo fmt -- --check
+
+  check-style:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-style.sh
+
+  check-generate:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-generate.sh
+
+  check-blog:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-blog-signatures.rb
+
+  check-version:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-version.rb
+
+  check-examples:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ["sh", "-ec", "./target/x86_64-unknown-linux-musl/release/vector validate --topology --deny-warnings ./config/examples/*.toml"]
+
   build-archive:
     build:
       context: scripts/ci-docker-images
@@ -91,3 +165,11 @@ services:
       - $PWD:$PWD
     working_dir: $PWD
     command: ["sh", "-ec", "rm -rf target"]
+
+  init-target-dir:
+    image: ubuntu:18.04
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ["sh", "-ec", "mkdir -p target/cargo/registry target/cargo/git"]
