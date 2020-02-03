@@ -48,10 +48,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
+  path = "/path/to/socket" # example, relevant when mode = "unix"
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -68,11 +68,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
+  path = "/path/to/socket" # example, relevant when mode = "unix"
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
   max_length = 102400 # default, bytes
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -188,7 +188,7 @@ The type of socket to use.
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

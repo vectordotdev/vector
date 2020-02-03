@@ -17,7 +17,6 @@ type = "string"
 category = "Context"
 required = true
 default = "host"
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """
