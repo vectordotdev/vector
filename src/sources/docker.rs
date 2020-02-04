@@ -863,7 +863,6 @@ impl ContainerLogInfo {
             log_event
         };
 
-
         // Partial or not partial - we return the event we got here, because all
         // other cases were handeled earlier.
         let event = Event::Log(log_event);
