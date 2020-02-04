@@ -78,6 +78,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
     max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
 
+  # OPTIONAL - Sasl
+  [sinks.my_sink_id.sasl]
+    enabled = false # default
+    mechanism = "SCRAM-SHA-256" # example, no default
+    password = "password" # example, no default
+    username = "username" # example, no default
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
@@ -298,6 +305,120 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"sasl"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### sasl
+
+Options for SASL/SCRAM authentication support
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  name={"enabled"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### enabled
+
+Enable SASL/SCRAM authentication to the remote.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["SCRAM-SHA-256","SCRAM-SHA-512"]}
+  name={"mechanism"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### mechanism
+
+The Kafka SASL/SCRAM mechanisms.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["password"]}
+  name={"password"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### password
+
+The Kafka SASL/SCRAM authentication password.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["username"]}
+  name={"username"}
+  path={"sasl"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### username
+
+The Kafka SASL/SCRAM authentication username.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
