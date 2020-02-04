@@ -790,76 +790,13 @@ impl ContainerLogInfo {
             true
         };
 
-        // Populate the message. We only need a message to merge.
-        let mut log_event = Event::new_empty_log().into_log();
-        log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
+        // Prepare the log event.
+        let mut log_event = {
+            let mut log_event = Event::new_empty_log().into_log();
 
-        // We got the message, that's the only part of the event we merge, so if
-        // we have the automatic partial event merging enabled, we might be able
-        // to return early and skip the logic of parsing the rest of the fields.
-        // Otherwize we continue populating the event with the rest of the
-        // fields and then we might want to consume it to initialize a partial
-        // merge event state - or return it.
-        let use_event_to_initialize_partial_merge_event_state = if auto_partial_merge {
-            // We can return early only if we have an partial event merge state,
-            // however we operate on the merge state differently based on
-            // whether the incoming event is partial or not.
-            if is_partial {
-                // Incoming event is partial, so, if we have a merge state -
-                // merge the incoming event in to the merge state and preserve
-                // the state for later.
-                // Then return early with `None` because we don't have a merged
-                // message to return yet.
-                // Otherwise, we can't return early, cause there's no partial
-                // event merge state and, since this is a partial event, we have
-                // to initialize a new partial event merge state from this
-                // event.
-                // However, we need all fields fully loaded into the event
-                // before we can use it, so we don't return early and continue
-                // with the event initialization until it's complete.
-                if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state
-                        .merge_in_next_event(log_event, &[event::MESSAGE.clone()]);
-                    return None;
-                }
+            // The log message.
+            log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
 
-                // Note that we want to use this event to initialize the partial
-                // event merge state.
-                true
-            } else {
-                // Incoming event is not partial, which means that, if we have a
-                // partial event merge state, we just merge it in as a final
-                // message, consuming the partial event merge state in return
-                // for a completely merged event.
-                // Then we can return early with this new merged event we got.
-                // Otherwise we can't return early, because this event is not
-                // partial, and we'll be returning it as is, but we need it
-                // fully initialized with all the fields, so we continue to let
-                // the event be completely initialized.
-                // Returning the non-partial non-merged event now will be
-                // invalid.
-                if let Some(partial_event_merge_state) = partial_event_merge_state.take() {
-                    let merged_log_event = partial_event_merge_state
-                        .merge_in_final_event(log_event, &[event::MESSAGE.clone()]);
-                    let event = Event::Log(merged_log_event);
-                    trace!(message = "Received one event (merged).", ?event);
-                    return Some(event);
-                }
-
-                // We want to return this event as is, so we note that we don't
-                // want to to use it to initialize the partial event merge
-                // state.
-                false
-            }
-        } else {
-            // If the automatic partial event merging is off, we definetly don't
-            // want to use this message to initialize the partial event merge
-            // state.
-            false
-        };
-
-        // Populate the rest of the fields.
-        {
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);
 
@@ -884,29 +821,54 @@ impl ContainerLogInfo {
 
             // Timestamp of the container creation.
             log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
-        }
 
-        // The event is fully initialized now.
+            // Return the resulting log event.
+            log_event
+        };
 
-        // If earlier we noted that we want to use this event to initialize new
-        // partial event merge state - we do so, and return None because there's
-        // no event to emit right now.
-        if use_event_to_initialize_partial_merge_event_state {
-            *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
-            return None;
-        }
+        // If automatic partial event merging is requested - perform the
+        // merging.
+        // Otherwise mark partial events and return all the events with no
+        // merging.
+        let log_event = if auto_partial_merge {
+            // Partial event events merging logic.
 
-        // We got a partial event we didn't use in the partial event merging
-        // logic before. In this case, what we do is we mark it as partial (if
-        // requested) and return it.
-        if is_partial {
-            // User can opt-out from marking the partial events - in this case
-            // just do not mark it even though it's partial, effectively
-            // dropping this bit of information.
-            if let Some(partial_event_marker_field) = partial_event_marker_field {
-                log_event.insert(partial_event_marker_field, true);
+            // If event is partial, stash it and return `None`.
+            if is_partial {
+                // If we already have a partial event merge state, the current
+                // message has to be merged into that existing state.
+                // Otherwise, create a new partial event merge state with the
+                // current message being the initial one.
+                if let Some(partial_event_merge_state) = partial_event_merge_state {
+                    partial_event_merge_state
+                        .merge_in_next_event(log_event, &[event::MESSAGE.clone()]);
+                } else {
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                };
+                return None;
+            };
+
+            // This is not a parial event. If we have a partial event merge
+            // state from before, the current event must be a final event, that
+            // would give us a merged event we can return.
+            // Otherwise it's just a regular event that we return as-is.
+            match partial_event_merge_state.take() {
+                Some(partial_event_merge_state) => partial_event_merge_state
+                    .merge_in_final_event(log_event, &[event::MESSAGE.clone()]),
+                None => log_event,
             }
-        }
+        } else {
+            // If the event is partial, just set the partial event marker field.
+            if is_partial {
+                // Only add partial event marker field if it's requested.
+                if let Some(partial_event_marker_field) = partial_event_marker_field {
+                    log_event.insert(partial_event_marker_field, true);
+                }
+            }
+            // Return the log event as is, partial or not. No merging here.
+            log_event
+        };
+
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handeled earlier.
