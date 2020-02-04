@@ -79,7 +79,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             error!("Failed to forward events, downstream is closed");
                             error!("Tried to send the following event: {:?}", e);
                             error!("Shutting down");
-                            
+
                             trigger.try_lock().ok().take().map(drop); // shut down the http server if someone hasn't already
                             warp::reject::custom("shutting down")
                         },

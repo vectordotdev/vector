@@ -12,7 +12,7 @@ use std::{
     io::{BufRead, BufReader, Read},
     net::SocketAddr,
 };
-use warp::http::{HeaderMap, StatusCode, HeaderValue};
+use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -80,7 +80,10 @@ fn add_headers(
     headers: HeaderMap,
 ) -> Vec<Event> {
     for header_name in headers_config {
-        let value = headers.get(header_name).map(HeaderValue::as_bytes).unwrap_or_default();
+        let value = headers
+            .get(header_name)
+            .map(HeaderValue::as_bytes)
+            .unwrap_or_default();
         for event in events.iter_mut() {
             event.as_mut_log().insert(header_name as &str, value);
         }
@@ -89,34 +92,34 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(body: impl Buf) -> impl Iterator<Item=String> {
-    BufReader::new(body.reader()).lines().filter_map(|res| {
-        res.map_err(|error| error!(message = "Error reading request body", ?error))
-            .ok()
-    })
-    .filter(|s| !s.is_empty())
+fn body_to_lines(body: impl Buf) -> impl Iterator<Item = String> {
+    BufReader::new(body.reader())
+        .lines()
+        .filter_map(|res| {
+            res.map_err(|error| error!(message = "Error reading request body", ?error))
+                .ok()
+        })
+        .filter(|s| !s.is_empty())
 }
 
 fn decode_body(body: impl Buf, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
-        Encoding::Text => {
-            Ok( body_to_lines(body).map(Event::from).collect() )
-        },
-        Encoding::Ndjson => {
-            Ok( 
-                body_to_lines(body)
-                    .map(|j| {
-                        let parsed_json = serde_json::from_str(&j).map_err(|e| json_error(format!("Error parsing Ndjson: {:?}",e)))?;
-                        json_parse_object( parsed_json ) 
-                    })
-                    .collect::<Result<_,_>>()? 
-            )
-        },
+        Encoding::Text => Ok(body_to_lines(body).map(Event::from).collect()),
+        Encoding::Ndjson => Ok(body_to_lines(body)
+            .map(|j| {
+                let parsed_json = serde_json::from_str(&j)
+                    .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
+                json_parse_object(parsed_json)
+            })
+            .collect::<Result<_, _>>()?),
         Encoding::Json => {
             let mut buffer = String::new();
-            body.reader().read_to_string(&mut buffer).map_err(|e| json_error(format!("Error reading body: {:?}",e)))?;
-            let parsed_json = serde_json::from_str(&buffer).map_err(|e| json_error(format!("Error parsing Json: {:?}",e)))?;
-            json_parse_array_of_object( parsed_json )
+            body.reader()
+                .read_to_string(&mut buffer)
+                .map_err(|e| json_error(format!("Error reading body: {:?}", e)))?;
+            let parsed_json = serde_json::from_str(&buffer)
+                .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
+            json_parse_array_of_object(parsed_json)
         }
     }
 }
@@ -130,36 +133,41 @@ fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
             flatten(log, map);
             Ok(event)
         }
-        _ => Err(json_error(format!("Expected Object, got {}",json_value_to_type_string(&value))))
+        _ => Err(json_error(format!(
+            "Expected Object, got {}",
+            json_value_to_type_string(&value)
+        ))),
     }
 }
 
 fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
     match value {
-        JsonValue::Array(v) => {
-            v.into_iter()
-                .map(json_parse_object)
-                .collect::<Result<_,_>>()
-        }
+        JsonValue::Array(v) => v
+            .into_iter()
+            .map(json_parse_object)
+            .collect::<Result<_, _>>(),
         JsonValue::Object(map) => {
             //treat like an array of one object
             Ok(vec![json_parse_object(JsonValue::Object(map))?])
         }
-        _ => Err( json_error(format!("Expected Array or Object, got {}.",json_value_to_type_string(&value))) )
+        _ => Err(json_error(format!(
+            "Expected Array or Object, got {}.",
+            json_value_to_type_string(&value)
+        ))),
     }
 }
 
 fn json_error(s: String) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}",s))
+    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
 fn json_value_to_type_string(value: &JsonValue) -> &'static str {
     match value {
         JsonValue::Object(_) => "Object",
-        JsonValue::Array(_)  => "Array",
+        JsonValue::Array(_) => "Array",
         JsonValue::String(_) => "String",
         JsonValue::Number(_) => "Number",
-        JsonValue::Bool(_)   => "Bool",
-        JsonValue::Null      => "Null",
+        JsonValue::Bool(_) => "Bool",
+        JsonValue::Null => "Null",
     }
 }
 
