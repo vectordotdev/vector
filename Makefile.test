@@ -1,8 +1,23 @@
 RUN=./scripts/docker-compose-run.sh
 
-# default target
+# default target, build the project in debug mode
+build: build-x86_64
 
-all: check verify
+# build the project in debug mode for all platforms
+build-all: build-x86_64 build-armv7 build-aarch64
+
+build-x86_64: init-target-dir
+	$(RUN) build-x86_64
+
+build-armv7: init-target-dir load-qemu-binfmt
+	$(RUN) build-armv7
+
+build-aarch64: init-target-dir load-qemu-binfmt
+	$(RUN) build-aach64
+
+# generate 
+
+all: build check verify
 
 # checks
 
@@ -80,9 +95,9 @@ verify-deb-artifact-on-ubuntu-19-04: package-deb
 verify-nixos:
 	$(RUN) verify-nixos
 
-# misc
+# miscellaneous
 
-# display dependencies between all targets in this Makefile
+# display dependencies between targets in this Makefile
 target-graph:
 	@docker-compose -f docker-compose.test.yml run --rm target-graph $(TARGET)
 
@@ -90,6 +105,10 @@ target-graph:
 clean:
 	$(RUN) clean
 
-# create target directory with correct permissions
+# create target directory owned by the current user
 init-target-dir:
 	$(RUN) init-target-dir
+
+# load `binfmt-misc` kernel module which required to use `qemu-user`
+load-qemu-binfmt:
+	$(RUN) load-qemu-binfmt
