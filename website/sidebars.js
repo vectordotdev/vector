@@ -218,6 +218,8 @@ module.exports = {
             
               "reference/sinks/gcp_pubsub",
             
+              "reference/sinks/gcp_stackdriver_logging",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",
@@ -225,6 +227,8 @@ module.exports = {
               "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
+            
+              "reference/sinks/sematext",
             
               "reference/sinks/socket",
             
@@ -264,6 +268,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Security',
+          href: 'https://github.com/timberio/vector/security/policy'
+        },
       ],
     },
   ]

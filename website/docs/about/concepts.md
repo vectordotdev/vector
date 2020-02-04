@@ -31,7 +31,7 @@ import Jump from '@site/src/components/Jump';
 
 ### Sources
 
-Vector would be junk if it couldn't injest data. A "source" defines where Vector
+Vector would be junk if it couldn't ingest data. A "source" defines where Vector
 should pull data from, or how it should receive data pushed to it. A pipeline
 can have any number of sources, and as they ingest data they proceed to
 normalize it into [events](#events) \(see next section\). This sets the stage
@@ -52,7 +52,7 @@ to you.
 
 ### Sinks
 
-A "sink" is a destination for [events][docs.data_model#event]. Each sink's
+A "sink" is a destination for [events][docs.data-model]. Each sink's
 design and transmission method is dictated by the downstream service it is
 interacting with. For example, the [`socket` sink][docs.sinks.socket] will
 stream individual events, while the [`aws_s3` sink][docs.sinks.aws_s3] will
@@ -79,7 +79,6 @@ pipeline in the [configuration section][docs.configuration].
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model]: /docs/about/data-model/
-[docs.data_model#event]: /docs/about/data-model/#event
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
 [docs.sinks.socket]: /docs/reference/sinks/socket/
 [docs.sources.file]: /docs/reference/sources/file/

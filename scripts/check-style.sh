@@ -27,6 +27,7 @@ for i in $(git ls-files); do
     *png) continue;;
     *svg) continue;;
     *ico) continue;;
+    *sig) continue;;
     test-data*) continue;;
     tests/data*) continue;;
     website/sidebars.js) continue;;

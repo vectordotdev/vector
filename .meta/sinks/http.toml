@@ -1,6 +1,6 @@
 [sinks.http]
 title = "HTTP"
-batch_is_simple = true
+batch_is_common = true
 batch_max_size = 1049000
 batch_timeout_secs = 1
 buffer = true
@@ -29,6 +29,7 @@ description = "Options for the authentication strategy."
 
 [sinks.http.options.auth.options.strategy]
 type = "string"
+prioritize = true
 required = true
 description = "The authentication strategy to use."
 

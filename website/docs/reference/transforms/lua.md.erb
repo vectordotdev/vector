@@ -6,6 +6,16 @@
 
 <%= component_config_example(component) %>
 
+<%- if !component.requirements.nil? -%>
+## Requirements
+
+<Alert type="danger" fill={true} icon={false}>
+
+<%= component.requirements %>
+
+</Alert>
+
+<%- end -%>
 ## Options
 
 <%= options(component.specific_options_list, heading_depth: 3) %>
@@ -87,7 +97,7 @@ variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
 |:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#schema]. |
 
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
@@ -119,6 +129,16 @@ for f,v in pairs(event) do
   end
 end
 ```
+
+### Lua Manual
+
+Understanding Lua and how write it is outside of the scope of Vector. We
+encourage you to take a look at the [Lua manual][urls.lua_manual] for more
+information.
+
+### Lua Version
+
+Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
 
 ### Search Directories
 

@@ -1,3 +1,4 @@
+require "json_schemer"
 require "ostruct"
 require "toml-rb"
 
@@ -18,19 +19,71 @@ require_relative "metadata/transform"
 class Metadata
   class << self
     def load!(meta_dir, docs_root, pages_root)
-      metadata = {}
-
-      Dir.glob("#{meta_dir}/**/*.toml").each do |file|
-        hash = TomlRB.load_file(file)
-        metadata.deep_merge!(hash)
-      end
-
+      metadata = load_metadata!(meta_dir)
+      json_schema = load_json_schema!(meta_dir)
+      validate_schema!(json_schema, metadata)
       new(metadata, docs_root, pages_root)
     end
+
+    private
+      def load_json_schema!(meta_dir)
+        json_schema = read_json("#{meta_dir}/.schema.json")
+
+        Dir.glob("#{meta_dir}/.schema/**/*.json").each do |file|
+          hash = read_json("#{meta_dir}/.schema.json")
+          json_schema.deep_merge!(hash)
+        end
+
+        json_schema
+      end
+
+      def load_metadata!(meta_dir)
+        metadata = {}
+
+        Dir.glob("#{meta_dir}/**/*.toml").each do |file|
+          hash = TomlRB.load_file(file)
+          metadata.deep_merge!(hash)
+        end
+
+        metadata
+      end
+
+      def read_json(path)
+        json_data = File.read(path)
+        JSON.parse(json_data)
+      end
+
+      def validate_schema!(schema, metadata)
+        schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
+        errors = schemer.validate(metadata).to_a
+        limit = 5
+
+        if errors.any?
+          error_messages =
+            errors[0..(limit - 1)].collect do |error|
+              "The value at `#{error.fetch("data_pointer")}` failed validation for `#{error.fetch("schema_pointer")}`, reason: `#{error.fetch("type")}`"
+            end
+
+          if errors.size > limit
+            error_messages << "+ #{errors.size} errors"
+          end
+
+          error!(
+            <<~EOF
+            The metadata schema is invalid. This means the the resulting
+            hash from the `/.meta/**/*.toml` files violates the defined
+            schema. Errors include:
+
+            * #{error_messages.join("\n* ")}
+            EOF
+          )
+        end
+      end
   end
 
   attr_reader :blog_posts,
-  :env_vars,
+    :domains,
+    :env_vars,
     :installation,
     :links,
     :log_fields,
@@ -55,6 +108,10 @@ class Metadata
     @transforms = OpenStruct.new()
     @testing = Option.build_struct(hash.fetch("testing"))
 
+    # domains
+
+    @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
+
     # installation
 
     installation_hash = hash.fetch("installation")
@@ -68,7 +125,7 @@ class Metadata
     @posts ||=
       Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
         Post.new(path)
-      end.sort
+      end.sort_by { |post| [ post.date, post.id ] }
 
     # releases
 
@@ -116,6 +173,12 @@ class Metadata
     hash["sinks"].collect do |sink_name, sink_hash|
       sink_hash["name"] = sink_name
       sink_hash["posts"] = posts.select { |post| post.sink?(sink_name) }
+
+      (sink_hash["service_providers"] || []).each do |service_provider|
+        provider_hash = (hash["service_providers"] || {})[service_provider.downcase] || {}
+        sink_hash["env_vars"] = (sink_hash["env_vars"] || {}).merge((provider_hash["env_vars"] || {}).clone)
+        sink_hash["options"] = sink_hash["options"].merge((provider_hash["options"] || {}).clone)
+      end
 
       sink =
         case sink_hash.fetch("egress_method")

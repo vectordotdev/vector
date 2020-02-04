@@ -4,9 +4,7 @@ beta = false
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
-guides = []
 output_types = ["log"]
-resources = []
 through_description = "one or more local files"
 
 [sources.file.options.data_dir]
@@ -14,7 +12,7 @@ type = "string"
 examples = ["/var/lib/vector"]
 description = """\
 The directory used to persist file checkpoint positions. By default, the \
-[global `data_dir` option][docs.configuration#data_dir] is used. Please make \
+[global `data_dir` option][docs.global-options#data_dir] is used. Please make \
 sure the Vector project has write permissions to this dir.\
 """
 
@@ -40,7 +38,6 @@ type = "string"
 category = "Context"
 default = "file"
 required = true
-section = "context"
 description = """\
 The key name added to each event with the full path of the file.\
 """
@@ -56,12 +53,10 @@ Vector searches for files.\
 """
 
 [sources.file.options.host_key]
-name = "host_key"
 type = "string"
 category = "Context"
 default = "host"
 required = true
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """
@@ -105,6 +100,7 @@ Configuration for how the file source should identify files.\
 [sources.file.options.fingerprinting.options.strategy]
 type = "string"
 default = "checksum"
+prioritize = true
 description = """\
 The strategy used to uniquely identify files. This is important for \
 [checkpointing](#checkpointing) when file rotation is used.\

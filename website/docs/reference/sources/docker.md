@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `docker` source ingests data through the docker engine daemon and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "docker|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/docker.rs
 status: "beta"

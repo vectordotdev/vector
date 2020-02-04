@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
@@ -226,7 +226,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -560,7 +560,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -835,8 +835,8 @@ should supply to the [`host`](#host) and [`token`](#token) options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M

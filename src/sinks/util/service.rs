@@ -16,6 +16,9 @@ use tower::{
     Service, ServiceBuilder,
 };
 
+pub type TowerBatchedSink<T, L, B, S> =
+    BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>;
+
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
     where
@@ -119,7 +122,7 @@ impl TowerRequestSettings {
         retry_logic: L,
         service: S,
         acker: Acker,
-    ) -> BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>
+    ) -> TowerBatchedSink<T, L, B, S>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
     // `trait SinkExt` above), as it is missing a bound on the
@@ -212,7 +215,7 @@ where
     type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+        self.inner.poll_ready().map_err(Into::into)
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
@@ -228,5 +231,35 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
             f: self.f.clone(),
             inner: self.inner.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::Future;
+    use std::sync::Arc;
+    use tokio01_test::{assert_ready, task::MockTask};
+    use tower::layer::Layer;
+    use tower_test::{assert_request_eq, mock};
+
+    #[test]
+    fn map() {
+        let mut task = MockTask::new();
+        let (mock, mut handle) = mock::pair();
+
+        let f = |r| r;
+
+        let map_layer = MapLayer { f: Arc::new(f) };
+
+        let mut svc = map_layer.layer(mock);
+
+        task.enter(|| assert_ready!(svc.poll_ready()));
+
+        let res = svc.call("hello world");
+
+        assert_request_eq!(handle, "hello world").send_response("world bye");
+
+        res.wait().unwrap();
     }
 }

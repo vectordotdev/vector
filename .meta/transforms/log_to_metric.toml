@@ -3,10 +3,8 @@ title = "Log to Metric"
 allow_you_to_description = "convert logs into one or more metrics"
 common = true
 function_category = "convert"
-guides = []
 input_types = ["log"]
 output_types = ["metric"]
-resources = []
 
 [transforms.log_to_metric.options.metrics]
 type = "[table]"

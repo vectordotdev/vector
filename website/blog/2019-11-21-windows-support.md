@@ -2,7 +2,7 @@
 id: windows-support
 title: "Windows Support Is Here!"
 description: "Bringing the performance and reliability of Vector to Windows"
-author_id: ben
+author_github: https://github.com/binarylogic
 tags: ["type: announcement", "domain: platforms", "platform: windows"]
 ---
 
