@@ -1184,7 +1184,7 @@ not create or modify buckets). You can set the storage class via the
 
 Vector currently only supports [AWS S3 object tags][urls.aws_s3_tags] and does
 _not_ support [object metadata][urls.aws_s3_metadata]. If you require metadata
-support please [open a feature request][urls.new_feature_request].
+support see [issue #1694][urls.issue_1694].
 
 We believe tags are more flexible since they are separate from the actual S3
 object. Youc an freely modify tags without modifying the object. Conversely,
@@ -1237,7 +1237,7 @@ You can read more about the complete syntax in the
 [urls.aws_s3_storage_classes]: https://aws.amazon.com/s3/storage-classes/
 [urls.aws_s3_tags]: https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[urls.issue_1694]: https://github.com/timberio/vector/issues/1694
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
