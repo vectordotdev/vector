@@ -256,7 +256,7 @@ ENV RUSTUP_HOME=$RUST_PREFIX
 ENV CARGO_HOME=$RUST_PREFIX
 COPY rust-toolchain /tmp/
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --default-toolchain `cat /tmp/rust-toolchain` --target $TARGET
+  sh -s -- -y --default-toolchain $(cat /tmp/rust-toolchain) --target $TARGET
 ENV PATH="$RUST_PREFIX/bin:$PATH"
 
 ARG CLANG_PREFIX
