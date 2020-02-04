@@ -4584,13 +4584,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The cloud destination to send logs to.
-  #
-  # * required
-  # * type: string
-  cloud = "north_america"
-  cloud = "europe"
-
   # The token that will be used to write to Sematext.
   #
   # * required
@@ -4604,6 +4597,24 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # The host that will be used to send logs to. This option is required if
+  # `region` is not set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://8.8.8.8"
+  host = "http://example.com"
+
+  # The region destination to send logs to. This option is required if `host` is
+  # not set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "na"
+  region = "eu"
 
   #
   # Batch

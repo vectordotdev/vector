@@ -108,7 +108,7 @@ mod tests {
     fn smoke() {
         let (mut config, cx, mut rt) = load_sink::<SematextConfig>(
             r#"
-            cloud = "north_america"
+            region = "na"
             token = "mylogtoken"
         "#,
         )
