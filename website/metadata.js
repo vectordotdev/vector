@@ -17324,6 +17324,28 @@ module.exports = {
 
       ]
     },
+    "http": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Ingests data through the HTTP protocol and outputs log events.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "receive",
+      "id": "http_source",
+      "name": "http",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": null,
+      "status": "beta",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "journald": {
       "beta": true,
       "delivery_guarantee": "best_effort",

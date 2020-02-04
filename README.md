@@ -58,7 +58,7 @@ of your observability data with Vector.
 
 #### Reference
 
-* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [6 more...][docs.sources]
+* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [6 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [12 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [gcp_stackdriver_logging][docs.sinks.gcp_stackdriver_logging], [http][docs.sinks.http], and [15 more...][docs.sinks]
 
@@ -177,6 +177,7 @@ Or use your own [preferred method][docs.installation].
 [docs.sinks]: https://vector.dev/docs/reference/sinks/
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker/
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file/
+[docs.sources.http]: https://vector.dev/docs/reference/sources/http/
 [docs.sources.journald]: https://vector.dev/docs/reference/sources/journald/
 [docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka/
 [docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
