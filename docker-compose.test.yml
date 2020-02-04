@@ -19,8 +19,8 @@ services:
 
   build-armv7:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: builder-armv7-unknown-linux-musleabihf/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
     environment:
       TARGET: armv7-unknown-linux-musleabihf
       FEATURES: default-musl
@@ -35,8 +35,8 @@ services:
 
   build-aarch64:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: builder-aarch64-unknown-linux-musl/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
     environment:
       TARGET: aarch64-unknown-linux-musl
       FEATURES: default-musl
@@ -141,8 +141,8 @@ services:
 
   package-deb:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: builder-x86_64-unknown-linux-musl/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
     environment:
       TARGET: x86_64-unknown-linux-musl
     volumes:
@@ -154,8 +154,8 @@ services:
 
   package-rpm:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: packager-rpm/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/packager-rpm/Dockerfile
     environment:
       TARGET: x86_64-unknown-linux-musl
     volumes:
@@ -165,8 +165,8 @@ services:
 
   verify-rpm-amazonlinux-1:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-amazonlinux-1/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-amazonlinux-1/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -174,8 +174,8 @@ services:
 
   verify-rpm-amazonlinux-2:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-amazonlinux-2/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-amazonlinux-2/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -183,8 +183,8 @@ services:
 
   verify-rpm-centos-7:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-centos-7/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-centos-7/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -192,8 +192,8 @@ services:
 
   verify-deb-artifact-on-deb-8:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-deb-8/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-deb-8/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -201,8 +201,8 @@ services:
 
   verify-deb-artifact-on-deb-9:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-deb-9/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-deb-9/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -210,8 +210,8 @@ services:
 
   verify-deb-artifact-on-deb-10:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-deb-10/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-deb-10/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -219,8 +219,8 @@ services:
 
   verify-deb-artifact-on-ubuntu-16-04:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-ubuntu-16-04/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-ubuntu-16-04/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -228,8 +228,8 @@ services:
 
   verify-deb-artifact-on-ubuntu-18-04:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-ubuntu-18-04/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-ubuntu-18-04/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -237,8 +237,8 @@ services:
 
   verify-deb-artifact-on-ubuntu-19-04:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: verifier-ubuntu-19-04/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/verifier-ubuntu-19-04/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
@@ -255,8 +255,8 @@ services:
 
   target-graph:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: target-graph/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/target-graph/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
