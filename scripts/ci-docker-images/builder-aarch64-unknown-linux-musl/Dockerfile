@@ -253,12 +253,12 @@ FROM ubuntu:19.10
 RUN apt-get update && apt-get install -y curl
 ARG TARGET
 ARG RUST_PREFIX
-ENV RUSTUP_HOME=$RUST_PREFIX
-ENV CARGO_HOME=$RUST_PREFIX
+ENV RUSTUP_HOME=$RUST_PREFIX/rustup
+ENV CARGO_HOME=$RUST_PREFIX/cargo
 COPY rust-toolchain /tmp
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
   sh -s -- -y --default-toolchain $(cat /tmp/rust-toolchain) --target $TARGET
-ENV PATH="$RUST_PREFIX/bin:$PATH"
+ENV PATH="$RUSTUP_HOME/bin:$CARGO_HOME/bin:$PATH"
 
 ARG CLANG_PREFIX
 RUN apt-get update && apt-get install -y clang llvm lld
