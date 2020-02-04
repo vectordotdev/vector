@@ -74,10 +74,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 )
                 .and_then(|events| {
                     out.send_all(futures::stream::iter_ok(events)).map_err(
-                        move |_: mpsc::SendError<Event>| {
+                        move |e: mpsc::SendError<Event>| {
+                            //can only fail if receiving end disconnected, so shut down and make some error logs
                             error!("Failed to forward events, downstream is closed");
-                            // shut down the http server if someone hasn't already
-                            trigger.try_lock().ok().take().map(drop);
+                            error!("Tried to send the following event: {:?}", e);
+                            error!("Shutting down");
+                            
+                            trigger.try_lock().ok().take().map(drop); // shut down the http server if someone hasn't already
                             warp::reject::custom("shutting down")
                         },
                     )
