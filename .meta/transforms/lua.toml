@@ -1,4 +1,5 @@
 [transforms.lua]
+title = "LUA"
 allow_you_to_description = "transform events with a full embedded [Lua][urls.lua] engine"
 beta = true
 common = true
@@ -26,13 +27,12 @@ if event["host"] == nil then
 end\
 """
 ]
-null = false
+required = true
 description = "The inline Lua source to evaluate."
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
 examples = [["/etc/vector/lua"]]
-null = true
 common = true
 description = """\
 A list of directories search when loading a Lua file via the `require` \

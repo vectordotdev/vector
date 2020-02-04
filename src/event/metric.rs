@@ -66,24 +66,13 @@ impl Metric {
         }
 
         match (&mut self.value, &other.value) {
-            (
-                MetricValue::Counter { ref mut value, .. },
-                MetricValue::Counter { value: value2, .. },
-            ) => {
+            (MetricValue::Counter { ref mut value }, MetricValue::Counter { value: value2 }) => {
                 *value += value2;
             }
-            (
-                MetricValue::Gauge { ref mut value, .. },
-                MetricValue::Gauge { value: value2, .. },
-            ) => {
+            (MetricValue::Gauge { ref mut value }, MetricValue::Gauge { value: value2 }) => {
                 *value += value2;
             }
-            (
-                MetricValue::Set { ref mut values, .. },
-                MetricValue::Set {
-                    values: values2, ..
-                },
-            ) => {
+            (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
                 for val in values2 {
                     values.insert(val.to_string());
                 }
@@ -92,18 +81,83 @@ impl Metric {
                 MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
-                    ..
                 },
                 MetricValue::Distribution {
                     values: values2,
                     sample_rates: sample_rates2,
-                    ..
                 },
             ) => {
                 values.extend_from_slice(&values2);
                 sample_rates.extend_from_slice(&sample_rates2);
             }
+            (
+                MetricValue::AggregatedHistogram {
+                    ref buckets,
+                    ref mut counts,
+                    ref mut count,
+                    ref mut sum,
+                },
+                MetricValue::AggregatedHistogram {
+                    buckets: buckets2,
+                    counts: counts2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if buckets == buckets2 && counts.len() == counts2.len() {
+                    for (i, c) in counts2.iter().enumerate() {
+                        counts[i] += c;
+                    }
+                    *count += count2;
+                    *sum += sum2;
+                }
+            }
             _ => {}
+        }
+    }
+
+    pub fn reset(&mut self) {
+        match &mut self.value {
+            MetricValue::Counter { ref mut value } => {
+                *value = 0.0;
+            }
+            MetricValue::Gauge { ref mut value } => {
+                *value = 0.0;
+            }
+            MetricValue::Set { ref mut values } => {
+                values.clear();
+            }
+            MetricValue::Distribution {
+                ref mut values,
+                ref mut sample_rates,
+            } => {
+                values.clear();
+                sample_rates.clear();
+            }
+            MetricValue::AggregatedHistogram {
+                ref mut counts,
+                ref mut count,
+                ref mut sum,
+                ..
+            } => {
+                for c in counts.iter_mut() {
+                    *c = 0;
+                }
+                *count = 0;
+                *sum = 0.0;
+            }
+            MetricValue::AggregatedSummary {
+                ref mut values,
+                ref mut count,
+                ref mut sum,
+                ..
+            } => {
+                for v in values.iter_mut() {
+                    *v = 0.0;
+                }
+                *count = 0;
+                *sum = 0.0;
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -32,7 +33,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
@@ -98,7 +99,7 @@ impl Transform for Tokenizer {
             for ((name, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
             {
                 match conversion.convert(value.as_bytes().into()) {
-                    Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
+                    Ok(value) => event.as_mut_log().insert(name.clone(), value),
                     Err(error) => {
                         debug!(
                             message = "Could not convert types.",
@@ -153,7 +154,7 @@ pub fn parse(input: &str) -> Vec<&str> {
 mod tests {
     use super::parse;
     use super::TokenizerConfig;
-    use crate::event::{LogEvent, ValueKind};
+    use crate::event::{LogEvent, Value};
     use crate::{topology::config::TransformConfig, Event};
     use string_cache::DefaultAtom as Atom;
 
@@ -255,6 +256,7 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(text);
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
@@ -265,7 +267,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             ..Default::default()
         }
-        .build()
+        .build(rt.executor())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()
@@ -307,10 +309,10 @@ mod tests {
             &[("flag", "bool"), ("code", "integer"), ("number", "float")],
         );
 
-        assert_eq!(log[&"number".into()], ValueKind::Float(42.3));
-        assert_eq!(log[&"flag".into()], ValueKind::Boolean(true));
-        assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"rest".into()], ValueKind::Bytes("word".into()));
+        assert_eq!(log[&"number".into()], Value::Float(42.3));
+        assert_eq!(log[&"flag".into()], Value::Boolean(true));
+        assert_eq!(log[&"code".into()], Value::Integer(1234));
+        assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
     }
 
     #[test]
@@ -322,8 +324,8 @@ mod tests {
             false,
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         );
-        assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"who".into()], ValueKind::Bytes("-".into()));
-        assert_eq!(log[&"why".into()], ValueKind::Bytes("foo".into()));
+        assert_eq!(log[&"code".into()], Value::Integer(1234));
+        assert_eq!(log[&"who".into()], Value::Bytes("-".into()));
+        assert_eq!(log[&"why".into()], Value::Bytes("foo".into()));
     }
 }

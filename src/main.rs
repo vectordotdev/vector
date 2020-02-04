@@ -13,7 +13,9 @@ use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{generate, list, metrics, runtime, topology, trace, unit_test};
+use vector::{
+    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
+};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -102,8 +104,9 @@ struct Validate {
     #[structopt(short, long)]
     deny_warnings: bool,
 
-    /// Any number of Vector config files to validate.
-    config_paths: Vec<PathBuf>,
+    /// Any number of Vector config files to validate. If none are specified the
+    /// default config path `/etc/vector/vector.toml` will be targeted.
+    paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -267,7 +270,7 @@ fn main() {
         info!("Dry run enabled, exiting after config validation.");
     }
 
-    let pieces = topology::validate(&config).unwrap_or_else(|| {
+    let pieces = topology::validate(&config, rt.executor()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -364,23 +367,26 @@ fn main() {
     }
     #[cfg(windows)]
     {
-        let mut ctrl_c_stream = tokio_signal::ctrl_c().flatten_stream();
-        let ctrl_c = future::poll_fn(move || ctrl_c_stream.poll());
+        let ctrl_c = tokio_signal::ctrl_c().flatten_stream().into_future();
         let crash = future::poll_fn(move || graceful_crash.poll());
 
-        let interruptions = ctrl_c.select2(crash);
-        rt.block_on(interruptions)
+        let interruption = rt
+            .block_on(ctrl_c.select2(crash))
             .map_err(|_| ())
             .expect("Neither stream errors");
 
         use futures::future::Either;
 
+        let ctrl_c = match interruption {
+            Either::A(((_, ctrl_c_stream), _)) => ctrl_c_stream.into_future(),
+            Either::B((_, ctrl_c)) => ctrl_c,
+        };
+
         info!("Shutting down.");
         let shutdown = topology.stop();
         metrics_trigger.cancel();
 
-        let ctrl_c_stream = tokio_signal::ctrl_c().flatten_stream();
-        match rt.block_on(shutdown.select2(ctrl_c_stream.into_future())) {
+        match rt.block_on(shutdown.select2(ctrl_c)) {
             Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
             Ok(Either::B(_)) => {
                 info!("Shutting down immediately.");
@@ -421,7 +427,13 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate) -> exitcode::ExitCode {
-    for config_path in &opts.config_paths {
+    let paths = if opts.paths.len() > 0 {
+        &opts.paths
+    } else {
+        &DEFAULT_CONFIG_PATHS
+    };
+
+    for config_path in paths {
         let file = if let Some(file) = open_config(&config_path) {
             file
         } else {

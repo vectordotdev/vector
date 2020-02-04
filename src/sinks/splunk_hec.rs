@@ -1,25 +1,22 @@
 use crate::{
-    buffers::Acker,
-    event::{self, Event, ValueKind},
+    dns::Resolver,
+    event::{self, Event, LogEvent, Value},
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
+        http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
-use hyper::{Body, Client};
-use hyper_tls::HttpsConnector;
+use hyper::Body;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, value::Value as JsonValue};
 use snafu::{ResultExt, Snafu};
-use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -34,20 +31,23 @@ pub struct HecSinkConfig {
     pub host: String,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+    #[serde(default)]
+    pub indexed_fields: Vec<Atom>,
     pub encoding: Encoding,
     pub compression: Option<Compression>,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
+    #[serde(default)]
+    pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        in_flight_limit: Some(10),
+        rate_limit_num: Some(10),
+        ..Default::default()
+    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -69,10 +69,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        let sink = hec(self.clone(), acker)?;
-        let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
+        let healthcheck = healthcheck(&self, cx.resolver())?;
+        let sink = hec(self.clone(), cx)?;
 
         Ok((sink, healthcheck))
     }
@@ -86,7 +86,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -96,20 +96,8 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         Compression::Gzip => true,
     };
     let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
     let encoding = config.encoding.clone();
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
 
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
@@ -118,35 +106,30 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
 
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service =
-        HttpService::builder()
-            .tls_settings(tls_settings)
-            .build(move |body: Vec<u8>| {
-                let mut builder = Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
+    let http_service = HttpService::builder(cx.resolver())
+        .tls_settings(tls_settings)
+        .build(move |body: Vec<u8>| {
+            let mut builder = Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
 
-                builder.header("Content-Type", "application/json");
+            builder.header("Content-Type", "application/json");
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
-                }
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
 
-                builder.header("Authorization", token.clone());
+            builder.header("Authorization", token.clone());
 
-                builder.body(body).unwrap()
-            });
+            builder.body(body).unwrap()
+        });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
+    let indexed_fields = config.indexed_fields.clone();
 
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
+        .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &indexed_fields, &encoding)));
 
     Ok(Box::new(sink))
 }
@@ -159,18 +142,21 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub fn healthcheck(token: String, host: String) -> crate::Result<super::Healthcheck> {
-    let uri = format!("{}/services/collector/health/1.0", host)
+pub fn healthcheck(
+    config: &HecSinkConfig,
+    resolver: Resolver,
+) -> crate::Result<super::Healthcheck> {
+    let uri = format!("{}/services/collector/health/1.0", config.host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Splunk {}", token))
+        .header("Authorization", format!("Splunk {}", config.token))
         .body(Body::empty())
         .unwrap();
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let client = https_client(resolver, tls)?;
 
     let healthcheck = client
         .request(request)
@@ -194,22 +180,38 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
+fn event_to_json(event: LogEvent, indexed_fields: &Vec<Atom>, timestamp: i64) -> JsonValue {
+    let mut fields = Event::new_empty_log().into_log();
+    for field in indexed_fields.iter() {
+        if let Some(value) = event.get(field) {
+            fields.insert(field, value.clone());
+        }
+    }
+
+    json!({
+        "fields": fields.unflatten(),
+        "event": event.unflatten(),
+        "time": timestamp
+    })
+}
+
+fn encode_event(
+    host_field: &Atom,
+    event: Event,
+    indexed_fields: &Vec<Atom>,
+    encoding: &Encoding,
+) -> Option<Vec<u8>> {
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
-    let timestamp = if let Some(ValueKind::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
+    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
         ts.timestamp()
     } else {
         chrono::Utc::now().timestamp()
     };
 
     let mut body = match encoding {
-        Encoding::Json => json!({
-            "fields": event.explicit_fields(),
-            "event": event.unflatten(),
-            "time": timestamp,
-        }),
+        Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
             "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
@@ -244,11 +246,9 @@ mod tests {
     fn splunk_encode_event_json() {
         let host = "host".into();
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert_explicit("key".into(), "value".into());
+        event.as_mut_log().insert("key", "value");
 
-        let bytes = encode_event(&host, event, &Encoding::Json).unwrap();
+        let bytes = encode_event(&host, event, &vec![], &Encoding::Json).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
@@ -279,14 +279,17 @@ mod tests {
 #[cfg(feature = "splunk-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string, runtime},
+        topology::config::SinkContext,
         Event,
     };
     use futures::Sink;
+    use http::StatusCode;
     use serde_json::Value as JsonValue;
+    use std::net::SocketAddr;
+    use warp::Filter;
 
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
@@ -294,8 +297,9 @@ mod integration_tests {
     #[test]
     fn splunk_insert_message() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text, vec![]), cx).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -325,8 +329,9 @@ mod integration_tests {
     #[test]
     fn splunk_insert_many() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text, vec![]), cx).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -357,14 +362,14 @@ mod integration_tests {
     #[test]
     fn splunk_custom_fields() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
+        let indexed_fields = vec![Atom::from("asdf")];
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json, indexed_fields), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("asdf".into(), "hello".into());
+        event.as_mut_log().insert("asdf", "hello");
 
         let pump = sink.send(event);
 
@@ -390,17 +395,15 @@ mod integration_tests {
     #[test]
     fn splunk_hostname() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
+        let indexed_fields = vec![Atom::from("asdf")];
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json, indexed_fields), cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("asdf".into(), "hello".into());
-        event
-            .as_mut_log()
-            .insert_implicit("host".into(), "example.com:1234".into());
+        event.as_mut_log().insert("asdf", "hello");
+        event.as_mut_log().insert("host", "example.com:1234");
 
         let pump = sink.send(event);
 
@@ -428,25 +431,20 @@ mod integration_tests {
     #[test]
     fn splunk_configure_hostname() {
         let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
 
         let config = super::HecSinkConfig {
             host_field: "roast".into(),
-            ..config(Encoding::Json)
+            ..config(Encoding::Json, vec![Atom::from("asdf")])
         };
 
-        let sink = sinks::splunk_hec::hec(config, Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config, cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("asdf".into(), "hello".into());
-        event
-            .as_mut_log()
-            .insert_implicit("host".into(), "example.com:1234".into());
-        event
-            .as_mut_log()
-            .insert_explicit("roast".into(), "beef.example.com:1234".into());
+        event.as_mut_log().insert("asdf", "hello");
+        event.as_mut_log().insert("host", "example.com:1234");
+        event.as_mut_log().insert("roast", "beef.example.com:1234");
 
         let pump = sink.send(event);
 
@@ -474,20 +472,22 @@ mod integration_tests {
     #[test]
     fn splunk_healthcheck() {
         let mut rt = runtime();
+        let resolver = crate::dns::Resolver::new(Vec::new(), rt.executor()).unwrap();
 
         // OK
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:8088".to_string())
-                    .unwrap();
+            let config = config(Encoding::Text, vec![]);
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
             rt.block_on(healthcheck).unwrap();
         }
 
         // Server not listening at address
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:1111".to_string())
-                    .unwrap();
+            let config = HecSinkConfig {
+                host: "http://localhost:1111".to_string(),
+                ..config(Encoding::Text, vec![])
+            };
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver.clone()).unwrap();
 
             rt.block_on(healthcheck).unwrap_err();
         }
@@ -507,9 +507,17 @@ mod integration_tests {
 
         // Unhealthy server
         {
-            let healthcheck =
-                sinks::splunk_hec::healthcheck(get_token(), "http://503.returnco.de".to_string())
-                    .unwrap();
+            let config = HecSinkConfig {
+                host: "http://localhost:5503".to_string(),
+                ..config(Encoding::Text, vec![])
+            };
+
+            let unhealthy = warp::any()
+                .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
+            let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
+            rt.spawn(server);
+
+            let healthcheck = sinks::splunk_hec::healthcheck(&config, resolver).unwrap();
             assert_downcast_matches!(
                 rt.block_on(healthcheck).unwrap_err(),
                 HealthcheckError,
@@ -536,17 +544,18 @@ mod integration_tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config(encoding: Encoding) -> super::HecSinkConfig {
+    fn config(encoding: Encoding, indexed_fields: Vec<Atom>) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
             encoding,
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
+            indexed_fields,
             ..Default::default()
         }
     }

@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::tls::TlsOptions,
     sinks::util::MetadataFuture,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{
     future::{self, poll_fn, IntoFuture},
@@ -31,7 +31,7 @@ enum BuildError {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KafkaSinkConfig {
-    bootstrap_servers: Vec<String>,
+    bootstrap_servers: String,
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
@@ -80,8 +80,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = KafkaSink::new(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
     }
@@ -98,9 +98,7 @@ impl SinkConfig for KafkaSinkConfig {
 impl KafkaSinkConfig {
     fn to_rdkafka(&self) -> crate::Result<rdkafka::ClientConfig> {
         let mut client_config = rdkafka::ClientConfig::new();
-        let bs = self.bootstrap_servers.join(",");
-        client_config.set("bootstrap.servers", &bs);
-
+        client_config.set("bootstrap.servers", &self.bootstrap_servers);
         let mut tls_enabled = false;
         if let Some(ref tls) = self.tls {
             tls_enabled = tls.enabled.unwrap_or(true);
@@ -298,12 +296,8 @@ mod tests {
     fn kafka_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event
-            .as_mut_log()
-            .insert_explicit("key".into(), "value".into());
-        event
-            .as_mut_log()
-            .insert_explicit("foo".into(), "bar".into());
+        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert("foo", "bar");
 
         let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
 
@@ -352,7 +346,6 @@ mod integration_test {
     }
 
     fn kafka_happy_path(server: &str, tls: Option<KafkaSinkTlsConfig>) {
-        let bootstrap_servers = vec![server.into()];
         let topic = format!("test-{}", random_string(10));
 
         let tls_enabled = tls
@@ -360,7 +353,7 @@ mod integration_test {
             .map(|tls| tls.enabled.unwrap_or(false))
             .unwrap_or(false);
         let config = KafkaSinkConfig {
-            bootstrap_servers: bootstrap_servers.clone(),
+            bootstrap_servers: server.to_string(),
             topic: topic.clone(),
             encoding: Encoding::Text,
             key_field: None,
@@ -378,8 +371,7 @@ mod integration_test {
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
-        let bs = bootstrap_servers.join(",");
-        client_config.set("bootstrap.servers", &bs);
+        client_config.set("bootstrap.servers", server);
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
         if tls_enabled {

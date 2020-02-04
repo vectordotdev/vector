@@ -9,7 +9,7 @@ module.exports = {
         "about/concepts",
         {
           type: 'category',
-          label: 'Data Model',
+          label: 'Data Model (Event)',
           items: [
             "about/data-model",
             "about/data-model/log",
@@ -44,6 +44,7 @@ module.exports = {
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
                   "setup/installation/package-managers/rpm",
+                  "setup/installation/package-managers/msi",
               ],
             },
             {
@@ -55,7 +56,7 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
-                  "setup/installation/operating-systems/raspberry-pi",
+                  "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
                   "setup/installation/operating-systems/windows",
@@ -67,7 +68,7 @@ module.exports = {
               items: [
                 "setup/installation/manual",
                 "setup/installation/manual/from-archives",
-                "setup/installation/manual/from-source",              
+                "setup/installation/manual/from-source",
               ],
             },
           ],
@@ -96,6 +97,7 @@ module.exports = {
           items: [
             "setup/guides",
             "setup/guides/getting-started",
+            "setup/guides/unit-testing",
             "setup/guides/troubleshooting",
           ]
         },
@@ -120,15 +122,19 @@ module.exports = {
             
               "reference/sources/kafka",
             
+              "reference/sources/logplex",
+            
+              "reference/sources/prometheus",
+            
+              "reference/sources/socket",
+            
+              "reference/sources/splunk_hec",
+            
               "reference/sources/statsd",
             
               "reference/sources/stdin",
             
               "reference/sources/syslog",
-            
-              "reference/sources/tcp",
-            
-              "reference/sources/udp",
             
               "reference/sources/vector",
             
@@ -144,15 +150,25 @@ module.exports = {
             
               "reference/transforms/add_tags",
             
+              "reference/transforms/ansi_stripper",
+            
+              "reference/transforms/aws_ec2_metadata",
+            
               "reference/transforms/coercer",
             
+              "reference/transforms/concat",
+            
               "reference/transforms/field_filter",
+            
+              "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",
             
               "reference/transforms/json_parser",
             
               "reference/transforms/log_to_metric",
+            
+              "reference/transforms/logfmt_parser",
             
               "reference/transforms/lua",
             
@@ -180,6 +196,8 @@ module.exports = {
             
               "reference/sinks/aws_cloudwatch_metrics",
             
+              "reference/sinks/aws_kinesis_firehose",
+            
               "reference/sinks/aws_kinesis_streams",
             
               "reference/sinks/aws_s3",
@@ -196,17 +214,21 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_pubsub",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",
             
+              "reference/sinks/new_relic_logs",
+            
               "reference/sinks/prometheus",
+            
+              "reference/sinks/socket",
             
               "reference/sinks/splunk_hec",
             
               "reference/sinks/statsd",
-            
-              "reference/sinks/tcp",
             
               "reference/sinks/vector",
             

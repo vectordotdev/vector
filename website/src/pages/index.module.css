@@ -60,13 +60,12 @@
   animation-fill-mode: forwards;
   background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
   background-position: center center;
-  border-bottom: 0px none;
-  min-height: calc( 100vh - var(--ifm-navbar-height) );
 }
 
 .indexHeroDiagram {
-  margin: calc( var(--ifm-spacing-vertical) * 4 ) 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
   max-height: 325px;
+  height: auto;
   width: 100%;
 }
 
@@ -83,8 +82,12 @@ html[data-theme="dark"] .hero {
   }
 
   .indexHeroDiagram {
-    display: none;
+    margin: var(--ifm-spacing-vertical) 0 0 0;
   }
+
+/*  .indexHeroDiagram {
+    display: none;
+  }*/
 }
 
 /*
@@ -129,6 +132,10 @@ html[data-theme="dark"] .hero {
 .performance {
 
 }
+
+/*
+ * Comparison Section
+ */
 
 /*
  * Integrations Section
@@ -234,6 +241,23 @@ html[data-theme="dark"] .hero {
     color: var(--ifm-panel-color-active);
     text-decoration: none;
   }
+}
+
+/*
+ * Topology Section
+ */
+
+ .topology {
+  text-align: center;
+ }
+
+.topologyDiagram {
+  display: block;
+  margin: var(--ifm-heading-margin-bottom) auto;
+  max-height: 300px;
+  max-width: 900px;
+  height: 100%;
+  width: 100%;
 }
 
 /*

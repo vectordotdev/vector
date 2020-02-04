@@ -13,9 +13,9 @@ fn benchmark_event(c: &mut Criterion) {
         b.iter_with_setup(
             || {
                 let mut e = Event::new_empty_log().into_log();
-                e.insert_implicit("key1".into(), "value1".into());
-                e.insert_implicit("key2".into(), "value2".into());
-                e.insert_implicit("key3".into(), "value3".into());
+                e.insert("key1", "value1");
+                e.insert("key2", "value2");
+                e.insert("key3", "value3");
 
                 e
             },
@@ -73,9 +73,7 @@ fn benchmark_event(c: &mut Criterion) {
 fn create_event(json: Value) -> LogEvent {
     let s = serde_json::to_string(&json).unwrap();
     let mut event = Event::new_empty_log();
-    event
-        .as_mut_log()
-        .insert_implicit(event::MESSAGE.clone().into(), s.into());
+    event.as_mut_log().insert(event::MESSAGE.clone(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
     parser.transform(event).unwrap().into_log()

@@ -40,7 +40,7 @@ end
 # Commit
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 release = metadata.latest_release
 
 if release_exists?(release)
@@ -57,7 +57,7 @@ else
   bump_cargo_version(release.version)
 
   success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
-  
+
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
   commands =

@@ -7,8 +7,6 @@
 #   Uploads target/artifacts to Github releases
 
 require_relative "setup"
-require_relative "generate/templates"
-require_relative "generate/post_processors/link_definer"
 
 #
 # Constants
@@ -18,11 +16,10 @@ VERSION = ENV.fetch("VERSION")
 SHA1 = ENV.fetch("CIRCLE_SHA1")
 
 #
-# Commit
+# Setup
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT)
-templates = Templates.new(ROOT_DIR, metadata)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
 release = metadata.releases.to_h.fetch(:"#{VERSION}")
 
 #
@@ -31,12 +28,10 @@ release = metadata.releases.to_h.fetch(:"#{VERSION}")
 
 title("Releasing artifacts to Github")
 
-flags = ["--assets 'target/artifacts/*'"]
-
-notes = templates.release_notes(release)
-notes = PostProcessors::LinkDefiner.define!(notes.clone, "", metadata.links)
-notes = notes.gsub("'", "")
-flags << "--notes '#{notes}'"
+flags = [
+  "--assets 'target/artifacts/*'",
+  "--notes '[View release notes](#{HOST}/releases/#{VERSION})'"
+]
 
 if release.pre?
   flags << "--pre"

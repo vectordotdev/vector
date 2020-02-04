@@ -1,0 +1,25 @@
+.avatar .avatar__name {
+  font-size: var(--ifm-h4-font-size);
+  font-weight: bold;
+  line-height: 1;
+  margin: 0;
+}
+
+.avatar.avatar--sm .avatar__intro {
+  font-size: 0.8em;
+  margin-left: 10px;
+}
+
+.avatar.avatar--sm .avatar__subtitle {
+  font-size: 1em;
+  margin-top: 1px;
+}
+
+.avatar.avatar--inline {
+  display: inline;
+}
+
+.avatar.avatar--inline .avatar__photo {
+  margin-right: 5px;
+  vertical-align: middle;
+}

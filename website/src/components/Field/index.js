@@ -4,8 +4,6 @@ import {MDXProvider} from '@mdx-js/react';
 import CodeHeader from '@site/src/components/CodeHeader';
 import CodeBlock from '@theme/CodeBlock';
 
-import './styles.css';
-
 function isObject(a) {
   return (!!a) && (a.constructor === Object);
 };
@@ -14,12 +12,20 @@ function toTOML(value) {
   return JSON.stringify(value);
 }
 
+function keyToTOML(key) {
+  if ( key.includes(".") ) {
+    return "\"" + key + "\"";
+  } else {
+    return key;
+  }
+}
+
 function exampleToTOML(name, example) {
   if (isObject(example)) {
     if ('name' in example && 'value' in example) {
-      return `${example.name} = ${toTOML(example.value)}`;
+      return `${keyToTOML(example.name)} = ${toTOML(example.value)}`;
     } else {
-      return `${Object.keys(example)[0]} = ${toTOML(Object.values(example)[0])}`
+      return `${keyToTOML(Object.keys(example)[0])} = ${toTOML(Object.values(example)[0])}`
     }
   } else if (name) {
     return `${name} = ${toTOML(example)}`;
@@ -136,7 +142,7 @@ function Field({children, common, defaultValue, enumValues, examples, name, path
           <span className="badge badge--secondary">optional</span>}
       </div>
       {filteredChildren}
-      {!collapse && 
+      {!collapse &&
         <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} />}
     </div>
   );

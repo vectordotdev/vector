@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::event::Event;
+use crate::runtime::TaskExecutor;
 use crate::topology::config::{DataType, TransformConfig, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer { types }))
     }
@@ -48,7 +49,7 @@ impl Transform for Coercer {
         for (field, conv) in &self.types {
             if let Some(value) = log.remove(field) {
                 match conv.convert(value) {
-                    Ok(converted) => log.insert_explicit(field.into(), converted),
+                    Ok(converted) => log.insert(field, converted),
                     Err(error) => {
                         warn!(
                             message = "Could not convert types.",
@@ -67,11 +68,12 @@ impl Transform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::CoercerConfig;
-    use crate::event::{LogEvent, ValueKind};
+    use crate::event::{LogEvent, Value};
     use crate::{topology::config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
     fn parse_it() -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let mut event = Event::from("dummy message");
         for &(key, value) in &[
             ("number", "1234"),
@@ -79,7 +81,7 @@ mod tests {
             ("other", "no"),
             ("float", "broken"),
         ] {
-            event.as_mut_log().insert_explicit(key.into(), value.into());
+            event.as_mut_log().insert(key, value);
         }
 
         let mut coercer = toml::from_str::<CoercerConfig>(
@@ -91,7 +93,7 @@ mod tests {
             "#,
         )
         .unwrap()
-        .build()
+        .build(rt.executor())
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }
@@ -99,14 +101,14 @@ mod tests {
     #[test]
     fn coercer_converts_valid_fields() {
         let log = parse_it();
-        assert_eq!(log[&"number".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"bool".into()], ValueKind::Boolean(true));
+        assert_eq!(log[&"number".into()], Value::Integer(1234));
+        assert_eq!(log[&"bool".into()], Value::Boolean(true));
     }
 
     #[test]
     fn coercer_leaves_unnamed_fields_as_is() {
         let log = parse_it();
-        assert_eq!(log[&"other".into()], ValueKind::Bytes("no".into()));
+        assert_eq!(log[&"other".into()], Value::Bytes("no".into()));
     }
 
     #[test]

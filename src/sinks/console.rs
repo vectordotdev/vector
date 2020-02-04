@@ -1,8 +1,7 @@
 use super::util::SinkExt;
 use crate::{
-    buffers::Acker,
     event::{self, Event},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
@@ -45,7 +44,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
@@ -54,7 +53,7 @@ impl SinkConfig for ConsoleSinkConfig {
         };
 
         let sink = FramedWrite::new(output, LinesCodec::new())
-            .stream_ack(acker)
+            .stream_ack(cx.acker())
             .sink_map_err(|_| ())
             .with(move |event| encode_event(event, &encoding));
 
@@ -116,6 +115,23 @@ mod test {
         });
         assert_eq!(
             Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
+            encode_event(event, &Encoding::Text)
+        );
+    }
+
+    #[test]
+    fn encodes_set() {
+        let event = Event::Metric(Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        });
+        assert_eq!(
+            Ok(r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#.to_string()),
             encode_event(event, &Encoding::Text)
         );
     }

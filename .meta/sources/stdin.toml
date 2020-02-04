@@ -1,4 +1,5 @@
 [sources.stdin]
+title = "STDIN"
 common = false
 delivery_guarantee = "at_least_once"
 function_category = "receive"
@@ -10,14 +11,13 @@ through_description = "standard input (STDIN)"
 [sources.stdin.options.max_length]
 type = "int"
 default = 102400
-null = true
 unit = "bytes"
 description = "The maxiumum bytes size of a message before it is discarded."
 
 [sources.stdin.options.host_key]
 type = "string"
 category = "Context"
-null = false
+required = true
 default = "host"
 section = "context"
 description = """\
@@ -26,21 +26,28 @@ The key name added to each event representing the current host.\
 
 [[sources.stdin.output.log.examples]]
 label = "Generic"
-input = """\
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1\
-"""
-output = """\
+body = """\
+Given the following input:
+
+```text
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+
+A log event will be output with the following structure:
+
+```json
 {
   "timestamp": <current_timestamp>,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
   "host": "<local_hostname>"
 }
+```\
 """
 
 [sources.stdin.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-optional = false
+required = true
 description = """\
 The local hostname.
 """
@@ -48,7 +55,7 @@ The local hostname.
 [sources.stdin.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-optional = false
+required = true
 description = """\
 The raw message, unaltered.
 """
@@ -56,7 +63,7 @@ The raw message, unaltered.
 [sources.stdin.output.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
-optional = false
+required = true
 description = """\
 The exact time the event was ingested.\
 """

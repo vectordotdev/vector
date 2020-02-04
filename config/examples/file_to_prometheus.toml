@@ -1,6 +1,6 @@
-# Parsing logs as metrics and exposing into Prometheus
+# Prometheus sink example
 # ------------------------------------------------------------------------------
-# WIP
+# Parsing logs as metrics and exposing into Prometheus
 
 data_dir = "/var/lib/vector"
 

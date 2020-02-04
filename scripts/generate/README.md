@@ -8,7 +8,7 @@ command.
 
 To start, you should be familiar with the Vector [`/.meta`](/.meta) directory.
 This directory contains various metadata about the Vector project as a whole,
-mostly configuration details but also link definitions and more. This file is
+mostly configuration details but also link definitions and more. Its content is
 loaded via the [`./util/metadata.rb`](./util/metadata.rb) file and represented
 as an object.
 

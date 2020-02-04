@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
@@ -34,7 +35,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let mut grok = grok::Grok::with_patterns();
@@ -86,7 +87,7 @@ impl Transform for GrokParser {
                     let name: Atom = name.into();
                     let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
-                        Ok(value) => event.insert_explicit(name, value),
+                        Ok(value) => event.insert(name, value),
                         Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
@@ -108,6 +109,7 @@ impl Transform for GrokParser {
             debug!(
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
+                rate_limit_secs = 30,
             );
         }
 
@@ -130,6 +132,7 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(event);
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
@@ -137,7 +140,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build()
+        .build(rt.executor())
         .unwrap();
         parser.transform(event).unwrap().into_log()
     }
@@ -180,7 +183,7 @@ mod tests {
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
-            event::ValueKind::from("help i'm stuck in an http server"),
+            event::Value::from("help i'm stuck in an http server"),
             event[&event::MESSAGE]
         );
         assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
@@ -225,7 +228,7 @@ mod tests {
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
-            event::ValueKind::from("i am the only field"),
+            event::Value::from("i am the only field"),
             event[&event::MESSAGE]
         );
         assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);

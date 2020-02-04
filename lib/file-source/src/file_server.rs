@@ -99,7 +99,7 @@ impl FileServer {
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .unwrap_or(time::SystemTime::now())
+                .unwrap_or_else(|_| time::SystemTime::now())
         });
 
         for (path, file_id) in existing_files {
@@ -215,6 +215,10 @@ impl FileServer {
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                if !watcher.should_read() {
+                    continue;
+                }
+
                 let mut bytes_read: usize = 0;
                 while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
                     if sz > 0 {

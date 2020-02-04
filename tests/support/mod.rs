@@ -7,12 +7,12 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
-use vector::buffers::Acker;
-use vector::event::{metric::MetricValue, Event, ValueKind, MESSAGE};
+use vector::event::{metric::MetricValue, Event, Value, MESSAGE};
+use vector::runtime::TaskExecutor;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
-    DataType, GlobalOptions, SinkConfig, SourceConfig, TransformConfig,
+    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
 };
 use vector::transforms::Transform;
 
@@ -29,7 +29,7 @@ pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
 }
 
 pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures::sync::mpsc::channel(0);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
@@ -93,7 +93,7 @@ impl Transform for MockTransform {
             Event::Log(log) => {
                 let mut v = log.get(&MESSAGE).unwrap().to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
+                log.insert(MESSAGE.clone(), Value::from(v));
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {
@@ -148,7 +148,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
+    fn build(&self, _exec: TaskExecutor) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -193,12 +193,12 @@ enum HealthcheckError {
 
 #[typetag::serde(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), vector::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
         let sink = self
             .sender
             .clone()
             .unwrap()
-            .stream_ack(acker)
+            .stream_ack(cx.acker())
             .sink_map_err(|e| error!("Error sending in sink {}", e));
         let healthcheck = match self.healthy {
             true => future::ok(()),

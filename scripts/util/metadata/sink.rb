@@ -1,6 +1,7 @@
 #encoding: utf-8
 
 require_relative "component"
+require_relative "output"
 
 class Sink < Component
   EGRESS_METHODS = ["batching", "exposing", "streaming"].freeze
@@ -12,7 +13,7 @@ class Sink < Component
     :healthcheck,
     :output,
     :service_limits_short_link,
-    :service_provider,
+    :service_providers,
     :tls,
     :write_to_description
 
@@ -27,9 +28,8 @@ class Sink < Component
     encodings = hash["encodings"]
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
-    @output = OpenStruct.new
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_provider = hash["service_provider"]
+    @service_providers = hash["service_provider"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -47,12 +47,8 @@ class Sink < Component
 
     # output
 
-    output = hash["output"] || {}
-    @output.examples = (output["examples"] || []).collect do |e|
-      s = OpenStruct.new(e)
-      s.input = OpenStruct.new(s.input) if s.input
-      s.output = OpenStruct.new(s.output) if s.output
-      s
+    if hash["output"]
+      @output = Output.new(hash["output"])
     end
 
     # Healthcheck option
@@ -111,14 +107,13 @@ class Sink < Component
 
     # Endpoint option
 
-    if service_provider == "AWS"
+    if service_provider?("AWS")
       @env_vars.AWS_ACCESS_KEY_ID =
         Option.new({
           "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
           "examples" => ["AKIAIOSFODNN7EXAMPLE"],
           "name" => "AWS_ACCESS_KEY_ID",
-          "null" => false,
-          "optional" => true,
+          "null" => true,
           "type" => "string"
         })
 
@@ -127,8 +122,7 @@ class Sink < Component
           "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
           "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
           "name" => "AWS_SECRET_ACCESS_KEY",
-          "null" => false,
-          "optional" => true,
+          "null" => true,
           "type" => "string"
         })
 
@@ -182,7 +176,7 @@ class Sink < Component
           "unit" => "bytes"
         }
 
-      buffer_options["num_items"] =
+      buffer_options["max_events"] =
         {
           "description" => "The maximum number of [events][docs.data-model#event] allowed in the buffer.",
           "default" => 500,
@@ -195,9 +189,9 @@ class Sink < Component
       buffer_option =
         Option.new({
           "name" => "buffer",
-          "description" => "Configures the sink specific buffer.",
+          "description" => "Configures the sink buffer behavior.",
           "options" => buffer_options,
-          "null" => true,
+          "null" => false,
           "type" => "table"
         })
 
@@ -294,6 +288,10 @@ class Sink < Component
     buffer == true
   end
 
+  def description
+    @description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
+  end
+
   def exposing?
     egress_method == "exposing"
   end
@@ -313,6 +311,10 @@ class Sink < Component
     else
       raise("Unhandled egress_method: #{egress_method.inspect}")
     end
+  end
+
+  def service_provider?(provider_name)
+    service_providers.collect(&:downcase).include?(provider_name.downcase)
   end
 
   def streaming?

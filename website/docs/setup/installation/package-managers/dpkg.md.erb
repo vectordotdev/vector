@@ -7,12 +7,24 @@ description: Install Vector through the DKG package manager
 Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
 
+<%- downloads = metadata.downloads(package_manager: :dpkg) -%>
+<%- download_tabs = downloads.collect { |d| {label: d.arch, value: d.arch} } -%>
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 ## Install
 
-1.  Download the [Vector `.deb file`][urls.vector_downloads.<%= metadata.latest_version %>/vector-amd64.deb]:
+<Tabs
+  block={true}
+  defaultValue="<%= download_tabs.first.fetch(:value) %>"
+  urlKey="arch"
+  values={<%= download_tabs.to_json %>}>
+
+<%- downloads.each do |download| %>
+<TabItem value="<%= download.arch %>">
+
+1.  Download the Vector `.deb` package
 
     <Tabs
       className="mini"
@@ -25,32 +37,38 @@ import TabItem from '@theme/TabItem';
     <TabItem value="latest">
 
     ```bash
-    curl -O [[[urls.vector_downloads.<%= metadata.latest_version %>/vector-amd64.deb]]]
+    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version.minor_x}/#{download.file_name}") %>
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
     ```bash
-    curl -O [[[urls.vector_downloads.nightly/latest/vector-amd64.deb]]]
+    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.nightly/latest/#{download.file_name}") %>
     ```
 
     </TabItem>
     </Tabs>
 
-2.  Install the Vector `.deb` package directly:
+2.  Install the downloaded package
 
     ```bash
-    sudo dpkg -i vector-amd64.deb
+    sudo dpkg -i <%= download.file_name %>
     ```
 
-3.  Start Vector:
+3.  Start Vector
 
     ```bash
     sudo systemctl start vector
     ```
 
-    That's it! Proceed to [configure](#configuring) Vector for your use case.
+</TabItem>
+
+<%- end -%>
+
+</Tabs>
+
+That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 ### Previous Versions
 

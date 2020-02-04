@@ -3,20 +3,25 @@ import classnames from 'classnames';
 
 import './styles.css';
 
-function Alert({children, type}) {
-  let icon = null;
+function Alert({children, fill, icon, type}) {
+  let typeIcon = null;
 
   switch (type) {
+    case 'success':
+      typeIcon = 'check-circle';
+      break;
+
     case 'warning':
-      icon = 'alert-triangle';
+      typeIcon = 'alert-triangle';
+      break;
 
     default:
-      icon = 'info';
+      typeIcon = 'info';
   }
 
   return (
-    <div className={classnames('alert', `alert--${type}`)} role="alert">
-      <i className={classnames('feather', `icon-${icon}`, `text--${type}`)}></i>
+    <div className={classnames('alert', `alert--${type}`, {'alert--fill': fill})} role="alert">
+      <i className={classnames('feather', `icon-${icon || typeIcon}`)}></i>
       {children}
     </div>
   );

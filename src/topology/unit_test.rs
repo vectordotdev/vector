@@ -1,6 +1,7 @@
 use crate::{
     conditions::Condition,
-    event::Event,
+    event::{Event, Value},
+    runtime::Runtime,
     topology::config::{TestCondition, TestDefinition, TestInputValue},
     transforms::Transform,
 };
@@ -152,6 +153,7 @@ fn build_unit_test(
     definition: &TestDefinition,
     config: &super::Config,
 ) -> Result<UnitTest, Vec<String>> {
+    let rt = Runtime::single_threaded().unwrap();
     let mut errors = vec![];
 
     // Build input event.
@@ -159,7 +161,7 @@ fn build_unit_test(
         "raw" => match definition.input.value.as_ref() {
             Some(v) => Event::from(v.clone()),
             None => {
-                errors.push(format!("input type 'raw' requires the field 'value'"));
+                errors.push("input type 'raw' requires the field 'value'".to_string());
                 Event::from("")
             }
         },
@@ -167,19 +169,17 @@ fn build_unit_test(
             if let Some(log_fields) = &definition.input.log_fields {
                 let mut event = Event::from("");
                 for (path, value) in log_fields {
-                    event.as_mut_log().insert_explicit(
-                        path.to_owned().into(),
-                        match value {
-                            TestInputValue::String(s) => s.as_bytes().into(),
-                            TestInputValue::Boolean(b) => (*b).into(),
-                            TestInputValue::Integer(i) => (*i).into(),
-                            TestInputValue::Float(f) => (*f).into(),
-                        },
-                    );
+                    let value: Value = match value {
+                        TestInputValue::String(s) => s.as_bytes().into(),
+                        TestInputValue::Boolean(b) => (*b).into(),
+                        TestInputValue::Integer(i) => (*i).into(),
+                        TestInputValue::Float(f) => (*f).into(),
+                    };
+                    event.as_mut_log().insert(path.to_owned(), value);
                 }
                 event
             } else {
-                errors.push(format!("input type 'log' requires the field 'log_fields'"));
+                errors.push("input type 'log' requires the field 'log_fields'".to_string());
                 Event::from("")
             }
         }
@@ -187,7 +187,7 @@ fn build_unit_test(
             if let Some(metric) = &definition.input.metric {
                 Event::Metric(metric.clone())
             } else {
-                errors.push(format!("input type 'log' requires the field 'log_fields'"));
+                errors.push("input type 'log' requires the field 'log_fields'".to_string());
                 Event::from("")
             }
         }
@@ -237,12 +237,12 @@ fn build_unit_test(
     let mut transforms: HashMap<String, UnitTestTransform> = HashMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build() {
+            match transform_config.inner.build(rt.executor()) {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),
                         UnitTestTransform {
-                            transform: transform,
+                            transform,
                             next: outputs.into_iter().map(|(k, _)| k).collect(),
                         },
                     );
@@ -268,33 +268,38 @@ fn build_unit_test(
     });
 
     // Build all output conditions.
-    let checks = definition.outputs.iter().map(|o| {
-        let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
-        for (index, cond_conf) in o.conditions.iter().enumerate() {
-            match cond_conf {
-                TestCondition::Embedded(b) => {
-                    match b.build() {
+    let checks = definition
+        .outputs
+        .iter()
+        .map(|o| {
+            let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
+            for (index, cond_conf) in o.conditions.iter().enumerate() {
+                match cond_conf {
+                    TestCondition::Embedded(b) => match b.build() {
                         Ok(c) => {
                             conditions.push(c);
-                        },
+                        }
                         Err(e) => {
                             errors.push(format!(
                                 "failed to create test condition '{}': {}",
                                 index, e,
                             ));
-                        },
+                        }
+                    },
+                    TestCondition::String(_s) => {
+                        errors.push(format!(
+              "failed to create test condition '{}': condition references are not yet supported",
+              index
+            ));
                     }
-                },
-                TestCondition::String(_s) => {
-                    errors.push(format!("failed to create test condition '{}': condition references are not yet supported", index));
-                },
+                }
             }
-        }
-        UnitTestCheck{
-            extract_from: o.extract_from.clone(),
-            conditions: conditions,
-        }
-    }).collect();
+            UnitTestCheck {
+                extract_from: o.extract_from.clone(),
+                conditions,
+            }
+        })
+        .collect();
 
     if !errors.is_empty() {
         Err(errors)
@@ -302,8 +307,8 @@ fn build_unit_test(
         Ok(UnitTest {
             name: definition.name.clone(),
             input: (definition.input.insert_at.clone(), input_event),
-            transforms: transforms,
-            checks: checks,
+            transforms,
+            checks,
         })
     }
 }

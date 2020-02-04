@@ -14,6 +14,7 @@ class Commit
     :deletions_count,
     :description,
     :files_count,
+    :group,
     :insertions_count,
     :message,
     :pr_number,
@@ -36,6 +37,7 @@ class Commit
     @pr_number = message_attributes["pr_number"]
     @scope = CommitScope.new(message_attributes["scope"] || "core")
     @type = message_attributes.fetch("type")
+    @group = @breaking_change ? "breaking change" : @type
   end
 
   def breaking_change?
@@ -64,7 +66,7 @@ class Commit
     @component_name =
       if new_feature?
         match =  description.match(/`?(?<name>[a-zA-Z_]*)`? (source|transform|sink)/)
-        
+
         if !match.nil? && !match[:name].nil?
           match[:name].downcase
         else
@@ -127,18 +129,36 @@ class Commit
     component_type == "source"
   end
 
+  def to_h
+    {
+      author: author,
+      breaking_change: breaking_change,
+      date: date,
+      deletions_count: deletions_count,
+      description: description,
+      files_count: files_count,
+      group: group,
+      insertions_count: insertions_count,
+      message: message,
+      pr_number: pr_number,
+      scope: scope.deep_to_h,
+      sha: sha,
+      type: type,
+    }
+  end
+
   def transform?
     component_type == "transform"
   end
 
   private
     def parse_commit_message!(message)
-      match = message.match(/^(?<type>[a-z]*)(?<breaking_change>!)?(\((?<scope>[a-z0-9_ ]*)\))?: (?<description>.*?)( \(#(?<pr_number>[0-9]*)\))?$/)
+      match = message.match(/^(?<type>[a-z]*)(\((?<scope>[a-z0-9_ ]*)\))?(?<breaking_change>!)?: (?<description>.*?)( \(#(?<pr_number>[0-9]*)\))?$/)
 
       if match.nil?
         raise <<~EOF
         Commit message does not conform to the conventional commit format.
-        
+
         Unable to parse at all!
 
           #{message}
@@ -171,7 +191,7 @@ class Commit
         The type must be one of #{TYPES.inspect}.
 
           #{type.inspect}
-        
+
         Please correct in the release /.meta file and retry.
         EOF
       end

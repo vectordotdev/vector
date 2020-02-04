@@ -1,4 +1,5 @@
 [transforms.split]
+title = "Split"
 allow_you_to_description = """\
 split a field's value on a given separator \
 and zip the tokens into ordered field names\
@@ -13,14 +14,14 @@ types_coercion = true
 type = "string"
 common = true
 default = "message"
-null = false
+required = true
 description = "The field to apply the split on."
 
 [transforms.split.options.field_names]
 type = "[string]"
 common = true
 examples = [["timestamp", "level", "message"]]
-null = false
+required = true
 description = "The field names assigned to the resulting tokens, in order."
 
 [transforms.split.options.separator]
@@ -28,7 +29,7 @@ type = "[string]"
 common = true
 default = "whitespace"
 examples = [","]
-null = false
+required = true
 description = """\
 The separator to split the field on. \
 If no separator is given, it will split on whitespace.\
@@ -38,5 +39,5 @@ If no separator is given, it will split on whitespace.\
 type = "bool"
 common = true
 default = true
-null = false
+required = true
 description = "If `true` the `field` will be dropped after parsing."

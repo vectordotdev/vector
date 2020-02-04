@@ -5,6 +5,7 @@ mod task;
 pub mod unit_test;
 
 pub use self::config::Config;
+pub use self::config::SinkContext;
 
 use crate::topology::builder::Pieces;
 
@@ -39,7 +40,8 @@ pub fn start(
     rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    validate(&config).and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
+    validate(&config, rt.executor())
+        .and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
 }
 
 pub fn start_validated(
@@ -68,8 +70,8 @@ pub fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-pub fn validate(config: &Config) -> Option<Pieces> {
-    match builder::build_pieces(config) {
+pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> {
+    match builder::build_pieces(config, exec) {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -173,7 +175,7 @@ impl RunningTopology {
             return false;
         }
 
-        match validate(&new_config) {
+        match validate(&new_config, rt.executor()) {
             Some(mut new_pieces) => {
                 if !self.run_healthchecks(&new_config, &mut new_pieces, rt, require_healthy) {
                     return false;
@@ -403,11 +405,11 @@ impl RunningTopology {
         }
     }
 
-    fn setup_outputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+    fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let output = new_pieces.outputs.remove(name).unwrap();
 
         for (sink_name, sink) in &self.config.sinks {
-            if sink.inputs.contains(name) {
+            if sink.inputs.iter().any(|i| i == name) {
                 output
                     .unbounded_send(fanout::ControlMessage::Add(
                         sink_name.clone(),
@@ -417,7 +419,7 @@ impl RunningTopology {
             }
         }
         for (transform_name, transform) in &self.config.transforms {
-            if transform.inputs.contains(name) {
+            if transform.inputs.iter().any(|i| i == name) {
                 output
                     .unbounded_send(fanout::ControlMessage::Add(
                         transform_name.clone(),
@@ -530,7 +532,7 @@ fn handle_errors(
 #[cfg(test)]
 mod tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sources::tcp::TcpConfig;
+    use crate::sources::socket::SocketConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
     use crate::topology::config::Config;
@@ -542,7 +544,7 @@ mod tests {
         use std::path::Path;
 
         let mut old_config = Config::empty();
-        old_config.add_source("in", TcpConfig::new(next_addr().into()));
+        old_config.add_source("in", SocketConfig::make_tcp_config(next_addr()));
         old_config.add_sink(
             "out",
             &[&"in"],

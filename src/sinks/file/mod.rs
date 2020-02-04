@@ -2,11 +2,10 @@ mod file;
 
 use self::file::File;
 use crate::{
-    buffers::Acker,
     event::Event,
     sinks::util::SinkExt,
     template::Template,
-    topology::config::{DataType, SinkConfig},
+    topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use futures::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -37,14 +36,8 @@ impl Default for Encoding {
 
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = PartitionedFileSink {
-            path: self.path.clone(),
-            idle_timeout_secs: self.idle_timeout_secs.unwrap_or(30),
-            encoding: self.encoding.clone(),
-            ..Default::default()
-        }
-        .stream_ack(acker);
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = PartitionedFileSink::new(&self).stream_ack(cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }
@@ -70,6 +63,15 @@ pub struct PartitionedFileSink {
 }
 
 impl PartitionedFileSink {
+    pub fn new(config: &FileSinkConfig) -> Self {
+        PartitionedFileSink {
+            path: config.path.clone(),
+            idle_timeout_secs: config.idle_timeout_secs.unwrap_or(30),
+            encoding: config.encoding.clone(),
+            ..Default::default()
+        }
+    }
+
     fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
@@ -183,13 +185,11 @@ impl Sink for PartitionedFileSink {
 mod tests {
     use super::*;
     use crate::{
-        buffers::Acker,
         event,
         test_util::{
             lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
             temp_file,
         },
-        topology::config::SinkConfig,
     };
     use futures::stream;
 
@@ -203,7 +203,7 @@ mod tests {
             encoding: Encoding::Text,
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let sink = PartitionedFileSink::new(&config);
         let (input, events) = random_lines_with_stream(100, 64);
 
         let mut rt = crate::test_util::runtime();
@@ -229,57 +229,25 @@ mod tests {
             encoding: Encoding::Text,
         };
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+        let sink = PartitionedFileSink::new(&config);
 
         let (mut input, _) = random_events_with_stream(32, 8);
-        input[0]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-26-07".into());
-        input[0]
-            .as_mut_log()
-            .insert_implicit("level".into(), "warning".into());
-        input[1]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-26-07".into());
-        input[1]
-            .as_mut_log()
-            .insert_implicit("level".into(), "error".into());
-        input[2]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-26-07".into());
-        input[2]
-            .as_mut_log()
-            .insert_implicit("level".into(), "warning".into());
-        input[3]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-27-07".into());
-        input[3]
-            .as_mut_log()
-            .insert_implicit("level".into(), "error".into());
-        input[4]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-27-07".into());
-        input[4]
-            .as_mut_log()
-            .insert_implicit("level".into(), "warning".into());
-        input[5]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-27-07".into());
-        input[5]
-            .as_mut_log()
-            .insert_implicit("level".into(), "warning".into());
-        input[6]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-28-07".into());
-        input[6]
-            .as_mut_log()
-            .insert_implicit("level".into(), "warning".into());
-        input[7]
-            .as_mut_log()
-            .insert_implicit("date".into(), "2019-29-07".into());
-        input[7]
-            .as_mut_log()
-            .insert_implicit("level".into(), "error".into());
+        input[0].as_mut_log().insert("date", "2019-26-07");
+        input[0].as_mut_log().insert("level", "warning");
+        input[1].as_mut_log().insert("date", "2019-26-07");
+        input[1].as_mut_log().insert("level", "error");
+        input[2].as_mut_log().insert("date", "2019-26-07");
+        input[2].as_mut_log().insert("level", "warning");
+        input[3].as_mut_log().insert("date", "2019-27-07");
+        input[3].as_mut_log().insert("level", "error");
+        input[4].as_mut_log().insert("date", "2019-27-07");
+        input[4].as_mut_log().insert("level", "warning");
+        input[5].as_mut_log().insert("date", "2019-27-07");
+        input[5].as_mut_log().insert("level", "warning");
+        input[6].as_mut_log().insert("date", "2019-28-07");
+        input[6].as_mut_log().insert("level", "warning");
+        input[7].as_mut_log().insert("date", "2019-29-07");
+        input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter_ok(input.clone().into_iter());
         let mut rt = crate::test_util::runtime();

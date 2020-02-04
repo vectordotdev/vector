@@ -9,7 +9,7 @@ module.exports = {
         <%= metadata.links.fetch_id("docs.concepts").to_json %>,
         {
           type: 'category',
-          label: 'Data Model',
+          label: 'Data Model (Event)',
           items: [
             <%= metadata.links.fetch_id("docs.data-model").to_json %>,
             <%= metadata.links.fetch_id("docs.data-model.log").to_json %>,
@@ -64,7 +64,7 @@ module.exports = {
               items: [
                 <%= metadata.links.fetch_id("docs.manual").to_json %>,
                 <%= metadata.links.fetch_id("docs.manual.from-archives").to_json %>,
-                <%= metadata.links.fetch_id("docs.manual.from-source").to_json %>,              
+                <%= metadata.links.fetch_id("docs.manual.from-source").to_json %>,
               ],
             },
           ],
@@ -93,6 +93,7 @@ module.exports = {
           items: [
             <%= metadata.links.fetch_id("docs.guides").to_json %>,
             <%= metadata.links.fetch_id("docs.guides.getting-started").to_json %>,
+            <%= metadata.links.fetch_id("docs.guides.unit-testing").to_json %>,
             <%= metadata.links.fetch_id("docs.guides.troubleshooting").to_json %>,
           ]
         },

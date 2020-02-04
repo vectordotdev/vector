@@ -17,7 +17,9 @@ class Component
     :name,
     :operating_systems,
     :options,
+    :posts,
     :resources,
+    :title,
     :type,
     :unsupported_operating_systems
 
@@ -27,6 +29,8 @@ class Component
     @env_vars = Option.build_struct(hash["env_vars"] || {})
     @function_category = hash.fetch("function_category")
     @name = hash.fetch("name")
+    @posts = hash.fetch("posts")
+    @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = Option.build_struct(hash["options"] || {})
@@ -58,7 +62,7 @@ class Component
         "enum" => {
           name => "The name of this component"
         },
-        "null" => false,
+        "required" => true,
         "type" => "string"
       })
 
@@ -68,7 +72,7 @@ class Component
           "name" => "inputs",
           "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
           "examples" => [["my-source-id"]],
-          "null" => false,
+          "required" => true,
           "type" => "[string]"
         })
     end
@@ -146,11 +150,12 @@ class Component
     {
       beta: beta?,
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
+      description: description,
       event_types: event_types,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
       name: name,
-      operating_systems: operating_systems,
+      operating_systems: (transform? ? [] : operating_systems),
       service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
       status: status,
       type: type,

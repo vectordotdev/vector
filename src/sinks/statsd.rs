@@ -2,8 +2,8 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{BatchConfig, BatchServiceSink, Buffer, SinkExt},
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,7 @@ pub struct Client {
 
 impl Client {
     pub fn new(address: SocketAddr) -> crate::Result<Self> {
-        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
         let socket = UdpSocket::bind(&from).context(SocketBindError)?;
         Ok(Client { socket, address })
     }
@@ -48,8 +48,8 @@ pub struct StatsdSinkConfig {
     pub namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -62,8 +62,8 @@ inventory::submit! {
 
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = StatsdSvc::new(self.clone(), acker)?;
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = StatsdSvc::new(self.clone(), cx.acker())?;
         let healthcheck = StatsdSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }
@@ -316,9 +316,9 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch: BatchConfig {
-                batch_size: Some(512),
-                batch_timeout: Some(1),
+            batch: BatchBytesConfig {
+                max_size: Some(512),
+                timeout_secs: Some(1),
             },
         };
 

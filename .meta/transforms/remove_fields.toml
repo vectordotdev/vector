@@ -1,4 +1,5 @@
 [transforms.remove_fields]
+title = "Remove Fields"
 allow_you_to_description = "remove one or more log fields"
 common = false
 function_category = "shape"
@@ -9,5 +10,5 @@ output_types = ["log"]
 type = "[string]"
 common = true
 examples = [["field1", "field2"]]
-null = false
+required = true
 description = "The log field names to drop."

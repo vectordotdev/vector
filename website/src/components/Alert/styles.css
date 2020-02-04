@@ -9,7 +9,9 @@
 .alert > i.feather {
   float: left;
   font-size: 2em !important;
-  margin-left: -1.75em;
+  margin-left: -1.65em;
+  position: relative;
+  top: -2px;
 }
 
 .alert p:last-child {
@@ -18,6 +20,7 @@
 
 .alert.alert--danger,
 .alert.alert--info,
+.alert.alert--primary,
 .alert.alert--success,
 .alert.alert--warning {
   background: var(--ifm-panel-background) !important;
@@ -32,10 +35,25 @@
   border-left: 2px solid var(--ifm-color-info);
 }
 
+.alert.alert--primary {
+  border-left: 2px solid var(--ifm-color-primary);
+}
+
 .alert.alert--success {
   border-left: 2px solid var(--ifm-color-success);
 }
 
 .alert.alert--warning {
   border-left: 3px solid var(--ifm-color-warning);
+}
+
+.alert.alert--fill.alert--primary {
+  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
+  border: 1px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary) !important;
+}
+.alert.alert--fill.alert--warning {
+  background: rgba( var(--ifm-color-warning-rgb), 0.15 ) !important;
+  border: 1px solid var(--ifm-color-warning);
+  color: var(--ifm-color-warning) !important;
 }

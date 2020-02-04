@@ -1,14 +1,13 @@
 use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
-    buffers::Acker,
     test_util::{
         block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
     },
     topology::{
         self,
-        config::{self, GlobalOptions},
+        config::{self, GlobalOptions, SinkContext},
     },
     Event, {sinks, sources},
 };
@@ -20,7 +19,7 @@ struct PanicSink;
 impl config::SinkConfig for PanicSink {
     fn build(
         &self,
-        _acker: Acker,
+        _cx: SinkContext,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
@@ -58,11 +57,14 @@ fn test_sink_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
     config.add_sink("panic", &["in"], PanicSink);
 
@@ -99,7 +101,7 @@ struct ErrorSink;
 impl config::SinkConfig for ErrorSink {
     fn build(
         &self,
-        _acker: Acker,
+        _cx: SinkContext,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
@@ -137,11 +139,14 @@ fn test_sink_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
     config.add_sink("error", &["in"], ErrorSink);
 
@@ -201,12 +206,15 @@ fn test_source_error() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_source("error", ErrorSourceConfig);
     config.add_sink(
         "out",
         &["in", "error"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
     let mut rt = runtime();
@@ -267,12 +275,15 @@ fn test_source_panic() {
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr.into()));
+    config.add_source(
+        "in",
+        sources::socket::SocketConfig::make_tcp_config(in_addr),
+    );
     config.add_source("panic", PanicSourceConfig);
     config.add_sink(
         "out",
         &["in", "panic"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
     let mut rt = runtime();

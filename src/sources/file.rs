@@ -332,15 +332,11 @@ fn create_event(
     let mut event = Event::from(line);
 
     if let Some(file_key) = &file_key {
-        event
-            .as_mut_log()
-            .insert_implicit(file_key.clone().into(), file.into());
+        event.as_mut_log().insert(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
-        event
-            .as_mut_log()
-            .insert_implicit(host_key.into(), hostname.clone().into());
+        event.as_mut_log().insert(host_key, hostname.clone());
     }
 
     event
@@ -349,15 +345,19 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event;
-    use crate::runtime;
-    use crate::sources::file;
-    use crate::test_util::{block_on, shutdown_on_idle};
-    use crate::topology::Config;
+    use crate::{
+        event, runtime,
+        sources::file,
+        test_util::{block_on, shutdown_on_idle},
+        topology::Config,
+    };
     use futures::{Future, Stream};
-    use std::collections::HashSet;
-    use std::fs::{self, File};
-    use std::io::{Seek, Write};
+    use pretty_assertions::assert_eq;
+    use std::{
+        collections::HashSet,
+        fs::{self, File},
+        io::{Seek, Write},
+    };
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
     use tokio::util::FutureExt;
@@ -999,7 +999,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             start_at_beginning: true,
-            ignore_older: Some(1000),
+            ignore_older: Some(5),
             ..test_default_file_config(&dir)
         };
 
@@ -1017,8 +1017,8 @@ mod tests {
 
         {
             // Set the modified times
-            let before = SystemTime::now() - Duration::from_secs(1010);
-            let after = SystemTime::now() - Duration::from_secs(990);
+            let before = SystemTime::now() - Duration::from_secs(8);
+            let after = SystemTime::now() - Duration::from_secs(2);
 
             let before_time = libc::timeval {
                 tv_sec: before
@@ -1311,6 +1311,43 @@ mod tests {
                 "i'm new".into(),
                 "hopefully you read all the old stuff first".into(),
                 "because otherwise i'm not going to make sense".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_gzipped_file() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![PathBuf::from("test-data/gzipped.log")],
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "this is a simple file".into(),
+                "i have been compressed".into(),
+                "in order to make me smaller".into(),
+                "but you can still read me".into(),
+                "hooray".into(),
             ]
         );
     }

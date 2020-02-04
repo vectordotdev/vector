@@ -8,8 +8,10 @@
 
 set -eu
 
+project_root=$(pwd)
 archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
+package_version="$($project_root/scripts/version.sh)"
 
 # RPM has a concept of releases, but we do not need this so every
 # release is 1.
@@ -18,11 +20,13 @@ export RELEASE=1
 # The RPM spec does not like a leading `v` or `-` in the version name.
 # Therefore we clean the version so that the `rpmbuild` command does
 # not fail.
-export CLEANED_VERSION=$VERSION
+export CLEANED_VERSION=$package_version
 CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 
 # The arch is the first part of the target
-ARCH=$(echo $TARGET | cut -d'-' -f1)
+# For some architectures, like armv7hl it doesn't match the arch
+# from Rust target triple and needs to be specified manually.
+ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
 
 # Create source dir
 rm -rf /root/rpmbuild/SOURCES
@@ -36,9 +40,7 @@ cp -av distribution/systemd/. /root/rpmbuild/SOURCES/systemd
 cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
-# Calling rpmbuild with --target tells RPM everything it needs to know
-# about where the build can run, including the architecture.
-rpmbuild --target $TARGET -ba distribution/rpm/vector.spec
+rpmbuild --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/rpm/vector.spec
 
 # Move the RPM into the artifacts dir
 ls "/root/rpmbuild/RPMS/$ARCH"

@@ -1,15 +1,14 @@
 use crate::{
-    buffers::Acker,
+    dns::Resolver,
     event::Event,
     region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
         tls::{TlsOptions, TlsSettings},
-        BatchConfig, BatchServiceSink, Buffer, Compression, SinkExt,
+        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkDescription},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
@@ -17,6 +16,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request,
 };
+use lazy_static::lazy_static;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -25,8 +25,6 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::time::Duration;
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -36,24 +34,16 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
-    pub provider: Option<Provider>,
-    #[serde(default, flatten)]
-    pub batch: BatchConfig,
+    #[serde(default)]
+    pub batch: BatchBytesConfig,
     // TODO: This should be an Option, but when combined with flatten we never seem to get back
     // a None. For now, we get optionality by handling the error during parsing when nothing is
     // passed. See https://github.com/timberio/vector/issues/1160
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
-
-    pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+    pub auth: Option<ElasticSearchAuth>,
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
@@ -61,18 +51,27 @@ pub struct ElasticSearchConfig {
     pub tls: Option<TlsOptions>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ElasticSearchBasicAuthConfig {
-    pub password: String,
-    pub user: String,
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        ..Default::default()
+    };
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
-pub enum Provider {
-    Default,
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+pub enum ElasticSearchAuth {
+    Basic { user: String, password: String },
     Aws,
+}
+
+impl ElasticSearchAuth {
+    pub fn apply<B>(&self, req: &mut Request<B>) {
+        if let Self::Basic { user, password } = &self {
+            use headers::HeaderMapExt;
+            let auth = headers::Authorization::basic(&user, &password);
+            req.headers_mut().typed_insert(auth);
+        }
+    }
 }
 
 inventory::submit! {
@@ -81,10 +80,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(&common)?;
-        let sink = es(self, common, acker);
+        let healthcheck = healthcheck(cx.resolver(), &common)?;
+        let sink = es(self, common, cx);
 
         Ok((sink, healthcheck))
     }
@@ -98,8 +97,8 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-struct ElasticSearchCommon {
-    base_url: String,
+pub struct ElasticSearchCommon {
+    pub base_url: String,
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
@@ -121,11 +120,14 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        let authorization = config.basic_auth.as_ref().map(|auth| {
-            let token = format!("{}:{}", auth.user, auth.password);
-            format!("Basic {}", base64::encode(token.as_bytes()))
-        });
+    pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
+        let authorization = match &config.auth {
+            Some(ElasticSearchAuth::Basic { user, password }) => {
+                let token = format!("{}:{}", user, password);
+                Some(format!("Basic {}", base64::encode(token.as_bytes())))
+            }
+            _ => None,
+        };
 
         let region: Option<Region> = match (&config.region).try_into() {
             Ok(region) => Some(region),
@@ -133,14 +135,14 @@ impl ElasticSearchCommon {
             Err(error) => return Err(error.into()),
         };
 
-        let provider = config.provider.unwrap_or(Provider::Default);
+        // let provider = config.provider.unwrap_or(Provider::Default);
 
-        let base_url = match provider {
-            Provider::Default => match config.host {
+        let base_url = match &config.auth {
+            Some(ElasticSearchAuth::Basic { .. }) | None => match config.host {
                 Some(ref host) => host.clone(),
                 None => return Err(ParseError::DefaultRequiresHost.into()),
             },
-            Provider::Aws => match region {
+            Some(ElasticSearchAuth::Aws) => match region {
                 None => return Err(ParseError::AWSRequiresRegion.into()),
                 Some(ref region) => match region {
                     // Adapted from rusoto_core::signature::build_hostname, which is unfortunately not pub
@@ -159,9 +161,9 @@ impl ElasticSearchCommon {
         uri.parse::<Uri>()
             .with_context(|| InvalidHost { host: &base_url })?;
 
-        let credentials = match provider {
-            Provider::Default => None,
-            Provider::Aws => {
+        let credentials = match &config.auth {
+            Some(ElasticSearchAuth::Basic { .. }) | None => None,
+            Some(ElasticSearchAuth::Aws) => {
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
@@ -199,7 +201,7 @@ impl ElasticSearchCommon {
 fn es(
     config: &ElasticSearchConfig,
     common: ElasticSearchCommon,
-    acker: Acker,
+    cx: SinkContext,
 ) -> super::RouterSink {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
@@ -208,13 +210,7 @@ fn es(
     };
 
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
-
-    let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
-    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
-    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
     let index = if let Some(idx) = &config.index {
         Template::from(idx.as_str())
@@ -222,12 +218,6 @@ fn es(
         Template::from("vector-%Y.%m.%d")
     };
     let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
-
-    let policy = FixedRetryPolicy::new(
-        retry_attempts,
-        Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
-    );
 
     let headers = config
         .headers
@@ -247,7 +237,7 @@ fn es(
         gzip = false;
     }
 
-    let http_service = HttpService::builder()
+    let http_service = HttpService::builder(cx.resolver())
         .tls_settings(common.tls_settings.clone())
         .build(move |body: Vec<u8>| {
             let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
@@ -299,14 +289,8 @@ fn es(
             }
         });
 
-    let service = ServiceBuilder::new()
-        .concurrency_limit(in_flight_limit)
-        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
-        .retry(policy)
-        .timeout(Duration::from_secs(timeout))
-        .service(http_service);
-
-    let sink = BatchServiceSink::new(service, acker)
+    let sink = request
+        .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
@@ -350,7 +334,10 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck> {
+fn healthcheck(
+    resolver: Resolver,
+    common: &ElasticSearchCommon,
+) -> crate::Result<super::Healthcheck> {
     let (uri, mut builder) = common.request_builder(Method::GET, "/_cluster/health");
     match &common.credentials {
         None => {
@@ -368,7 +355,7 @@ fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck
     let request = builder.body(Body::empty())?;
 
     Ok(Box::new(
-        https_client(common.tls_settings.clone())?
+        https_client(resolver, common.tls_settings.clone())?
             .request(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
@@ -417,9 +404,7 @@ mod tests {
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
-        event
-            .as_mut_log()
-            .insert_explicit("foo".into(), "bar".into());
+        event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &event);
@@ -431,9 +416,7 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
-        event
-            .as_mut_log()
-            .insert_explicit("not_foo".into(), "bar".into());
+        event.as_mut_log().insert("not_foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &event);
@@ -445,9 +428,7 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
         let mut event = Event::from("butts");
-        event
-            .as_mut_log()
-            .insert_explicit("foo".into(), "bar".into());
+        event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &event);
@@ -470,7 +451,14 @@ mod tests {
 
     #[test]
     fn host_is_required_for_default() {
-        let err = parse_config_err(r#"provider = "default""#);
+        let err = parse_config_err(
+            r#"
+        [auth]
+        strategy = "basic"
+        user = "user"
+        password = "password"
+        "#,
+        );
         assert_downcast_matches!(err, ParseError, ParseError::DefaultRequiresHost);
     }
 
@@ -478,8 +466,10 @@ mod tests {
     fn host_is_not_required_for_aws() {
         let result = parse_config(
             r#"
-                provider = "aws"
-                region = "us-east-1"
+            region = "us-east-1"
+
+            [auth]
+            strategy = "aws"
             "#,
         );
         // If not running in an AWS context, this will fail with a
@@ -501,7 +491,12 @@ mod tests {
 
     #[test]
     fn region_is_required_for_aws() {
-        let err = parse_config_err(r#"provider = "aws""#);
+        let err = parse_config_err(
+            r#"
+        [auth]
+        strategy = "aws"
+        "#,
+        );
         assert_downcast_matches!(err, ParseError, ParseError::AWSRequiresRegion { .. });
     }
 }
@@ -510,13 +505,12 @@ mod tests {
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
         event,
         sinks::util::http::https_client,
         sinks::util::tls::TlsOptions,
-        test_util::{block_on, random_events_with_stream, random_string},
-        topology::config::SinkConfig,
+        test_util::{random_events_with_stream, random_string, runtime},
+        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::{Future, Sink};
@@ -527,6 +521,8 @@ mod integration_tests {
 
     #[test]
     fn structures_events_correctly() {
+        let mut rt = runtime();
+
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: Some("http://localhost:9200".into()),
@@ -538,21 +534,18 @@ mod integration_tests {
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, _hc) = config.build(Acker::Null).unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+        let (sink, _hc) = config.build(cx.clone()).unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event
-            .as_mut_log()
-            .insert_explicit("my_id".into(), "42".into());
-        input_event
-            .as_mut_log()
-            .insert_explicit("foo".into(), "bar".into());
+        input_event.as_mut_log().insert("my_id", "42");
+        input_event.as_mut_log().insert("foo", "bar");
 
         let pump = sink.send(input_event.clone());
-        block_on(pump).unwrap();
+        rt.block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(&common)).unwrap();
+        rt.block_on(flush(cx.resolver(), &common)).unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", common.base_url, index))
@@ -609,28 +602,32 @@ mod integration_tests {
     #[test]
     fn insert_events_on_aws() {
         run_insert_tests(ElasticSearchConfig {
-            provider: Some(Provider::Aws),
+            auth: Some(ElasticSearchAuth::Aws),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
             ..config()
         });
     }
 
     fn run_insert_tests(mut config: ElasticSearchConfig) {
+        let mut rt = runtime();
+
         let index = gen_index();
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let (sink, healthcheck) = config.build(Acker::Null).expect("Building config failed");
+        let cx = SinkContext::new_test(rt.executor());
+        let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
-        block_on(healthcheck).expect("Health check failed");
+        rt.block_on(healthcheck).expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        let _ = block_on(pump).expect("Sending events failed");
+        let _ = rt.block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&common)).expect("Flushing writes failed");
+        rt.block_on(flush(cx.resolver(), &common))
+            .expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -669,11 +666,14 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(common: &ElasticSearchCommon) -> impl Future<Item = (), Error = crate::Error> {
+    fn flush(
+        resolver: Resolver,
+        common: &ElasticSearchCommon,
+    ) -> impl Future<Item = (), Error = crate::Error> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        https_client(common.tls_settings.clone())
+        https_client(resolver, common.tls_settings.clone())
             .expect("Could not build client to flush")
             .request(request)
             .map_err(|source| dbg!(source).into())
@@ -685,9 +685,9 @@ mod integration_tests {
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchConfig {
-                batch_size: Some(1),
-                batch_timeout: None,
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
             },
             ..Default::default()
         }

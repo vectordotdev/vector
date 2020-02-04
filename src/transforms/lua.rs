@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -111,8 +112,7 @@ impl rlua::UserData for Event {
             rlua::MetaMethod::NewIndex,
             |_ctx, this, (key, value): (String, Option<rlua::String<'lua>>)| {
                 if let Some(string) = value {
-                    this.as_mut_log()
-                        .insert_explicit(key.into(), string.as_bytes().into());
+                    this.as_mut_log().insert(key, string.as_bytes());
                 } else {
                     this.as_mut_log().remove(&key.into());
                 }
@@ -212,9 +212,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "Bob".into());
+        event.as_mut_log().insert("name", "Bob");
         let event = transform.transform(event).unwrap();
 
         assert!(event.as_log().get(&"name".into()).is_none());
@@ -231,9 +229,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "Bob".into());
+        event.as_mut_log().insert("name", "Bob");
         let event = transform.transform(event);
 
         assert!(event.is_none());
@@ -397,12 +393,8 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event
-            .as_mut_log()
-            .insert_explicit("name".into(), "Bob".into());
-        event
-            .as_mut_log()
-            .insert_explicit("friend".into(), "Alice".into());
+        event.as_mut_log().insert("name", "Bob");
+        event.as_mut_log().insert("friend", "Alice");
 
         let event = transform.transform(event).unwrap();
 

@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::{
+    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformDescription},
     Event,
 };
@@ -22,7 +23,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
     }
 
@@ -63,12 +64,8 @@ mod tests {
     #[test]
     fn remove_fields() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("to_remove".into(), "some value".into());
-        event
-            .as_mut_log()
-            .insert_explicit("to_keep".into(), "another value".into());
+        event.as_mut_log().insert("to_remove", "some value");
+        event.as_mut_log().insert("to_keep", "another value");
 
         let mut transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 
