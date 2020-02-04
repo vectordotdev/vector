@@ -2,7 +2,7 @@ RUN=./scripts/docker-compose-run.sh
 
 # default target
 
-all: verify
+all: check verify
 
 # checks
 
@@ -20,16 +20,16 @@ check-style:
 check-generate:
 	$(RUN) check-generate
 
-check-blog:
-	$(RUN) check-blog
-
 check-version:
 	$(RUN) check-version
 
 check-examples: build-archive
 	$(RUN) check-examples
 
-# build artifacts
+check-blog:
+	$(RUN) check-blog
+
+# packaging
 
 build-archive: init-target-dir
 	$(RUN) build-archive
@@ -40,7 +40,11 @@ package-deb: build-archive
 package-rpm: build-archive
 	$(RUN) package-rpm
 
+# verifications
+verify: verify-rpm verify-deb verify-nixos
+
 # verify RPM packages
+verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7
 
 verify-rpm-amazonlinux-1: package-rpm
 	$(RUN) verify-rpm-amazonlinux-1
@@ -51,24 +55,36 @@ verify-rpm-amazonlinux-2: package-rpm
 verify-rpm-centos-7: package-rpm
 	$(RUN) verify-rpm-centos-7
 
-verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7
-
 # verify DEB packages
+verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-19-04
+
+verify-deb-artifact-on-deb-8: package-deb
+	$(RUN) verify-deb-artifact-on-deb-8
+
+verify-deb-artifact-on-deb-9: package-deb
+	$(RUN) verify-deb-artifact-on-deb-9
 
 verify-deb-artifact-on-deb-10: package-deb
 	$(RUN) verify-deb-artifact-on-deb-10
 
-verify-deb: verify-deb-artifact-on-deb-10
+verify-deb-artifact-on-ubuntu-16-04: package-deb
+	$(RUN) verify-deb-artifact-on-ubuntu-16-04
 
-# verify all artifacts
+verify-deb-artifact-on-ubuntu-18-04: package-deb
+	$(RUN) verify-deb-artifact-on-ubuntu-18-04
 
-verify: verify-rpm verify-deb
+verify-deb-artifact-on-ubuntu-19-04: package-deb
+	$(RUN) verify-deb-artifact-on-ubuntu-19-04
+
+# verify that Vector can be built on NixOS
+verify-nixos:
+	$(RUN) verify-nixos
+
+# misc
 
 # display dependencies between all targets in this Makefile
 target-graph:
 	@docker-compose -f docker-compose.test.yml run --rm target-graph $(TARGET)
-
-# misc
 
 # clean everything
 clean:

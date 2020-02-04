@@ -47,16 +47,6 @@ services:
     user: $USER
     command: ./scripts/check-generate.sh
 
-  check-blog:
-    build:
-      context: scripts
-      dockerfile: ci-docker-images/checker/Dockerfile
-    volumes:
-      - $PWD:$PWD
-    working_dir: $PWD
-    user: $USER
-    command: ./scripts/check-blog-signatures.rb
-
   check-version:
     build:
       context: scripts
@@ -74,6 +64,16 @@ services:
     working_dir: $PWD
     user: $USER
     command: ["sh", "-ec", "./target/x86_64-unknown-linux-musl/release/vector validate --topology --deny-warnings ./config/examples/*.toml"]
+
+  check-blog:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/checker/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    user: $USER
+    command: ./scripts/check-blog-signatures.rb
 
   build-archive:
     build:
@@ -142,6 +142,24 @@ services:
     working_dir: $PWD
     command: ["sh", "-ec", "rpm -i target/artifacts/*-x86_64.rpm && vector --version"]
 
+  verify-deb-artifact-on-deb-8:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-deb-8/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
+  verify-deb-artifact-on-deb-9:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-deb-9/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
   verify-deb-artifact-on-deb-10:
     build:
       context: scripts/ci-docker-images
@@ -150,6 +168,42 @@ services:
       - $PWD:$PWD
     working_dir: $PWD
     command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
+  verify-deb-artifact-on-ubuntu-16-04:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-ubuntu-16-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
+  verify-deb-artifact-on-ubuntu-18-04:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-ubuntu-18-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
+  verify-deb-artifact-on-ubuntu-19-04:
+    build:
+      context: scripts/ci-docker-images
+      dockerfile: verifier-ubuntu-19-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
+  verify-nixos:
+    build:
+      context: scripts
+      dockerfile: ci-docker-images/verifier-nixos/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command: ["sh", "-ec", "./scripts/verify-nix.sh && vector --version"]
 
   target-graph:
     build:
