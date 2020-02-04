@@ -63,7 +63,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   healthcheck = true # default
-  host = "http://8.8.8.8" # example, no default
+  host = "http://127.0.0.1" # example, no default
   region = "na" # example, no default
 
   # OPTIONAL - Batch
@@ -313,7 +313,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["http://8.8.8.8","http://example.com"]}
+  examples={["http://127.0.0.1","http://example.com"]}
   name={"host"}
   path={null}
   relevantWhen={null}
