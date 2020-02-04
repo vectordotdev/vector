@@ -3,8 +3,8 @@ version: '3'
 services:
   build-x86_64:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: builder-x86_64-unknown-linux-musl/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
     environment:
       TARGET: x86_64-unknown-linux-musl
       FEATURES: default-musl
@@ -125,8 +125,8 @@ services:
 
   build-archive:
     build:
-      context: scripts/ci-docker-images
-      dockerfile: builder-x86_64-unknown-linux-musl/Dockerfile
+      context: scripts
+      dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
     environment:
       TARGET: x86_64-unknown-linux-musl
       FEATURES: default-musl
