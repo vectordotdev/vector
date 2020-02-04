@@ -467,8 +467,6 @@ mod integration_tests {
             .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
 
-        println!("response {:?}", response);
-
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
@@ -586,7 +584,7 @@ mod integration_tests {
         https_client(resolver, common.tls_settings.clone())
             .expect("Could not build client to flush")
             .request(request)
-            .map_err(|source| dbg!(source).into())
+            .map_err(|source| source.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
