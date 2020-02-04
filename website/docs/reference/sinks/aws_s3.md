@@ -83,11 +83,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # default
 
   # OPTIONAL - Object Attributes
-  acl = "authenticated-read" # example, no default, enum
-  grant_full_control = nil # example, no default
-  grant_read = nil # example, no default
-  grant_read_acp = nil # example, no default
-  grant_write_acp = nil # example, no default
+  acl = "private" # example, no default, enum
+  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
   server_side_encryption = "AES256" # example, no default, enum
   ssekms_key_id = nil # example, no default
   storage_class = "STANDARD" # example, no default, enum
@@ -137,7 +137,7 @@ import Field from '@site/src/components/Field';
   common={false}
   defaultValue={null}
   enumValues={{"private":"Owner gets FULL_CONTROL. No one else has access rights (default).","public-read":"Owner gets FULL_CONTROL. The AllUsers group gets READ access.","public-read-write":"Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. Granting this on a bucket is generally not recommended.","aws-exec-read":"Owner gets FULL_CONTROL. Amazon EC2 gets READ access to GET an Amazon Machine Image (AMI) bundle from Amazon S3.","authenticated-read":"Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access.","log-delivery-write":"The LogDelivery group gets WRITE and READ_ACP permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html)."}}
-  examples={["authenticated-read"]}
+  examples={["private","public-read","public-read-write","aws-exec-read","authenticated-read","log-delivery-write"]}
   name={"acl"}
   path={null}
   relevantWhen={null}
@@ -149,7 +149,7 @@ import Field from '@site/src/components/Field';
 
 ### acl
 
-Canned ACL to apply to the created objects. For more information, see [Canned ACL](https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl).
+Canned ACL to apply to the created objects. For more information, see [Canned ACL][urls.aws_s3_canned_acl]. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -443,7 +443,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
 
 ### filename_append_uuid
 
-Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.
+Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object naming](#object-naming) for more info.
 
 
 </Field>
@@ -487,7 +487,7 @@ The extension to use in the object name.
 
 ### filename_time_format
 
-The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported. See [Object Naming](#object-naming) for more info.
+The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported. See [Object naming](#object-naming) for more info.
 
 
 </Field>
@@ -497,7 +497,7 @@ The format of the resulting object file name. [`strftime` specifiers][urls.strpt
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
   name={"grant_full_control"}
   path={null}
   relevantWhen={null}
@@ -509,7 +509,7 @@ The format of the resulting object file name. [`strftime` specifiers][urls.strpt
 
 ### grant_full_control
 
-Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the created objects.
+Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP permissions on the created objects. See [Cross account object writing](#cross-account-object-writing) and [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -519,7 +519,7 @@ Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the created
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
   name={"grant_read"}
   path={null}
   relevantWhen={null}
@@ -531,7 +531,7 @@ Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the created
 
 ### grant_read
 
-Allows the named grantee to read the created objects and their metadata.
+Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and their metadata. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -541,7 +541,7 @@ Allows the named grantee to read the created objects and their metadata.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
   name={"grant_read_acp"}
   path={null}
   relevantWhen={null}
@@ -553,7 +553,7 @@ Allows the named grantee to read the created objects and their metadata.
 
 ### grant_read_acp
 
-Allows the named grantee to read the created objects' ACL.
+Allows the named [grantee][urls.aws_s3_grantee] to read the created objects' ACL. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -563,7 +563,7 @@ Allows the named grantee to read the created objects' ACL.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
   name={"grant_write_acp"}
   path={null}
   relevantWhen={null}
@@ -575,7 +575,7 @@ Allows the named grantee to read the created objects' ACL.
 
 ### grant_write_acp
 
-Allows the named grantee to write the created objects' ACL.
+Allows the named [grantee][urls.aws_s3_grantee] to write the created objects' ACL. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -619,7 +619,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### key_prefix
 
-A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
+A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 
 </Field>
@@ -843,7 +843,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 ### server_side_encryption
 
-The server-side encryption algorithm used when storing these objects.
+The server-side encryption algorithm used when storing these objects. See [Server-side encryption (SSE)](#server-side-encryption-sse) for more info.
 
 
 </Field>
@@ -887,7 +887,7 @@ If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`
 
 ### storage_class
 
-The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details.
+The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details. See [Storage class](#storage-class) for more info.
 
 
 </Field>
@@ -1034,6 +1034,15 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
+### Cross account object writing
+
+If you're using Vector to write objects across AWS accounts then you should
+consider setting the [`grant_full_control`](#grant_full_control) option to the bucket owner's
+canonical user ID. AWS provides a
+[full tutorial][urls.aws_s3_cross_account_tutorial] for this use case. If
+don't know the bucket owner's canoncial ID you can find it by following
+[this tutorial][urls.aws_canonical_user_id].
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -1064,7 +1073,21 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
-### Object Naming
+### Object access control list (ACL)
+
+AWS S3 supports [access control lists (ACL)][urls.aws_s3_acl] for buckets and
+objects. In the context of Vector, only object ACLs are relevant (Vector does
+not create or modify buckets). You can set the object level ACL by using one
+of the [`acl`](#acl), [`grant_full_control`](#grant_full_control), [`grant_read`](#grant_read), [`grant_read_acp`](#grant_read_acp), or
+`grant_write_acp` options.
+
+#### [`acl`](#acl) vs the `grant_*` options
+
+The `grant_*` options name a specific entity to grant access to. The [`acl`](#acl)
+options is one of a set of [specific canned ACLs][urls.aws_s3_canned_acl] that
+can only name the owner or world.
+
+### Object naming
 
 By default, Vector will name your S3 objects in the following format:
 
@@ -1112,8 +1135,6 @@ time.
 You can control the resulting name via the [`key_prefix`](#key_prefix), [`filename_time_format`](#filename_time_format),
 and [`filename_append_uuid`](#filename_append_uuid) options.
 
-
-
 ### Partitioning
 
 Partitioning is controlled via the [`key_prefix`](#key_prefix)
@@ -1141,6 +1162,34 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+
+### Server-side encryption (SSE)
+
+AWS S3 offers [server-side encryption][urls.aws_s3_sse]. You can apply defaults
+at the bucket level or set the encryption at the object level. In the context,
+of Vector only the object level is relevant (Vector does not create or modify
+buckets). Although, we recommend setting defaults at the bucket level whne
+possible. You can explicitly set the object level encryption via the
+`server_side_encryption` option.
+
+### Storage class
+
+AWS S3 offers [storage classes][urls.aws_s3_storage_classes]. You can apply
+defaults, and rules, at the bucket level or set the storage class at the object
+level. In the context of Vector only the object level is relevant (Vector does
+not create or modify buckets). You can set the storage class via the
+`storage_class` option.
+
+### Tags & metadata
+
+Vector currently only supports [AWS S3 object tags][urls.aws_s3_tags] and does
+_not_ support [object metadata][urls.aws_s3_metadata]. If you require metadata
+support please [open a feature request][urls.new_feature_request].
+
+We believe tags are more flexible since they are separate from the actual S3
+object. Youc an freely modify tags without modifying the object. Conversely,
+object metadata requires a full rewrite of the object to make changes.
+
 
 ### Template Syntax
 
@@ -1174,11 +1223,21 @@ You can read more about the complete syntax in the
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_canonical_user_id]: https://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html#FindingCanonicalId
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.aws_s3_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
+[urls.aws_s3_canned_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
+[urls.aws_s3_cross_account_tutorial]: https://docs.aws.amazon.com/AmazonS3/latest/dev/example-walkthroughs-managing-access-example3.html
+[urls.aws_s3_grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+[urls.aws_s3_metadata]: https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html#object-metadata
+[urls.aws_s3_sse]: https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html
+[urls.aws_s3_storage_classes]: https://aws.amazon.com/s3/storage-classes/
+[urls.aws_s3_tags]: https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
+[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)

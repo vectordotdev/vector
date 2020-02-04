@@ -2270,7 +2270,12 @@ end
   # * no default
   # * type: string
   # * enum: "private", "public-read", "public-read-write", "aws-exec-read", "authenticated-read", and "log-delivery-write"
+  acl = "private"
+  acl = "public-read"
+  acl = "public-read-write"
+  acl = "aws-exec-read"
   acl = "authenticated-read"
+  acl = "log-delivery-write"
 
   # Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the
   # created objects.
@@ -2278,24 +2283,36 @@ end
   # * optional
   # * no default
   # * type: string
+  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_full_control = "person@email.com"
+  grant_full_control = "http://acs.amazonaws.com/groups/global/AllUsers"
 
   # Allows the named grantee to read the created objects and their metadata.
   #
   # * optional
   # * no default
   # * type: string
+  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_read = "person@email.com"
+  grant_read = "http://acs.amazonaws.com/groups/global/AllUsers"
 
   # Allows the named grantee to read the created objects' ACL.
   #
   # * optional
   # * no default
   # * type: string
+  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_read_acp = "person@email.com"
+  grant_read_acp = "http://acs.amazonaws.com/groups/global/AllUsers"
 
   # Allows the named grantee to write the created objects' ACL.
   #
   # * optional
   # * no default
   # * type: string
+  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_write_acp = "person@email.com"
+  grant_write_acp = "http://acs.amazonaws.com/groups/global/AllUsers"
 
   # The server-side encryption algorithm used when storing these objects.
   #
