@@ -30,7 +30,7 @@ test-armv7: build-armv7
 test-aarch64: build-aarch64
 	$(RUN) test-aarch64
 
-# generate 
+# generate
 
 all: build check verify
 
