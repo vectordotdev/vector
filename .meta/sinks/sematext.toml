@@ -21,7 +21,7 @@ write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][ur
 
 [sinks.sematext.options.region]
 type = "string"
-required = false 
+required = false
 examples = ["na", "eu"]
 description = "The region destination to send logs to. This option is required if `host` is not set."
 
@@ -30,7 +30,6 @@ type = "string"
 required = false
 examples = ["http://8.8.8.8", "http://example.com"]
 description = "The host that will be used to send logs to. This option is required if `region` is not set."
-
 
 [sinks.sematext.options.token]
 type = "string"
