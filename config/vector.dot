@@ -1,0 +1,31 @@
+#                                    __   __  __
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#                                   Configuration
+#
+# ------------------------------------------------------------------------------
+# Website: https://vector.dev
+# Docs: https://vector.dev/docs/
+# ------------------------------------------------------------------------------
+
+digraph {
+  data_dir = "/var/lib/vector"
+
+  subgraph sources {
+    in [
+      type = "stdin"
+    ]
+  }
+
+  subgraph sinks {
+    console [
+      type = "console"
+      encoding = "text"
+    ]
+  }
+
+  in -> console
+}

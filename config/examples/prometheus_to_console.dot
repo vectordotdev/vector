@@ -1,0 +1,27 @@
+# Prometheus source example
+# ------------------------------------------------------------------------------
+# Scraping Prometheus metrics and printing them into console
+
+digraph {
+  data_dir = "/var/lib/vector"
+
+  subgraph sources {
+    # Ingest
+    prometheus [
+      type = "prometheus"
+      hosts = "http://127.0.0.1:9090,http://127.0.0.1:9090"
+      scrape_interval_secs = 2
+    ]
+  }
+
+  subgraph sinks {
+    # Output
+    console [
+      type = "console"
+      encoding = "json"
+    ]
+  }
+
+  # Set up the data flow
+  prometheus -> console
+}

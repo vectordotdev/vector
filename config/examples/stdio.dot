@@ -1,0 +1,23 @@
+# STDIO Example
+# ------------------------------------------------------------------------------
+# A simple STDIN / STDOUT example. This script is used in the getting started
+# guide:
+#
+# https://vector.dev/docs/setup/guides/getting-started
+
+digraph {
+  subgraph sources {
+    in [
+      type = "stdin"
+    ]
+  }
+
+  subgraph sinks {
+    console [
+      type = "console"
+      encoding = "text"
+    ]
+  }
+
+  in -> console
+}
