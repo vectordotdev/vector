@@ -586,6 +586,13 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
+### Obtaining a Sematext token
+
+1. Register for a free account at [Sematext.com](https://apps.sematext.com/ui/registration)
+
+2. [Create a Logs App](https://apps.sematext.com/ui/integrations) to get a Logs Token
+for [Sematext Logs](http://www.sematext.com/logsene/)
+
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
