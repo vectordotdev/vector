@@ -130,10 +130,15 @@ impl KafkaSinkConfig {
             }
         }
 
-        let security_protocol = if tls_enabled && sasl_enabled { "sasl_ssl" }
-        else if tls_enabled && !sasl_enabled { "ssl" }
-        else if !tls_enabled && sasl_enabled { "sasl_plaintext" }
-        else { "plaintext" };
+        let security_protocol = if tls_enabled && sasl_enabled {
+            "sasl_ssl"
+        } else if tls_enabled && !sasl_enabled {
+            "ssl"
+        } else if !tls_enabled && sasl_enabled {
+            "sasl_plaintext"
+        } else {
+            "plaintext"
+        };
         client_config.set("security.protocol", security_protocol);
 
         Ok(client_config)
