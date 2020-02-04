@@ -53,15 +53,50 @@ pub struct S3SinkConfig {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct S3Options {
-    acl: Option<String>,
+    acl: Option<S3CannedAcl>,
     grant_full_control: Option<String>,
     grant_read: Option<String>,
     grant_read_acp: Option<String>,
     grant_write_acp: Option<String>,
-    server_side_encryption: Option<String>,
+    server_side_encryption: Option<S3ServerSideEncryption>,
     ssekms_key_id: Option<String>,
-    storage_class: Option<String>,
+    storage_class: Option<S3StorageClass>,
     tags: Option<HashMap<String, String>>,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "kebab-case")]
+enum S3CannedAcl {
+    #[derivative(Default)]
+    Private,
+    PublicRead,
+    PublicReadWrite,
+    AwsExecRead,
+    AuthenticatedRead,
+    LogDeliveryWrite,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+enum S3ServerSideEncryption {
+    #[serde(rename = "AES256")]
+    AES256,
+    #[serde(rename = "aws:kms")]
+    AwsKms,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum S3StorageClass {
+    #[derivative(Default)]
+    Standard,
+    ReducedRedundancy,
+    IntelligentTiering,
+    StandardIA,
+    OnezoneIA,
+    Glacier,
+    DeepArchive,
 }
 
 lazy_static! {
@@ -250,19 +285,23 @@ impl Service<Request> for S3Sink {
                 bucket: request.bucket,
                 key: request.key,
                 content_encoding: request.content_encoding,
-                acl: options.acl,
+                acl: options.acl.map(to_string),
                 grant_full_control: options.grant_full_control,
                 grant_read: options.grant_read,
                 grant_read_acp: options.grant_read_acp,
                 grant_write_acp: options.grant_write_acp,
-                server_side_encryption: options.server_side_encryption,
+                server_side_encryption: options.server_side_encryption.map(to_string),
                 ssekms_key_id: options.ssekms_key_id,
-                storage_class: options.storage_class,
+                storage_class: options.storage_class.map(to_string),
                 tagging: Some(tagging),
                 ..Default::default()
             })
             .instrument(info_span!("request"))
     }
+}
+
+fn to_string(value: impl Serialize) -> String {
+    serde_json::to_value(&value).unwrap().to_string()
 }
 
 fn build_request(

@@ -2269,6 +2269,7 @@ end
   # * optional
   # * no default
   # * type: string
+  # * enum: "private", "public-read", "public-read-write", "aws-exec-read", "authenticated-read", and "log-delivery-write"
   acl = "authenticated-read"
 
   # Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the
@@ -2301,6 +2302,7 @@ end
   # * optional
   # * no default
   # * type: string
+  # * enum: "AES256" or "aws:kms"
   server_side_encryption = "AES256"
   server_side_encryption = "aws:kms"
 
@@ -2319,6 +2321,14 @@ end
   # * optional
   # * no default
   # * type: string
+  # * enum: "STANDARD", "REDUCED_REDUNDANCY", "INTELLIGENT_TIERING", "STANDARD_IA", "ONEZONE_IA", "GLACIER", and "DEEP_ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "REDUCED_REDUNDANCY"
+  storage_class = "INTELLIGENT_TIERING"
+  storage_class = "STANDARD_IA"
+  storage_class = "ONEZONE_IA"
+  storage_class = "GLACIER"
+  storage_class = "DEEP_ARCHIVE"
 
   [sinks.aws_s3.tags]
     # A custom tag to be added to the created objects.

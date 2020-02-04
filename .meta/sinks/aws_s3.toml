@@ -84,6 +84,14 @@ required = false
 examples = [ "authenticated-read" ]
 description = "Canned ACL to apply to the created objects. For more information, see [Canned ACL](https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl)."
 
+[sinks.aws_s3.options.acl.enum]
+private = "Owner gets FULL_CONTROL. No one else has access rights (default)."
+public-read = "Owner gets FULL_CONTROL. The AllUsers group gets READ access."
+public-read-write = "Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. Granting this on a bucket is generally not recommended."
+aws-exec-read = "Owner gets FULL_CONTROL. Amazon EC2 gets READ access to GET an Amazon Machine Image (AMI) bundle from Amazon S3."
+authenticated-read = "Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access."
+log-delivery-write = "The LogDelivery group gets WRITE and READ_ACP permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html)."
+
 [sinks.aws_s3.options.grant_full_control]
 type = "string"
 category = "Object Attributes"
@@ -120,6 +128,10 @@ required = false
 examples = [ "AES256", "aws:kms" ]
 description = "The server-side encryption algorithm used when storing these objects."
 
+[sinks.aws_s3.options.server_side_encryption.enum]
+AES256 = "256-bit Advanced Encryption Standard"
+"aws:kms" = "AWS managed key encryption"
+
 [sinks.aws_s3.options.ssekms_key_id]
 type = "string"
 category = "Object Attributes"
@@ -139,6 +151,15 @@ category = "Object Attributes"
 common = false
 required = false
 description = "The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details."
+
+[sinks.aws_s3.options.storage_class.enum]
+STANDARD = "The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class."
+REDUCED_REDUNDANCY = "Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. "
+INTELLIGENT_TIERING = "Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data."
+STANDARD_IA = "Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class)."
+ONEZONE_IA = "Amazon S3 stores the object data in only one Availability Zone."
+GLACIER = "Use for archives where portions of the data might need to be retrieved in minutes."
+DEEP_ARCHIVE = "Use for archiving data that rarely needs to be accessed."
 
 [sinks.aws_s3.options.tags]
 type = "table"

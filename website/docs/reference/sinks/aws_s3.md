@@ -83,14 +83,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # default
 
   # OPTIONAL - Object Attributes
-  acl = "authenticated-read" # example, no default
+  acl = "authenticated-read" # example, no default, enum
   grant_full_control = nil # example, no default
   grant_read = nil # example, no default
   grant_read_acp = nil # example, no default
   grant_write_acp = nil # example, no default
-  server_side_encryption = "AES256" # example, no default
+  server_side_encryption = "AES256" # example, no default, enum
   ssekms_key_id = nil # example, no default
-  storage_class = nil # example, no default
+  storage_class = "STANDARD" # example, no default, enum
   [sinks.my_sink_id.tags]
     Tag1 = "Value1" # example
 
@@ -136,7 +136,7 @@ import Field from '@site/src/components/Field';
 <Field
   common={false}
   defaultValue={null}
-  enumValues={null}
+  enumValues={{"private":"Owner gets FULL_CONTROL. No one else has access rights (default).","public-read":"Owner gets FULL_CONTROL. The AllUsers group gets READ access.","public-read-write":"Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. Granting this on a bucket is generally not recommended.","aws-exec-read":"Owner gets FULL_CONTROL. Amazon EC2 gets READ access to GET an Amazon Machine Image (AMI) bundle from Amazon S3.","authenticated-read":"Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access.","log-delivery-write":"The LogDelivery group gets WRITE and READ_ACP permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html)."}}
   examples={["authenticated-read"]}
   name={"acl"}
   path={null}
@@ -830,7 +830,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 <Field
   common={false}
   defaultValue={null}
-  enumValues={null}
+  enumValues={{"AES256":"256-bit Advanced Encryption Standard","aws:kms":"AWS managed key encryption"}}
   examples={["AES256","aws:kms"]}
   name={"server_side_encryption"}
   path={null}
@@ -874,8 +874,8 @@ If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`
 <Field
   common={false}
   defaultValue={null}
-  enumValues={null}
-  examples={[]}
+  enumValues={{"STANDARD":"The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class.","REDUCED_REDUNDANCY":"Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. ","INTELLIGENT_TIERING":"Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data.","STANDARD_IA":"Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class).","ONEZONE_IA":"Amazon S3 stores the object data in only one Availability Zone.","GLACIER":"Use for archives where portions of the data might need to be retrieved in minutes.","DEEP_ARCHIVE":"Use for archiving data that rarely needs to be accessed."}}
+  examples={["STANDARD","REDUCED_REDUNDANCY","INTELLIGENT_TIERING","STANDARD_IA","ONEZONE_IA","GLACIER","DEEP_ARCHIVE"]}
   name={"storage_class"}
   path={null}
   relevantWhen={null}
