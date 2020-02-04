@@ -73,7 +73,7 @@ description = "A custom header to be added to each outgoing Elasticsearch reques
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
-description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
+description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
 
 [sinks.elasticsearch.options.index]
 type = "string"

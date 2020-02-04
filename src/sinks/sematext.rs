@@ -54,7 +54,7 @@ impl SinkConfig for SematextConfig {
         }
 
         ElasticSearchConfig {
-            host: Some(host),
+            host,
             compression: Some(Compression::None),
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),

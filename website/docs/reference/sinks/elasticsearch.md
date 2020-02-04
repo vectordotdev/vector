@@ -539,7 +539,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
 
 
 </Field>
