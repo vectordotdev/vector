@@ -53,15 +53,15 @@ A list of image names to match against. If not provided, \
 all images will be included.\
 """
 
-[sources.docker.options.no_auto_partial_merge]
+[sources.docker.options.auto_partial_merge]
 type = "bool"
 common = false
-default = false
+default = true
 description = """\
 Setting this to `false` will disable the automatic merging of partial events.\
 """
 
-[sources.docker.options.partial_event_marker]
+[sources.docker.options.partial_event_marker_field]
 type = "string"
 common = false
 default = "_partial"

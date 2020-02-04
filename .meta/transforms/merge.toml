@@ -3,35 +3,41 @@ title = "Merge"
 allow_you_to_description = "merge partial log events into a single event"
 common = false
 function_category = "merge"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
-resources = []
 
 [transforms.merge.options.merge_fields]
 type = "[string]"
 common = true
 default = ["message"]
 description = """\
-Fields to merge.
-
-The values of these fields will be merged into the _first_ partial event. \
-Fields not specified here will be ignored. Merging process takes the first \
-buffered partial event, then loops over the rest of them and merges in the \
-fields from each buffered partial event. The last event with the field takes \
-priority and overrides the previous event.
-
-Finally, the non-partial event fields are merged in, producing the resulting \
-merged event.\
+Fields to merge. The values of these fields will be merged into the \
+first partial event. Fields not specified here will be ignored. \
+Merging process takes the first partial event and the base, then it \
+merges in the fields from each successive partial event, until a \
+non-partial event arrives. Finally, the non-partial event fields are \
+merged in, producing the resulting merged event.\
 """
 
-[transforms.merge.options.partial_event_marker]
+[transforms.merge.options.partial_event_marker_field]
 type = "string"
 common = true
 default = "_partial"
 description = """\
-The field that indicates that the event is partial. A consequent stream of \
-partial events along with the first non-partial event will be merged together.\
+The field that indicates that the event is partial. A consequent stream \
+of partial events along with the first non-partial event will be merged \
+together.\
+"""
+
+[transforms.merge.options.stream_discriminant_fields]
+type = "[string]"
+common = true
+default = []
+description = """\
+An ordered list of fields to distinguish streams by. Each stream has a \
+separate partial event merging state. Should be used to prevent events \
+from unrelated sources from mixing together, as this affects partial \
+event processing.\
 """
 
 [[transforms.merge.output.log.examples]]
@@ -102,7 +108,7 @@ This is because they were not listed in the `merge_fields` option.\
 [[transforms.merge.output.log.examples]]
 label = "With Merge Fields"
 body = """\
-Given the following _default_ configuration:
+Given the following configuration:
 
 <CodeHeader fileName="vector.toml" />
 
