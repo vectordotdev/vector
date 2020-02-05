@@ -9,13 +9,13 @@ build: build-x86_64
 # build the project in debug mode for all platforms
 build-all: build-x86_64 build-armv7 build-aarch64
 
-build-x86_64: check-code
+build-x86_64:
 	$(RUN) build-x86_64
 
-build-armv7: check-code load-qemu-binfmt
+build-armv7: load-qemu-binfmt
 	$(RUN) build-armv7
 
-build-aarch64: check-code load-qemu-binfmt
+build-aarch64: load-qemu-binfmt
 	$(RUN) build-aarch64
 
 # run benchmarks

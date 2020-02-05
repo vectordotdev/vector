@@ -9,8 +9,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
@@ -22,8 +23,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
@@ -35,8 +37,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
@@ -48,8 +51,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
@@ -74,8 +78,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/root/.cargo/registry
-        - ./target/cache/root/cargo/git:/root/.cargo/git
+        - ./target/cargo/registry:/root/.cargo/registry
+        - ./target/cargo/git:/root/.cargo/git
+        - ./target/rustup/tmp:/root/.rustup/tmp
       working_dir: $PWD
       command: cargo check --all --all-targets
 
@@ -87,8 +92,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/root/.cargo/registry
-        - ./target/cache/root/cargo/git:/root/.cargo/git
+        - ./target/cargo/registry:/root/.cargo/registry
+        - ./target/cargo/git:/root/.cargo/git
+        - ./target/rustup/tmp:/root/.rustup/tmp
       working_dir: $PWD
       command: cargo fmt -- --check
 
@@ -149,8 +155,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: ./scripts/build-archive.sh
 
@@ -164,8 +171,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+        - ./target/armv7-unknwon-linux-musleabihf/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknwon-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: ./scripts/build-archive.sh
 
@@ -179,8 +187,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: ./scripts/build-archive.sh
 
@@ -192,8 +201,9 @@ services:
         TARGET: x86_64-unknown-linux-musl
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
@@ -205,8 +215,9 @@ services:
         TARGET: armv7-unknown-linux-musleabihf
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
@@ -218,8 +229,9 @@ services:
         TARGET: aarch64-unknown-linux-musl
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
@@ -362,13 +374,6 @@ services:
       working_dir: $PWD
       command: ["sh", "-ec", "rm -rf target"]
 
-    init-target-dir:
-      image: ubuntu:18.04
-      volumes:
-        - $PWD:$PWD
-      working_dir: $PWD
-      command: ["sh", "-ec", "mkdir -p target/cache/root/cargo/registry target/cache/root/cargo/git"]
-
     load-qemu-binfmt:
       build:
         context: scripts
@@ -384,8 +389,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
       working_dir: $PWD
       command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
@@ -399,8 +405,9 @@ services:
         AWS_SECRET_ACCESS_KEY: dummy
       volumes:
         - $PWD:$PWD
-        - ./target/cache/root/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cache/root/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
         - /var/run/docker.sock:/var/run/docker.sock
       depends_on:
         - localstack
