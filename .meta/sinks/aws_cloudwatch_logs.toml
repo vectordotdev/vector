@@ -22,6 +22,8 @@ service_limits_short_link = "aws_cw_logs_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
 
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_logs.env_vars") %>
+
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
 common = true
@@ -69,6 +71,8 @@ common = false
 examples = ["arn:aws:iam::123456789098:role/my_role"]
 required = false
 description = "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
+
+<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
 
 [[sinks.aws_cloudwatch_logs.output.examples]]
 label = "Generic"
