@@ -46,7 +46,7 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 check-blog: ## Checks that all blog articles are signed by their authors
 	@scripts/run.sh checker scripts/check-blog-signatures.rb
 
-export CHECK_URLS ?= false
+export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta
 	@scripts/run.sh checker scripts/generate.rb
 

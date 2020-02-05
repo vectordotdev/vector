@@ -5,7 +5,6 @@ common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-resources = []
 types_coercion = true
 
 [transforms.coercer.options.drop_unspecified]

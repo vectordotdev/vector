@@ -174,6 +174,8 @@ module.exports = {
             
               "reference/transforms/lua",
             
+              "reference/transforms/merge",
+            
               "reference/transforms/regex_parser",
             
               "reference/transforms/remove_fields",
@@ -268,6 +270,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Security',
+          href: 'https://github.com/timberio/vector/security/policy'
+        },
       ],
     },
   ]

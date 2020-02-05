@@ -36,7 +36,30 @@
 
 <%= component_sections(component) %>
 
-### Object Naming
+### Cross account object writing
+
+If you're using Vector to write objects across AWS accounts then you should
+consider setting the `grant_full_control` option to the bucket owner's
+canonical user ID. AWS provides a
+[full tutorial][urls.aws_s3_cross_account_tutorial] for this use case. If
+don't know the bucket owner's canoncial ID you can find it by following
+[this tutorial][urls.aws_canonical_user_id].
+
+### Object access control list (ACL)
+
+AWS S3 supports [access control lists (ACL)][urls.aws_s3_acl] for buckets and
+objects. In the context of Vector, only object ACLs are relevant (Vector does
+not create or modify buckets). You can set the object level ACL by using one
+of the `acl`, `grant_full_control`, `grant_read`, `grant_read_acp`, or
+`grant_write_acp` options.
+
+#### `acl` vs the `grant_*` options
+
+The `grant_*` options name a specific entity to grant access to. The `acl`
+options is one of a set of [specific canned ACLs][urls.aws_s3_canned_acl] that
+can only name the owner or world.
+
+### Object naming
 
 By default, Vector will name your S3 objects in the following format:
 
@@ -84,4 +107,30 @@ time.
 You can control the resulting name via the `key_prefix`, `filename_time_format`,
 and `filename_append_uuid` options.
 
+### Server-side encryption (SSE)
+
+AWS S3 offers [server-side encryption][urls.aws_s3_sse]. You can apply defaults
+at the bucket level or set the encryption at the object level. In the context,
+of Vector only the object level is relevant (Vector does not create or modify
+buckets). Although, we recommend setting defaults at the bucket level whne
+possible. You can explicitly set the object level encryption via the
+`server_side_encryption` option.
+
+### Storage class
+
+AWS S3 offers [storage classes][urls.aws_s3_storage_classes]. You can apply
+defaults, and rules, at the bucket level or set the storage class at the object
+level. In the context of Vector only the object level is relevant (Vector does
+not create or modify buckets). You can set the storage class via the
+`storage_class` option.
+
+### Tags & metadata
+
+Vector currently only supports [AWS S3 object tags][urls.aws_s3_tags] and does
+_not_ support [object metadata][urls.aws_s3_metadata]. If you require metadata
+support see [issue #1694][urls.issue_1694].
+
+We believe tags are more flexible since they are separate from the actual S3
+object. Youc an freely modify tags without modifying the object. Conversely,
+object metadata requires a full rewrite of the object to make changes.
 

@@ -5,7 +5,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+socket%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "socket|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sources/socket.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sources/socket
 status: "prod-ready"
 title: "Socket Source"
 unsupported_operating_systems: []
@@ -48,10 +48,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
+  path = "/path/to/socket" # example, relevant when mode = "unix"
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -68,11 +68,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
+  path = "/path/to/socket" # example, relevant when mode = "unix"
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
   max_length = 102400 # default, bytes
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -188,7 +188,7 @@ The type of socket to use.
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

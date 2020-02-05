@@ -5,7 +5,6 @@ common = false
 delivery_guarantee = "best_effort"
 function_category = "proxy"
 output_types = ["log", "metric"]
-resources = []
 through_description = "another upstream [`vector` sink][docs.sinks.vector]"
 
 [sources.vector.options.address]

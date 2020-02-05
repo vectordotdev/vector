@@ -15,12 +15,6 @@ absolute_archive_path="$project_root/$archive_path"
 package_version="$($project_root/scripts/version.sh)"
 echo "Packaging .deb for $archive_name"
 
-# Rename the rust-toolchain file so that we can use our custom version of rustc installed
-# on release containers.
-on_exit="mv rust-toolchain.bak rust-toolchain"
-trap "$on_exit" EXIT
-mv rust-toolchain rust-toolchain.bak
-
 # Unarchive the tar since cargo deb wants direct access to the files.
 td=$(mktemp -d)
 pushd $td

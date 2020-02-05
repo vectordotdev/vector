@@ -31,8 +31,8 @@ description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kin
 
 [[sinks.aws_kinesis_firehose.output.examples]]
 label = "Generic"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST / HTTP/1.1
 Host: firehose.<region>.<domain>
 Content-Length: <byte_size>
@@ -52,5 +52,6 @@ X-Amz-Target: Firehose_20150804.PutRecordBatch
             "Data": "<base64_encoded_log>",
         },
     ]
-}\
+}
+```\
 """

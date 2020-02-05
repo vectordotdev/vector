@@ -1,4 +1,5 @@
 use crate::{
+    event::merge_state::LogEventMergeState,
     event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -37,12 +38,26 @@ lazy_static! {
 
 type DockerEvent = shiplift::rep::Event;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields, default)]
 pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
+    partial_event_marker_field: Option<Atom>,
+    auto_partial_merge: bool,
+}
+
+impl Default for DockerConfig {
+    fn default() -> Self {
+        Self {
+            include_containers: None,
+            include_labels: None,
+            include_images: None,
+            partial_event_marker_field: Some(event::PARTIAL.clone()),
+            auto_partial_merge: true,
+        }
+    }
 }
 
 impl DockerConfig {
@@ -67,6 +82,15 @@ impl DockerConfig {
             true
         }
     }
+
+    fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
+        if let Some(val) = &self.partial_event_marker_field {
+            if val.is_empty() {
+                self.partial_event_marker_field = None;
+            }
+        }
+        self
+    }
 }
 
 inventory::submit! {
@@ -81,9 +105,12 @@ impl SourceConfig for DockerConfig {
         _globals: &GlobalOptions,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
-        DockerSource::new(self.clone(), out)
-            .map(Box::new)
-            .map(|source| source as Box<_>)
+        DockerSource::new(
+            self.clone().with_empty_partial_event_marker_field_as_none(),
+            out,
+        )
+        .map(Box::new)
+        .map(|source| source as Box<_>)
     }
 
     fn output_type(&self) -> DataType {
@@ -103,13 +130,12 @@ struct DockerSourceCore {
 }
 
 impl DockerSourceCore {
-    /// Only logs created at, or after this moment are logged.
     fn new(config: DockerConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = Docker::new();
 
-        // Only logs created at, or after this moment are logged.
+        // Only log events created at-or-after this moment are logged.
         let now = chrono::Local::now();
         info!(
             message = "Capturing logs from now on",
@@ -531,6 +557,9 @@ impl EventStreamBuilder {
 
         // Create event streamer
         let mut state = Some((self.main_send.clone(), info));
+        let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
+        let auto_partial_merge = self.core.config.auto_partial_merge;
+        let mut partial_event_merge_state = None;
         tokio::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
@@ -538,7 +567,12 @@ impl EventStreamBuilder {
                 loop {
                     return match stream.poll() {
                         Ok(Async::Ready(Some(message))) => {
-                            if let Some(event) = info.new_event(message) {
+                            if let Some(event) = info.new_event(
+                                message,
+                                partial_event_marker_field.clone(),
+                                auto_partial_merge,
+                                &mut partial_event_merge_state,
+                            ) {
                                 Ok(Async::Ready(Some(event)))
                             } else {
                                 continue;
@@ -675,17 +709,20 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the begining of message
-    /// Expects messages to be ordered by timestamps
-    fn new_event(&mut self, message: Chunk) -> Option<Event> {
-        let mut log_event = Event::new_empty_log().into_log();
-
+    /// Expects timestamp at the begining of message.
+    /// Expects messages to be ordered by timestamps.
+    fn new_event(
+        &mut self,
+        message: Chunk,
+        partial_event_marker_field: Option<Atom>,
+        auto_partial_merge: bool,
+        partial_event_merge_state: &mut Option<LogEventMergeState>,
+    ) -> Option<Event> {
         let stream = match message.stream_type {
             StreamType::StdErr => STDERR.clone(),
             StreamType::StdOut => STDOUT.clone(),
             _ => return None,
         };
-        log_event.insert(STREAM.clone(), stream);
 
         let mut bytes_message = BytesMut::from(message.data);
 
@@ -693,7 +730,7 @@ impl ContainerLogInfo {
 
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
-        match DateTime::parse_from_rfc3339(timestamp_str) {
+        let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
@@ -713,46 +750,121 @@ impl ContainerLogInfo {
                         return None;
                     }
                 }
-                // Supply timestamp
-                log_event.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc));
 
                 self.last_log = Some((timestamp, self.generation));
 
                 let log = splitter.next()?;
                 let remove_len = message.len() - log.len();
                 bytes_message.advance(remove_len);
+
+                // Provide the timestamp.
+                Some(timestamp.with_timezone(&Utc))
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
                 error!(message="Didn't recieve rfc3339 timestamp from docker",%error);
-                // So log whole message
+                // So continue normally but without a timestamp.
+                None
             }
-        }
+        };
 
-        // Message is actually one line from stderr or stdout, and they are delimited with newline
-        // so that newline needs to be removed.
-        if bytes_message
+        // Message is actually one line from stderr or stdout, and they are
+        // delimited with newline, so that newline needs to be removed.
+        // If there's no newline, the event is considered partial, and will
+        // either be merged within the docker source, or marked accordingly
+        // before sending out, depending on the configuration.
+        let is_partial = if bytes_message
             .last()
             .map(|&b| b as char == '\n')
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
-        }
+            false
+        } else {
+            true
+        };
 
-        // Supply message
-        log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
+        // Prepare the log event.
+        let mut log_event = {
+            let mut log_event = Event::new_empty_log().into_log();
 
-        // Supply container
-        log_event.insert(CONTAINER.clone(), self.id.0.clone());
+            // The log message.
+            log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
 
-        // Add Metadata
-        for (key, value) in self.metadata.labels.iter() {
-            log_event.insert(key.clone(), value.clone());
-        }
-        log_event.insert(NAME.clone(), self.metadata.name.clone());
-        log_event.insert(IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+            // Stream we got the message from.
+            log_event.insert(STREAM.clone(), stream);
 
+            // Timestamp of the event.
+            if let Some(timestamp) = timestamp {
+                log_event.insert(event::TIMESTAMP.clone(), timestamp);
+            }
+
+            // Container ID.
+            log_event.insert(CONTAINER.clone(), self.id.0.clone());
+
+            // Labels.
+            for (key, value) in self.metadata.labels.iter() {
+                log_event.insert(key.clone(), value.clone());
+            }
+
+            // Container name.
+            log_event.insert(NAME.clone(), self.metadata.name.clone());
+
+            // Container image.
+            log_event.insert(IMAGE.clone(), self.metadata.image.clone());
+
+            // Timestamp of the container creation.
+            log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+
+            // Return the resulting log event.
+            log_event
+        };
+
+        // If automatic partial event merging is requested - perform the
+        // merging.
+        // Otherwise mark partial events and return all the events with no
+        // merging.
+        let log_event = if auto_partial_merge {
+            // Partial event events merging logic.
+
+            // If event is partial, stash it and return `None`.
+            if is_partial {
+                // If we already have a partial event merge state, the current
+                // message has to be merged into that existing state.
+                // Otherwise, create a new partial event merge state with the
+                // current message being the initial one.
+                if let Some(partial_event_merge_state) = partial_event_merge_state {
+                    partial_event_merge_state
+                        .merge_in_next_event(log_event, &[event::MESSAGE.clone()]);
+                } else {
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                };
+                return None;
+            };
+
+            // This is not a parial event. If we have a partial event merge
+            // state from before, the current event must be a final event, that
+            // would give us a merged event we can return.
+            // Otherwise it's just a regular event that we return as-is.
+            match partial_event_merge_state.take() {
+                Some(partial_event_merge_state) => partial_event_merge_state
+                    .merge_in_final_event(log_event, &[event::MESSAGE.clone()]),
+                None => log_event,
+            }
+        } else {
+            // If the event is partial, just set the partial event marker field.
+            if is_partial {
+                // Only add partial event marker field if it's requested.
+                if let Some(partial_event_marker_field) = partial_event_marker_field {
+                    log_event.insert(partial_event_marker_field, true);
+                }
+            }
+            // Return the log event as is, partial or not. No merging here.
+            log_event
+        };
+
+        // Partial or not partial - we return the event we got here, because all
+        // other cases were handeled earlier.
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
         Some(event)

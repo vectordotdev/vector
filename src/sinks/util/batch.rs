@@ -101,6 +101,10 @@ where
         Self::build(inner, batch, min_size, min_size, max_linger)
     }
 
+    pub fn from_settings(inner: S, batch: B, settings: BatchSettings) -> Self {
+        Self::new_min(inner, batch, settings.size, settings.timeout.into())
+    }
+
     fn build(
         inner: S,
         batch: B,

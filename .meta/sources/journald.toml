@@ -6,7 +6,6 @@ delivery_guarantee = "best_effort"
 function_category = "collect"
 only_operating_systems = ["Linux"]
 output_types = ["log"]
-resources = []
 through_description = "log records from journald"
 requirements = """\
 1. The `journald` source requires the presence of the `journalctl` binary. \

@@ -3,7 +3,7 @@ use futures::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use sinks::socket::SocketSinkConfig;
-use sinks::util::tcp::Encoding;
+use sinks::util::Encoding;
 use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]

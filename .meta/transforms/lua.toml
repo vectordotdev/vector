@@ -6,9 +6,6 @@ common = true
 function_category = "program"
 input_types = ["log"]
 output_types = ["log"]
-resources = [
-  {name = "Lua Reference Manual", short_link = "lua_manual"}
-]
 
 [transforms.lua.options.source]
 type = "string"

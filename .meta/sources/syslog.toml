@@ -4,7 +4,6 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-resources = []
 through_description = "the Syslog 5424 protocol"
 
 [sources.syslog.options.address]
@@ -18,12 +17,10 @@ the Nth socket passed by systemd socket activation.\
 """
 
 [sources.syslog.options.host_key]
-name = "host_key"
 type = "string"
 category = "Context"
 required = true
 default = "host"
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """

@@ -1,5 +1,6 @@
 [sinks.datadog_metrics]
 title = "Datadog Metrics"
+batch_is_common = false
 batch_max_events = 20
 batch_timeout_secs = 1
 beta = true

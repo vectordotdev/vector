@@ -5,7 +5,7 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
-Sources are responsible for ingesting [events][docs.data-model#event] into
+Sources are responsible for ingesting [events][docs.data-model] into
 Vector, they can both receive and pull in data. If you're deploying Vector in
 an [agent role][docs.roles.agent], you'll want to user local data sources
 like the [`file`][docs.sources.file] or [`stdin`][docs.sources.stdin] sources.
@@ -21,7 +21,7 @@ import VectorComponents from '@site/src/components/VectorComponents';
 <VectorComponents titles={false} sinks={false} transforms={false} />
 
 
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model]: /docs/about/data-model/
 [docs.roles.agent]: /docs/setup/deployment/roles/agent/
 [docs.roles.service]: /docs/setup/deployment/roles/service/
 [docs.sources.file]: /docs/reference/sources/file/

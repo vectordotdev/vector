@@ -5,7 +5,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_pubsub%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "gcp_pubsub|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp_pubsub.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/pubsub.rs
 status: "beta"
 title: "GCP PubSub Sink"
 unsupported_operating_systems: []
@@ -242,7 +242,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -554,7 +554,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -863,8 +863,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/

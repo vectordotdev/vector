@@ -6,12 +6,11 @@ edition = "2018"
 
 [dependencies]
 tracing-core = "0.1"
-tracing-subscriber = "0.1.1"
+tracing-subscriber = "0.2"
 ansi_term = "0.11"
 
 [dev-dependencies]
 tracing = "0.1.2"
-tracing-subscriber = "0.1.2"
 criterion = "0.2"
 
 [[bench]]
