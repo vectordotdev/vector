@@ -74,10 +74,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/user/cargo/registry:/root/.cargo/registry
-        - ./target/cache/user/cargo/git:/root/.cargo/git
+        - ./target/cache/root/cargo/registry:/root/.cargo/registry
+        - ./target/cache/root/cargo/git:/root/.cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo check --all --all-targets
 
     check-fmt:
@@ -88,10 +87,9 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/user/cargo/registry:/root/.cargo/registry
-        - ./target/cache/user/cargo/git:/root/.cargo/git
+        - ./target/cache/root/cargo/registry:/root/.cargo/registry
+        - ./target/cache/root/cargo/git:/root/.cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo fmt -- --check
 
     check-style:
@@ -139,7 +137,6 @@ services:
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
-      user: $USER
       command: ./scripts/check-blog-signatures.rb
 
     build-archive-x86_64:
@@ -370,7 +367,7 @@ services:
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
-      command: ["sh", "-ec", "mkdir -p target/cache/user/cargo/registry target/cache/user/cargo/git"]
+      command: ["sh", "-ec", "mkdir -p target/cache/root/cargo/registry target/cache/root/cargo/git"]
 
     load-qemu-binfmt:
       build:
