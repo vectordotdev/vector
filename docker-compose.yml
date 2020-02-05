@@ -74,8 +74,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/$USER/cargo/registry:/root/.cargo/registry
-        - ./target/cache/$USER/cargo/git:/root/.cargo/git
+        - ./target/cache/user/cargo/registry:/root/.cargo/registry
+        - ./target/cache/user/cargo/git:/root/.cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo check --all --all-targets
@@ -88,8 +88,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cache/$USER/cargo/registry:/root/.cargo/registry
-        - ./target/cache/$USER/cargo/git:/root/.cargo/git
+        - ./target/cache/user/cargo/registry:/root/.cargo/registry
+        - ./target/cache/user/cargo/git:/root/.cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo fmt -- --check
@@ -370,7 +370,7 @@ services:
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
-      command: ["sh", "-ec", "mkdir -p target/cargo/registry target/cargo/git"]
+      command: ["sh", "-ec", "mkdir -p target/cache/user/cargo/registry target/cache/user/cargo/git"]
 
     load-qemu-binfmt:
       build:
