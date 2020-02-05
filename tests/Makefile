@@ -49,7 +49,7 @@ check-generate:
 check-version:
 	$(RUN) check-version
 
-check-examples: build-archive
+check-examples: build
 	$(RUN) check-examples
 
 check-blog:

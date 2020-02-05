@@ -12,7 +12,6 @@ services:
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
         - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
     build-armv7:
@@ -26,7 +25,6 @@ services:
         - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
         - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
 
     build-aarch64:
@@ -40,7 +38,6 @@ services:
         - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
         - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
     bench:
@@ -54,7 +51,6 @@ services:
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
         - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
     generate:
@@ -80,7 +76,7 @@ services:
         - ./target/cargo/registry:/root/.cargo/registry
         - ./target/cargo/git:/root/.cargo/git
       working_dir: $PWD
-      user: root
+      user: $USER
       command: cargo check --all --all-targets
 
     check-fmt:
@@ -92,7 +88,7 @@ services:
         - ./target/cargo/registry:/root/.cargo/registry
         - ./target/cargo/git:/root/.cargo/git
       working_dir: $PWD
-      user: root
+      user: $USER
       command: cargo fmt -- --check
 
     check-style:
@@ -156,7 +152,6 @@ services:
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
         - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: ./scripts/build-archive.sh
 
     build-archive-armv7:
@@ -172,7 +167,6 @@ services:
         - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
         - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: ./scripts/build-archive.sh
 
     build-archive-aarch64:
@@ -188,7 +182,6 @@ services:
         - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
         - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: ./scripts/build-archive.sh
 
     package-deb-x86_64:
@@ -374,14 +367,12 @@ services:
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
-      user: $USER
       command: ["sh", "-ec", "mkdir -p target/cargo/registry target/cargo/git"]
 
     load-qemu-binfmt:
       build:
         context: scripts
         dockerfile: ci-docker-images/loader-qemu-binfmt/Dockerfile
-      user: root
       privileged: true
       command: dpkg-reconfigure qemu-user-binfmt
 
@@ -396,7 +387,6 @@ services:
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
         - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
-      user: $USER
       command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
     test-docker:
@@ -426,7 +416,6 @@ services:
         - gcloud-pubsub
       network_mode: host
       working_dir: $PWD
-      user: root
       command: cargo test --all --no-default-features --features docker,default-musl --target x86_64-unknown-linux-musl -- --test-threads 4
 
     # test dependencies
