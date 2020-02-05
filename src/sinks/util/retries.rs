@@ -94,6 +94,7 @@ where
                     warn!(message = "retrying after response.", %reason);
                     Some(self.build_retry())
                 } else {
+                    warn!("request is not retryable; dropping the request.");
                     None
                 }
             }
