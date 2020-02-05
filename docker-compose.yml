@@ -143,7 +143,7 @@ services:
       user: $USER
       command: ./scripts/check-blog-signatures.rb
 
-    build-archive:
+    build-archive-x86_64:
       build:
         context: scripts
         dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -159,7 +159,39 @@ services:
       user: $USER
       command: ./scripts/build-archive.sh
 
-    package-deb:
+    build-archive-armv7:
+      build:
+        context: scripts
+        dockerfile: ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+      environment:
+        TARGET: armv7-unknown-linux-musleabihf
+        FEATURES: default-musl
+        CARGO_TERM_COLOR: always
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/opt/rust/cargo/registry
+        - ./target/cargo/git:/opt/rust/cargo/git
+      working_dir: $PWD
+      user: $USER
+      command: ./scripts/build-archive.sh
+
+    build-archive-aarch64:
+      build:
+        context: scripts
+        dockerfile: ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+      environment:
+        TARGET: aarch64-unknown-linux-musl
+        FEATURES: default-musl
+        CARGO_TERM_COLOR: always
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/opt/rust/cargo/registry
+        - ./target/cargo/git:/opt/rust/cargo/git
+      working_dir: $PWD
+      user: $USER
+      command: ./scripts/build-archive.sh
+
+    package-deb-x86_64:
       build:
         context: scripts
         dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -172,12 +204,60 @@ services:
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
-    package-rpm:
+    package-deb-armv7:
+      build:
+        context: scripts
+        dockerfile: ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+      environment:
+        TARGET: armv7-unknown-linux-musleabihf
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/opt/rust/cargo/registry
+        - ./target/cargo/git:/opt/rust/cargo/git
+      working_dir: $PWD
+      command: ./scripts/package-deb.sh
+
+    package-deb-aarch64:
+      build:
+        context: scripts
+        dockerfile: ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+      environment:
+        TARGET: aarch64-unknown-linux-musl
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/opt/rust/cargo/registry
+        - ./target/cargo/git:/opt/rust/cargo/git
+      working_dir: $PWD
+      command: ./scripts/package-deb.sh
+
+    package-rpm-x86_64:
       build:
         context: scripts
         dockerfile: ci-docker-images/packager-rpm/Dockerfile
       environment:
         TARGET: x86_64-unknown-linux-musl
+      volumes:
+        - $PWD:$PWD
+      working_dir: $PWD
+      command: ./scripts/package-rpm.sh
+
+    package-rpm-armv7:
+      build:
+        context: scripts
+        dockerfile: ci-docker-images/packager-rpm/Dockerfile
+      environment:
+        TARGET: armv7-unknown-linux-musleabihf
+      volumes:
+        - $PWD:$PWD
+      working_dir: $PWD
+      command: ./scripts/package-rpm.sh
+
+    package-rpm-aarch64:
+      build:
+        context: scripts
+        dockerfile: ci-docker-images/packager-rpm/Dockerfile
+      environment:
+        TARGET: aarch64-unknown-linux-musl
       volumes:
         - $PWD:$PWD
       working_dir: $PWD

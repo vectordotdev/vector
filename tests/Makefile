@@ -1,5 +1,8 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
+# run all tests, checks, and verifications
+all: check build-all package-all test-docker verify
+
 # default target, build the project in debug mode
 build: build-x86_64
 
@@ -54,14 +57,45 @@ check-blog:
 
 # packaging
 
-build-archive: init-target-dir
-	$(RUN) build-archive
+package-all: build-archive-all package-deb-all package-rpm-all
 
-package-deb: build-archive
-	$(RUN) package-deb
+# .tar.gz archive
+build-archive: build-archive-x86_64
+build-archive-all: build-archive-x86_64 build-archive-armv7 build-archive-aarch64
 
-package-rpm: build-archive
-	$(RUN) package-rpm
+build-archive-x86_64: build-x86_64
+	$(RUN) build-archive-x86_64
+
+build-archive-armv7: build-armv7
+	$(RUN) build-archive-armv7
+
+build-archive-aarch64: build-aarch64
+	$(RUN) build-archive-aarch64
+
+# .deb package
+package-deb: package-deb-x86_64
+
+package-deb-x86_64: build-archive-x86_64
+	$(RUN) package-deb-x86_64
+
+package-deb-armv7: build-archive-armv7
+	$(RUN) package-deb-armv7
+
+package-deb-aarch64: build-archive-aarch64
+	$(RUN) package-deb-aarch64
+
+# .rpm package
+package-rpm: package-rpm-x86_64
+package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64
+
+package-rpm-x86_64: build-archive-x86_64
+	$(RUN) package-rpm-x86_64
+
+package-rpm-armv7: build-archive-armv7
+	$(RUN) package-rpm-armv7
+
+package-rpm-armv7: build-archive-armv7
+	$(RUN) package-rpm-armv7
 
 # verifications
 verify: verify-rpm verify-deb verify-nixos
