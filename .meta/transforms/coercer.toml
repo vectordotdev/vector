@@ -5,7 +5,6 @@ common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-types_coercion = true
 
 [transforms.coercer.options.drop_unspecified]
 type = "bool"
@@ -17,6 +16,8 @@ Make sure both `message` and `timestamp` are specified in the `types` table \
 as their absense will cause the original message data to be dropped along \
 with other extraneous fields.\
 """
+
+<%= render("_partials/_types.toml", namespace: "transforms.coercer", common: true) %>
 
 [[transforms.coercer.output.log.examples]]
 label = "Generic"

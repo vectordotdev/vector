@@ -53,7 +53,7 @@ tokio-tls = "0.2.1"
 # Tracing
 tracing = "0.1.9"
 tracing-futures = { version = "0.2", features = ["futures-01"]}
-tracing-subscriber = "0.2.0-alpha.5"
+tracing-subscriber = "0.2"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809fcc726b8187db85b23c42e32ef5dce" }
 

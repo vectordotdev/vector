@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
   # OPTIONAL
@@ -64,11 +64,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
   partition_key_field = "user_id" # example, no default
 
@@ -321,10 +321,10 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
+  examples={["127.0.0.0:5000/path/to/service"]}
   name={"endpoint"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -390,7 +390,7 @@ The log field used as the Kinesis record's partition key value. See [Partitionin
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}

@@ -11,6 +11,10 @@ types:
 
 scopes:
 
+  - new source
+  - new transform
+  - new sink
+
   # domains
   - blog
   - buffers
@@ -76,6 +80,7 @@ scopes:
   - log_to_metric transform
   - logfmt_parser transform
   - lua transform
+  - merge transform
   - regex_parser transform
   - remove_fields transform
   - remove_tags transform
@@ -99,6 +104,7 @@ scopes:
   - gcp_stackdriver_logging sink
   - http sink
   - kafka sink
+  - logdna sink
   - new_relic_logs sink
   - prometheus sink
   - sematext sink

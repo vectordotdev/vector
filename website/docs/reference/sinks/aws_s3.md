@@ -49,7 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
 
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -70,7 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
 
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -79,7 +79,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   key_prefix = "date=%F/" # default
 
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
 
   # OPTIONAL - Object Attributes
@@ -409,10 +409,10 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
+  examples={["127.0.0.0:5000/path/to/service"]}
   name={"endpoint"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -632,7 +632,7 @@ A prefix to apply to all object key names. This should be used to partition your
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}

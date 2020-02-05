@@ -1,3 +1,4 @@
+require "erb"
 require "json_schemer"
 require "ostruct"
 require "toml-rb"
@@ -17,6 +18,23 @@ require_relative "metadata/transform"
 # This represents the /.meta directory in object form. Sub-classes represent
 # each sub-component.
 class Metadata
+  module Template
+    extend self
+
+    def render(path, args = {})
+      context = binding
+
+      args.each do |key, value|
+        context.local_variable_set("#{key}", value)
+      end
+
+      full_path = path.start_with?("/") ? path : "#{META_ROOT}/#{path}"
+      body = File.read(full_path)
+      renderer = ERB.new(body, nil, '-')
+      renderer.result(context)
+    end
+  end
+
   class << self
     def load!(meta_dir, docs_root, pages_root)
       metadata = load_metadata!(meta_dir)
@@ -40,8 +58,9 @@ class Metadata
       def load_metadata!(meta_dir)
         metadata = {}
 
-        Dir.glob("#{meta_dir}/**/*.toml").each do |file|
-          hash = TomlRB.load_file(file)
+        Dir.glob("#{meta_dir}/**/[^_]*.toml").each do |file|
+          content = Template.render(file)
+          hash = TomlRB.parse(content)
           metadata.deep_merge!(hash)
         end
 
@@ -49,8 +68,8 @@ class Metadata
       end
 
       def read_json(path)
-        json_data = File.read(path)
-        JSON.parse(json_data)
+        body = File.read(path)
+        JSON.parse(body)
       end
 
       def validate_schema!(schema, metadata)

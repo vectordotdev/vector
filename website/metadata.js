@@ -17370,6 +17370,30 @@ module.exports = {
 
       ]
     },
+    "logdna": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "logdna_sink",
+      "name": "logdna",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "new_relic_logs": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -18130,6 +18154,26 @@ module.exports = {
       ],
       "service_providers": null,
       "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "merge": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to merge partial log events into a single event.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "merge",
+      "id": "merge_transform",
+      "name": "merge",
+      "operating_systems": [
+
+      ],
+      "service_providers": null,
+      "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
 

@@ -8,7 +8,10 @@ use std::collections::{hash_map::Drain, HashMap};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
+pub mod discriminant;
 pub mod flatten;
+pub mod merge;
+pub mod merge_state;
 pub mod metric;
 mod unflatten;
 
@@ -23,6 +26,7 @@ lazy_static! {
     pub static ref MESSAGE: Atom = Atom::from("message");
     pub static ref HOST: Atom = Atom::from("host");
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
+    pub static ref PARTIAL: Atom = Atom::from("_partial");
 }
 
 #[derive(PartialEq, Debug, Clone)]

@@ -105,49 +105,6 @@ class Sink < Component
         })
     end
 
-    # AWS
-
-    if service_provider?("AWS")
-      @env_vars.AWS_ACCESS_KEY_ID =
-        Option.new({
-          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
-          "examples" => ["AKIAIOSFODNN7EXAMPLE"],
-          "name" => "AWS_ACCESS_KEY_ID",
-          "null" => true,
-          "type" => "string"
-        })
-
-      @env_vars.AWS_SECRET_ACCESS_KEY =
-        Option.new({
-          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
-          "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
-          "name" => "AWS_SECRET_ACCESS_KEY",
-          "null" => true,
-          "type" => "string"
-        })
-
-      @options.endpoint =
-        Option.new({
-          "description" => "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot.",
-          "examples" => ["127.0.0.0:5000"],
-          "name" => "endpoint",
-          "null" => true,
-          "required" => false,
-          "type" => "string"
-        })
-
-      @options.region =
-        Option.new({
-          "common" => only_service_provider?("AWS"),
-          "description" => "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region.",
-          "examples" => ["us-east-1"],
-          "name" => "region",
-          "null" => true,
-          "required" => only_service_provider?("AWS"),
-          "type" => "string"
-        })
-    end
-
     if buffer?
       # Buffer options
 

@@ -27,7 +27,7 @@ class Component
     @beta = hash["beta"] == true
     @common = hash["common"] == true
     @env_vars = Option.build_struct(hash["env_vars"] || {})
-    @function_category = hash.fetch("function_category")
+    @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
     @requirements = hash["requirements"]

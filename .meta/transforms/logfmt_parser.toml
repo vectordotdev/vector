@@ -7,7 +7,6 @@ common = true
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-types_coercion = true
 
 [transforms.logfmt_parser.options.field]
 type = "string"
@@ -22,3 +21,5 @@ common = true
 default = true
 required = true
 description = "If the specified `field` should be dropped (removed) after parsing."
+
+<%= render("_partials/_types.toml", namespace: "transforms.logfmt_parser", common: true) %>

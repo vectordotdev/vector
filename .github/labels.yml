@@ -224,6 +224,9 @@
 - name: "transform: lua"
   description: Anything `lua` transform related
   color: 54a0ff
+- name: "transform: merge"
+  description: Anything `merge` transform related
+  color: 54a0ff
 - name: "transform: regex_parser"
   description: Anything `regex_parser` transform related
   color: 54a0ff
@@ -287,6 +290,9 @@
   color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related
+  color: 4ddbfb
+- name: "sink: logdna"
+  description: Anything `logdna` sink related
   color: 4ddbfb
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related

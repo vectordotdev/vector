@@ -48,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL
@@ -67,14 +67,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   create_missing_group = true # default
   create_missing_stream = true # default
-  endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
 
   # OPTIONAL - requests
@@ -392,10 +392,10 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
+  examples={["127.0.0.0:5000/path/to/service"]}
   name={"endpoint"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -461,7 +461,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}

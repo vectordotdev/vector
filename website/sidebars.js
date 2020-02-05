@@ -172,6 +172,8 @@ module.exports = {
             
               "reference/transforms/lua",
             
+              "reference/transforms/merge",
+            
               "reference/transforms/regex_parser",
             
               "reference/transforms/remove_fields",
@@ -221,6 +223,8 @@ module.exports = {
               "reference/sinks/http",
             
               "reference/sinks/kafka",
+            
+              "reference/sinks/logdna",
             
               "reference/sinks/new_relic_logs",
             
