@@ -9,8 +9,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
@@ -23,8 +23,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo build --no-default-features --features default-musl --target armv7-unknown-linux-musleabihf
@@ -37,8 +37,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
@@ -51,8 +51,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo bench --all --no-default-features --features default-musl --target x86_64-unknown-linux-musl
@@ -153,8 +153,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: ./scripts/build-archive.sh
@@ -169,8 +169,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: ./scripts/build-archive.sh
@@ -185,8 +185,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: ./scripts/build-archive.sh
@@ -199,8 +199,8 @@ services:
         TARGET: x86_64-unknown-linux-musl
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
@@ -212,8 +212,8 @@ services:
         TARGET: armv7-unknown-linux-musleabihf
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
+        - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
@@ -225,8 +225,8 @@ services:
         TARGET: aarch64-unknown-linux-musl
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       command: ./scripts/package-deb.sh
 
@@ -393,8 +393,8 @@ services:
         CARGO_TERM_COLOR: always
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
       working_dir: $PWD
       user: $USER
       command: cargo test --no-default-features --features default-musl --target x86_64-unknown-linux-musl
@@ -409,8 +409,8 @@ services:
         AWS_SECRET_ACCESS_KEY: dummy
       volumes:
         - $PWD:$PWD
-        - ./target/cargo/registry:/opt/rust/cargo/registry
-        - ./target/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
         - /var/run/docker.sock:/var/run/docker.sock
       depends_on:
         - localstack

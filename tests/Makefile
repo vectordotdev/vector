@@ -1,7 +1,7 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
 # run all tests, checks, and verifications
-all: check build-x86_64 package-x86_64 test-docker verify
+all: build-all package-all test-docker verify
 
 # default target, build the project in debug mode
 build: build-x86_64
@@ -9,13 +9,13 @@ build: build-x86_64
 # build the project in debug mode for all platforms
 build-all: build-x86_64 build-armv7 build-aarch64
 
-build-x86_64: init-target-dir
+build-x86_64:
 	$(RUN) build-x86_64
 
-build-armv7: init-target-dir load-qemu-binfmt
+build-armv7: load-qemu-binfmt
 	$(RUN) build-armv7
 
-build-aarch64: init-target-dir load-qemu-binfmt
+build-aarch64: load-qemu-binfmt
 	$(RUN) build-aarch64
 
 # run benchmarks
@@ -57,6 +57,7 @@ check-blog:
 
 # packaging
 
+package: build-archive package-deb package-rpm
 package-all: build-archive-all package-deb-all package-rpm-all
 
 # .tar.gz archive
@@ -74,6 +75,7 @@ build-archive-aarch64: build-aarch64
 
 # .deb package
 package-deb: package-deb-x86_64
+package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64
 
 package-deb-x86_64: build-archive-x86_64
 	$(RUN) package-deb-x86_64
@@ -98,7 +100,7 @@ package-rpm-aarch64: build-archive-aarch64
 	$(RUN) package-rpm-armv7
 
 # verifications
-verify: verify-rpm verify-deb verify-nixos
+verify: verify-rpm verify-deb
 
 # verify RPM packages
 verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7
