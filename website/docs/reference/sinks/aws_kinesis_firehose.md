@@ -64,6 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
 
@@ -104,6 +105,28 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
 
 
 <Field
@@ -686,6 +709,12 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
 
+#### Assuming Roles
+
+Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
+optional setting that is helpful for a variety of use cases, such as cross
+account access.
+
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';
@@ -767,6 +796,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+[urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_kinesis_data_firehose]: https://aws.amazon.com/kinesis/data-firehose/
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html

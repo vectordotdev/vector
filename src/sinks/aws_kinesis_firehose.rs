@@ -2,13 +2,15 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{
+        retries::RetryLogic, rusoto::create_client, BatchEventsConfig, SinkExt, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
+use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_firehose::{
     DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
     PutRecordBatchInput, PutRecordBatchOutput, Record,
@@ -36,6 +38,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub assume_role: Option<String>,
 }
 
 lazy_static! {
@@ -81,7 +84,11 @@ impl KinesisFirehoseService {
         config: KinesisFirehoseSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = create_client(config.region.clone().try_into()?, cx.resolver())?;
+        let client = create_client::<KinesisFirehoseClient>(
+            config.region.clone().try_into()?,
+            config.assume_role.clone(),
+            cx.resolver(),
+        )?;
 
         let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -163,7 +170,11 @@ fn healthcheck(
     config: KinesisFirehoseSinkConfig,
     resolver: Resolver,
 ) -> crate::Result<super::Healthcheck> {
-    let client = create_client(config.region.try_into()?, resolver)?;
+    let client = create_client::<KinesisFirehoseClient>(
+        config.region.try_into()?,
+        config.assume_role,
+        resolver,
+    )?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -183,15 +194,6 @@ fn healthcheck(
         });
 
     Ok(Box::new(fut))
-}
-
-fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisFirehoseClient> {
-    use rusoto_credential::DefaultCredentialsProvider;
-
-    let p = DefaultCredentialsProvider::new()?;
-    let d = crate::sinks::util::rusoto::client(resolver)?;
-
-    Ok(KinesisFirehoseClient::new_with(d, p, region))
 }
 
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
@@ -287,6 +289,7 @@ mod integration_tests {
                 retry_attempts: Some(0),
                 ..Default::default()
             },
+            ..Default::default()
         };
 
         let mut rt = runtime::Runtime::new().unwrap();

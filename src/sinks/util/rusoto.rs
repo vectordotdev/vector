@@ -6,6 +6,7 @@ use hyper_openssl::{
 };
 use rusoto_core::{CredentialsError, HttpClient, Region};
 use rusoto_credential::{DefaultCredentialsProvider, ProvideAwsCredentials};
+use rusoto_firehose::KinesisFirehoseClient;
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
@@ -65,6 +66,16 @@ pub fn create_client<T: RusotoNewClient>(
 }
 
 impl RusotoNewClient for CloudWatchLogsClient {
+    fn new_client<P>(client: Client, creds: P, region: Region) -> Self
+    where
+        P: ProvideAwsCredentials + Send + Sync + 'static,
+        P::Future: Send,
+    {
+        Self::new_with(client, creds, region)
+    }
+}
+
+impl RusotoNewClient for KinesisFirehoseClient {
     fn new_client<P>(client: Client, creds: P, region: Region) -> Self
     where
         P: ProvideAwsCredentials + Send + Sync + 'static,

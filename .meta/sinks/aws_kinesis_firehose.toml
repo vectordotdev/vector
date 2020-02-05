@@ -33,6 +33,13 @@ description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kin
 
 <%= render("_partials/_aws_options.toml", namespace: "sinks.aws_kinesis_firehose.options") %>
 
+[sinks.aws_kinesis_firehose.options.assume_role]
+type = "string"
+common = false
+examples = ["arn:aws:iam::123456789098:role/my_role"]
+required = false
+description = "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
+
 [[sinks.aws_kinesis_firehose.output.examples]]
 label = "Generic"
 body = """\
