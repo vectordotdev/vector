@@ -35,28 +35,21 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let mut host = None;
-
-        if let Some(region) = &self.region {
-            host = match &region {
-                Region::Na => "https://logsene-receiver.sematext.com".to_string().into(),
-                Region::Eu => "https://logsene-receiver.eu.sematext.com"
-                    .to_string()
-                    .into(),
-            };
-        }
-
-        // Test workaround for settings a custom host so we can test the body manually
-        if let Some(h) = &self.host {
-            host = Some(h.clone());
-        }
-
-        if host.is_none() {
+        let host = if let Some(h) = &self.host {
+            // Test workaround for settings a custom host so we can test the body manually
+            h.clone()
+        } else if let Some(region) = &self.region {
+            match region {
+                Region::Na => "https://logsene-receiver.sematext.com",
+                Region::Eu => "https://logsene-receiver.eu.sematext.com",
+            }
+            .to_string()
+        } else {
             return Err(format!("Either `region` or `host` must be set.").into());
-        }
+        };
 
         let (sink, healthcheck) = ElasticSearchConfig {
-            host: host.unwrap(),
+            host,
             compression: Some(Compression::None),
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
