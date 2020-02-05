@@ -1,5 +1,3 @@
-# A version like "1.38.0" or "nightly-2019-11-01".
-ARG RUST_VERSION=1.39.0
 # We use compiler-rt, libunwind, and libc++ from LLVM.
 ARG LLVM_VERSION=9.0.0
 ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
@@ -260,8 +258,9 @@ ARG TARGET
 ARG RUST_PREFIX
 ENV RUSTUP_HOME=$RUST_PREFIX/rustup
 ENV CARGO_HOME=$RUST_PREFIX/cargo
+COPY rust-toolchain /tmp/
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --target $TARGET
+  sh -s -- -y --default-toolchain $(cat /tmp/rust-toolchain) --target $TARGET
 ENV PATH="$RUSTUP_HOME/bin:$CARGO_HOME/bin:$PATH"
 
 RUN apt-get update && apt-get install -y llvm clang lld
