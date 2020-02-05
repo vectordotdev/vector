@@ -222,6 +222,8 @@ module.exports = {
             
               "reference/sinks/http",
             
+              "reference/sinks/humio",
+            
               "reference/sinks/kafka",
             
               "reference/sinks/new_relic_logs",
