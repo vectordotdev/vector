@@ -10,8 +10,6 @@ examples = [
 {status = "int"},
 {duration = "float"},
 {success = "bool"},
-{timestamp = "timestamp|%s"},
-{timestamp = "timestamp|%+"},
 {timestamp = "timestamp|%F"},
 {timestamp = "timestamp|%a %b %e %T %Y"}
 ]
