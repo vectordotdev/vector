@@ -23,6 +23,7 @@ pub trait RetryLogic: Clone {
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
     fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
+        // Treat the default as the request is successful
         RetryAction::Successful
     }
 }
