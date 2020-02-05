@@ -4384,6 +4384,7 @@ end
   #
   # * required
   # * type: string
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # The hostname that will be attached to each batch of events.
@@ -4822,6 +4823,7 @@ end
   #
   # * required
   # * type: string
+  token = "${SEMATEXT_TOKEN_ENV_VAR}"
   token = "some-sematext-token"
 
   # Enables/disables the sink healthcheck upon start.

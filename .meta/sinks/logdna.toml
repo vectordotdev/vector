@@ -22,7 +22,7 @@ write_to_description = "[LogDna][urls.logdna]'s HTTP Ingestion API"
 [sinks.logdna.options.api_key]
 type = "string"
 required = true
-examples = ["ef8d5de700e7989468166c40fc8a0ccd"]
+examples = ["${LOGDNA_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 description = "The Ingestion API key."
 
 [sinks.logdna.options.host]

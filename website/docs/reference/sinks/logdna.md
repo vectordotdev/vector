@@ -46,7 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "logdna" # must be: "logdna"
   inputs = ["my-source-id"] # example
-  api_key = "ef8d5de700e7989468166c40fc8a0ccd" # example
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # example
   hostname = "my-local-machine" # example
 ```
 
@@ -60,7 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "logdna" # must be: "logdna"
   inputs = ["my-source-id"] # example
-  api_key = "ef8d5de700e7989468166c40fc8a0ccd" # example
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # example
   hostname = "my-local-machine" # example
 
   # OPTIONAL - General
@@ -111,7 +111,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${LOGDNA_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
   name={"api_key"}
   path={null}
   relevantWhen={null}

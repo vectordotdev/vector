@@ -34,5 +34,5 @@ description = "The host that will be used to send logs to. This option is requir
 [sinks.sematext.options.token]
 type = "string"
 required = true
-examples = ["some-sematext-token"]
+examples = ["${SEMATEXT_TOKEN_ENV_VAR}", "some-sematext-token"]
 description = "The token that will be used to write to Sematext."
