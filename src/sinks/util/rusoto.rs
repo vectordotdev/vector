@@ -4,6 +4,7 @@ use hyper_openssl::{
     openssl::ssl::{SslConnector, SslMethod},
     HttpsConnector,
 };
+use rusoto_cloudwatch::CloudWatchClient;
 use rusoto_core::{CredentialsError, HttpClient, Region};
 use rusoto_credential::{DefaultCredentialsProvider, ProvideAwsCredentials};
 use rusoto_firehose::KinesisFirehoseClient;
@@ -76,6 +77,16 @@ impl RusotoNewClient for CloudWatchLogsClient {
 }
 
 impl RusotoNewClient for KinesisFirehoseClient {
+    fn new_client<P>(client: Client, creds: P, region: Region) -> Self
+    where
+        P: ProvideAwsCredentials + Send + Sync + 'static,
+        P::Future: Send,
+    {
+        Self::new_with(client, creds, region)
+    }
+}
+
+impl RusotoNewClient for CloudWatchClient {
     fn new_client<P>(client: Client, creds: P, region: Region) -> Self
     where
         P: ProvideAwsCredentials + Send + Sync + 'static,
