@@ -1,0 +1,75 @@
+@keyframes glidingHorizontal {
+  0% {
+    padding-left: 20px;
+    padding-right: 0%;
+  }
+
+  25% {
+    padding-left: 0%;
+    padding-right: 20px;
+  }
+
+  50% {
+    padding-left: 20px;
+    padding-right: 0%;
+  }
+
+  75% {
+    padding-left: 0%;
+    padding-right: 20px;
+  }
+
+  100% {
+    padding-left: 20px;
+    padding-right: 0%;
+  }
+}
+
+@keyframes glidingVertical {
+  0% {
+    padding-top: 20px;
+    padding-bottom: 0%;
+  }
+
+  25% {
+    padding-top: 0%;
+    padding-bottom: 20px;
+  }
+
+  50% {
+    padding-top: 20px;
+    padding-bottom: 0%;
+  }
+
+  75% {
+    padding-top: 0%;
+    padding-bottom: 20px;
+  }
+
+  100% {
+    padding-top: 20px;
+    padding-bottom: 0%;
+  }
+}
+
+.vicHero {
+  background-image: url(/img/acorn-bg-light.svg);
+}
+
+html[data-theme='dark'] .vicHero {
+  background-image: url(/img/acorn-bg-dark.svg);
+}
+
+.vicmoji {
+  height: 32px;
+}
+
+.vicLarge {
+  max-width: 300px;
+  padding: 10px;
+
+  animation-duration: 24s, 6s;
+  animation-name: glidingHorizontal, glidingVertical;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
