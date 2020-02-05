@@ -269,6 +269,20 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### When to use this transform
+
+Where possible, Vector will handle event merging at the source level. For
+example, the [`file`][docs.sources.file] contains a `message_start_indicator`
+option and the [`docker`][docs.sources.file] contains an `auto_partial_merge`
+option. Both of these options should be used instead of this transform.
+Unfortunately, merging logs is not always this straight forward. It is
+precisely these edge cases that this transform hopes to solve.
+
+If you're using this transform for a common use case, please consider
+[opening an issue][urls.new_feature_request] to let us know.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.sources.file]: /docs/reference/sources/file/
+[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature

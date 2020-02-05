@@ -189,7 +189,7 @@ A list of container object labels to match against when filtering running contai
 
 ### partial_event_marker_field
 
-The field name to be added to events that are detected to contain an incomplete message (i.e. partial events). If set to `""`, no field will be added to partial event. This allows to opt-out of partial event detection.
+The field name to be added to events that are detected to contain an incomplete message (i.e. partial events). If set to `""`, no field will be added to partial event. This allows to opt-out of partial event detection. See [Message Splitting & Merging](#message-splitting--merging) for more info.
 
 
 </Field>
@@ -442,7 +442,7 @@ difficult to work with. Vector's `docker` source solves this by default,
 automatically merging these messages into a single message. You can turn this
 off via the `no_auto_partial_merge` option. Furthermore, you can adjust
 the marker that we use to determine if an event is partial via the
-`partial_event_marker` option.
+`partial_event_marker_field` option.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
