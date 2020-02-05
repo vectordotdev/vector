@@ -1,3 +1,4 @@
+require "erb"
 require "json_schemer"
 require "ostruct"
 require "toml-rb"
