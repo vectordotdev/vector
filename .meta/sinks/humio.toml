@@ -28,7 +28,7 @@ description = "Your Humio ingestion token."
 [sinks.humio.options.host]
 type = "string"
 examples = ["http://myhumiohost.com"]
-required = false 
+required = false
 description = "The optional host to send Humio logs to."
 
 [sinks.humio.options.encoding]
