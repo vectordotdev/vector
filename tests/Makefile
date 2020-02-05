@@ -1,7 +1,7 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
 # run all tests, checks, and verifications
-all: build-all package-all test-docker verify
+all: check build-all package-all test-docker verify
 
 # default target, build the project in debug mode
 build: build-x86_64
