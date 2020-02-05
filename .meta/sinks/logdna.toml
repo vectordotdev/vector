@@ -1,5 +1,5 @@
 [sinks.logdna]
-title = "logdna"
+title = "LogDNA"
 batch_max_size = 10490000
 batch_timeout_secs = 1
 beta = true

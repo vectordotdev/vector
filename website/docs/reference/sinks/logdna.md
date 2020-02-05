@@ -7,7 +7,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "logdna|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/logdna.rs
 status: "beta"
-title: "logdna Sink"
+title: "LogDNA Sink"
 unsupported_operating_systems: []
 ---
 
