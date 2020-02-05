@@ -26,14 +26,24 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"] # example
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
 
-  # OPTIONAL
+  # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
+
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%s" # example
+    timestamp = "timestamp|%+" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options
@@ -107,6 +117,54 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
 
 The Regular Expression to apply. Do not include the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
 
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"types"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### types
+
+Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-syntax) for more info.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  name={"`[field-name]`"}
+  path={"types"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field-name]`
+
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -209,7 +267,7 @@ You can name Regex captures with the `<name>` syntax. For example:
 ```
 
 Will capture `timestamp`, `level`, and `message`. All values are extracted as
-`string` values and must be coerced with the `types` table.
+`string` values and must be coerced with the [`types`](#types) table.
 
 More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].
@@ -246,3 +304,4 @@ documentation][urls.regex_grouping_and_flags].
 [urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [urls.regex_tester]: https://rustexp.lpil.uk/
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

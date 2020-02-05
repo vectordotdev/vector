@@ -35,4 +35,4 @@ description = """\
 The Regular Expression to apply. Do not include the leading or trailing `/`.\
 """
 
-<%= render("_partials/_types.toml", namespace: "transforms.coercer", common: true) %>
+<%= render("_partials/_types.toml", namespace: "transforms.regex_parser", common: true) %>

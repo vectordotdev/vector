@@ -22,4 +22,4 @@ default = true
 required = true
 description = "If the specified `field` should be dropped (removed) after parsing."
 
-<%= render("_partials/_types.toml", namespace: "transforms.coercer", common: true) %>
+<%= render("_partials/_types.toml", namespace: "transforms.logfmt_parser", common: true) %>
