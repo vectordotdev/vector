@@ -8,6 +8,14 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
+fn encode_namespace(namespace: &str, name: &str) -> String {
+    if !namespace.is_empty() {
+        format!("{}.{}", namespace, name)
+    } else {
+        name.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -23,5 +31,11 @@ mod tests {
         let start = Utc::now().timestamp_nanos();
         assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
         assert!(encode_timestamp(None) >= start)
+    }
+
+    #[test]
+    fn test_encode_namespace() {
+        assert_eq!(encode_namespace("services", "status"), "services.status");
+        assert_eq!(encode_namespace("", "status"), "status")
     }
 }
