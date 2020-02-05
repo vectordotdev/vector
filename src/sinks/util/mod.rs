@@ -24,6 +24,7 @@ use std::hash::Hash;
 use tower::Service;
 
 pub use batch::{Batch, BatchBytesConfig, BatchEventsConfig, BatchSettings, BatchSink};
+pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};

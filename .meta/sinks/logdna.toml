@@ -1,0 +1,63 @@
+[sinks.logdna]
+title = "logdna"
+batch_max_size = 10490000
+batch_timeout_secs = 1
+beta = true
+buffer = true
+common = false
+delivery_guarantee = "best_effort"
+egress_method = "batching"
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+request_rate_limit_duration_secs = 1
+request_rate_limit_num = 5
+request_retry_attempts = 5
+request_retry_initial_backoff_secs = 1
+request_retry_max_duration_secs = 10
+request_in_flight_limit = 5
+request_timeout_secs = 60
+write_to_description = "[LogDna][urls.logdna]'s HTTP Ingestion API"
+
+[sinks.logdna.options.api_key]
+type = "string"
+required = true
+examples = ["ef8d5de700e7989468166c40fc8a0ccd"]
+description = "The Ingestion API key."
+
+[sinks.logdna.options.host]
+type = "string"
+required = false
+examples = ["http://127.0.0.1", "http://example.com"]
+description = "An optional host that will override the default one."
+
+[sinks.logdna.options.hostname]
+type = "string"
+required = true
+examples = ["my-local-machine"]
+description = "The hostname that will be attached to each batch of events."
+
+[sinks.logdna.options.mac]
+type = "string"
+required = false
+examples = ["my-mac-address"]
+description = "The mac address that will be attached to each batch of events."
+
+[sinks.logdna.options.ip]
+type = "string"
+required = false
+examples = ["0.0.0.0"]
+description = "The IP address that will be attached to each batch of events."
+
+[sinks.logdna.options.tags]
+type = "[string]"
+required = false
+examples = [["tag1", "tag2"]]
+description = "The tags that will be attached to each batch of events."
+
+[sinks.logdna.options.default_app]
+type = "string"
+required = false
+examples = ["vector", "myapp"]
+default = "vector"
+description = "The default app that will be set for events that do not contain a `file` or `app` field."

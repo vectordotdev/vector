@@ -11,6 +11,10 @@ types:
 
 scopes:
 
+  - new source
+  - new transform
+  - new sink
+
   # domains
   - blog
   - buffers
@@ -100,6 +104,7 @@ scopes:
   - gcp_stackdriver_logging sink
   - http sink
   - kafka sink
+  - logdna sink
   - new_relic_logs sink
   - prometheus sink
   - sematext sink

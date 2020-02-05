@@ -4382,6 +4382,211 @@ end
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
+# Batches `log` events to LogDna's HTTP Ingestion API.
+[sinks.logdna]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `logdna`.
+  #
+  # * required
+  # * type: string
+  # * must be: "logdna"
+  type = "logdna"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The Ingestion API key.
+  #
+  # * required
+  # * type: string
+  api_key = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # The hostname that will be attached to each batch of events.
+  #
+  # * required
+  # * type: string
+  hostname = "my-local-machine"
+
+  # The default app that will be set for events that do not contain a `file` or
+  # `app` field.
+  #
+  # * optional
+  # * default: "vector"
+  # * type: string
+  default_app = "vector"
+  default_app = "myapp"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # An optional host that will override the default one.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://127.0.0.1"
+  host = "http://example.com"
+
+  # The IP address that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  ip = "0.0.0.0"
+
+  # The mac address that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  mac = "my-mac-address"
+
+  # The tags that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  tags = ["tag1", "tag2"]
+
+  #
+  # Batch
+  #
+
+  [sinks.logdna.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.logdna.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.logdna.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Batches `log` events to New Relic's log service via their log API.
 [sinks.new_relic_logs]
   #

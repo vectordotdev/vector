@@ -224,6 +224,8 @@ module.exports = {
             
               "reference/sinks/kafka",
             
+              "reference/sinks/logdna",
+            
               "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
