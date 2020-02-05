@@ -1,4 +1,4 @@
-RUN=./scripts/docker-compose-run.sh
+RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
 # default target, build the project in debug mode
 build: build-x86_64
@@ -107,7 +107,7 @@ verify-nixos:
 
 # display dependencies between targets in this Makefile
 target-graph:
-	@docker-compose -f docker-compose.test.yml run --rm target-graph $(TARGET)
+	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST))))/.. && docker-compose run --rm target-graph $(TARGET)
 
 # clean everything
 clean:

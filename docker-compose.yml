@@ -280,6 +280,7 @@ services:
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
+      entrypoint: ./scripts/target-graph.sh
 
     clean:
       image: ubuntu:18.04
