@@ -325,7 +325,9 @@ mod test {
         assert!(logic
             .should_retry_response(&response_400)
             .is_not_retryable());
-        assert!(logic.should_retry_response(&response_501).is_retryable());
+        assert!(logic
+            .should_retry_response(&response_501)
+            .is_not_retryable());
     }
 
     #[test]
