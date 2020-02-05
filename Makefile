@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
-export USE_DOCKER ?= true
+export USE_CONTAINER ?= docker
 
 
 help:

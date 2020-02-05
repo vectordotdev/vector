@@ -9,6 +9,8 @@
 
 set -eou pipefail
 
+DOCKER=${USE_CONTAINER:-docker}
+
 #
 # Requirements
 #
@@ -34,7 +36,7 @@ image="timberiodev/vector-$tag:latest"
 # Execute
 #
 
-docker build \
+$DOCKER build \
   -t $image \
   -f scripts/ci-docker-images/$tag/Dockerfile \
   .
@@ -56,7 +58,7 @@ for line in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
 done
 unset IFS
 
-docker run \
+$DOCKER run \
   "${docker_flags[@]}" \
   -w "$PWD" \
   -v "$PWD":"$PWD" \
