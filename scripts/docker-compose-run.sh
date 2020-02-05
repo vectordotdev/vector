@@ -1,5 +1,12 @@
 #!/bin/bash
-set -eu
+
+# docker-compose-run.sh
+#
+# SUMMARY
+#
+#   Runs a job from `docker-compose.yml` file.
+
+set -euo pipefail
 
 cd $(dirname $0)/..
 
