@@ -968,10 +968,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts `log` events and allows you to parse a log field value with Grok.
 [transforms.grok_parser]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `grok_parser`.
   #
@@ -1006,27 +1002,6 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
-  #
-  # Types
-  #
-
-  [transforms.grok_parser.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strptime` specifiers are supported for the
-    # `timestamp` type.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` events and allows you to parse a log field value as JSON.
 [transforms.json_parser]
@@ -1154,10 +1129,6 @@ dns_servers = ["0.0.0.0:53"]
 
 # Accepts `log` events and allows you to extract data from a logfmt-formatted log field.
 [transforms.logfmt_parser]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `logfmt_parser`.
   #
@@ -1186,27 +1157,6 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "message"
   # * type: string
   field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.logfmt_parser.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strptime` specifiers are supported for the
-    # `timestamp` type.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` events and allows you to transform events with a full embedded Lua engine.
 [transforms.lua]
@@ -1296,10 +1246,6 @@ end
 
 # Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `regex_parser`.
   #
@@ -1334,27 +1280,6 @@ end
   # * required
   # * type: string
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
-
-  #
-  # Types
-  #
-
-  [transforms.regex_parser.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strptime` specifiers are supported for the
-    # `timestamp` type.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 
 # Accepts `log` events and allows you to remove one or more log fields.
 [transforms.remove_fields]
@@ -1435,10 +1360,6 @@ end
 
 # Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
 [transforms.split]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `split`.
   #
@@ -1482,33 +1403,8 @@ end
   # * type: [string]
   separator = ","
 
-  #
-  # Types
-  #
-
-  [transforms.split.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strptime` specifiers are supported for the
-    # `timestamp` type.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-
 # Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `tokenizer`.
   #
@@ -1543,27 +1439,6 @@ end
   # * required
   # * type: [string]
   field_names = ["timestamp", "level", "message"]
-
-  #
-  # Types
-  #
-
-  [transforms.tokenizer.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strptime` specifiers are supported for the
-    # `timestamp` type.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    # * enum: "bool", "float", "int", "string", and "timestamp"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 
 
 # ------------------------------------------------------------------------------

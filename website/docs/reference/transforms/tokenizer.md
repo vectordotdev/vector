@@ -26,17 +26,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"] # example
   field_names = ["timestamp", "level", "message"] # example
 
-  # OPTIONAL - General
+  # OPTIONAL
   drop_field = true # default
   field = "message" # default
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
 ```
 
 ## Options
@@ -114,54 +111,6 @@ The log field names assigned to the resulting tokens, in order.
 </Field>
 
 
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  name={"types"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### types
-
-Key/Value pairs representing mapped log field types.
-
-<Fields filters={false}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
-  name={"`[field-name]`"}
-  path={"types"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### `[field-name]`
-
-A definition of log field type conversions. They key is the log field name and the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are supported for the `timestamp` type.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
 </Fields>
 
 ## Output
@@ -233,4 +182,3 @@ certain characters as special. These characters will be discarded:
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
