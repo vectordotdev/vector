@@ -35,28 +35,20 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let mut host = None;
-
-        if let Some(region) = &self.region {
-            host = match &region {
-                Region::Na => "https://logsene-receiver.sematext.com".to_string().into(),
-                Region::Eu => "https://logsene-receiver.eu.sematext.com"
-                    .to_string()
-                    .into(),
-            };
-        }
-
-        // Test workaround for settings a custom host so we can test the body manually
-        if let Some(h) = &self.host {
-            host = Some(h.clone());
-        }
-
-        if host.is_none() {
-            return Err(format!("Either `region` or `host` must be set.").into());
-        }
+        let host = match (&self.host, &self.region) {
+            (Some(host), None) => host.clone(),
+            (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_string(),
+            (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_string(),
+            (None, None) => {
+                return Err(format!("Either `region` or `host` must be set.").into());
+            }
+            (Some(_), Some(_)) => {
+                return Err(format!("Only one of `region` and `host` can be set.").into());
+            }
+        };
 
         let (sink, healthcheck) = ElasticSearchConfig {
-            host: host.unwrap(),
+            host,
             compression: Some(Compression::None),
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
@@ -121,6 +113,7 @@ mod tests {
         // Swap out the host so we can force send it
         // to our local server
         config.host = Some(format!("http://{}", addr));
+        config.region = None;
 
         let (sink, _) = config.build(cx).unwrap();
 
