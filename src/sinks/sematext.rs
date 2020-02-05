@@ -2,12 +2,16 @@ use crate::{
     sinks::elasticsearch::ElasticSearchConfig,
     sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    Event,
 };
+use futures::{Future, Sink};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextConfig {
-    cloud: Cloud,
+    region: Option<Region>,
+    // TODO: replace this with `UriEncode` once that is on master.
+    host: Option<String>,
     token: String,
 
     #[serde(default)]
@@ -15,46 +19,44 @@ pub struct SematextConfig {
 
     #[serde(default)]
     batch: BatchBytesConfig,
-
-    // Used for testing, `serde` will skip this field
-    // and this can only be set manually once you
-    // have a copy of this struct.
-    #[serde(skip)]
-    host: Option<String>,
 }
 
 inventory::submit! {
-    SinkDescription::new::<SematextConfig>("sematext")
+    SinkDescription::new_without_default::<SematextConfig>("sematext")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Cloud {
-    NorthAmerica,
-    Europe,
-}
-
-impl Default for Cloud {
-    fn default() -> Self {
-        Cloud::NorthAmerica
-    }
+pub enum Region {
+    Na,
+    Eu,
 }
 
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let mut host = match &self.cloud {
-            Cloud::NorthAmerica => "https://logsene-receiver.sematext.com".to_string(),
-            Cloud::Europe => "https://logsene-receiver.eu.sematext.com".to_string(),
-        };
+        let mut host = None;
+
+        if let Some(region) = &self.region {
+            host = match &region {
+                Region::Na => "https://logsene-receiver.sematext.com".to_string().into(),
+                Region::Eu => "https://logsene-receiver.eu.sematext.com"
+                    .to_string()
+                    .into(),
+            };
+        }
 
         // Test workaround for settings a custom host so we can test the body manually
         if let Some(h) = &self.host {
-            host = h.clone();
+            host = Some(h.clone());
         }
 
-        ElasticSearchConfig {
-            host: Some(host),
+        if host.is_none() {
+            return Err(format!("Either `region` or `host` must be set.").into());
+        }
+
+        let (sink, healthcheck) = ElasticSearchConfig {
+            host,
             compression: Some(Compression::None),
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
@@ -62,7 +64,11 @@ impl SinkConfig for SematextConfig {
             request: self.request.clone(),
             ..Default::default()
         }
-        .build(cx)
+        .build(cx)?;
+
+        let sink = Box::new(sink.with(map_timestamp));
+
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -72,6 +78,21 @@ impl SinkConfig for SematextConfig {
     fn sink_type(&self) -> &'static str {
         "sematext"
     }
+}
+
+/// Used to map `timestamp` to `@timestamp`.
+fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
+    let log = event.as_mut_log();
+
+    if let Some(ts) = log.remove(&crate::event::TIMESTAMP) {
+        log.insert("@timestamp", ts);
+    }
+
+    if let Some(host) = log.remove(&crate::event::HOST) {
+        log.insert("os.host", host);
+    }
+
+    futures::future::ok(event)
 }
 
 #[cfg(test)]
@@ -87,7 +108,7 @@ mod tests {
     fn smoke() {
         let (mut config, cx, mut rt) = load_sink::<SematextConfig>(
             r#"
-            cloud = "north_america"
+            region = "na"
             token = "mylogtoken"
         "#,
         )
