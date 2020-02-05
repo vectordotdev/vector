@@ -853,8 +853,6 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1023,8 +1021,6 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1203,8 +1199,6 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1351,8 +1345,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1498,8 +1490,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1560,8 +1550,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 

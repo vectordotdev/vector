@@ -44,7 +44,6 @@ possible on our security efforts.
 1. [Building & Releasing](#building--releasing)
    1. [Network Security](#network-security)
    1. [Runtime Isolation](#runtime-isolation)
-   1. [Asset Encryption](#asset-encryption)
    1. [Asset Audit Logging](#asset-audit-logging)
    1. [Asset Signatures & Checksums](#asset-signatures--checksums)
 1. [Vulnerability Reporting](#vulnerability-reporting)
@@ -87,8 +86,10 @@ changes are audited and traceable.
 
 #### Signed Commits
 
-When possible, commits from individual contributes Vector's should be
-cryptographically signed in their working branches.
+Because of Vector's [merge style](CONTRIBUTING.md#merge-style), commits to
+release branches are signed by Github itself during the squash and merge
+process. Commits to development branches are encouraged to be signed but not
+required since changes must go through a [review process](#reviews--approvals).
 
 #### Protected Branches
 
@@ -137,8 +138,8 @@ is required, such as dealing with CFFI.
 
 #### User Privileges
 
-Vector is always designed to run under non-`sudo` privileges, and our
-documentation always defaults to non-`sudo` use.
+Vector is always designed to run under non-`root` privileges, and our
+documentation always defaults to non-`root` use.
 
 ### Dependencies
 
@@ -173,7 +174,7 @@ When possible, we'll create automated checks to enforce security policies.
 
 ##### Vulnerability Scans
 
-Vector implements an automated [`cargo audit` check][urls.cargo_audit]. This
+Vector implements an automated [`cargo deny` check][urls.cargo_deny]. This
 is part of the [Rust Security advisory database][urls.rust_sec].
 
 ##### Fuzz Testing
@@ -195,10 +196,6 @@ Docker image retrieval, and publishment of Vector's release artifacts.
 ### Runtime Isolation
 
 All builds run in an isolated sandbox that is destroyed after each use.
-
-### Asset Encryption
-
-Vector's artifacts are stored on S3 with SSE encryption enabled.
 
 ### Asset Audit Logging
 
@@ -231,7 +228,7 @@ our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
 
-[urls.cargo_audit]: https://github.com/RustSec/cargo-audit
+[urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
 [urls.git]: https://git-scm.com/
 [urls.github_protected_branches]: https://help.github.com/en/github/administering-a-repository/about-protected-branches
 [urls.new_security_report]: https://github.com/timberio/vector/issues/new?labels=domain%3A+security
