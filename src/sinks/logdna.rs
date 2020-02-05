@@ -1,17 +1,22 @@
 use crate::{
+    dns::Resolver,
     event::{self, Event},
-    sinks::util::http::{Auth, BatchedHttpSink, HttpSink},
+    sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
+    sinks::util::tls::TlsSettings,
     sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use futures03::{compat::Future01CompatExt, TryFutureExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
 
 lazy_static::lazy_static! {
-    static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com/logs/ingest").into();
+    static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com").into();
 }
+
+const PATH: &str = "/logs/ingest";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LogdnaConfig {
@@ -51,7 +56,7 @@ impl SinkConfig for LogdnaConfig {
             &cx,
         );
 
-        let healthcheck = Box::new(futures::future::ok(()));
+        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
 
         Ok((Box::new(sink), healthcheck))
     }
@@ -107,7 +112,7 @@ impl HttpSink for LogdnaConfig {
     }
 
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
-        let mut query = url::form_urlencoded::Serializer::new(format!(""));
+        let mut query = url::form_urlencoded::Serializer::new(String::new());
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -137,9 +142,7 @@ impl HttpSink for LogdnaConfig {
         }))
         .unwrap();
 
-        let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
-
-        let uri = format!("{}?{}", host, query);
+        let uri = self.build_uri(&query);
 
         let mut request = Request::builder()
             .uri(uri)
@@ -157,6 +160,37 @@ impl HttpSink for LogdnaConfig {
 
         request
     }
+}
+
+impl LogdnaConfig {
+    fn build_uri(&self, query: &str) -> Uri {
+        let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
+
+        let uri = format!("{}{}?{}", host, PATH, query);
+
+        uri.parse::<http::Uri>()
+            .expect("This should be a valid uri")
+    }
+}
+
+async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> Result<(), crate::Error> {
+    let uri = config.build_uri("");
+
+    let client = https_client(resolver, TlsSettings::from_options(&None)?)?;
+
+    let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
+
+    let res = client.request(req).compat().await?;
+
+    if res.status().is_server_error() {
+        return Err(format!("Server returned a server error").into());
+    }
+
+    if res.status() == http::StatusCode::FORBIDDEN {
+        return Err(format!("Token is not valid, 403 returned.").into());
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
