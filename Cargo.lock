@@ -4132,15 +4132,6 @@ dependencies = [
 [[package]]
 name = "tracing-futures"
 version = "0.2.1"
-source = "git+https://github.com/tokio-rs/tracing#1c3bb7087db7570e91d27cd40e5e27f0f9a2c8b1"
-dependencies = [
- "pin-project",
- "tracing",
-]
-
-[[package]]
-name = "tracing-futures"
-version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33848db47a7c848ab48b66aab3293cb9c61ea879a3586ecfcd17302fcea0baf1"
 dependencies = [
@@ -4182,7 +4173,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-core",
- "tracing-futures 0.2.1 (git+https://github.com/tokio-rs/tracing)",
+ "tracing-futures 0.2.1",
  "tracing-subscriber",
 ]
 
@@ -4645,7 +4636,7 @@ dependencies = [
  "tower-hyper",
  "tower-test",
  "tracing",
- "tracing-futures 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracing-futures 0.2.1",
  "tracing-limit",
  "tracing-log",
  "tracing-metrics",

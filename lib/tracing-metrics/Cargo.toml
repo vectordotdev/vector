@@ -14,5 +14,5 @@ serde_json = "1.0"
 futures = "0.1.25"
 tokio = "0.1.21"
 hyper = "0.12.18"
-tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
-tracing-subscriber = "0.2.0-alpah.5"
+tracing-futures = { version = "0.2", features = ["futures-01"]}
+tracing-subscriber = "0.2.0-alpha.5"

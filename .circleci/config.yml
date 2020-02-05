@@ -194,7 +194,6 @@ jobs:
       - run:
           name: Build tests
           command: |
-            rm rust-toolchain
             ./scripts/docker-run.sh builder-$TARGET cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
       - run:
           name: Start dependencies

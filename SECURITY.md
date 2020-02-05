@@ -3,7 +3,7 @@
 ---
 
 <p align="center">
-  <strong>Reporting a vulnerability? See the <a href="#vulnerability-reporting">Vulnerability Reporting" section]</a></strong>
+  <strong>Reporting a vulnerability? See the <a href="#vulnerability-reporting">Vulnerability Reporting section</a></strong>
 </p>
 
 ---
@@ -14,7 +14,7 @@ That's why we apply widely accepted best practices when it comes to security.
 This document will describe these practices and aims to be as transparent as
 possible on our security efforts.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
+<!-- MarkdownTOC autolink="true" style="ordered" -->
 
 1. [Project Structure](#project-structure)
    1. [Transparency](#transparency)
@@ -25,7 +25,6 @@ possible on our security efforts.
       1. [Signed Commits](#signed-commits)
       1. [Protected Branches](#protected-branches)
 1. [Personnel](#personnel)
-   1. [Background Checks](#background-checks)
    1. [Education](#education)
    1. [Policies](#policies)
    1. [Two-factor Authentication](#two-factor-authentication)
@@ -88,8 +87,8 @@ changes are audited and traceable.
 
 #### Signed Commits
 
-When possible, commits on Vector's release branches must be cryptographically
-signed.
+When possible, commits from individual contributes Vector's should be
+cryptographically signed in their working branches.
 
 #### Protected Branches
 
@@ -103,10 +102,6 @@ are [protected][urls.github_protected_branches]. The exact requirements are:
 * Administrators are included in these checks.
 
 ## Personnel
-
-### Background Checks
-
-All Vector team members undergo background checks before access is permitted.
 
 ### Education
 

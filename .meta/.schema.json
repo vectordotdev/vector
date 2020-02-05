@@ -488,7 +488,8 @@
             "parse",
             "program",
             "sanitize",
-            "shape"
+            "shape",
+            "merge"
           ]
         },
         "input_types": {

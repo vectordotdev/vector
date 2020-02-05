@@ -46,7 +46,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "sematext" # must be: "sematext"
   inputs = ["my-source-id"] # example
-  cloud = "north_america" # example
   token = "some-sematext-token" # example
 ```
 
@@ -60,11 +59,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "sematext" # must be: "sematext"
   inputs = ["my-source-id"] # example
-  cloud = "north_america" # example
   token = "some-sematext-token" # example
 
   # OPTIONAL - General
   healthcheck = true # default
+  host = "http://127.0.0.1" # example, no default
+  region = "na" # example, no default
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -288,28 +288,6 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["north_america","europe"]}
-  name={"cloud"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### cloud
-
-The cloud destination to send logs to.
-
-
-</Field>
-
-
-<Field
   common={false}
   defaultValue={true}
   enumValues={null}
@@ -326,6 +304,50 @@ The cloud destination to send logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["http://127.0.0.1","http://example.com"]}
+  name={"host"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### host
+
+The host that will be used to send logs to. This option is required if [`region`](#region) is not set.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["na","eu"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The region destination to send logs to. This option is required if [`host`](#host) is not set.
 
 
 </Field>
@@ -585,6 +607,13 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
+
+### Obtaining a Sematext token
+
+1. Register for a free account at [Sematext.com](https://apps.sematext.com/ui/registration)
+
+2. [Create a Logs App](https://apps.sematext.com/ui/integrations) to get a Logs Token
+for [Sematext Logs](http://www.sematext.com/logsene/)
 
 ### Rate Limits
 

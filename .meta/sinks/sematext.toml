@@ -19,11 +19,17 @@ request_in_flight_limit = 5
 request_timeout_secs = 60
 write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es]"
 
-[sinks.sematext.options.cloud]
+[sinks.sematext.options.region]
 type = "string"
-required = true
-examples = ["north_america", "europe"]
-description = "The cloud destination to send logs to."
+required = false
+examples = ["na", "eu"]
+description = "The region destination to send logs to. This option is required if `host` is not set."
+
+[sinks.sematext.options.host]
+type = "string"
+required = false
+examples = ["http://127.0.0.1", "http://example.com"]
+description = "The host that will be used to send logs to. This option is required if `region` is not set."
 
 [sinks.sematext.options.token]
 type = "string"
