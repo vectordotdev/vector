@@ -6,7 +6,7 @@ issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+lab
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "humio|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/humio.rs
-status: "prod-ready"
+status: "beta"
 title: "Humio Sink"
 unsupported_operating_systems: []
 ---

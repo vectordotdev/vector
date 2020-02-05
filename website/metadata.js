@@ -17346,7 +17346,7 @@ module.exports = {
       ]
     },
     "humio": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
       "event_types": [
@@ -17363,7 +17363,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "status": "prod-ready",
+      "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
 
