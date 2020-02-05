@@ -8,8 +8,12 @@ use tokio::timer::Delay;
 use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
+    /// Indicate that this request should be retried with a reason
     Retry(String),
+    /// Indicate that this request should not be retried with a reason
     DontRetry(String),
+    /// Indicate that this request should not be retried but the request was successful
+    Successful,
 }
 
 pub trait RetryLogic: Clone {
@@ -19,7 +23,7 @@ pub trait RetryLogic: Clone {
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
     fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
-        RetryAction::DontRetry("unknown".into())
+        RetryAction::Successful
     }
 }
 
@@ -99,10 +103,13 @@ where
                         warn!(message = "retrying after response.", %reason);
                         Some(self.build_retry())
                     }
+
                     RetryAction::DontRetry(reason) => {
                         warn!(message = "request is not retryable; dropping the request.", %reason);
                         None
                     }
+
+                    RetryAction::Successful => None,
                 }
             }
             Err(error) => {
@@ -159,6 +166,14 @@ impl RetryAction {
 
     pub fn is_not_retryable(&self) -> bool {
         if let RetryAction::DontRetry(_) = &self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_successful(&self) -> bool {
+        if let RetryAction::Successful = &self {
             true
         } else {
             false

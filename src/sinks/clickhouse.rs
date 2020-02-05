@@ -188,8 +188,11 @@ impl RetryLogic for ClickhouseRetryLogic {
                 // retry those errors.
                 //
                 // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
-                if body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53") {
+                // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
+                if body.starts_with(b"Code: 117") {
                     RetryAction::DontRetry("incorrect data".into())
+                } else if body.starts_with(b"Code: 53") {
+                    RetryAction::DontRetry("type mismatch".into())
                 } else {
                     RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
