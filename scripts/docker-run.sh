@@ -9,8 +9,6 @@
 
 set -eou pipefail
 
-DOCKER=${USE_CONTAINER:-docker}
-
 #
 # Requirements
 #
@@ -29,18 +27,25 @@ fi
 # Variables
 #
 
+DOCKER=${USE_CONTAINER:-docker}
 DOCKER_PRIVILEGED=${DOCKER_PRIVILEGED:-false}
 tag="$1"
 image="timberiodev/vector-$tag:latest"
 
 #
+# (Re)Build
+#
+if ! $DOCKER inspect $image >/dev/null 2>&1 || [ "$REBUILD_CONTAINER_IMAGE" == true ]
+then
+  $DOCKER build \
+    --file scripts/ci-docker-images/$tag/Dockerfile \
+    --tag $image \
+    .
+fi
+
+#
 # Execute
 #
-
-$DOCKER build \
-  -t $image \
-  -f scripts/ci-docker-images/$tag/Dockerfile \
-  .
 
 # Set flags for "docker run".
 # The `--rm` flag is used to delete containers on exit.
