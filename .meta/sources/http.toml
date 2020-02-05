@@ -4,16 +4,13 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
-guides = []
 output_types = ["log"]
-resources = []
 through_description = "the HTTP protocol"
 
 [sources.http.options.address]
 type = "string"
 common = true
 examples = ["0.0.0.0:80", "localhost:8080"]
-null = false
 required = true
 description = """The address to listen for connections on"""
 
@@ -22,7 +19,6 @@ type = "string"
 common = true
 default = "text"
 examples = ["text","ndjson","json"]
-null = false
 required = true
 description = """The expected encoding of received data. `text` indicates newline-delimited text, with each line forming a message. `ndjson` indicates newline-delimited JSON, where each line must contain a json object. `json` indicates a JSON payload, which must be a JSON array containing JSON objects. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields."""
 
@@ -35,7 +31,6 @@ json = "Array of JSON objects"
 type = "[string]"
 common = true
 examples = [["User-Agent","X-My-Custom-Header"]]
-null = false
 required = false
 description = """A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names. An empty string will be inserted into the log event if the corresponding HTTP header was missing."""
 
