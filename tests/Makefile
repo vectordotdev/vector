@@ -3,9 +3,6 @@ RUN=./scripts/docker-compose-run.sh
 # default target, build the project in debug mode
 build: build-x86_64
 
-# run tests which do not require additional services to be present
-test: test-x86_64
-
 # build the project in debug mode for all platforms
 build-all: build-x86_64 build-armv7 build-aarch64
 
@@ -18,21 +15,17 @@ build-armv7: init-target-dir load-qemu-binfmt
 build-aarch64: init-target-dir load-qemu-binfmt
 	$(RUN) build-aarch64
 
-# run tests for all platforms
-test-all: test-x86_64
+# run benchmarks
+bench: build
+	$(RUN) bench
 
-test-x86_64: build-x86_64
-	$(RUN) test-x86_64
+# run tests which do not require additional services to be present
+test: build
+	$(RUN) test
 
-test-armv7: build-armv7
-	$(RUN) test-armv7
-
-test-aarch64: build-aarch64
-	$(RUN) test-aarch64
-
-# generate
-
-all: build check verify
+# run tests which use Docker
+test-docker: build
+	$(RUN) test-docker
 
 # checks
 
