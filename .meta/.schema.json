@@ -522,10 +522,6 @@
           "description": "A simple title for this transform, typically one word.",
           "minLength": 1,
           "max_lenfth": 50
-        },
-        "types_coercion": {
-          "type": "boolean",
-          "description": "If this transform offers a `type` table for field coercion."
         }
       }
     }
