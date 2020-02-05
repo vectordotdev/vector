@@ -224,6 +224,9 @@
 - name: "transform: lua"
   description: Anything `lua` transform related
   color: 54a0ff
+- name: "transform: merge"
+  description: Anything `merge` transform related
+  color: 54a0ff
 - name: "transform: regex_parser"
   description: Anything `regex_parser` transform related
   color: 54a0ff

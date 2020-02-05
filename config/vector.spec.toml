@@ -58,6 +58,14 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "docker"
   type = "docker"
 
+  # Setting this to `false` will disable the automatic merging of partial events.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  auto_partial_merge = true
+  auto_partial_merge = false
+
   # A list of container IDs _or_ names to match against. Prefix matches are
   # supported, meaning you can supply just the first few characters of the
   # container ID or name. If not provided, all containers will be included.
@@ -83,6 +91,15 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: [string]
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"]
+
+  # The field name to be added to events that are detected to contain an
+  # incomplete message (i.e. partial events). If set to `""`, no field will be
+  # added to partial event. This allows to opt-out of partial event detection.
+  #
+  # * optional
+  # * default: "_partial"
+  # * type: string
+  partial_event_marker_field = "_partial"
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
@@ -1230,6 +1247,52 @@ end
   # * no default
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
+
+# Accepts `log` events and allows you to merge partial log events into a single event.
+[transforms.merge]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `merge`.
+  #
+  # * required
+  # * type: string
+  # * must be: "merge"
+  type = "merge"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Fields to merge. The values of these fields will be merged into the first
+  # partial event. Fields not specified here will be ignored. Merging process
+  # takes the first partial event and the base, then it merges in the fields from
+  # each successive partial event, until a non-partial event arrives. Finally,
+  # the non-partial event fields are merged in, producing the resulting merged
+  # event.
+  #
+  # * optional
+  # * default: ["message"]
+  # * type: [string]
+  merge_fields = ["message"]
+
+  # The field that indicates that the event is partial. A consequent stream of
+  # partial events along with the first non-partial event will be merged together.
+  #
+  # * optional
+  # * default: "_partial"
+  # * type: string
+  partial_event_marker_field = "_partial"
+
+  # An ordered list of fields to distinguish streams by. Each stream has a
+  # separate partial event merging state. Should be used to prevent events from
+  # unrelated sources from mixing together, as this affects partial event
+  # processing.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  stream_discriminant_fields = []
 
 # Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]

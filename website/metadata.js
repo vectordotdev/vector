@@ -18135,6 +18135,26 @@ module.exports = {
 
       ]
     },
+    "merge": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to merge partial log events into a single event.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "merge",
+      "id": "merge_transform",
+      "name": "merge",
+      "operating_systems": [
+
+      ],
+      "service_providers": null,
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "regex_parser": {
       "beta": false,
       "delivery_guarantee": null,
