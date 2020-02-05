@@ -21,6 +21,8 @@ service_providers = ["AWS", "Elastic"]
 write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
 tls_options = []
 
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.elasticsearch.env_vars") %>
+
 [sinks.elasticsearch.options.auth]
 type = "table"
 common = false
@@ -73,7 +75,7 @@ description = "A custom header to be added to each outgoing Elasticsearch reques
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
-description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
+description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
 
 [sinks.elasticsearch.options.index]
 type = "string"

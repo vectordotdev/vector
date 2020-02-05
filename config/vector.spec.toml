@@ -1592,6 +1592,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target CloudWatch Logs stream.
@@ -1633,7 +1634,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1810,6 +1812,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
@@ -1818,7 +1821,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1853,6 +1857,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Firehose delivery stream.
@@ -1867,7 +1872,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2042,6 +2048,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Logs stream.
@@ -2056,7 +2063,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2252,6 +2260,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
@@ -2260,7 +2269,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3070,14 +3080,6 @@ end
   index = "application-{{ application_id }}-%Y-%m-%d"
   index = "vector-%Y-%m-%d"
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -3087,20 +3089,12 @@ end
   healthcheck = false
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example. This is required if the `provider` is not `"aws"`
+  # in the example.
   #
   # * optional
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # Auth
@@ -4257,14 +4251,6 @@ end
   # * type: string
   topic = "topic-1234"
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -4272,14 +4258,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # requests

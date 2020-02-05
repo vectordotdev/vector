@@ -56,7 +56,7 @@ impl SinkConfig for SematextConfig {
         }
 
         let (sink, healthcheck) = ElasticSearchConfig {
-            host,
+            host: host.unwrap(),
             compression: Some(Compression::None),
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),

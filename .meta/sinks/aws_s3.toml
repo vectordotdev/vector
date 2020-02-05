@@ -23,6 +23,8 @@ service_limits_short_link = "aws_s3_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
 
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_s3.env_vars") %>
+
 [sinks.aws_s3.options.bucket]
 type = "string"
 common = true
@@ -176,3 +178,5 @@ type = "string"
 required = false
 examples = [ {"Tag1" = "Value1"} ]
 description = "A custom tag to be added to the created objects."
+
+<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_s3.options") %>

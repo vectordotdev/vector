@@ -68,10 +68,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - General
   doc_type = "_doc" # default
   index = "vector-%F" # default
-  endpoint = "127.0.0.0:5000" # example, no default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
-  region = "us-east-1" # example, no default
 
   # OPTIONAL - Auth
   [sinks.my_sink_id.auth]
@@ -435,28 +433,6 @@ The [`doc_type`](#doc_type) for your index data. This is only relevant for Elast
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   name={"headers"}
   path={null}
@@ -539,7 +515,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
 
 
 </Field>
@@ -611,28 +587,6 @@ A custom parameter to be added to each Elasticsearch request.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
-
 
 </Field>
 
@@ -1185,7 +1139,6 @@ You can read more about the complete syntax in the
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
-[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
