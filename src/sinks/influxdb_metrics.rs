@@ -125,7 +125,7 @@ fn encode_fields(fields: HashMap<String, Field>) -> String {
                 format!("\"{}\"", escaped)
             }
             Field::Float(f) => f.to_string(),
-            Field::UnsignedInt(i) => i.to_string(),
+            Field::UnsignedInt(i) => format!("{}i", i.to_string()),
         };
         if !key.is_empty() && !value.is_empty() {
             format!("{}={}", key, value)
@@ -307,7 +307,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1,bucket_2.1=2,bucket_3=3,count=6,sum=12.5 1542182950000000011", ]
+            vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1i,bucket_2.1=2i,bucket_3=3i,count=6i,sum=12.5 1542182950000000011", ]
         );
     }
 
@@ -329,7 +329,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011", ]
+            vec!["ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6i,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011", ]
         );
     }
 }
