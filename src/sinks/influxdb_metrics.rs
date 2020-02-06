@@ -8,8 +8,10 @@ use std::collections::BTreeMap;
 pub enum Field {
     /// string
     String(String),
-    /// Float
+    /// float
     Float(f64),
+    /// unsigned integer
+    UnsignedInt(u32),
 }
 
 fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
@@ -34,6 +36,18 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
                     let fields = to_fields(values.len() as f64);
 
                     Some(vec![influx_line_protocol(fullname, "set", tags, Some(fields), ts)])
+                }
+                MetricValue::AggregatedHistogram { buckets,
+                    counts,
+                    count,
+                    sum, } => {
+                    let mut fields: HashMap<String, Field> = buckets.iter().zip(counts.iter())
+                        .map(|pair| (format!("bucket_{}", pair.0), Field::UnsignedInt(*pair.1))).collect();
+                    fields.insert("count".to_owned(), Field::UnsignedInt(count));
+                    fields.insert("sum".to_owned(), Field::Float(sum));
+
+
+                    Some(vec![influx_line_protocol(fullname, "histogram", tags, Some(fields), ts)])
                 }
                 _ => None
             }
@@ -101,6 +115,7 @@ fn encode_fields(fields: HashMap<String, Field>) -> String {
                 format!("\"{}\"", escaped)
             }
             Field::Float(f) => f.to_string(),
+            Field::UnsignedInt(i) => i.to_string(),
         };
         if !key.is_empty() && !value.is_empty() {
             format!("{}={}", key, value)
@@ -261,6 +276,27 @@ mod tests {
         assert_eq!(
             line_protocols,
             vec!["ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011", ]
+        );
+    }
+    #[test]
+    fn encode_histogram() {
+        let events = vec![Metric {
+            name: "requests".to_owned(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedHistogram {
+                buckets: vec![1.0, 2.1, 3.0],
+                counts: vec![1, 2, 3],
+                count: 6,
+                sum: 12.5,
+            },
+        }];
+
+        let line_protocols = encode_events(events, "ns");
+        assert_eq!(
+            line_protocols,
+            vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1,bucket_2.1=2,bucket_3=3,count=6,sum=12.5 1542182950000000011", ]
         );
     }
 }
