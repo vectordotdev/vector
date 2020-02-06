@@ -26,7 +26,7 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
     // Create watcher now so not to miss any changes happening between
     // returning from this function and the thread starting.
-    let mut watcher = create_watcher(&config_path);
+    let mut watcher = Some(create_watcher(&config_path)?);
 
     info!("Watching configuration file.");
 
@@ -34,7 +34,7 @@ pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error
         if let Some((_, receiver)) = watcher.take() {
             while let Ok(RawEvent { op: Ok(event), .. }) = receiver.recv() {
                 if event.intersects(Op::CREATE | Op::REMOVE | Op::WRITE | Op::CLOSE_WRITE) {
-                    info!("Configuration file change detected.");
+                    debug!(message = "Configuration file change detected.", ?event);
 
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
@@ -49,7 +49,9 @@ pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error
 
         thread::sleep(RETRY_TIMEOUT);
 
-        watcher = create_watcher(&config_path);
+        watcher = create_watcher(&config_path)
+            .map_err(|error| error!(message = "Failed to create file watcher", ?error))
+            .ok();
 
         if watcher.is_some() {
             // Config file could have changed while we weren't watching,
@@ -66,7 +68,7 @@ pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error
 #[cfg(windows)]
 /// Errors on Windows.
 pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
-    Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .")
+    Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())
 }
 
 #[cfg(unix)]
@@ -77,19 +79,12 @@ fn raise_sighup() {
     });
 }
 
-fn create_watcher(config_path: &Path) -> Option<(RecommendedWatcher, Receiver<RawEvent>)> {
+fn create_watcher(config_path: &Path) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
     info!("Creating configuration file watcher");
     let (sender, receiver) = channel();
-    match raw_watcher(sender) {
-        Ok(mut watcher) => match watcher.watch(&config_path, RecursiveMode::NonRecursive) {
-            Ok(_) => {
-                return Some((watcher, receiver));
-            }
-            Err(error) => error!(message = "Failed to watch configuration file", ?error),
-        },
-        Err(error) => error!(message = "Failed to create file watcher", ?error),
-    }
-    None
+    let mut watcher = raw_watcher(sender)?;
+    watcher.watch(&config_path, RecursiveMode::NonRecursive)?;
+    Ok((watcher, receiver))
 }
 
 #[cfg(test)]
