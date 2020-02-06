@@ -420,7 +420,10 @@ fn cycle() {
     )
     .unwrap_err();
 
-    assert_eq!(errors, vec!["Configured topology contains a cycle"])
+    assert_eq!(
+        errors,
+        vec!["Cyclic dependency detected in the chain [ four -> two -> three -> four ]"]
+    )
 }
 
 #[test]

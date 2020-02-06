@@ -77,10 +77,12 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
         }
     }
 
-    if config.contains_cycle() {
-        errors.push("Configured topology contains a cycle".to_string());
-    } else if let Err(type_errors) = config.typecheck() {
+    if let Err(type_errors) = config.typecheck() {
         errors.extend(type_errors);
+    } else if config.contains_cycle() {
+        // I still think it's worth performing this for the listeners at the
+        // back.
+        errors.push("Configured topology contains a cycle".to_string());
     }
 
     if errors.is_empty() {

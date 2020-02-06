@@ -59,15 +59,32 @@ impl Graph {
             .insert(name.to_string(), Node::Sink { ty, inputs });
     }
 
-    fn paths(&self) -> Vec<Vec<String>> {
-        self.nodes
+    fn paths(&self) -> Result<Vec<Vec<String>>, Vec<String>> {
+        let mut errors = Vec::new();
+
+        let nodes = self
+            .nodes
             .iter()
             .filter_map(|(name, node)| match node {
                 Node::Sink { .. } => Some(name),
                 _ => None,
             })
-            .flat_map(|node| paths_rec(&self.nodes, node, Vec::new()))
-            .collect()
+            .flat_map(|node| match paths_rec(&self.nodes, node, Vec::new()) {
+                Ok(paths) => paths,
+                Err(err) => {
+                    errors.push(err);
+                    Vec::new()
+                }
+            })
+            .collect();
+
+        if !errors.is_empty() {
+            errors.sort();
+            errors.dedup();
+            Err(errors)
+        } else {
+            Ok(nodes)
+        }
     }
 
     fn clean_inputs(&self, inputs: Vec<impl Into<String>>) -> Vec<String> {
@@ -77,7 +94,14 @@ impl Graph {
     fn typecheck(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        for path in self.paths() {
+        let paths = match self.paths() {
+            Ok(paths) => paths,
+            Err(errs) => {
+                return Err(errs);
+            }
+        };
+
+        for path in paths {
             for pair in path.windows(2) {
                 let (x, y) = (&pair[0], &pair[1]);
                 if self.nodes.get(x).is_none() || self.nodes.get(y).is_none() {
@@ -185,17 +209,40 @@ impl From<&Config> for Graph {
     }
 }
 
-fn paths_rec(nodes: &HashMap<String, Node>, node: &str, mut path: Vec<String>) -> Vec<Vec<String>> {
+fn paths_rec(
+    nodes: &HashMap<String, Node>,
+    node: &str,
+    mut path: Vec<String>,
+) -> Result<Vec<Vec<String>>, String> {
+    if let Some(i) = path.iter().position(|p| p == node) {
+        let mut segment = path.split_off(i);
+        segment.push(node.into());
+        // I think this is maybe easier to grok from source -> sink, but I'm not
+        // married to either.
+        segment.reverse();
+        return Err(format!(
+            "Cyclic dependency detected in the chain [ {} ]",
+            segment.join(" -> ")
+        ));
+    }
     path.push(node.to_string());
     match nodes.get(node) {
         Some(Node::Source { .. }) | None => {
             path.reverse();
-            vec![path]
+            Ok(vec![path])
         }
-        Some(Node::Transform { inputs, .. }) | Some(Node::Sink { inputs, .. }) => inputs
-            .iter()
-            .flat_map(|input| paths_rec(nodes, input, path.clone()))
-            .collect(),
+        Some(Node::Transform { inputs, .. }) | Some(Node::Sink { inputs, .. }) => {
+            let mut paths = Vec::new();
+            for input in inputs {
+                match paths_rec(nodes, input, path.clone()) {
+                    Ok(mut p) => paths.append(&mut p),
+                    Err(err) => {
+                        return Err(err);
+                    }
+                }
+            }
+            Ok(paths)
+        }
     }
 }
 
@@ -218,6 +265,50 @@ mod test {
     }
 
     #[test]
+    fn paths_detects_cycles() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
+        graph.add_sink("out", DataType::Log, vec!["three"]);
+
+        assert_eq!(
+            Err(vec![
+                "Cyclic dependency detected in the chain [ three -> one -> two -> three ]".into()
+            ]),
+            graph.paths()
+        );
+
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
+        graph.add_sink("out", DataType::Log, vec!["two"]);
+
+        assert_eq!(
+            Err(vec![
+                "Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()
+            ]),
+            graph.paths()
+        );
+
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("in", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_sink("out", DataType::Log, vec!["in"]);
+
+        // This isn't really a cyclic dependency but let me have this one.
+        assert_eq!(
+            Err(vec![
+                "Cyclic dependency detected in the chain [ in -> in ]".into()
+            ]),
+            graph.paths()
+        );
+    }
+
+    #[test]
     fn doesnt_detect_noncycles() {
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
@@ -227,6 +318,18 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["three"]);
 
         assert_eq!(false, graph.contains_cycle());
+    }
+
+    #[test]
+    fn paths_doesnt_detect_noncycles() {
+        let mut graph = Graph::default();
+        graph.add_source("in", DataType::Log);
+        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform("two", DataType::Log, DataType::Log, vec!["in"]);
+        graph.add_transform("three", DataType::Log, DataType::Log, vec!["one", "two"]);
+        graph.add_sink("out", DataType::Log, vec!["three"]);
+
+        graph.paths().unwrap();
     }
 
     #[test]
