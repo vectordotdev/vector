@@ -410,6 +410,18 @@ services:
         - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
         - /var/run/docker.sock:/var/run/docker.sock
       depends_on:
+        - test-runtime-deps
+      network_mode: host
+      working_dir: $PWD
+      command: cargo test --all --no-default-features --features docker,default-musl --target x86_64-unknown-linux-musl -- --test-threads 4
+
+    # test dependencies
+
+    # dummy service which runs all dependencies
+    test-runtime-deps:
+      image: ubuntu:18.04
+      command: sleep infinity
+      depends_on:
         - localstack
         - minio
         - mockwatchlogs
@@ -421,11 +433,7 @@ services:
         - clickhouse
         - ec2_metadata
         - gcloud-pubsub
-      network_mode: host
-      working_dir: $PWD
-      command: cargo test --all --no-default-features --features docker,default-musl --target x86_64-unknown-linux-musl -- --test-threads 4
 
-    # test dependencies
     localstack:
       image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
       ports:
