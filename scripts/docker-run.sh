@@ -40,9 +40,11 @@ docker build \
   .
 
 # Set flags for "docker run".
-# Note that the `--privileged` flags is set by default because it is
+# The `--rm` flag is used to delete containers on exit.
+# The `--privileged` flags is set by default because it is
 # required to register `binfmt` handlers, whaich allow to run builders
 # for ARM achitectures which need to use `qemu-user`.
+# The `--interactive` flag is used to keep `stdin` open.
 docker_flags=("--rm" "--privileged" "--interactive")
 if [ -t 0 ]; then # the script's input is connected to a terminal
   docker_flags+=("--tty")
