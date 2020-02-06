@@ -40,8 +40,6 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
-    #[serde(default)]
-    pub reload_config: bool,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -262,7 +260,6 @@ impl Config {
             global: GlobalOptions {
                 data_dir: None,
                 dns_servers: Vec::new(),
-                reload_config: false,
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),

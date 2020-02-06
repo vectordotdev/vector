@@ -19,60 +19,53 @@ pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_se
 
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
-/// On unix triggers SIGHUP when file on config_path changes.
+/// Triggers SIGHUP when file on config_path changes.
 /// Accumulates file changes until no change for given duration has occured.
 /// Has best effort guarante of detecting all file changes from the end of
 /// this function until the main thread stops.
-///
-/// Errors on Windows.
-pub fn config_watcher(config: &Config, config_path: PathBuf, delay: Duration) -> Result<(), Error> {
-    if config.global.reload_config {
-        #[cfg(unix)]
-        {
-            // Create watcher now so not to miss any changes happening between
-            // returning from this function and thread started.
-            let mut watcher = create_watcher(&config_path, delay);
+#[cfg(unix)]
+pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
+    // Create watcher now so not to miss any changes happening between
+    // returning from this function and thread started.
+    let mut watcher = create_watcher(&config_path, delay);
 
-            thread::spawn(move || loop {
-                if let Some((_, receiver)) = watcher.take() {
-                    info!("Watching configuration file.");
-                    while let Ok(msg) = receiver.recv() {
-                        match msg {
-                            DebouncedEvent::Write(_)
-                            | DebouncedEvent::Create(_)
-                            | DebouncedEvent::Remove(_) => {
-                                info!("Configuration file changed.");
-                                raise_sighup()
-                            }
-                            event => debug!(message = "Ignoring event", ?event),
-                        }
+    info!("Watching configuration file.");
+
+    thread::spawn(move || loop {
+        if let Some((_, receiver)) = watcher.take() {
+            while let Ok(msg) = receiver.recv() {
+                match msg {
+                    DebouncedEvent::Write(_)
+                    | DebouncedEvent::Create(_)
+                    | DebouncedEvent::Remove(_) => {
+                        info!("Configuration file changed.");
+                        raise_sighup()
                     }
-                    error!("Stoped watching configuration file.");
+                    event => debug!(message = "Ignoring event", ?event),
                 }
-
-                thread::sleep(RETRY_TIMEOUT);
-
-                watcher = create_watcher(&config_path, delay);
-
-                if watcher.is_some() {
-                    // Config file could have changed while we weren't watching,
-                    // so for a good measure raise SIGHUP and let reload logic
-                    // to determine if anything changed.
-                    info!("Speculating that configuration file changed.");
-                    raise_sighup();
-                }
-            });
-
-            Ok(())
+            }
         }
 
-        #[cfg(windows)]
-        {
-            Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .")
+        thread::sleep(RETRY_TIMEOUT);
+
+        watcher = create_watcher(&config_path, delay);
+
+        if watcher.is_some() {
+            // Config file could have changed while we weren't watching,
+            // so for a good measure raise SIGHUP and let reload logic
+            // determine if anything changed.
+            info!("Speculating that configuration file changed.");
+            raise_sighup();
         }
-    } else {
-        Ok(())
-    }
+    });
+
+    Ok(())
+}
+
+#[cfg(windows)]
+/// Errors on Windows.
+pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
+    Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .")
 }
 
 #[cfg(unix)]

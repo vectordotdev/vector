@@ -72,6 +72,10 @@ struct RootOpts {
     /// Options: `auto`, `always` or `never`
     #[structopt(long)]
     color: Option<Color>,
+
+    /// Watch for changes in configuration file, and update accordingly.
+    #[structopt(short, long)]
+    watch_config: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -250,20 +254,6 @@ fn main() {
     let config = config.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
-
-    // Start listening for config changes immediately.
-    //
-    // There is a chance of config file changing since we read
-    // it with vector::topology::Config::load until the end of
-    // vector::topology::config::watcher::config_watcher function.
-    // This should be extremly rare, and because the solution is
-    // somewhat complex, intrusive, this will be fine for now.
-    let _ = vector::topology::config::watcher::config_watcher(
-        &config,
-        opts.config_path.clone(),
-        vector::topology::config::watcher::CONFIG_WATCH_DELAY,
-    )
-    .map_err(|error| error!(?error));
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
