@@ -237,6 +237,8 @@ fn main() {
             config_paths.push(path);
         }
     }
+    config_paths.sort();
+    config_paths.dedup();
 
     info!(
         message = "Loading configs.",
