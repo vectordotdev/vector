@@ -204,9 +204,8 @@ impl Kube {
         retry(|| {
             api.create(&PostParams::default(), json.clone())
                 .map_err(|error| {
-                    error!(message = "Failed creating Kubernetes object", ?error);
+                    format!("Failed creating Kubernetes object with error: {:?}", error)
                 })
-                .ok()
         })
     }
 
@@ -217,10 +216,7 @@ impl Kube {
                     field_selector: Some(format!("metadata.namespace=={}", self.namespace)),
                     ..ListParams::default()
                 })
-                .map_err(|error| {
-                    error!(message = "Failed listing Pods", ?error);
-                })
-                .ok()
+                .map_err(|error| format!("Failed listing Pods with error: {:?}", error))
         })
         .items
         .into_iter()
@@ -237,10 +233,7 @@ impl Kube {
         retry(|| {
             self.api(Api::v1Pod)
                 .log(pod_name, &LogParams::default())
-                .map_err(|error| {
-                    error!(message = "Failed getting Pod logs", ?error);
-                })
-                .ok()
+                .map_err(|error| format!("Failed getting Pod logs with error: {:?}", error))
         })
         .lines()
         .map(|s| s.to_owned())
@@ -252,20 +245,14 @@ impl Kube {
         retry(move || {
             object = api
                 .get_status(object.meta().name.as_str())
-                .map_err(|error| {
-                    error!(message = "Failed getting object status", ?error);
-                })
-                .ok()?;
-            match object.status.clone()? {
+                .map_err(|error| format!("Failed getting object status with error: {:?}", error))?;
+            match object.status.clone().ok_or("Object status is missing")? {
                 DaemonSetStatus {
                     desired_number_scheduled,
                     number_available: Some(number_available),
                     ..
-                } if number_available == desired_number_scheduled => Some(object.clone()),
-                status => {
-                    debug!(message = "DaemonSet not yet ready", ?status);
-                    None
-                }
+                } if number_available == desired_number_scheduled => Ok(object.clone()),
+                status => Err(format!("DaemonSet not yet ready with status: {:?}", status)),
             }
         })
     }
@@ -277,22 +264,20 @@ impl Kube {
         retry(move || {
             object = api
                 .get_status(object.meta().name.as_str())
-                .map_err(|error| {
-                    error!(message = "Failed getting object status", ?error);
-                })
-                .ok()?;
-            match object.status.clone()? {
+                .map_err(|error| format!("Failed getting object status with error: {:?}", error))?;
+            match object.status.clone().ok_or("Object status is missing")? {
                 PodStatus {
                     phase: Some(ref phase),
                     ..
-                } if phase.as_str() == goal => Some(object.clone()),
+                } if phase.as_str() == goal => Ok(object.clone()),
                 PodStatus {
                     phase: Some(ref phase),
                     ..
-                } if legal.contains(&phase.as_str()) => None,
+                } if legal.contains(&phase.as_str()) => {
+                    Err(format!("Pod in intermediate phase: {:?}", phase))
+                }
                 PodStatus { phase, .. } => {
-                    error!(message = "Illegal pod phase", ?phase);
-                    None
+                    Err(format!("Illegal pod phase with phase: {:?}", phase))
                 }
             }
         })
@@ -317,15 +302,20 @@ impl Drop for Kube {
 
 /// If F returns None, retries it after some time, for some count.
 /// Panics if all trys fail.
-fn retry<F: FnMut() -> Option<R>, R>(mut f: F) -> R {
+fn retry<F: FnMut() -> Result<R, E>, R, E: std::fmt::Debug>(mut f: F) -> R {
+    let mut last_error = None;
     for _ in 0..WAIT_LIMIT {
-        if let Some(data) = f() {
-            return data;
+        match f() {
+            Ok(data) => return data,
+            Err(error) => {
+                error!(?error);
+                last_error = Some(error);
+            }
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
         debug!("Retrying");
     }
-    panic!("timed out while waiting");
+    panic!("timed out while waiting. Last error: {:?}", last_error);
 }
 
 fn user_namespace<S: AsRef<str>>(namespace: S) -> String {
