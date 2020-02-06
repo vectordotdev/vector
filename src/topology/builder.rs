@@ -70,7 +70,7 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
                 .any(|(_, sink)| sink.inputs.contains(&name))
         {
             warnings.push(format!(
-                "{} {:?} has no outputs",
+                "{} {:?} has no consumers",
                 capitalize(input_type),
                 name
             ));

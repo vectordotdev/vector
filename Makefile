@@ -46,7 +46,7 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 check-blog: ## Checks that all blog articles are signed by their authors
 	@scripts/run.sh checker scripts/check-blog-signatures.rb
 
-export CHECK_URLS ?= false
+export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta
 	@scripts/run.sh checker scripts/generate.rb
 
@@ -72,7 +72,7 @@ sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
 test: ## Spins up Docker resources and runs _every_ test
-	@docker-compose up -d
+	@docker-compose up -d test-runtime-deps
 	@cargo test --all --features docker -- --test-threads 4
 
 clean: ## Remove build artifacts

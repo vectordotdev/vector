@@ -19,7 +19,7 @@ class Component
     :options,
     :posts,
     :requirements,
-    :resources,
+    :service_providers,
     :title,
     :type,
     :unsupported_operating_systems
@@ -28,10 +28,11 @@ class Component
     @beta = hash["beta"] == true
     @common = hash["common"] == true
     @env_vars = Option.build_struct(hash["env_vars"] || {})
-    @function_category = hash.fetch("function_category")
+    @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
     @requirements = hash["requirements"]
+    @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
@@ -48,13 +49,6 @@ class Component
     end
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
-
-    # Resources
-
-    @resources =
-      (hash.delete("resources") || []).collect do |resource_hash|
-        OpenStruct.new(resource_hash)
-      end
 
     # Default options
 
@@ -119,12 +113,20 @@ class Component
     types.uniq
   end
 
+  def only_service_provider?(provider_name)
+    service_providers.length == 1 && service_provider?(provider_name)
+  end
+
   def options_list
     @options_list ||= options.to_h.values.sort
   end
 
   def partition_options
     options_list.select(&:partition_key?)
+  end
+
+  def service_provider?(provider_name)
+    service_providers.collect(&:downcase).include?(provider_name.downcase)
   end
 
   def sink?
@@ -159,7 +161,7 @@ class Component
       id: id,
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
-      service_providers: (respond_to?(:service_providers, true) ? service_providers : nil),
+      service_providers: service_providers,
       status: status,
       type: type,
       unsupported_operating_systems: unsupported_operating_systems

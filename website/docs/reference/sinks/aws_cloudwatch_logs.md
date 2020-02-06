@@ -5,7 +5,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "aws_cloudwatch_logs|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/mod.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/
 status: "beta"
 title: "AWS Cloudwatch Logs Sink"
 unsupported_operating_systems: []
@@ -48,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL
@@ -67,14 +67,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"] # example
   group_name = "{{ file }}" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "{{ instance_id }}" # example
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   create_missing_group = true # default
   create_missing_stream = true # default
-  endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
 
   # OPTIONAL - requests
@@ -132,7 +132,7 @@ import Field from '@site/src/components/Field';
 
 ### assume_role
 
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authentication](#aws-authentication) for more info.
 
 
 </Field>
@@ -245,7 +245,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum number of [events][docs.data-model] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -392,10 +392,10 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
+  examples={["127.0.0.0:5000/path/to/service"]}
   name={"endpoint"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -461,7 +461,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -645,7 +645,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -791,6 +791,12 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
 
+#### Assuming Roles
+
+Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
+optional setting that is helpful for a variety of use cases, such as cross
+account access.
+
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';
@@ -844,7 +850,7 @@ If you'd like to disable health checks for this sink you can set the
 
 Partitioning is controlled via the [`group_name`](#group_name) and [`stream_name`](#stream_name)
 options and allows you to dynamically partition data on the fly.
-You'll notice that Vector's [template sytax](#template-syntax) is supported
+You'll notice that Vector's [template sytax](#field-interpolation) is supported
 for these options, enabling you to use field values as the partition's key.
 
 ### Rate Limits
@@ -871,7 +877,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 ### Template Syntax
 
 The [`group_name`](#group_name) and [`stream_name`](#stream_name) options
-support [Vector's template syntax][docs.configuration#template-syntax],
+support [Vector's template syntax][docs.configuration#field-interpolation],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -888,13 +894,13 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration#template-syntax].
+[template syntax section][docs.configuration#field-interpolation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/

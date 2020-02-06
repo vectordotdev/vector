@@ -37,7 +37,7 @@ image="timberiodev/vector-$tag:latest"
 docker build \
   -t $image \
   -f scripts/ci-docker-images/$tag/Dockerfile \
-  scripts
+  .
 
 # Set flags for "docker run".
 # Note that the `--privileged` flags is set by default because it is

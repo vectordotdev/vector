@@ -10,39 +10,56 @@ types:
   - perf                # A change that enhancements performance.
 
 scopes:
-  - buffers             # Anything related to Vector's buffers, serialization, etc.
-  - cli                 # Anything related to Vector's CLI.
-  - config              # Anything related to Vector's configuration as a whole.
-  - docs                # Anything related to documentation.
-  - log data model      # Anything related to the log event data model.
-  - metric data model   # Anything related to the metric event data model.
-  - networking          # Anything related to Vector's networking (DNS, HTTP, TCP, etc).
-  - new platform        # A new platform, operating system, architecture, etc.
-  - new source          # A new Vector source.
-  - new transform       # A new Vector transform.
-  - new sink            # A new Vector sink.
-  - observability       # Anything related to observing Vector (internal logs, metrics, etc).
-  - operations          # Anything related to /scripts, CI, etc.
-  - platforms           # Anything related to Vector's supported platforms.
-  - security            # Anything related to security.
-  - testing             # Anything related to testing.
-  - topology            # Anything related to Vector's topology code.
-  - website             # Anything related to the website (not docs).
+
+  - new source
+  - new transform
+  - new sink
+
+  # domains
+  - blog
+  - buffers
+  - cli
+  - config
+  - dependencies
+  - docs
+  - guides
+  - marketing
+  - networking
+  - observability
+  - operations
+  - platforms
+  - security
+  - setup
+  - sinks
+  - sources
+  - testing
+  - topology
+  - transforms
+  - website
 
   # platforms
-  - Docker platform
-  - Amazon Linux platform
-  - CentOS platform
-  - Debian platform
-  - MacOS platform
-  - Raspbian platform
-  - RHEL platform
-  - Ubuntu platform
-  - Windows platform
-  - DPKG platform
-  - Homebrew platform
-  - RPM platform
-  - MSI platform
+  - docker platform
+  - amazon linux platform
+  - centos platform
+  - debian platform
+  - macos platform
+  - raspbian platform
+  - rhel platform
+  - ubuntu platform
+  - windows platform
+  - dpkg platform
+  - homebrew platform
+  - rpm platform
+  - msi platform
+
+  # providers
+  - aws provider
+  - datadog provider
+  - elastic provider
+  - google provider
+  - confluent provider
+  - new relic provider
+  - splunk provider
 
   # sources
   - docker source
@@ -72,6 +89,7 @@ scopes:
   - log_to_metric transform
   - logfmt_parser transform
   - lua transform
+  - merge transform
   - regex_parser transform
   - remove_fields transform
   - remove_tags transform
@@ -95,6 +113,7 @@ scopes:
   - gcp_stackdriver_logging sink
   - http sink
   - kafka sink
+  - logdna sink
   - new_relic_logs sink
   - prometheus sink
   - sematext sink

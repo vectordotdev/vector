@@ -3,7 +3,7 @@ type = "string"
 examples = ["debug"]
 description = """\
 Sets Vector's log level. See the [log section in the monitoring \
-guide][docs.monitoring#level] for more information on the available levels.\
+guide][docs.monitoring#levels] for more information on the available levels.\
 """
 
 [env_vars.RUST_BACKTRACE]

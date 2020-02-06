@@ -48,7 +48,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -104,7 +104,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -160,7 +160,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -216,7 +216,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -272,7 +272,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.7.1)', value: 'latest'},
+        { label: 'Latest (0.7.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -328,7 +328,7 @@ Vector in the [Configuration][docs.configuration] section.
 
 ### Data Directory
 
-We highly recommend creating a [data directory][docs.global-options#data-directory]
+We highly recommend creating a [data directory][docs.global-options#data_dir]
 that Vector can use:
 
 ```
@@ -379,6 +379,5 @@ Simply follow the same [installation instructions above](#installation).
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.containers]: /docs/setup/installation/containers/
-[docs.global-options#data-directory]: /docs/reference/global-options/#data-directory
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.package_managers]: /docs/setup/installation/package-managers/

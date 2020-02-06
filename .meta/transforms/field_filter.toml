@@ -6,7 +6,6 @@ common = false
 function_category = "filter"
 input_types = ["log", "metric"]
 output_types = ["log", "metric"]
-resources = []
 
 [transforms.field_filter.options.field]
 type = "string"

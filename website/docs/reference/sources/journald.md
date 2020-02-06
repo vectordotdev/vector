@@ -357,7 +357,7 @@ Vector checkpoints the journal position after every batch read. The size of
 the batch is controlled via the [`batch_size`](#batch_size) option. Checkpointing ensures that
 Vector resumes where it left off if restarted, preventing data from being read
 twice. The checkpoint positions are stored in the data directory which is
-specified via the [global [`data_dir`](#data_dir) option][docs.configuration#data-directory]
+specified via the [global [`data_dir`](#data_dir) option][docs.global-options#data_dir]
 but can be overridden via the [`data_dir`](#data_dir) option in the `journald` source
 directly.
 
@@ -392,8 +392,8 @@ usermod -aG systemd-journal vector
 ```
 
 
-[docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [urls.issue_1473]: https://github.com/timberio/vector/issues/1473
 [urls.rust_subprocess]: https://docs.rs/subprocess

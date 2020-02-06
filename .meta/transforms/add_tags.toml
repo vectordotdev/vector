@@ -5,7 +5,6 @@ common = false
 function_category = "shape"
 input_types = ["metric"]
 output_types = ["metric"]
-resources = []
 
 [transforms.add_tags.options.tags]
 type = "table"

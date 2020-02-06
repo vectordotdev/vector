@@ -17,6 +17,14 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
+<%- if component.options.assume_role -%>
+
+#### Assuming Roles
+
+Vector can assume an AWS IAM role via the `assume_role` option. This is an
+optional setting that is helpful for a variety of use cases, such as cross
+account access.
+<%- end -%>
 <%- end -%>
 <%- if component.sink? && component.buffer? && component.batching? -%>
 
@@ -116,7 +124,7 @@ If you'd like to disable health checks for this sink you can set the
 Partitioning is controlled via the <%= option_names(component.partition_options).to_sentence %>
 options and allows you to dynamically partition data on the fly.
 <%- if component.partition_options.any?(&:templateable?) -%>
-You'll notice that Vector's [template sytax](#template-syntax) is supported
+You'll notice that Vector's [template sytax](#field-interpolation) is supported
 for these options, enabling you to use field values as the partition's key.
 <%- end -%>
 <%- end -%>
@@ -157,7 +165,7 @@ event-by-event basis. It does not batch data.
 ### Template Syntax
 
 The <%= option_names(component.templateable_options).to_sentence %> options
-support [Vector's template syntax][docs.configuration#template-syntax],
+support [Vector's template syntax][docs.configuration#field-interpolation],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -175,5 +183,5 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration#template-syntax].
+[template syntax section][docs.configuration#field-interpolation].
 <%- end -%>

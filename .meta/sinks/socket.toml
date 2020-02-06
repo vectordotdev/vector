@@ -8,21 +8,32 @@ encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-write_to_description = "a socket, such as a TCP, UDP, or Unix socket"
+write_to_description = "a socket, such as a TCP or Unix domain socket"
 tls_options = ["+enabled"]
 
 [sinks.socket.options.mode]
 type = "string"
 common = true
 required = true
-description = "The type of socket to use. Currently only `tcp` is valid."
+description = "The type of socket to use."
 
 [sinks.socket.options.mode.enum]
-tcp = "Use the TCP protocol."
+tcp = "TCP Socket."
+unix = "Unix Domain Socket."
 
 [sinks.socket.options.address]
 type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
 required = true
+relevant_when = {mode = "tcp"}
 description = "The address to connect to. The address _must_ include a port."
+
+[sinks.socket.options.path]
+type = "string"
+common = true
+examples = ["/path/to/socket"]
+required = true
+relevant_when = {mode = "unix"}
+description = """The unix socket path. This should be the absolute path.\
+"""

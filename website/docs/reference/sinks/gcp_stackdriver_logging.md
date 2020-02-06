@@ -5,7 +5,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "gcp_stackdriver_logging|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp_stackdriver_logging.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logging.rs
 status: "beta"
 title: "GCP Stackdriver Logging Sink"
 unsupported_operating_systems: []
@@ -95,7 +95,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Resource
   [sinks.my_sink_id.resource]
-    type = "global" # example, no default
+    # REQUIRED
+    type = "global" # example
+
+    # OPTIONAL
     projectId = "vector-123456" # example
     zone = "Twilight" # example
 
@@ -253,7 +256,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -638,7 +641,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -695,14 +698,14 @@ For example, Compute Engine VM instances use the labels `projectId`, `instanceId
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["global","gce_instance"]}
   name={"type"}
   path={"resource"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -999,8 +1002,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/

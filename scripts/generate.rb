@@ -15,6 +15,7 @@
 # Setup
 #
 
+require 'uri'
 require_relative "setup"
 
 #
@@ -38,14 +39,19 @@ dry_run = ARGV.include?("--dry-run")
 # Functions
 #
 
-def doc_valid?(file_or_dir)
-  parts = file_or_dir.split("#", 2)
-  path = DOCS_ROOT + parts[0]
+def doc_valid?(url_path)
+  parts = url_path.split("#", 2)
+  file_or_dir_path = WEBSITE_ROOT + parts[0][0..-2]
   anchor = parts[1]
+  file_path =
+    if File.directory?(file_or_dir_path) && File.file?("#{file_or_dir_path}/README.md")
+      "#{file_or_dir_path}/README.md"
+    else
+      "#{file_or_dir_path}.md"
+    end
 
-  if File.exists?(path)
+  if File.exists?(file_path)
     if !anchor.nil?
-      file_path = File.directory?(path) ? "#{path}/README.md" : path
       content = File.read(file_path)
       headings = content.scan(/\n###?#?#? (.*)\n/).flatten.uniq
       anchors = headings.collect(&:parameterize)
@@ -59,11 +65,28 @@ def doc_valid?(file_or_dir)
 end
 
 def link_valid?(value)
-  if value.start_with?("/")
+  if value.start_with?(DOCS_BASE_PATH)
     doc_valid?(value)
+  elsif value.start_with?("/")
+    page_valid?(value)
   else
     url_valid?(value)
   end
+end
+
+def page_valid?(path)
+  uri = URI::parse(path)
+
+  path =
+    if uri.path == "/"
+      "/index"
+    elsif uri.path.end_with?("/")
+      uri.path[0..-2]
+    else
+      uri.path
+    end
+
+  File.exists?("#{PAGES_ROOT}#{path}.js")
 end
 
 def post_process(content, doc, links)

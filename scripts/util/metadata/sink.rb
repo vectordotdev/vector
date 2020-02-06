@@ -13,7 +13,6 @@ class Sink < Component
     :healthcheck,
     :output,
     :service_limits_short_link,
-    :service_providers,
     :tls,
     :write_to_description
 
@@ -29,7 +28,6 @@ class Sink < Component
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_providers = hash["service_providers"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -105,49 +103,6 @@ class Sink < Component
         })
     end
 
-    # AWS
-
-    if service_provider?("AWS")
-      @env_vars.AWS_ACCESS_KEY_ID =
-        Option.new({
-          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
-          "examples" => ["AKIAIOSFODNN7EXAMPLE"],
-          "name" => "AWS_ACCESS_KEY_ID",
-          "null" => true,
-          "type" => "string"
-        })
-
-      @env_vars.AWS_SECRET_ACCESS_KEY =
-        Option.new({
-          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
-          "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
-          "name" => "AWS_SECRET_ACCESS_KEY",
-          "null" => true,
-          "type" => "string"
-        })
-
-      @options.endpoint =
-        Option.new({
-          "description" => "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot.",
-          "examples" => ["127.0.0.0:5000"],
-          "name" => "endpoint",
-          "null" => true,
-          "required" => false,
-          "type" => "string"
-        })
-
-      @options.region =
-        Option.new({
-          "common" => only_service_provider?("AWS"),
-          "description" => "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region.",
-          "examples" => ["us-east-1"],
-          "name" => "region",
-          "null" => true,
-          "required" => only_service_provider?("AWS"),
-          "type" => "string"
-        })
-    end
-
     if buffer?
       # Buffer options
 
@@ -189,7 +144,7 @@ class Sink < Component
 
       buffer_options["max_events"] =
         {
-          "description" => "The maximum number of [events][docs.data-model#event] allowed in the buffer.",
+          "description" => "The maximum number of [events][docs.data-model] allowed in the buffer.",
           "default" => 500,
           "null" => true,
           "relevant_when" => {"type" => "memory"},
@@ -207,12 +162,6 @@ class Sink < Component
         })
 
       @options.buffer = buffer_option
-    end
-
-    # resources
-
-    if @service_limits_short_link
-      @resources << OpenStruct.new({"name" => "Service Limits", "short_link" => @service_limits_short_link})
     end
 
     # An empty array means TLS options are supported
@@ -311,10 +260,6 @@ class Sink < Component
     healthcheck == true
   end
 
-  def only_service_provider?(provider_name)
-    service_providers.length == 1 && service_provider?(provider_name)
-  end
-
   def plural_write_verb
     case egress_method
     when "batching"
@@ -326,10 +271,6 @@ class Sink < Component
     else
       raise("Unhandled egress_method: #{egress_method.inspect}")
     end
-  end
-
-  def service_provider?(provider_name)
-    service_providers.collect(&:downcase).include?(provider_name.downcase)
   end
 
   def streaming?

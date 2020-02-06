@@ -34,7 +34,7 @@ support specific guarantees.
 ### At-Least-Once
 
 The `at-least-once` delivery guarantee ensures that an
-[event][docs.data-model#event] received by Vector will be delivered at least
+[event][docs.data-model] received by Vector will be delivered at least
 once to the configured destination(s). While rare, it is possible for an event
 to be delivered more than once. See the [Does Vector support exactly once
 delivery](#does-vector-support-exactly-once-delivery) FAQ below).
@@ -151,7 +151,7 @@ Head over to the [components section][pages.components] and use the guarantee
 filters.
 
 
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.data-model]: /docs/about/data-model/
 [docs.sinks]: /docs/reference/sinks/
 [pages.components]: /components/
 [urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

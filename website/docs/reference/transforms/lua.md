@@ -182,7 +182,7 @@ variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
 |:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#schema]. |
 
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
@@ -199,6 +199,16 @@ for f,v in pairs(event) do
   end
 end
 ```
+
+### Lua Manual
+
+Understanding Lua and how write it is outside of the scope of Vector. We
+encourage you to take a look at the [Lua manual][urls.lua_manual] for more
+information.
+
+### Lua Version
+
+Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
 
 ### Nested Fields
 
@@ -223,11 +233,13 @@ function][urls.lua_require].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model.log#default-schema]: /docs/about/data-model/log/#default-schema
+[docs.data-model.log#schema]: /docs/about/data-model/log/#schema
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data_model]: /docs/about/data-model/
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/
+[urls.lua_manual]: http://www.lua.org/manual/5.1/manual.html
 [urls.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
 [urls.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
 [urls.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
+[urls.rlua]: https://github.com/kyren/rlua

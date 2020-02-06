@@ -5,7 +5,6 @@ common = false
 function_category = "enrich"
 input_types = ["log"]
 output_types = ["log"]
-resources = []
 
 [transforms.geoip.options.database]
 type = "string"

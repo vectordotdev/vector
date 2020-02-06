@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
 ```
 
 </TabItem>
@@ -61,10 +61,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
 
   # OPTIONAL
-  endpoint = "127.0.0.0:5000" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
 ```
 
@@ -85,10 +85,10 @@ import Field from '@site/src/components/Field';
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
+  examples={["127.0.0.0:5000/path/to/service"]}
   name={"endpoint"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -154,7 +154,7 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}

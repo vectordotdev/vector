@@ -194,14 +194,13 @@ jobs:
       - run:
           name: Build tests
           command: |
-            rm rust-toolchain
             ./scripts/docker-run.sh builder-$TARGET cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
       - run:
           name: Start dependencies
           command: |
             docker-compose up -d splunk
             sleep 30 # Splunk crashes when started simultaneously with other services
-            docker-compose up -d
+            docker-compose up -d test-runtime-deps
             sleep 180
       - run:
           name: Run tests

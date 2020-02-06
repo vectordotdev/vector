@@ -40,7 +40,7 @@ Vector checkpoints the journal position after every batch read. The size of
 the batch is controlled via the `batch_size` option. Checkpointing ensures that
 Vector resumes where it left off if restarted, preventing data from being read
 twice. The checkpoint positions are stored in the data directory which is
-specified via the [global `data_dir` option][docs.configuration#data-directory]
+specified via the [global `data_dir` option][docs.global-options#data_dir]
 but can be overridden via the `data_dir` option in the `journald` source
 directly.
 

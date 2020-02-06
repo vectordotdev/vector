@@ -14,9 +14,13 @@ service_limits_short_link = "aws_cw_metrics_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
 
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_metrics.env_vars") %>
+
 [sinks.aws_cloudwatch_metrics.options.namespace]
 type = "string"
 common = true
 examples = ["service"]
 required = true
 description = "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
+
+<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options") %>

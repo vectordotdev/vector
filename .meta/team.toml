@@ -2,6 +2,7 @@
 id = "alex"
 avatar = "https://github.com/a-rodin.png"
 github = "https://github.com/a-rodin"
+keybase = "https://keybase.io/arodin"
 name = "Alexander"
 
 [[team]]
@@ -14,18 +15,24 @@ name = "Alexey"
 id = "ana"
 avatar = "https://github.com/hoverbear.png"
 github = "https://github.com/hoverbear"
+keybase = "https://keybase.io/hoverbear"
+twitter = "https://twitter.com/a_hoverbear"
 name = "Ana"
 
 [[team]]
 id = "ashley"
 avatar = "https://github.com/Jeffail.png"
 github = "https://github.com/Jeffail"
+keybase = "https://keybase.io/jeffail"
+twitter = "https://twitter.com/jeffail"
 name = "Ashley"
 
 [[team]]
 id = "ben"
 avatar = "https://github.com/binarylogic.png"
 github = "https://github.com/binarylogic"
+keybase = "https://keybase.io/binarylogic"
+twitter = "https://twitter.com/binarylogic"
 name = "Ben"
 
 [[team]]
@@ -44,10 +51,14 @@ name = "Kruno"
 id = "lucio"
 avatar = "https://github.com/LucioFranco.png"
 github = "https://github.com/LucioFranco"
+keybase = "https://keybase.io/luciofranco"
+twitter = "https://twitter.com/lucio_d_franco"
 name = "Lucio"
 
 [[team]]
 id = "luke"
 avatar = "https://github.com/lukesteensen.png"
 github = "https://github.com/lukesteensen"
+keybase = "https://keybase.io/lukesteensen"
+twitter = "https://twitter.com/lukesteensen"
 name = "Luke"

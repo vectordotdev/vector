@@ -1,3 +1,5 @@
+require "erb"
+require "json_schemer"
 require "ostruct"
 require "toml-rb"
 
@@ -16,20 +18,90 @@ require_relative "metadata/transform"
 # This represents the /.meta directory in object form. Sub-classes represent
 # each sub-component.
 class Metadata
-  class << self
-    def load!(meta_dir, docs_root, pages_root)
-      metadata = {}
+  module Template
+    extend self
 
-      Dir.glob("#{meta_dir}/**/*.toml").each do |file|
-        hash = TomlRB.load_file(file)
-        metadata.deep_merge!(hash)
+    def render(path, args = {})
+      context = binding
+
+      args.each do |key, value|
+        context.local_variable_set("#{key}", value)
       end
 
-      new(metadata, docs_root, pages_root)
+      full_path = path.start_with?("/") ? path : "#{META_ROOT}/#{path}"
+      body = File.read(full_path)
+      renderer = ERB.new(body, nil, '-')
+      renderer.result(context)
     end
   end
 
+  class << self
+    def load!(meta_dir, docs_root, pages_root)
+      metadata = load_metadata!(meta_dir)
+      json_schema = load_json_schema!(meta_dir)
+      validate_schema!(json_schema, metadata)
+      new(metadata, docs_root, pages_root)
+    end
+
+    private
+      def load_json_schema!(meta_dir)
+        json_schema = read_json("#{meta_dir}/.schema.json")
+
+        Dir.glob("#{meta_dir}/.schema/**/*.json").each do |file|
+          hash = read_json("#{meta_dir}/.schema.json")
+          json_schema.deep_merge!(hash)
+        end
+
+        json_schema
+      end
+
+      def load_metadata!(meta_dir)
+        metadata = {}
+
+        Dir.glob("#{meta_dir}/**/[^_]*.toml").each do |file|
+          content = Template.render(file)
+          hash = TomlRB.parse(content)
+          metadata.deep_merge!(hash)
+        end
+
+        metadata
+      end
+
+      def read_json(path)
+        body = File.read(path)
+        JSON.parse(body)
+      end
+
+      def validate_schema!(schema, metadata)
+        schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
+        errors = schemer.validate(metadata).to_a
+        limit = 5
+
+        if errors.any?
+          error_messages =
+            errors[0..(limit - 1)].collect do |error|
+              "The value at `#{error.fetch("data_pointer")}` failed validation for `#{error.fetch("schema_pointer")}`, reason: `#{error.fetch("type")}`"
+            end
+
+          if errors.size > limit
+            error_messages << "+ #{errors.size} errors"
+          end
+
+          error!(
+            <<~EOF
+            The metadata schema is invalid. This means the the resulting
+            hash from the `/.meta/**/*.toml` files violates the defined
+            schema. Errors include:
+
+            * #{error_messages.join("\n* ")}
+            EOF
+          )
+        end
+      end
+  end
+
   attr_reader :blog_posts,
+    :domains,
     :env_vars,
     :installation,
     :links,
@@ -54,6 +126,10 @@ class Metadata
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
     @testing = Option.build_struct(hash.fetch("testing"))
+
+    # domains
+
+    @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
 
     # installation
 
@@ -259,6 +335,10 @@ class Metadata
 
   def relesed_versions
     releases
+  end
+
+  def service_providers
+    @service_providers ||= components.collect(&:service_providers).flatten.uniq
   end
 
   def sinks_list

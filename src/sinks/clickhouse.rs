@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
-        retries::RetryLogic,
+        retries::{RetryAction, RetryLogic},
         tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -16,7 +16,6 @@ use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::borrow::Cow;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -179,7 +178,7 @@ impl RetryLogic for ClickhouseRetryLogic {
         self.inner.is_retriable_error(error)
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> Option<Cow<str>> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         match response.status() {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.body();
@@ -189,10 +188,13 @@ impl RetryLogic for ClickhouseRetryLogic {
                 // retry those errors.
                 //
                 // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
-                if body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53") {
-                    None
+                // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
+                if body.starts_with(b"Code: 117") {
+                    RetryAction::DontRetry("incorrect data".into())
+                } else if body.starts_with(b"Code: 53") {
+                    RetryAction::DontRetry("type mismatch".into())
                 } else {
-                    Some(String::from_utf8_lossy(body).to_string().into())
+                    RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
             _ => self.inner.should_retry_response(response),

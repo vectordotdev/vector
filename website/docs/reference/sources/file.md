@@ -128,7 +128,7 @@ import Field from '@site/src/components/Field';
 
 ### data_dir
 
-The directory used to persist file checkpoint positions. By default, the [global [`data_dir`](#data_dir) option][docs.configuration#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
+The directory used to persist file checkpoint positions. By default, the [global [`data_dir`](#data_dir) option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
 
 
 </Field>
@@ -602,7 +602,7 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global [`data_dir`](#data_dir) option][docs.configuration#data-directory] but can be
+[global [`data_dir`](#data_dir) option][docs.global-options#data_dir] but can be
 overridden via the [`data_dir`](#data_dir) option in the [`file`](#file) source directly.
 
 ### Compressed Files
@@ -721,10 +721,9 @@ Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
 
 
-[docs.configuration#data-directory]: /docs/setup/configuration/#data-directory
-[docs.configuration#data_dir]: /docs/setup/configuration/#data_dir
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)

@@ -8,7 +8,7 @@ use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
 };
-use structopt::StructOpt;
+use structopt::{clap::AppSettings, StructOpt};
 #[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
@@ -83,14 +83,14 @@ enum SubCommand {
     /// Validate the target config, then exit.
     Validate(Validate),
 
-    /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    Test(unit_test::Opts),
+    /// Generate a Vector configuration containing a list of components.
+    Generate(generate::Opts),
 
     /// List available components, then exit.
     List(list::Opts),
 
-    /// Generate a Vector configuration containing a list of components.
-    Generate(generate::Opts),
+    /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
+    Test(unit_test::Opts),
 }
 
 #[derive(StructOpt, Debug)]
@@ -153,7 +153,11 @@ fn get_version() -> String {
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
     let version = get_version();
-    let app = Opts::clap().version(&version[..]);
+    let app = Opts::clap().version(&version[..]).global_settings(&[
+        AppSettings::ColoredHelp,
+        AppSettings::InferSubcommands,
+        AppSettings::DeriveDisplayOrder,
+    ]);
     let root_opts = Opts::from_clap(&app.get_matches());
     let opts = root_opts.root;
     let sub_command = root_opts.sub_command;

@@ -1,9 +1,9 @@
 use crate::{
     dns::Resolver,
-    event::{self, Event},
     sinks::util::{
+        encode_event,
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
-        SinkExt,
+        Encoding, SinkExt,
     },
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
@@ -47,13 +47,6 @@ pub struct TcpSinkConfig {
     pub address: String,
     pub encoding: Encoding,
     pub tls: Option<TlsConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]

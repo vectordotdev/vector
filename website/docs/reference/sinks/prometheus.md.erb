@@ -102,17 +102,17 @@ As described in the [metric data model][docs.data-model.metric] page, Vector off
 a variety of metric types. Their support, as as well as their mappings, are
 described below:
 
-| Vector Metric Type                               | Prometheus Metric Type               |
-|:-------------------------------------------------|:-------------------------------------|
-| [`counter`][docs.data-model.metric#counters]     | ['counter'][urls.prometheus_counter] |
-| [`gauge`][docs.data-model.metric#gauges]         | ['gauge'][urls.prometheus_gauge]     |
-| [`histogram`][docs.data-model.metric#histograms] | ['histogram'][urls.prometheus_gauge] |
-| [`set`][docs.data-model.metric#sets]             | ⚠️ not supported                     |
-| -                                                | ['summary'][urls.prometheus_summary] |
+| Vector Metric Type                                         | Prometheus Metric Type                   |
+|:-----------------------------------------------------------|:-----------------------------------------|
+| [`counter`][docs.data-model.metric#counter]                | ['counter'][urls.prometheus_counter]     |
+| [`gauge`][docs.data-model.metric#gauge]                    | ['gauge'][urls.prometheus_gauge]         |
+| [`histogram`][docs.data-model.metric#aggregated_histogram] | ['histogram'][urls.prometheus_histogram] |
+| [`set`][docs.data-model.metric#set]                        | ⚠️ not supported                         |
+| -                                                          | ['summary'][urls.prometheus_summary]     |
 
 #### Sets
 
-Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
+Prometheus does not have a [`set`][docs.data-model.metric#set] type. Sets are
 generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `<%= component.name %>` sink it will be dropped, and a rate limited warning
 level log will be output.

@@ -5,7 +5,7 @@ event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "prometheus|[\"metric\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
 status: "beta"
 title: "Prometheus Sink"
 unsupported_operating_systems: []
@@ -417,17 +417,17 @@ As described in the [metric data model][docs.data-model.metric] page, Vector off
 a variety of metric types. Their support, as as well as their mappings, are
 described below:
 
-| Vector Metric Type                               | Prometheus Metric Type               |
-|:-------------------------------------------------|:-------------------------------------|
-| [`counter`][docs.data-model.metric#counters]     | ['counter'][urls.prometheus_counter] |
-| [`gauge`][docs.data-model.metric#gauges]         | ['gauge'][urls.prometheus_gauge]     |
-| [`histogram`][docs.data-model.metric#histograms] | ['histogram'][urls.prometheus_gauge] |
-| [`set`][docs.data-model.metric#sets]             | ⚠️ not supported                     |
-| -                                                | ['summary'][urls.prometheus_summary] |
+| Vector Metric Type                                         | Prometheus Metric Type                   |
+|:-----------------------------------------------------------|:-----------------------------------------|
+| [`counter`][docs.data-model.metric#counter]                | ['counter'][urls.prometheus_counter]     |
+| [`gauge`][docs.data-model.metric#gauge]                    | ['gauge'][urls.prometheus_gauge]         |
+| [`histogram`][docs.data-model.metric#aggregated_histogram] | ['histogram'][urls.prometheus_histogram] |
+| [`set`][docs.data-model.metric#set]                        | ⚠️ not supported                         |
+| -                                                          | ['summary'][urls.prometheus_summary]     |
 
 #### Sets
 
-Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
+Prometheus does not have a [`set`][docs.data-model.metric#set] type. Sets are
 generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `prometheus` sink it will be dropped, and a rate limited warning
 level log will be output.
@@ -451,12 +451,11 @@ discussion with your use case if you find this to be a problem.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model.metric#counters]: /docs/about/data-model/metric/#counters
+[docs.data-model.metric#aggregated_histogram]: /docs/about/data-model/metric/#aggregated_histogram
+[docs.data-model.metric#counter]: /docs/about/data-model/metric/#counter
 [docs.data-model.metric#distribution]: /docs/about/data-model/metric/#distribution
-[docs.data-model.metric#gauges]: /docs/about/data-model/metric/#gauges
-[docs.data-model.metric#histograms]: /docs/about/data-model/metric/#histograms
+[docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
-[docs.data-model.metric#sets]: /docs/about/data-model/metric/#sets
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710
@@ -464,6 +463,7 @@ discussion with your use case if you find this to be a problem.
 [urls.prometheus_counter]: https://prometheus.io/docs/concepts/metric_types/#counter
 [urls.prometheus_gauge]: https://prometheus.io/docs/concepts/metric_types/#gauge
 [urls.prometheus_high_cardinality]: https://prometheus.io/docs/practices/naming/#labels
+[urls.prometheus_histogram]: https://prometheus.io/docs/concepts/metric_types/#histogram
 [urls.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
 [urls.prometheus_metric_naming]: https://prometheus.io/docs/practices/naming/#metric-names
 [urls.prometheus_summary]: https://prometheus.io/docs/concepts/metric_types/#summary

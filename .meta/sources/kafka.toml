@@ -5,7 +5,6 @@ common = true
 delivery_guarantee = "at_least_once"
 function_category = "collect"
 output_types = ["log"]
-resources = []
 through_description = "Kafka 0.9 or later"
 
 [sources.kafka.options.bootstrap_servers]

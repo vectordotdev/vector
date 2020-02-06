@@ -70,7 +70,7 @@ function Footer() {
                 <MailingListForm description={false} width="150px" />
               </div>
               <div>
-                <a href="https://twitter.com/timberdotio" target="_blank"><i className="feather icon-twitter" alt="Vector's Twitter"></i></a>
+                <a href="https://twitter.com/vectordotdev" target="_blank"><i className="feather icon-twitter" alt="Vector's Twitter"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
                 <a href="https://chat.vector.dev" target="_blank"><i className="feather icon-message-circle" alt="Vector's Chat"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;

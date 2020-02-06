@@ -34,13 +34,13 @@ function Contact() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/timberdotio" target="_blank" className="panel panel--link text--center">
+                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel panel--link text--center">
                   <div className="panel--icon">
                     <i className="feather icon-twitter"></i>
                   </div>
-                  <div className="panel--title">Twitter @timberdotio</div>
+                  <div className="panel--title">@vectordotdev</div>
                   <div className="panel--description">
-                    Tweet at us. Use the <code>#vector</code> hashtag.
+                    Tweet at us
                   </div>
                 </a>
               </div>
