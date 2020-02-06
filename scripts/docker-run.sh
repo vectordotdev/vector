@@ -27,6 +27,7 @@ fi
 # Variables
 #
 
+DOCKER_PRIVILEGED=${DOCKER_PRIVILEGED:-false}
 tag="$1"
 image="timberiodev/vector-$tag:latest"
 
@@ -52,7 +53,6 @@ fi
 # pass `--privileged`. One use case is to register `binfmt`
 # handlers in order to run builders for ARM architectures
 # using `qemu-user`.
-DOCKER_PRIVILEGED=${DOCKER_PRIVILEGED:-}
 if [ "$DOCKER_PRIVILEGED" == "true" ]; then
   docker_flags+=("--privileged")
 fi
