@@ -55,6 +55,10 @@ check-examples: build
 check-blog:
 	$(RUN) check-blog
 
+# generate
+generate:
+	$(RUN) generate
+
 # packaging
 
 package: build-archive package-deb package-rpm
