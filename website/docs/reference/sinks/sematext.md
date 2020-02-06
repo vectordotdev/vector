@@ -46,7 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sinks.my_sink_id]
   type = "sematext" # must be: "sematext"
   inputs = ["my-source-id"] # example
-  token = "some-sematext-token" # example
+  token = "${SEMATEXT_TOKEN_ENV_VAR}" # example
 ```
 
 </TabItem>
@@ -59,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "sematext" # must be: "sematext"
   inputs = ["my-source-id"] # example
-  token = "some-sematext-token" # example
+  token = "${SEMATEXT_TOKEN_ENV_VAR}" # example
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -537,7 +537,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["some-sematext-token"]}
+  examples={["${SEMATEXT_TOKEN_ENV_VAR}","some-sematext-token"]}
   name={"token"}
   path={null}
   relevantWhen={null}

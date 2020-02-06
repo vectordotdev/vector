@@ -59,6 +59,12 @@
   color: ff9ff3
 <%- end -%>
 
+<%- metadata.service_providers.each do |service_provider| -%>
+- name: "provider: <%= service_provider.downcase %>"
+  description: Anything <%= service_provider %> related
+  color: ff9f43
+<%- end -%>
+
 <%- metadata.sources.to_h.values.sort.each do |source| -%>
 - name: "source: <%= source.name.downcase %>"
   description: Anything `<%= source.name %>` source realted

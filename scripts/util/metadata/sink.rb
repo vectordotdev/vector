@@ -13,7 +13,6 @@ class Sink < Component
     :healthcheck,
     :output,
     :service_limits_short_link,
-    :service_providers,
     :tls,
     :write_to_description
 
@@ -29,7 +28,6 @@ class Sink < Component
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_providers = hash["service_providers"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -262,10 +260,6 @@ class Sink < Component
     healthcheck == true
   end
 
-  def only_service_provider?(provider_name)
-    service_providers.length == 1 && service_provider?(provider_name)
-  end
-
   def plural_write_verb
     case egress_method
     when "batching"
@@ -277,10 +271,6 @@ class Sink < Component
     else
       raise("Unhandled egress_method: #{egress_method.inspect}")
     end
-  end
-
-  def service_provider?(provider_name)
-    service_providers.collect(&:downcase).include?(provider_name.downcase)
   end
 
   def streaming?
