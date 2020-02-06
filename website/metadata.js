@@ -18210,7 +18210,7 @@ module.exports = {
       ]
     },
     "merge": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": null,
       "description": "Accepts log events and allows you to merge partial log events into a single event.",
       "event_types": [
@@ -18225,7 +18225,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "status": "prod-ready",
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 

@@ -1,6 +1,7 @@
 [transforms.merge]
 title = "Merge"
 allow_you_to_description = "merge partial log events into a single event"
+beta = true
 common = false
 function_category = "merge"
 input_types = ["log"]
