@@ -172,6 +172,8 @@ module.exports = {
             
               "reference/transforms/lua",
             
+              "reference/transforms/merge",
+            
               "reference/transforms/regex_parser",
             
               "reference/transforms/remove_fields",
@@ -216,13 +218,19 @@ module.exports = {
             
               "reference/sinks/gcp_pubsub",
             
+              "reference/sinks/gcp_stackdriver_logging",
+            
               "reference/sinks/http",
             
               "reference/sinks/kafka",
             
+              "reference/sinks/logdna",
+            
               "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
+            
+              "reference/sinks/sematext",
             
               "reference/sinks/socket",
             
@@ -262,6 +270,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Security',
+          href: 'https://github.com/timberio/vector/security/policy'
+        },
       ],
     },
   ]

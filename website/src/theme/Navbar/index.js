@@ -69,7 +69,6 @@ function navLinkAttributes(label, right) {
 
 function NavLink({href, hideIcon, label, onClick, position, right, to}) {
   let attributes = navLinkAttributes(label, right) || {};
-  console.log(attributes)
   const toUrl = useBaseUrl(to);
 
   return (

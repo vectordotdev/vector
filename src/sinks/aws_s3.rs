@@ -19,6 +19,7 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
@@ -39,6 +40,8 @@ pub struct S3SinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
+    options: S3Options,
+    #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
     pub compression: Compression,
@@ -46,6 +49,54 @@ pub struct S3SinkConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct S3Options {
+    acl: Option<S3CannedAcl>,
+    grant_full_control: Option<String>,
+    grant_read: Option<String>,
+    grant_read_acp: Option<String>,
+    grant_write_acp: Option<String>,
+    server_side_encryption: Option<S3ServerSideEncryption>,
+    ssekms_key_id: Option<String>,
+    storage_class: Option<S3StorageClass>,
+    tags: Option<HashMap<String, String>>,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "kebab-case")]
+enum S3CannedAcl {
+    #[derivative(Default)]
+    Private,
+    PublicRead,
+    PublicReadWrite,
+    AwsExecRead,
+    AuthenticatedRead,
+    LogDeliveryWrite,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+enum S3ServerSideEncryption {
+    #[serde(rename = "AES256")]
+    AES256,
+    #[serde(rename = "aws:kms")]
+    AwsKms,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum S3StorageClass {
+    #[derivative(Default)]
+    Standard,
+    ReducedRedundancy,
+    IntelligentTiering,
+    StandardIA,
+    OnezoneIA,
+    Glacier,
+    DeepArchive,
 }
 
 lazy_static! {
@@ -133,6 +184,7 @@ impl S3Sink {
 
         let filename_extension = config.filename_extension.clone();
         let bucket = config.bucket.clone();
+        let options = config.options.clone();
 
         let svc = ServiceBuilder::new()
             .map(move |req| {
@@ -143,6 +195,7 @@ impl S3Sink {
                     filename_append_uuid,
                     compression,
                     bucket.clone(),
+                    options.clone(),
                 )
             })
             .settings(request, S3RetryLogic)
@@ -218,16 +271,37 @@ impl Service<Request> for S3Sink {
     }
 
     fn call(&mut self, request: Request) -> Self::Future {
+        let options = request.options;
+        let mut tagging = url::form_urlencoded::Serializer::new(String::new());
+        if let Some(tags) = options.tags {
+            for (p, v) in tags {
+                tagging.append_pair(&p, &v);
+            }
+        }
+        let tagging = tagging.finish();
         self.client
             .put_object(PutObjectRequest {
                 body: Some(request.body.into()),
                 bucket: request.bucket,
                 key: request.key,
                 content_encoding: request.content_encoding,
+                acl: options.acl.map(to_string),
+                grant_full_control: options.grant_full_control,
+                grant_read: options.grant_read,
+                grant_read_acp: options.grant_read_acp,
+                grant_write_acp: options.grant_write_acp,
+                server_side_encryption: options.server_side_encryption.map(to_string),
+                ssekms_key_id: options.ssekms_key_id,
+                storage_class: options.storage_class.map(to_string),
+                tagging: Some(tagging),
                 ..Default::default()
             })
             .instrument(info_span!("request"))
     }
+}
+
+fn to_string(value: impl Serialize) -> String {
+    serde_json::to_value(&value).unwrap().to_string()
 }
 
 fn build_request(
@@ -237,6 +311,7 @@ fn build_request(
     uuid: bool,
     gzip: bool,
     bucket: String,
+    options: S3Options,
 ) -> Request {
     let (inner, key) = req.into_parts();
 
@@ -270,6 +345,7 @@ fn build_request(
         bucket,
         key,
         content_encoding: if gzip { Some("gzip".to_string()) } else { None },
+        options,
     }
 }
 
@@ -279,6 +355,7 @@ struct Request {
     bucket: String,
     key: String,
     content_encoding: Option<String>,
+    options: S3Options,
 }
 
 #[derive(Debug, Clone)]
@@ -380,6 +457,7 @@ mod tests {
             false,
             false,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
@@ -390,6 +468,7 @@ mod tests {
             false,
             false,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_eq!(req.key, "key/date.log".to_string());
 
@@ -400,6 +479,7 @@ mod tests {
             false,
             true,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
@@ -410,6 +490,7 @@ mod tests {
             true,
             true,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }

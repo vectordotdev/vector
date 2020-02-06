@@ -5,7 +5,7 @@ require_relative "option"
 class Component
   DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
   EVENT_TYPES = ["log", "metric"].freeze
-  OPERATING_SYSTEMS = ["linux", "macos", "windows"].freeze
+  OPERATING_SYSTEMS = ["Linux", "MacOS", "Windows"].freeze
 
   include Comparable
 
@@ -18,7 +18,7 @@ class Component
     :operating_systems,
     :options,
     :posts,
-    :resources,
+    :requirements,
     :title,
     :type,
     :unsupported_operating_systems
@@ -27,9 +27,10 @@ class Component
     @beta = hash["beta"] == true
     @common = hash["common"] == true
     @env_vars = Option.build_struct(hash["env_vars"] || {})
-    @function_category = hash.fetch("function_category")
+    @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
+    @requirements = hash["requirements"]
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
@@ -46,12 +47,6 @@ class Component
     end
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
-
-    # Resources
-
-    @resources = (hash.delete("resources") || []).collect do |resource_hash|
-      OpenStruct.new(resource_hash)
-    end
 
     # Default options
 
@@ -156,7 +151,7 @@ class Component
       id: id,
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
-      service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
+      service_providers: (respond_to?(:service_providers, true) ? service_providers : nil),
       status: status,
       type: type,
       unsupported_operating_systems: unsupported_operating_systems

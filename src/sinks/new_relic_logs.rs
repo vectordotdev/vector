@@ -3,6 +3,7 @@ use crate::{
     sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -70,8 +71,8 @@ impl NewRelicLogsConfig {
         }
 
         let uri = match self.region.as_ref().unwrap_or(&NewRelicLogsRegion::Us) {
-            NewRelicLogsRegion::Us => "https://log-api.newrelic.com/log/v1",
-            NewRelicLogsRegion::Eu => "https://log-api.eu.newrelic.com/log/v1",
+            NewRelicLogsRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
+            NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
         let batch = BatchBytesConfig {
@@ -90,7 +91,7 @@ impl NewRelicLogsConfig {
         };
 
         Ok(HttpSinkConfig {
-            uri: uri.to_owned(),
+            uri: uri.into(),
             method: Some(HttpMethod::Post),
             healthcheck_uri: None,
             auth: None,
@@ -102,6 +103,8 @@ impl NewRelicLogsConfig {
             request,
 
             tls: None,
+
+            ..Default::default()
         })
     }
 }
@@ -140,7 +143,10 @@ mod tests {
         nr_config.license_key = Some("foo".to_owned());
         let http_config = nr_config.create_config().unwrap();
 
-        assert_eq!(http_config.uri, "https://log-api.newrelic.com/log/v1");
+        assert_eq!(
+            format!("{}", http_config.uri),
+            "https://log-api.newrelic.com/log/v1".to_string()
+        );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
@@ -168,7 +174,10 @@ mod tests {
 
         let http_config = nr_config.create_config().unwrap();
 
-        assert_eq!(http_config.uri, "https://log-api.eu.newrelic.com/log/v1");
+        assert_eq!(
+            format!("{}", http_config.uri),
+            "https://log-api.eu.newrelic.com/log/v1".to_string()
+        );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
@@ -202,7 +211,10 @@ mod tests {
 
         let http_config = nr_config.create_config().unwrap();
 
-        assert_eq!(http_config.uri, "https://log-api.eu.newrelic.com/log/v1");
+        assert_eq!(
+            format!("{}", http_config.uri),
+            "https://log-api.eu.newrelic.com/log/v1".to_string()
+        );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding, Encoding::Json);
         assert_eq!(
@@ -261,7 +273,10 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::default();
         nr_config.license_key = Some("foo".to_owned());
         let mut http_config = nr_config.create_config().unwrap();
-        http_config.uri = format!("http://{}/fake_nr", in_addr);
+        http_config.uri = format!("http://{}/fake_nr", in_addr)
+            .parse::<http::Uri>()
+            .unwrap()
+            .into();
 
         let mut rt = Runtime::new().unwrap();
 

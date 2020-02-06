@@ -145,7 +145,7 @@ A [`log` event][docs.data-model.log] will be output with the following structure
 ```
 
 While unrealistic, this example demonstrates the various accepted
-[types][docs.configuration#value-types] and how they're repsented in Vector's
+[types][docs.configuration#types] and how they're repsented in Vector's
 internal [log structure][docs.data-model.log].
 
 ## How It Works
@@ -223,26 +223,16 @@ Learn more about how [`log` events][docs.data-model.log] are structured.
 
 See the [`remove_fields` transform][docs.transforms.remove_fields].
 
-### Special Characters
-
-Aside from the [special characters][docs.data-model.log#special-characters]
-listed in the [Data Model][docs.data-model] doc, Vector does not restrict the
-characters allowed in keys. You can wrap key names in `" "` quote to preserve
-spaces and use `\` to escape quotes.
-
 ### Types
 
-All supported [configuration value types][docs.configuration#value-types] are accepted.
+All supported [configuration value types][docs.configuration#types] are accepted.
 This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.configuration#types]: /docs/setup/configuration/#types
-[docs.configuration#value-types]: /docs/setup/configuration/#value-types
-[docs.data-model.log#special-characters]: /docs/about/data-model/log/#special-characters
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.data-model]: /docs/about/data-model/
 [docs.transforms.lua]: /docs/reference/transforms/lua/
 [docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
 [urls.toml_array]: https://github.com/toml-lang/toml#array

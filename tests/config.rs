@@ -594,6 +594,7 @@ fn parses_sink_full_es_basic_auth() {
     .unwrap();
 }
 
+#[cfg(feature = "docker")]
 #[test]
 fn parses_sink_full_es_aws() {
     load(
@@ -604,7 +605,7 @@ fn parses_sink_full_es_aws() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        region = "us-east-1"
+        host = "https://es.us-east-1.amazonaws.com"
 
         [sinks.out.auth]
         strategy = "aws"

@@ -4,15 +4,19 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
 use serde::{Serialize, Serializer};
-use std::collections::HashMap;
+use std::collections::{hash_map::Drain, HashMap};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
+pub mod discriminant;
 pub mod flatten;
+pub mod merge;
+pub mod merge_state;
 pub mod metric;
 mod unflatten;
 
 pub use metric::Metric;
+pub use unflatten::Unflatten;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -22,6 +26,7 @@ lazy_static! {
     pub static ref MESSAGE: Atom = Atom::from("message");
     pub static ref HOST: Atom = Atom::from("host");
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
+    pub static ref PARTIAL: Atom = Atom::from("_partial");
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -123,6 +128,10 @@ impl LogEvent {
     pub fn unflatten(self) -> unflatten::Unflatten {
         unflatten::Unflatten::from(self.fields)
     }
+
+    pub fn drain(&mut self) -> Drain<Atom, Value> {
+        self.fields.drain()
+    }
 }
 
 impl std::ops::Index<&Atom> for LogEvent {
@@ -133,15 +142,20 @@ impl std::ops::Index<&Atom> for LogEvent {
     }
 }
 
+impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
+    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
+        for (k, v) in iter {
+            self.insert(k.into(), v.into());
+        }
+    }
+}
+
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        Self {
-            fields: iter
-                .into_iter()
-                .map(|(key, value)| (key.into(), value.into()))
-                .collect(),
-        }
+        let mut log_event = Event::new_empty_log().into_log();
+        log_event.extend(iter);
+        log_event
     }
 }
 
@@ -522,14 +536,7 @@ impl<'a> Iterator for FieldsIter<'a> {
     type Item = (&'a Atom, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (key, value) = match self.inner.next() {
-                Some(next) => next,
-                None => return None,
-            };
-
-            return Some((key, &value));
-        }
+        self.inner.next()
     }
 }
 

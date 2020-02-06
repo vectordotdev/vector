@@ -1,9 +1,9 @@
 use crate::{
     dns::Resolver,
-    event::{self, Event},
     sinks::util::{
+        encode_event,
         tls::{TlsConnectorExt, TlsOptions, TlsSettings},
-        SinkExt,
+        Encoding, SinkExt,
     },
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
@@ -47,13 +47,6 @@ pub struct TcpSinkConfig {
     pub address: String,
     pub encoding: Encoding,
     pub tls: Option<TlsConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -333,28 +326,6 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
     });
 
     Box::new(check)
-}
-
-fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
-    let log = event.into_log();
-
-    let b = match encoding {
-        Encoding::Json => serde_json::to_vec(&log.unflatten()),
-        Encoding::Text => {
-            let bytes = log
-                .get(&event::MESSAGE)
-                .map(|v| v.as_bytes().to_vec())
-                .unwrap_or_default();
-            Ok(bytes)
-        }
-    };
-
-    b.map(|mut b| {
-        b.push(b'\n');
-        Bytes::from(b)
-    })
-    .map_err(|error| error!(message = "Unable to encode.", %error))
-    .ok()
 }
 
 enum MaybeTlsStream<R, T> {

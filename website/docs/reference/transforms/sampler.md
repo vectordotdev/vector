@@ -60,7 +60,7 @@ import Field from '@site/src/components/Field';
 
 ### pass_list
 
-A list of regular expression patterns to exclude events from sampling. If an event&#39;s `&quot;message&quot;` key matches _any_ of these patterns it will _not_ be sampled.
+A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.
 
 
 </Field>

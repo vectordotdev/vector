@@ -4,9 +4,7 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
-guides = []
 output_types = ["log"]
-resources = []
 through_description = "the docker engine daemon"
 
 [sources.docker.env_vars.DOCKER_HOST]
@@ -53,6 +51,24 @@ examples = [["my_image_name", "httpd", "redis"]]
 description = """\
 A list of image names to match against. If not provided, \
 all images will be included.\
+"""
+
+[sources.docker.options.auto_partial_merge]
+type = "bool"
+common = false
+default = true
+description = """\
+Setting this to `false` will disable the automatic merging of partial events.\
+"""
+
+[sources.docker.options.partial_event_marker_field]
+type = "string"
+common = false
+default = "_partial"
+description = """\
+The field name to be added to events that are detected to contain an \
+incomplete message (i.e. partial events). If set to `""`, no field will be \
+added to partial event. This allows to opt-out of partial event detection.\
 """
 
 [sources.docker.output.log.fields.container_created_at]

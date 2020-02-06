@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
 status: "prod-ready"
@@ -159,7 +159,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -203,7 +203,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -464,6 +464,25 @@ The Kafka topic name to write events to.
 
 ## How It Works
 
+### AWS Authentication
+
+Vector checks for AWS credentials in the following order:
+
+1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
+#### Obtaining an access key
+
+In general, we recommend using instance profiles/roles whenever possible. In
+cases where this is not possible you can generate an AWS access key for any user
+within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
+how to do this.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -501,7 +520,12 @@ event-by-event basis. It does not batch data.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
+[urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

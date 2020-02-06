@@ -30,6 +30,7 @@ class Option
     :examples,
     :options,
     :partition_key,
+    :prioritize,
     :relevant_when,
     :required,
     :templateable,
@@ -46,6 +47,7 @@ class Option
     @name = hash.fetch("name")
     @options = self.class.build_struct(hash["options"] || {})
     @partition_key = hash["partition_key"] == true
+    @prioritize = hash["prioritize"] == true
     @relevant_when = hash["relevant_when"]
     @required = hash["required"] == true
     @templateable = hash["templateable"] == true
@@ -91,7 +93,11 @@ class Option
   end
 
   def <=>(other)
-    name <=> other.name
+    if prioritize? && !other.prioritize?
+      -1
+    else
+      name <=> other.name
+    end
   end
 
   def advanced?
@@ -180,6 +186,10 @@ class Option
 
   def partition_key?
     partition_key == true
+  end
+
+  def prioritize?
+    prioritize == true
   end
 
   def relevant_when_kvs

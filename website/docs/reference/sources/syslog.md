@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `syslog` source ingests data through the Syslog 5424 protocol and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "syslog|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
 status: "prod-ready"
@@ -105,7 +105,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The TCP or UDP address to listen for connections on, or &quot;systemd#N&quot; to use the Nth socket passed by systemd socket activation.
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the Nth socket passed by systemd socket activation.
 
 
 </Field>

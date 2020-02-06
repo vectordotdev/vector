@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
 status: "beta"
@@ -49,15 +49,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
+  region = "us-east-1" # example, relevant when host = ""
 
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-
-  # OPTIONAL - General
-  region = "us-east-1" # example, no default
 ```
 
 </TabItem>
@@ -72,6 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   bucket = "my-bucket" # example
   compression = "gzip" # example, enum
+  region = "us-east-1" # example, relevant when host = ""
 
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
@@ -80,9 +79,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
   key_prefix = "date=%F/" # default
 
   # OPTIONAL - General
-  endpoint = "https://s3.us-east-1.amazonaws.com" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
-  region = "us-east-1" # example, no default
+
+  # OPTIONAL - Object Attributes
+  acl = "private" # example, no default, enum
+  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
+  server_side_encryption = "AES256" # example, no default, enum
+  ssekms_key_id = nil # example, no default
+  storage_class = "STANDARD" # example, no default, enum
+  [sinks.my_sink_id.tags]
+    Tag1 = "Value1" # example
 
   # OPTIONAL - requests
   encoding = "ndjson" # example, no default, enum
@@ -126,6 +136,28 @@ import Field from '@site/src/components/Field';
 <Field
   common={false}
   defaultValue={null}
+  enumValues={{"private":"Owner gets FULL_CONTROL. No one else has access rights (default).","public-read":"Owner gets FULL_CONTROL. The AllUsers group gets READ access.","public-read-write":"Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. Granting this on a bucket is generally not recommended.","aws-exec-read":"Owner gets FULL_CONTROL. Amazon EC2 gets READ access to GET an Amazon Machine Image (AMI) bundle from Amazon S3.","authenticated-read":"Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access.","log-delivery-write":"The LogDelivery group gets WRITE and READ_ACP permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html)."}}
+  examples={["private","public-read","public-read-write","aws-exec-read","authenticated-read","log-delivery-write"]}
+  name={"acl"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### acl
+
+Canned ACL to apply to the created objects. For more information, see [Canned ACL][urls.aws_s3_canned_acl]. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
   enumValues={null}
   examples={[]}
   name={"batch"}
@@ -145,7 +177,7 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
@@ -167,7 +199,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={300}
   enumValues={null}
   examples={[300]}
@@ -252,7 +284,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -296,7 +328,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -377,10 +409,10 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["https://s3.us-east-1.amazonaws.com"]}
+  examples={["127.0.0.0:5000/path/to/service"]}
   name={"endpoint"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -389,7 +421,7 @@ The encoding format used to serialize the events before outputting.
 
 ### endpoint
 
-The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either &quot;endpoint&quot; or &quot;region&quot; must be specified.
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
 
 
 </Field>
@@ -411,7 +443,7 @@ The [endpoint][urls.aws_s3_endpoints] of the target S3 bucket. Either &quot;endp
 
 ### filename_append_uuid
 
-Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.
+Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object naming](#object-naming) for more info.
 
 
 </Field>
@@ -455,7 +487,95 @@ The extension to use in the object name.
 
 ### filename_time_format
 
-The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported. See [Object Naming](#object-naming) for more info.
+The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported. See [Object naming](#object-naming) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  name={"grant_full_control"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_full_control
+
+Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP permissions on the created objects. See [Cross account object writing](#cross-account-object-writing) and [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  name={"grant_read"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_read
+
+Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and their metadata. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  name={"grant_read_acp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_read_acp
+
+Allows the named [grantee][urls.aws_s3_grantee] to read the created objects' ACL. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  name={"grant_write_acp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### grant_write_acp
+
+Allows the named [grantee][urls.aws_s3_grantee] to write the created objects' ACL. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -499,7 +619,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### key_prefix
 
-A prefix to apply to all object key names. This should be used to partition your objects, and it&#39;s important to end this value with a `/` if you want this to be the root S3 &quot;folder&quot;. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
+A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 
 </Field>
@@ -512,8 +632,8 @@ A prefix to apply to all object key names. This should be used to partition your
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
-  required={false}
+  relevantWhen={{"host":""}}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -521,7 +641,7 @@ A prefix to apply to all object key names. This should be used to partition your
 
 ### region
 
-The [AWS region][urls.aws_s3_regions] of the target S3 bucket. Either &quot;region&quot; or &quot;endpoint&quot; must be specified.
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>
@@ -696,13 +816,178 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"AES256":"256-bit Advanced Encryption Standard","aws:kms":"AWS managed key encryption"}}
+  examples={["AES256","aws:kms"]}
+  name={"server_side_encryption"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### server_side_encryption
+
+The server-side encryption algorithm used when storing these objects. See [Server-side encryption (SSE)](#server-side-encryption-sse) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"ssekms_key_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### ssekms_key_id
+
+If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`, this specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed customer master key (CMK) that will used for the created objects. If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={{"STANDARD":"The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class.","REDUCED_REDUNDANCY":"Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. ","INTELLIGENT_TIERING":"Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data.","STANDARD_IA":"Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class).","ONEZONE_IA":"Amazon S3 stores the object data in only one Availability Zone.","GLACIER":"Use for archives where portions of the data might need to be retrieved in minutes.","DEEP_ARCHIVE":"Use for archiving data that rarely needs to be accessed."}}
+  examples={["STANDARD","REDUCED_REDUNDANCY","INTELLIGENT_TIERING","STANDARD_IA","ONEZONE_IA","GLACIER","DEEP_ARCHIVE"]}
+  name={"storage_class"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### storage_class
+
+The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details. See [Storage class](#storage-class) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### tags
+
+The tag-set for the object.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Tag1":"Value1"}]}
+  name={"`[tag-name]`"}
+  path={"tags"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[tag-name]`
+
+A custom tag to be added to the created objects.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+</Fields>
+
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
+
 
 </Field>
 
@@ -710,6 +995,25 @@ The maximum time a request can take before being aborted. It is highly recommend
 </Fields>
 
 ## How It Works
+
+### AWS Authentication
+
+Vector checks for AWS credentials in the following order:
+
+1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
+#### Obtaining an access key
+
+In general, we recommend using instance profiles/roles whenever possible. In
+cases where this is not possible you can generate an AWS access key for any user
+within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
+how to do this.
 
 ### Buffers & Batches
 
@@ -729,6 +1033,15 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 2. The batch size meets or exceeds the configured [`max_size`](#max_size).
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
+
+### Cross account object writing
+
+If you're using Vector to write objects across AWS accounts then you should
+consider setting the [`grant_full_control`](#grant_full_control) option to the bucket owner's
+canonical user ID. AWS provides a
+[full tutorial][urls.aws_s3_cross_account_tutorial] for this use case. If
+don't know the bucket owner's canoncial ID you can find it by following
+[this tutorial][urls.aws_canonical_user_id].
 
 ### Environment Variables
 
@@ -760,7 +1073,21 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
-### Object Naming
+### Object access control list (ACL)
+
+AWS S3 supports [access control lists (ACL)][urls.aws_s3_acl] for buckets and
+objects. In the context of Vector, only object ACLs are relevant (Vector does
+not create or modify buckets). You can set the object level ACL by using one
+of the [`acl`](#acl), [`grant_full_control`](#grant_full_control), [`grant_read`](#grant_read), [`grant_read_acp`](#grant_read_acp), or
+`grant_write_acp` options.
+
+#### [`acl`](#acl) vs the `grant_*` options
+
+The `grant_*` options name a specific entity to grant access to. The [`acl`](#acl)
+options is one of a set of [specific canned ACLs][urls.aws_s3_canned_acl] that
+can only name the owner or world.
+
+### Object naming
 
 By default, Vector will name your S3 objects in the following format:
 
@@ -808,13 +1135,11 @@ time.
 You can control the resulting name via the [`key_prefix`](#key_prefix), [`filename_time_format`](#filename_time_format),
 and [`filename_append_uuid`](#filename_append_uuid) options.
 
-
-
 ### Partitioning
 
 Partitioning is controlled via the [`key_prefix`](#key_prefix)
 options and allows you to dynamically partition data on the fly.
-You'll notice that Vector's [template sytax](#template-syntax) is supported
+You'll notice that Vector's [template sytax](#field-interpolation) is supported
 for these options, enabling you to use field values as the partition's key.
 
 ### Rate Limits
@@ -838,10 +1163,38 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### Server-side encryption (SSE)
+
+AWS S3 offers [server-side encryption][urls.aws_s3_sse]. You can apply defaults
+at the bucket level or set the encryption at the object level. In the context,
+of Vector only the object level is relevant (Vector does not create or modify
+buckets). Although, we recommend setting defaults at the bucket level whne
+possible. You can explicitly set the object level encryption via the
+`server_side_encryption` option.
+
+### Storage class
+
+AWS S3 offers [storage classes][urls.aws_s3_storage_classes]. You can apply
+defaults, and rules, at the bucket level or set the storage class at the object
+level. In the context of Vector only the object level is relevant (Vector does
+not create or modify buckets). You can set the storage class via the
+`storage_class` option.
+
+### Tags & metadata
+
+Vector currently only supports [AWS S3 object tags][urls.aws_s3_tags] and does
+_not_ support [object metadata][urls.aws_s3_metadata]. If you require metadata
+support see [issue #1694][urls.issue_1694].
+
+We believe tags are more flexible since they are separate from the actual S3
+object. Youc an freely modify tags without modifying the object. Conversely,
+object metadata requires a full rewrite of the object to make changes.
+
+
 ### Template Syntax
 
 The [`key_prefix`](#key_prefix) options
-support [Vector's template syntax][docs.configuration#template-syntax],
+support [Vector's template syntax][docs.configuration#field-interpolation],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -859,17 +1212,32 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration#template-syntax].
+[template syntax section][docs.configuration#field-interpolation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_canonical_user_id]: https://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html#FindingCanonicalId
+[urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
+[urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.aws_s3]: https://aws.amazon.com/s3/
-[urls.aws_s3_endpoints]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_endpoint
-[urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+[urls.aws_s3_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
+[urls.aws_s3_canned_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
+[urls.aws_s3_cross_account_tutorial]: https://docs.aws.amazon.com/AmazonS3/latest/dev/example-walkthroughs-managing-access-example3.html
+[urls.aws_s3_grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+[urls.aws_s3_metadata]: https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html#object-metadata
+[urls.aws_s3_sse]: https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html
+[urls.aws_s3_storage_classes]: https://aws.amazon.com/s3/storage-classes/
+[urls.aws_s3_tags]: https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html
+[urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[urls.issue_1694]: https://github.com/timberio/vector/issues/1694
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)

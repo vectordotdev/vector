@@ -3,7 +3,7 @@ id: kubernetes-source-alpha
 title: "Alpha Kubernetes Source"
 description: "Early adopters have something to chew on"
 author_github: https://github.com/Jeffail
-tags: ["type: announcement", "domain: sources"]
+tags: ["type: announcement", "domain: platforms", "platform: kubernetes"]
 ---
 
 We're currently [experimenting with Kubernetes integration](https://github.com/timberio/vector/issues/260)

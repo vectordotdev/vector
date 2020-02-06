@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `vector` sink streams `log` events to another downstream `vector` source."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "vector|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/vector.rs
 status: "prod-ready"
@@ -101,7 +101,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The downstream Vector address, this must include &lt;host&gt;:&lt;port&gt;.
+The downstream Vector address to connect to. The address _must_ include a port.
 
 
 </Field>
@@ -144,7 +144,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -188,7 +188,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -284,6 +284,6 @@ event-by-event basis. It does not batch data.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.sources.vector]: /docs/reference/sources/vector/

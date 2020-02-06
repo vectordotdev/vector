@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `aws_kinesis_streams` sink batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "aws_kinesis_streams|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
 status: "beta"
@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
   # OPTIONAL
@@ -64,10 +64,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
   # OPTIONAL - General
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
   partition_key_field = "user_id" # example, no default
 
@@ -217,7 +218,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum number of [events][docs.data-model] allowed in the buffer. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -261,7 +262,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -318,6 +319,28 @@ The encoding format used to serialize the events before outputting.
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000/path/to/service"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={{"region":""}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -354,7 +377,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### partition_key_field
 
-The log field used as the Kinesis record&#39;s partition key value. See [Partitioning](#partitioning) for more info.
+The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.
 
 
 </Field>
@@ -367,7 +390,7 @@ The log field used as the Kinesis record&#39;s partition key value. See [Partiti
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -376,7 +399,7 @@ The log field used as the Kinesis record&#39;s partition key value. See [Partiti
 
 ### region
 
-The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides.
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
 
 
 </Field>
@@ -551,7 +574,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -586,6 +609,57 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs strea
 
 </Fields>
 
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+
+
+</Fields>
+
 ## Output
 
 The `aws_kinesis_streams` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
@@ -594,7 +668,53 @@ Batches are flushed via the [`batch_size`](#batch_size) or
 batches](#buffers--batches) section.
 For example:
 
+
+```http
+POST / HTTP/1.1
+Host: kinesis.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive
+X-Amz-Target: Kinesis_20131202.PutRecords
+{
+    "Records": [
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<json_encoded_log>",
+            "PartitionKey": "<partition_key>"
+        },
+    ],
+    "StreamName": "<stream_name>"
+}
+```
+
 ## How It Works
+
+### AWS Authentication
+
+Vector checks for AWS credentials in the following order:
+
+1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
+#### Obtaining an access key
+
+In general, we recommend using instance profiles/roles whenever possible. In
+cases where this is not possible you can generate an AWS access key for any user
+within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
+how to do this.
 
 ### Buffers & Batches
 
@@ -708,14 +828,19 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model#event]: /docs/about/data-model/#event
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
-[urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
+[pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
+[urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
 [urls.aws_kinesis_split_shards]: https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html
+[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
+[urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_streams

@@ -3,7 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "elasticsearch|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
 status: "beta"
@@ -70,8 +70,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   index = "vector-%F" # default
   healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
-  provider = "default" # default, enum
-  region = "us-east-1" # example, no default
 
   # OPTIONAL - Auth
   [sinks.my_sink_id.auth]
@@ -157,28 +155,6 @@ Options for the authentication strategy.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
-  name={"password"}
-  path={"auth"}
-  relevantWhen={{"strategy":"basic"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### password
-
-The basic authentication password.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={{"aws":"Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch].","basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["aws","basic"]}
   name={"strategy"}
@@ -193,6 +169,28 @@ The basic authentication password.
 #### strategy
 
 The authentication strategy to use.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${PASSWORD_ENV_VAR}","password"]}
+  name={"password"}
+  path={"auth"}
+  relevantWhen={{"strategy":"basic"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### password
+
+The basic authentication password.
 
 
 </Field>
@@ -332,7 +330,7 @@ Configures the sink buffer behavior.
 
 #### max_events
 
-The maximum number of [events][docs.data-model#event] allowed in the buffer.
+The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
@@ -376,7 +374,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
 
 
 </Field>
@@ -425,7 +423,7 @@ The behavior when the buffer becomes full.
 
 ### doc_type
 
-The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch &lt;= 6.X. If you are using &gt;= 7.0 you do not need to set this option since Elasticsearch has removed it.
+The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.
 
 
 </Field>
@@ -517,7 +515,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### host
 
-The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the [`provider`](#provider) is not `&quot;aws&quot;`
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
 
 
 </Field>
@@ -540,28 +538,6 @@ The host of your Elasticsearch cluster. This should be the full URL as shown in 
 ### index
 
 Index name to write events to. See [Template Syntax](#template-syntax) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"default"}
-  enumValues={{"default":"A generic Elasticsearch provider.","aws":"The [AWS Elasticsearch Service][urls.aws_elasticsearch]."}}
-  examples={["default","aws"]}
-  name={"provider"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### provider
-
-The provider of the Elasticsearch service. This is used to properly authenticate with the Elasticsearch cluster. For example, authentication for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we obtain AWS credentials to properly sign the request.
 
 
 </Field>
@@ -611,28 +587,6 @@ A custom parameter to be added to each Elasticsearch request.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance.
-
 
 </Field>
 
@@ -806,7 +760,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service&#39;s internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -964,13 +918,64 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 #### verify_hostname
 
-If `true` (the default), Vector will validate the configured remote host name against the remote host&#39;s TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 
 </Field>
 
 
 </Fields>
+
+</Field>
+
+
+</Fields>
+
+## Env Vars
+
+<Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
+
 
 </Field>
 
@@ -1001,6 +1006,25 @@ Content-Length: <byte_size>
 ```
 
 ## How It Works
+
+### AWS Authentication
+
+Vector checks for AWS credentials in the following order:
+
+1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+
+If credentials are not found the [healtcheck](#healthchecks) will fail and an
+error will be [logged][docs.monitoring#logs].
+
+#### Obtaining an access key
+
+In general, we recommend using instance profiles/roles whenever possible. In
+cases where this is not possible you can generate an AWS access key for any user
+within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
+how to do this.
 
 ### Buffers & Batches
 
@@ -1084,7 +1108,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 ### Template Syntax
 
 The [`index`](#index) options
-support [Vector's template syntax][docs.configuration#template-syntax],
+support [Vector's template syntax][docs.configuration#field-interpolation],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -1100,18 +1124,23 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration#template-syntax].
+[template syntax section][docs.configuration#field-interpolation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#template-syntax]: /docs/setup/configuration/#template-syntax
-[docs.data-model#event]: /docs/about/data-model/#event
+[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model]: /docs/about/data-model/
 [docs.data_model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
+[urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_elasticsearch]: https://aws.amazon.com/elasticsearch-service/
-[urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
+[urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

@@ -33,6 +33,7 @@ data_dir = "/var/lib/vector"
   region       = "us-east-1"
   bucket       = "my-log-archives"
   key_prefix   = "date=%Y-%m-%d"               # daily partitions, hive friendly format
-  batch_size   = 10000000                      # 10mb uncompressed
   compression  = "gzip"                        # compress final objects
   encoding     = "ndjson"                      # new line delimited JSON
+  [sinks.s3_archives.batch]
+    max_size   = 10000000                      # 10mb uncompressed

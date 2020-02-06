@@ -29,7 +29,7 @@ class Sink < Component
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
-    @service_providers = hash["service_provider"] || []
+    @service_providers = hash["service_providers"] || []
     tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -105,38 +105,6 @@ class Sink < Component
         })
     end
 
-    # Endpoint option
-
-    if service_provider?("AWS")
-      @env_vars.AWS_ACCESS_KEY_ID =
-        Option.new({
-          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
-          "examples" => ["AKIAIOSFODNN7EXAMPLE"],
-          "name" => "AWS_ACCESS_KEY_ID",
-          "null" => true,
-          "type" => "string"
-        })
-
-      @env_vars.AWS_SECRET_ACCESS_KEY =
-        Option.new({
-          "description" => "Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.",
-          "examples" => ["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"],
-          "name" => "AWS_SECRET_ACCESS_KEY",
-          "null" => true,
-          "type" => "string"
-        })
-
-      @options.endpoint =
-        Option.new({
-          "description" => "Custom endpoint for use with AWS-compatible services.",
-          "examples" => ["127.0.0.0:5000"],
-          "name" => "endpoint",
-          "null" => false,
-          "optional" => true,
-          "type" => "string"
-        })
-    end
-
     if buffer?
       # Buffer options
 
@@ -178,7 +146,7 @@ class Sink < Component
 
       buffer_options["max_events"] =
         {
-          "description" => "The maximum number of [events][docs.data-model#event] allowed in the buffer.",
+          "description" => "The maximum number of [events][docs.data-model] allowed in the buffer.",
           "default" => 500,
           "null" => true,
           "relevant_when" => {"type" => "memory"},
@@ -196,12 +164,6 @@ class Sink < Component
         })
 
       @options.buffer = buffer_option
-    end
-
-    # resources
-
-    if @service_limits_short_link
-      @resources << OpenStruct.new({"name" => "Service Limits", "short_link" => @service_limits_short_link})
     end
 
     # An empty array means TLS options are supported
@@ -298,6 +260,10 @@ class Sink < Component
 
   def healthcheck?
     healthcheck == true
+  end
+
+  def only_service_provider?(provider_name)
+    service_providers.length == 1 && service_provider?(provider_name)
   end
 
   def plural_write_verb

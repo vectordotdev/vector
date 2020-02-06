@@ -61,8 +61,7 @@ jobs:
           name: Check generate
           environment:
             PASS_RUSTFLAGS: "-D warnings"
-          command: |
-            ./scripts/docker-run.sh checker make check-code
+          command: make check-code
 
   check-fmt:
     <<: *docker-machine
@@ -72,8 +71,7 @@ jobs:
           name: Check fmt
           environment:
             PASS_RUSTFLAGS: "-D warnings"
-          command: |
-            ./scripts/docker-run.sh checker make check-fmt
+          command: make check-fmt
 
   check-generate:
     <<: *docker-machine
@@ -81,8 +79,7 @@ jobs:
       - checkout
       - run:
           name: Check generate
-          command: |
-            ./scripts/docker-run.sh checker make check-generate
+          command: make check-generate
 
   check-version:
     <<: *docker-machine
@@ -90,8 +87,7 @@ jobs:
       - checkout
       - run:
           name: Check version
-          command: |
-            ./scripts/docker-run.sh checker make check-version
+          command: make check-version
 
   check-blog:
     <<: *docker-machine
@@ -99,8 +95,7 @@ jobs:
       - checkout
       - run:
           name: Check blog
-          command: |
-            ./scripts/docker-run.sh checker make check-blog
+          command: make check-blog
 
   test-x86_64-pc-windows-msvc:
     executor: win/vs2019
@@ -141,8 +136,6 @@ jobs:
           environment:
             RUSTFLAGS: -Ctarget-feature=+crt-static
             RUST_BACKTRACE: full
-            AWS_ACCESS_KEY_ID: fake-aws-key
-            AWS_SECRET_ACCESS_KEY: fake-aws-key
           command: |
             PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
             cargo test --release --no-default-features --features default-msvc -- --test-threads 1
@@ -169,7 +162,7 @@ jobs:
       - run:
           name: Start Kubernetes
           command: |
-            docker run -d --name kube --privileged -p 8443:8443 -p 10080:10080 bsycorp/kind:latest-1.12
+            docker run -d --name kube --privileged -p 8443:8443 -p 10080:10080 bsycorp/kind:latest-1.14
             until curl -s --fail http://127.0.0.1:10080/kubernetes-ready; do
               sleep 1;
             done
@@ -201,7 +194,6 @@ jobs:
       - run:
           name: Build tests
           command: |
-            rm rust-toolchain
             ./scripts/docker-run.sh builder-$TARGET cargo test --all --no-default-features --features default-musl,docker --no-run --target $TARGET
       - run:
           name: Start dependencies
@@ -740,20 +732,20 @@ jobs:
           command: |
             export PASS_VERSION=$(make version)
             export PASS_CIRCLE_SHA1="$CIRCLE_SHA1"
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
             ./scripts/docker-run.sh releaser make release-github
 
   release-homebrew:
-    docker:
-      - image: timberiodev/vector-releaser:latest
+    <<: *docker-machine
     steps:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
           name: Release Homebrew
           command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-homebrew
+            export PASS_VERSION=$(make version)
+            export PASS_GITHUB_TOKEN="$GITHUB_TOKEN"
+            ./scripts/docker-run.sh releaser make release-homebrew
 
   release-s3:
     docker:
@@ -805,7 +797,7 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - check-generate
     - check-blog
     - test-stable
-    - test-stable-kubernetes
+    # - test-stable-kubernetes
     - build-x86_64-unknown-linux-musl-archive-and-deb-package
     - build-aarch64-unknown-linux-musl-archive-and-deb-package
     - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
@@ -845,7 +837,7 @@ workflows:
       - check-version:
           <<: *master-filters
       - test-stable
-      - test-stable-kubernetes
+      # - test-stable-kubernetes
       - test-x86_64-pc-windows-msvc:
           <<: *prerelease-filters
 
@@ -929,8 +921,8 @@ workflows:
           <<: *release-filters
       - test-stable:
           <<: *release-filters
-      - test-stable-kubernetes:
-          <<: *release-filters
+      # - test-stable-kubernetes:
+          # <<: *release-filters
 
       # Build & verify
 
@@ -1042,7 +1034,7 @@ workflows:
       - check-generate
       - check-blog
       - test-stable
-      - test-stable-kubernetes
+      # - test-stable-kubernetes
 
       # Build & verify
 

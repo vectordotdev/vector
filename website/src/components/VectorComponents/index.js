@@ -163,7 +163,7 @@ function VectorComponents(props) {
   }
 
   if (onlyProviders.size > 0) {
-    components = components.filter(component => Array.from(onlyProviders).every(x => component.service_providers.includes(x)));
+    components = components.filter(component => Array.from(onlyProviders).every(x => component.service_providers && component.service_providers.includes(x)));
   }
 
   //
@@ -258,8 +258,9 @@ function VectorComponents(props) {
           <div className="filter--choices">
             <CheckboxList
               label="Functions"
-              icon="code"
+              icon="settings"
               values={functionCategories}
+              humanize={true}
               currentState={onlyFunctions}
               setState={setOnlyFunctions} />
           </div>

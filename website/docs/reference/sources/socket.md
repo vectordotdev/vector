@@ -3,9 +3,9 @@ delivery_guarantee: "best_effort"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+socket%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "socket|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sources/socket.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sources/socket
 status: "prod-ready"
 title: "Socket Source"
 unsupported_operating_systems: []
@@ -48,10 +48,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
+  path = "/path/to/socket" # example, relevant when mode = "unix"
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -68,11 +68,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "socket" # must be: "socket"
   address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
   mode = "tcp" # example, enum
+  path = "/path/to/socket" # example, relevant when mode = "unix"
 
   # OPTIONAL - General
   shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
   max_length = 102400 # default, bytes
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 
   # OPTIONAL - Context
   host_key = "host" # default
@@ -107,7 +107,8 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to listen for connections on, or &quot;systemd#N&quot; to use the Nth socket passed by systemd socket activation.
+The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port.
+
 
 
 </Field>
@@ -187,7 +188,7 @@ The type of socket to use.
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

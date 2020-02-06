@@ -1,7 +1,6 @@
 use crate::{
     dns::Resolver,
     event::Event,
-    region::{self, RegionOrEndpoint},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         tls::{TlsOptions, TlsSettings},
@@ -24,23 +23,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::convert::TryInto;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    pub host: Option<String>,
+    pub host: String,
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
-    // TODO: This should be an Option, but when combined with flatten we never seem to get back
-    // a None. For now, we get optionality by handling the error during parsing when nothing is
-    // passed. See https://github.com/timberio/vector/issues/1160
-    #[serde(flatten)]
-    pub region: RegionOrEndpoint,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub auth: Option<ElasticSearchAuth>,
@@ -97,10 +90,10 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
     authorization: Option<String>,
-    region: Option<Region>,
     credentials: Option<AwsCredentials>,
     tls_settings: TlsSettings,
 }
@@ -109,10 +102,8 @@ pub struct ElasticSearchCommon {
 enum ParseError {
     #[snafu(display("Invalid host {:?}: {:?}", host, source))]
     InvalidHost { host: String, source: InvalidUri },
-    #[snafu(display("Default provider requires a configured host"))]
-    DefaultRequiresHost,
-    #[snafu(display("AWS provider requires a configured region"))]
-    AWSRequiresRegion,
+    #[snafu(display("Host {:?} must include hostname", host))]
+    HostMustIncludeHostname { host: String },
     #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
     AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
@@ -129,37 +120,21 @@ impl ElasticSearchCommon {
             _ => None,
         };
 
-        let region: Option<Region> = match (&config.region).try_into() {
-            Ok(region) => Some(region),
-            Err(region::ParseError::MissingRegionAndEndpoint) => None,
-            Err(error) => return Err(error.into()),
-        };
-
         // let provider = config.provider.unwrap_or(Provider::Default);
 
-        let base_url = match &config.auth {
-            Some(ElasticSearchAuth::Basic { .. }) | None => match config.host {
-                Some(ref host) => host.clone(),
-                None => return Err(ParseError::DefaultRequiresHost.into()),
-            },
-            Some(ElasticSearchAuth::Aws) => match region {
-                None => return Err(ParseError::AWSRequiresRegion.into()),
-                Some(ref region) => match region {
-                    // Adapted from rusoto_core::signature::build_hostname, which is unfortunately not pub
-                    Region::Custom { endpoint, .. } if endpoint.contains("://") => endpoint.clone(),
-                    Region::Custom { endpoint, .. } => format!("https://{}", endpoint),
-                    Region::CnNorth1 | Region::CnNorthwest1 => {
-                        format!("https://es.{}.amazonaws.com.cn", region.name())
-                    }
-                    _ => format!("https://es.{}.amazonaws.com", region.name()),
-                },
-            },
-        };
+        let base_url = config.host.clone();
 
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", base_url);
-        uri.parse::<Uri>()
+        let uri = format!("{}/_test", &config.host);
+        let uri = uri
+            .parse::<Uri>()
             .with_context(|| InvalidHost { host: &base_url })?;
+        if uri.host().is_none() {
+            return Err(ParseError::HostMustIncludeHostname {
+                host: config.host.clone(),
+            }
+            .into());
+        }
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
@@ -182,7 +157,6 @@ impl ElasticSearchCommon {
         Ok(Self {
             base_url,
             authorization,
-            region,
             credentials,
             tls_settings,
         })
@@ -260,13 +234,7 @@ fn es(
                     builder.body(body).unwrap()
                 }
                 Some(ref credentials) => {
-                    let mut request = SignedRequest::new(
-                        "POST",
-                        "es",
-                        common.region.as_ref().unwrap(),
-                        uri.path(),
-                    );
-                    request.set_hostname(uri.host().map(|s| s.into()));
+                    let mut request = signed_request("POST", &uri);
 
                     request.add_header("Content-Type", "application/x-ndjson");
 
@@ -346,9 +314,7 @@ fn healthcheck(
             }
         }
         Some(credentials) => {
-            let mut signer =
-                SignedRequest::new("GET", "es", common.region.as_ref().unwrap(), uri.path());
-            signer.set_hostname(uri.host().map(|s| s.into()));
+            let mut signer = signed_request("GET", &uri);
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
@@ -363,6 +329,14 @@ fn healthcheck(
                 status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             }),
     ))
+}
+
+fn signed_request(method: &str, uri: &Uri) -> SignedRequest {
+    let region = Region::Custom {
+        name: "custom".into(),
+        endpoint: uri.to_string(),
+    };
+    SignedRequest::new(method, "es", &region, uri.path())
 }
 
 fn finish_signer(
@@ -397,7 +371,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_downcast_matches, Event};
+    use crate::Event;
     use serde_json::json;
 
     #[test]
@@ -435,70 +409,6 @@ mod tests {
 
         assert_eq!(json!({}), action);
     }
-
-    fn parse_config(input: &str) -> crate::Result<ElasticSearchCommon> {
-        let config: ElasticSearchConfig = toml::from_str(input).unwrap();
-        ElasticSearchCommon::parse_config(&config)
-    }
-
-    fn parse_config_err(input: &str) -> crate::Error {
-        // ElasticSearchCommon doesn't impl Debug, so can't just unwrap_err
-        match parse_config(input) {
-            Ok(_) => panic!("Mis-parsed invalid config"),
-            Err(err) => err,
-        }
-    }
-
-    #[test]
-    fn host_is_required_for_default() {
-        let err = parse_config_err(
-            r#"
-        [auth]
-        strategy = "basic"
-        user = "user"
-        password = "password"
-        "#,
-        );
-        assert_downcast_matches!(err, ParseError, ParseError::DefaultRequiresHost);
-    }
-
-    #[test]
-    fn host_is_not_required_for_aws() {
-        let result = parse_config(
-            r#"
-            region = "us-east-1"
-
-            [auth]
-            strategy = "aws"
-            "#,
-        );
-        // If not running in an AWS context, this will fail with a
-        // credentials error, but that is valid too.
-        match result {
-            Ok(_) => (),
-            Err(err) => {
-                assert_downcast_matches!(err, ParseError, ParseError::AWSCredentialsGenerateFailed { .. })
-            }
-        }
-    }
-
-    #[test]
-    fn region_is_not_required_for_default() {
-        let common = parse_config(r#"host = "https://example.com""#).unwrap();
-
-        assert_eq!(None, common.region);
-    }
-
-    #[test]
-    fn region_is_required_for_aws() {
-        let err = parse_config_err(
-            r#"
-        [auth]
-        strategy = "aws"
-        "#,
-        );
-        assert_downcast_matches!(err, ParseError, ParseError::AWSRequiresRegion { .. });
-    }
 }
 
 #[cfg(test)]
@@ -525,7 +435,7 @@ mod integration_tests {
 
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: Some("http://localhost:9200".into()),
+            host: "http://localhost:9200".into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
@@ -557,8 +467,6 @@ mod integration_tests {
             .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
 
-        println!("response {:?}", response);
-
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
@@ -578,7 +486,7 @@ mod integration_tests {
     #[test]
     fn insert_events_over_http() {
         run_insert_tests(ElasticSearchConfig {
-            host: Some("http://localhost:9200".into()),
+            host: "http://localhost:9200".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             ..config()
@@ -588,7 +496,7 @@ mod integration_tests {
     #[test]
     fn insert_events_over_https() {
         run_insert_tests(ElasticSearchConfig {
-            host: Some("https://localhost:9201".into()),
+            host: "https://localhost:9201".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             tls: Some(TlsOptions {
@@ -603,7 +511,7 @@ mod integration_tests {
     fn insert_events_on_aws() {
         run_insert_tests(ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
+            host: "http://localhost:4571".into(),
             ..config()
         });
     }
@@ -676,7 +584,7 @@ mod integration_tests {
         https_client(resolver, common.tls_settings.clone())
             .expect("Could not build client to flush")
             .request(request)
-            .map_err(|source| dbg!(source).into())
+            .map_err(|source| source.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),

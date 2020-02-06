@@ -303,7 +303,7 @@ mod integration_tests {
 
         let config = ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
+            host: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()
         };

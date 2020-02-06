@@ -180,13 +180,11 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
     }
 }
 
-fn event_to_json(event: LogEvent, indexed_fields: &Vec<Atom>, timestamp: i64) -> JsonValue {
-    let mut fields = Event::new_empty_log().into_log();
-    for field in indexed_fields.iter() {
-        if let Some(value) = event.get(field) {
-            fields.insert(field, value.clone());
-        }
-    }
+fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> JsonValue {
+    let fields = indexed_fields
+        .iter()
+        .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
+        .collect::<LogEvent>();
 
     json!({
         "fields": fields.unflatten(),
@@ -198,7 +196,7 @@ fn event_to_json(event: LogEvent, indexed_fields: &Vec<Atom>, timestamp: i64) ->
 fn encode_event(
     host_field: &Atom,
     event: Event,
-    indexed_fields: &Vec<Atom>,
+    indexed_fields: &[Atom],
     encoding: &Encoding,
 ) -> Option<Vec<u8>> {
     let mut event = event.into_log();

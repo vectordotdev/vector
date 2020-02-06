@@ -12,12 +12,14 @@ pub mod console;
 pub mod datadog_metrics;
 pub mod elasticsearch;
 pub mod file;
-pub mod gcp_pubsub;
+pub mod gcp;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod logdna;
 pub mod new_relic_logs;
 pub mod prometheus;
+pub mod sematext;
 pub mod socket;
 pub mod splunk_hec;
 pub mod statsd;

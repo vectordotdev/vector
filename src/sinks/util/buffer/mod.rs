@@ -4,6 +4,7 @@ use partition::Partition;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
+pub mod json;
 pub mod metrics;
 pub mod partition;
 

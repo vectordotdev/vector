@@ -105,7 +105,7 @@ module.exports = {
             },
             {
               label: 'Twitter',
-              to: 'https://twitter.com/timberdotio',
+              to: 'https://twitter.com/vectordotdev',
             },
             {
               label: 'Mailing List',

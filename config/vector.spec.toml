@@ -58,6 +58,14 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "docker"
   type = "docker"
 
+  # Setting this to `false` will disable the automatic merging of partial events.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  auto_partial_merge = true
+  auto_partial_merge = false
+
   # A list of container IDs _or_ names to match against. Prefix matches are
   # supported, meaning you can supply just the first few characters of the
   # container ID or name. If not provided, all containers will be included.
@@ -83,6 +91,15 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: [string]
   include_labels = ["label_key1=label_value1", "label_key2=label_value2"]
+
+  # The field name to be added to events that are detected to contain an
+  # incomplete message (i.e. partial events). If set to `""`, no field will be
+  # added to partial event. This allows to opt-out of partial event detection.
+  #
+  # * optional
+  # * default: "_partial"
+  # * type: string
+  partial_event_marker_field = "_partial"
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
@@ -382,10 +399,11 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "logplex"
   type = "logplex"
 
-  # The address to accept connections on.
+  # The address to accept connections on. The address _must_ include a port.
   #
   # * required
   # * type: string
+  address = "0.0.0.0:8088"
 
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
@@ -423,8 +441,9 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "socket"
   type = "socket"
 
-  # The address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation.
+  # The address to listen for connections on, or `systemd#N` to use the Nth
+  # socket passed by systemd socket activation. If an address is used it _must_
+  # include a port.
   #
   # * required
   # * type: string
@@ -442,6 +461,13 @@ dns_servers = ["0.0.0.0:53"]
   mode = "udp"
   mode = "unix"
 
+  # The unix socket path. *This should be absolute path*.
+  #
+  # * required
+  # * type: string
+  # * relevant when mode = "unix"
+  path = "/path/to/socket"
+
   # The timeout before a connection is forcefully closed during shutdown.
   #
   # * required
@@ -458,14 +484,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   # * unit: bytes
   max_length = 102400
-
-  # The unix socket path. *This should be absolute path*.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when mode = "unix"
-  path = "/path/to/socket"
 
   #
   # Context
@@ -625,8 +643,9 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "vector"
   type = "vector"
 
-  # The TCP address to listen for connections on, or "systemd#N" to use the Nth
-  # socket passed by systemd socket activation.
+  # The TCP address to listen for connections on, or `systemd#N to use the Nth
+  # socket passed by systemd socket activation. If an address is used it _must_
+  # include a port.
   #
   # * required
   # * type: string
@@ -807,6 +826,17 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # Set to `true` to drop all fields that are not specified in the `types` table.
+  # Make sure both `message` and `timestamp` are specified in the `types` table
+  # as their absense will cause the original message data to be dropped along
+  # with other extraneous fields.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  drop_unspecified = false
+  drop_unspecified = true
+
   #
   # Types
   #
@@ -823,8 +853,6 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -993,8 +1021,6 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1173,8 +1199,6 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1217,6 +1241,52 @@ end
   # * no default
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
+
+# Accepts `log` events and allows you to merge partial log events into a single event.
+[transforms.merge]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `merge`.
+  #
+  # * required
+  # * type: string
+  # * must be: "merge"
+  type = "merge"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Fields to merge. The values of these fields will be merged into the first
+  # partial event. Fields not specified here will be ignored. Merging process
+  # takes the first partial event and the base, then it merges in the fields from
+  # each successive partial event, until a non-partial event arrives. Finally,
+  # the non-partial event fields are merged in, producing the resulting merged
+  # event.
+  #
+  # * optional
+  # * default: ["message"]
+  # * type: [string]
+  merge_fields = ["message"]
+
+  # The field that indicates that the event is partial. A consequent stream of
+  # partial events along with the first non-partial event will be merged together.
+  #
+  # * optional
+  # * default: "_partial"
+  # * type: string
+  partial_event_marker_field = "_partial"
+
+  # An ordered list of fields to distinguish streams by. Each stream has a
+  # separate partial event merging state. Should be used to prevent events from
+  # unrelated sources from mixing together, as this affects partial event
+  # processing.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  stream_discriminant_fields = []
 
 # Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
@@ -1275,8 +1345,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1422,8 +1490,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1484,8 +1550,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1523,10 +1587,12 @@ end
   group_name = "ec2/{{ instance_id }}"
   group_name = "group-name"
 
-  # The AWS region of the target CloudWatch Logs stream resides.
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target CloudWatch Logs stream.
@@ -1561,6 +1627,15 @@ end
   # * type: bool
   create_missing_stream = true
   create_missing_stream = false
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1702,7 +1777,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -1732,11 +1807,22 @@ end
   # * type: string
   namespace = "service"
 
-  # The AWS region of the target CloudWatch stream resides.
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1766,10 +1852,12 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The AWS region of the target Kinesis Firehose delivery stream resides.
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Firehose delivery stream.
@@ -1777,6 +1865,15 @@ end
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1918,7 +2015,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -1946,10 +2043,12 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The AWS region of the target Kinesis stream resides.
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Logs stream.
@@ -1957,6 +2056,15 @@ end
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2105,7 +2213,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -2147,13 +2255,22 @@ end
   compression = "gzip"
   compression = "none"
 
-  # The endpoint of the target S3 bucket. Either "endpoint" or "region" must be
-  # specified.
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  # * relevant when host = ""
+  region = "us-east-1"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
   #
   # * optional
   # * no default
   # * type: string
-  endpoint = "https://s3.us-east-1.amazonaws.com"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2162,14 +2279,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-  # The AWS region of the target S3 bucket. Either "region" or "endpoint" must be
-  # specified.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # Object Names
@@ -2210,6 +2319,102 @@ end
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
   key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # Object Attributes
+  #
+
+  # Canned ACL to apply to the created objects. For more information, see Canned
+  # ACL.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "private", "public-read", "public-read-write", "aws-exec-read", "authenticated-read", and "log-delivery-write"
+  acl = "private"
+  acl = "public-read"
+  acl = "public-read-write"
+  acl = "aws-exec-read"
+  acl = "authenticated-read"
+  acl = "log-delivery-write"
+
+  # Gives the named grantee READ, READ_ACP, and WRITE_ACP permissions on the
+  # created objects.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_full_control = "person@email.com"
+  grant_full_control = "http://acs.amazonaws.com/groups/global/AllUsers"
+
+  # Allows the named grantee to read the created objects and their metadata.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_read = "person@email.com"
+  grant_read = "http://acs.amazonaws.com/groups/global/AllUsers"
+
+  # Allows the named grantee to read the created objects' ACL.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_read_acp = "person@email.com"
+  grant_read_acp = "http://acs.amazonaws.com/groups/global/AllUsers"
+
+  # Allows the named grantee to write the created objects' ACL.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be"
+  grant_write_acp = "person@email.com"
+  grant_write_acp = "http://acs.amazonaws.com/groups/global/AllUsers"
+
+  # The server-side encryption algorithm used when storing these objects.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "AES256" or "aws:kms"
+  server_side_encryption = "AES256"
+  server_side_encryption = "aws:kms"
+
+  # If `server_side_encryption` has the value `"aws.kms"`, this specifies the ID
+  # of the AWS Key Management Service (AWS KMS) symmetrical customer managed
+  # customer master key (CMK) that will used for the created objects. If not
+  # specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the S3 Storage Classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "STANDARD", "REDUCED_REDUNDANCY", "INTELLIGENT_TIERING", "STANDARD_IA", "ONEZONE_IA", "GLACIER", and "DEEP_ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "REDUCED_REDUNDANCY"
+  storage_class = "INTELLIGENT_TIERING"
+  storage_class = "STANDARD_IA"
+  storage_class = "ONEZONE_IA"
+  storage_class = "GLACIER"
+  storage_class = "DEEP_ARCHIVE"
+
+  [sinks.aws_s3.tags]
+    # A custom tag to be added to the created objects.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    Tag1 = "Value1"
 
   #
   # requests
@@ -2343,7 +2548,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -2589,7 +2794,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -2830,7 +3035,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 60
@@ -2884,32 +3089,12 @@ end
   healthcheck = false
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example. This is required if the `provider` is not `"aws"`
+  # in the example.
   #
   # * optional
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
-
-  # The provider of the Elasticsearch service. This is used to properly
-  # authenticate with the Elasticsearch cluster. For example, authentication for
-  # AWS Elasticsearch Service requires that we obtain AWS credentials to properly
-  # sign the request.
-  #
-  # * optional
-  # * default: "default"
-  # * type: string
-  # * enum: "default" or "aws"
-  provider = "default"
-  provider = "aws"
-
-  # When using the AWS provider, the AWS region of the target Elasticsearch
-  # instance.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # Auth
@@ -3082,7 +3267,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 60
@@ -3244,8 +3429,9 @@ end
   # * type: string
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the pubsub project and topic. Either this or `api_key`
-  # must be set.
+  # authenticate access to the pubsub project and topic. If this is unset, Vector
+  # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+  # filename. Either this or `api_key` must be set.
   #
   # * optional
   # * no default
@@ -3378,7 +3564,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 60
@@ -3391,6 +3577,305 @@ end
   #
 
   [sinks.gcp_pubsub.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
+# Batches `log` events to Google Cloud Platform's Stackdriver Logging service via the REST Interface.
+[sinks.gcp_stackdriver_logging]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `gcp_stackdriver_logging`.
+  #
+  # * required
+  # * type: string
+  # * must be: "gcp_stackdriver_logging"
+  type = "gcp_stackdriver_logging"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the stackdriver logging API. If this is unset, Vector
+  # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+  # filename.
+  #
+  # * required
+  # * type: string
+  credentials_path = "/path/to/credentials.json"
+
+  # The log ID to which to publish logs. This is a name you create to identify
+  # this log stream.
+  #
+  # * required
+  # * type: string
+  log_id = "vector-logs"
+
+  # The project ID to which to publish logs. See the Google Cloud Platform
+  # project management documentation for more details.
+  #
+  # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
+  # `project_id` must be set.
+  #
+  # * required
+  # * type: string
+  project_id = "vector-123456"
+
+  # The billing account ID to which to publish logs.
+  #
+  # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
+  # `project_id` must be set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  billing_account_id = "012345-6789AB-CDEF01"
+
+  # The folder ID to which to publish logs.
+  # See the Google Cloud Platform folder documentation for more details.
+  #
+  # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
+  # `project_id` must be set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  folder_id = "My Folder"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The organization ID to which to publish logs. This would be the identifier
+  # assigned to your organization on Google Cloud Platform.
+  #
+  # Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or
+  # `project_id` must be set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  organization_id = "622418129737"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_stackdriver_logging.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 5242880
+    # * type: int
+    # * unit: bytes
+    max_size = 5242880
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.gcp_stackdriver_logging.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.gcp_stackdriver_logging.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 1000
+    # * type: int
+    rate_limit_num = 1000
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 9223372036854775807
+    # * type: int
+    retry_attempts = 9223372036854775807
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Resource
+  #
+
+  [sinks.gcp_stackdriver_logging.resource]
+    # The monitored resource type. For example, the type of a Compute Engine VM
+    # instance is gce_instance.
+    #
+    # See the Google Cloud Platform monitored resource documentation for more
+    # details.
+    #
+    # * required
+    # * type: string
+    type = "global"
+    type = "gce_instance"
+
+    # Values for all of the labels listed in the associated monitored resource
+    # descriptor.
+    #
+    # For example, Compute Engine VM instances use the labels `projectId`,
+    # `instanceId`, and `zone`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    projectId = "vector-123456"
+    zone = "Twilight"
+
+  #
+  # Tls
+  #
+
+  [sinks.gcp_stackdriver_logging.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
@@ -3659,7 +4144,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -3875,6 +4360,212 @@ end
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
+# Batches `log` events to LogDna's HTTP Ingestion API.
+[sinks.logdna]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `logdna`.
+  #
+  # * required
+  # * type: string
+  # * must be: "logdna"
+  type = "logdna"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The Ingestion API key.
+  #
+  # * required
+  # * type: string
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
+  api_key = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # The hostname that will be attached to each batch of events.
+  #
+  # * required
+  # * type: string
+  hostname = "my-local-machine"
+
+  # The default app that will be set for events that do not contain a `file` or
+  # `app` field.
+  #
+  # * optional
+  # * default: "vector"
+  # * type: string
+  default_app = "vector"
+  default_app = "myapp"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # An optional host that will override the default one.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://127.0.0.1"
+  host = "http://example.com"
+
+  # The IP address that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  ip = "0.0.0.0"
+
+  # The mac address that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  mac = "my-mac-address"
+
+  # The tags that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  tags = ["tag1", "tag2"]
+
+  #
+  # Batch
+  #
+
+  [sinks.logdna.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.logdna.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.logdna.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Batches `log` events to New Relic's log service via their log API.
 [sinks.new_relic_logs]
   #
@@ -4047,7 +4738,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 30
@@ -4108,7 +4799,187 @@ end
   healthcheck = true
   healthcheck = false
 
-# Streams `log` events to a socket, such as a TCP, UDP, or Unix socket.
+# Batches `log` events to Sematext via the Elasticsearch API.
+[sinks.sematext]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `sematext`.
+  #
+  # * required
+  # * type: string
+  # * must be: "sematext"
+  type = "sematext"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The token that will be used to write to Sematext.
+  #
+  # * required
+  # * type: string
+  token = "${SEMATEXT_TOKEN_ENV_VAR}"
+  token = "some-sematext-token"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The host that will be used to send logs to. This option is required if
+  # `region` is not set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://127.0.0.1"
+  host = "http://example.com"
+
+  # The region destination to send logs to. This option is required if `host` is
+  # not set.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  region = "na"
+  region = "eu"
+
+  #
+  # Batch
+  #
+
+  [sinks.sematext.batch]
+    # The maximum size of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.sematext.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * optional
+    # * no default
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.sematext.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    in_flight_limit = 5
+
+    # The window used for the `rate_limit_num` option
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    retry_attempts = 5
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+# Streams `log` events to a socket, such as a TCP or Unix domain socket.
 [sinks.socket]
   #
   # General
@@ -4128,18 +4999,27 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The address to bind to, this must include some <host>:<port> pair.
+  # The address to connect to. The address _must_ include a port.
   #
   # * required
   # * type: string
+  # * relevant when mode = "tcp"
   address = "92.12.333.224:5000"
 
-  # The type of socket to use. Currently only `tcp` is valid.
+  # The type of socket to use.
   #
   # * required
   # * type: string
-  # * must be: "tcp"
+  # * enum: "tcp" or "unix"
   mode = "tcp"
+  mode = "unix"
+
+  # The unix socket path. This should be the absolute path.
+  #
+  # * required
+  # * type: string
+  # * relevant when mode = "unix"
+  path = "/path/to/socket"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -4451,7 +5331,7 @@ end
     # The maximum time a request can take before being aborted. It is highly
     # recommended that you do not lower value below the service's internal timeout,
     # as this could create orphaned requests, pile on retries, and result in
-    # deuplicate data downstream.
+    # duplicate data downstream.
     #
     # * optional
     # * default: 60
@@ -4574,7 +5454,8 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The downstream Vector address, this must include <host>:<port>.
+  # The downstream Vector address to connect to. The address _must_ include a
+  # port.
   #
   # * required
   # * type: string

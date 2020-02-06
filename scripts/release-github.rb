@@ -29,8 +29,9 @@ release = metadata.releases.to_h.fetch(:"#{VERSION}")
 title("Releasing artifacts to Github")
 
 flags = [
-  "--assets 'target/artifacts/*'",
-  "--notes '[View release notes](#{HOST}/releases/#{VERSION})'"
+  "--assets '#{ROOT_DIR}/target/artifacts/*'",
+  "--notes '[View release notes](#{HOST}/releases/#{VERSION})'",
+  "--name v#{VERSION}"
 ]
 
 if release.pre?

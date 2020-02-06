@@ -11,7 +11,7 @@ function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 request_rate_limit_duration_secs = 1
-request_rate_limit_num =5
+request_rate_limit_num = 5
 request_retry_attempts = 5
 request_retry_initial_backoff_secs = 1
 request_retry_max_duration_secs = 10
@@ -21,6 +21,8 @@ service_providers = ["AWS", "Elastic"]
 write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
 tls_options = []
 
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.elasticsearch.env_vars") %>
+
 [sinks.elasticsearch.options.auth]
 type = "table"
 common = false
@@ -28,6 +30,7 @@ description = "Options for the authentication strategy."
 
 [sinks.elasticsearch.options.auth.options.strategy]
 type = "string"
+prioritize = true
 required = true
 description = "The authentication strategy to use."
 
@@ -72,7 +75,7 @@ description = "A custom header to be added to each outgoing Elasticsearch reques
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
-description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
+description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
 
 [sinks.elasticsearch.options.index]
 type = "string"
@@ -86,20 +89,6 @@ required = true
 templateable = true
 description = "Index name to write events to."
 
-[sinks.elasticsearch.options.provider]
-type = "string"
-default = "default"
-description = """\
-The provider of the Elasticsearch service. This is used to properly \
-authenticate with the Elasticsearch cluster. For example, authentication \
-for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we \
-obtain AWS credentials to properly sign the request.\
-"""
-
-[sinks.elasticsearch.options.provider.enum]
-default = "A generic Elasticsearch provider."
-aws = "The [AWS Elasticsearch Service][urls.aws_elasticsearch]."
-
 [sinks.elasticsearch.options.query]
 type = "table"
 description = "Custom parameters to Elasticsearch query string."
@@ -109,11 +98,6 @@ type = "string"
 examples = [{"X-Powered-By" = "Vector"}]
 required = true
 description = "A custom parameter to be added to each Elasticsearch request."
-
-[sinks.elasticsearch.options.region]
-type = "string"
-examples = ["us-east-1"]
-description = "When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance."
 
 [[sinks.elasticsearch.output.examples]]
 label = "Generic"

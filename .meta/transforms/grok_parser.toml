@@ -3,14 +3,8 @@ title = "Grok Parser"
 allow_you_to_description = "parse a log field value with [Grok][urls.grok]"
 common = false
 function_category = "parse"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
-resources = [
-  {name = "Grok Debugger", short_link = "grok_debugger"},
-  {name = "Grok Patterns", short_link = "grok_patterns"}
-]
-types_coercion = true
 
 [transforms.grok_parser.options.drop_field]
 type = "bool"
@@ -20,7 +14,6 @@ required = true
 description = """\
 If `true` will drop the specified `field` after parsing.\
 """
-types_coercion = true
 
 [transforms.grok_parser.options.field]
 type = "string"
@@ -37,3 +30,5 @@ common = true
 examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 required = true
 description = "The [Grok pattern][urls.grok_patterns]"
+
+<%= render("_partials/_types.toml", namespace: "transforms.grok_parser", common: true) %>

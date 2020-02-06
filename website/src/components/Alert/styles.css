@@ -1,3 +1,7 @@
+/**
+ * base
+ */
+
 .alert {
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-color-content) !important;
@@ -17,6 +21,10 @@
 .alert p:last-child {
   margin-bottom: 0;
 }
+
+/**
+ * types
+ */
 
 .alert.alert--danger,
 .alert.alert--info,
@@ -47,6 +55,15 @@
   border-left: 3px solid var(--ifm-color-warning);
 }
 
+/**
+ * fill
+ */
+
+.alert.alert--fill.alert--danger {
+  background: rgba( var(--ifm-color-danger-rgb), 0.15 ) !important;
+  border: 1px solid var(--ifm-color-danger);
+  color: var(--ifm-color-danger) !important;
+}
 .alert.alert--fill.alert--primary {
   background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
   border: 1px solid var(--ifm-color-primary);
@@ -56,4 +73,14 @@
   background: rgba( var(--ifm-color-warning-rgb), 0.15 ) !important;
   border: 1px solid var(--ifm-color-warning);
   color: var(--ifm-color-warning) !important;
+}
+.alert.alert--fill a {
+  color: inherit;
+  text-decoration: underline;
+}
+.alert.alert--fill a code {
+  color: inherit;
+}
+.alert.alert--fill code {
+  color: inherit;
 }

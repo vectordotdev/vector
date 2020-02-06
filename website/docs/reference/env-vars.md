@@ -31,6 +31,50 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["AKIAIOSFODNN7EXAMPLE"]}
+  name={"AWS_ACCESS_KEY_ID"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_ACCESS_KEY_ID
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  name={"AWS_SECRET_ACCESS_KEY"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### AWS_SECRET_ACCESS_KEY
+
+Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
@@ -78,6 +122,28 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  name={"GOOGLE_APPLICATION_CREDENTIALS"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### GOOGLE_APPLICATION_CREDENTIALS
+
+The [GCP api key][urls.gcp_authentication_api_key] used for authentication.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["debug"]}
   name={"LOG"}
   path={null}
@@ -90,7 +156,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ### LOG
 
-Sets Vector&#39;s log level. See the [log section in the monitoring guide][docs.monitoring#level] for more information on the available levels.
+Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#levels] for more information on the available levels.
 
 
 </Field>
@@ -122,4 +188,6 @@ Enables backtraces when errors are logged. Use this when debugging only since it
 
 
 [docs.global-options]: /docs/reference/global-options/
-[docs.monitoring#level]: /docs/administration/monitoring/#level
+[docs.monitoring#levels]: /docs/administration/monitoring/#levels
+[pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys

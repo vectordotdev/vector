@@ -8,7 +8,6 @@ common = true
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-types_coercion = true
 
 [transforms.tokenizer.options.field]
 type = "string"
@@ -30,3 +29,5 @@ common = true
 default = true
 required = true
 description = "If `true` the `field` will be dropped after parsing."
+
+<%= render("_partials/_types.toml", namespace: "transforms.tokenizer", common: true) %>

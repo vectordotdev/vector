@@ -3,7 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+logplex%22
-operating_systems: ["linux","macos","windows"]
+operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "logplex|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/logplex.rs
 status: "beta"
@@ -30,7 +30,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   type = "logplex" # must be: "logplex"
-  address = nil # example
+  address = "0.0.0.0:8088" # example
 ```
 
 ## Options
@@ -46,7 +46,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["0.0.0.0:8088"]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -58,7 +58,7 @@ import Field from '@site/src/components/Field';
 
 ### address
 
-The address to accept connections on.
+The address to accept connections on. The address _must_ include a port.
 
 
 </Field>

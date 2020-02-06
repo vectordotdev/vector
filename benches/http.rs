@@ -30,7 +30,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                     "out",
                     &["in"],
                     sinks::http::HttpSinkConfig {
-                        uri: out_addr.to_string(),
+                        uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                         compression: Some(sinks::util::Compression::None),
                         ..Default::default()
                     },
@@ -81,7 +81,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                     "out",
                     &["in"],
                     sinks::http::HttpSinkConfig {
-                        uri: out_addr.to_string(),
+                        uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                         ..Default::default()
                     },
                 );

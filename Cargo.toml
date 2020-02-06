@@ -13,7 +13,6 @@ publish = false
 debug = true
 
 [package.metadata.deb]
-section = "utility"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
 assets = [
@@ -54,9 +53,9 @@ tokio-tls = "0.2.1"
 # Tracing
 tracing = "0.1.9"
 tracing-futures = { version = "0.2", features = ["futures-01"]}
-tracing-subscriber = "0.1.3"
+tracing-subscriber = "0.2"
 tracing-log = "0.1.0"
-tracing-tower = { git = "https://github.com/tokio-rs/tracing" }
+tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809fcc726b8187db85b23c42e32ef5dce" }
 
 # Metrics
 hotmic = "0.8"
@@ -77,7 +76,7 @@ tower-hyper = "0.1"
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
-serde_json = "1.0.33"
+serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Prost
 prost = "0.5"
@@ -85,7 +84,7 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # GCP
-goauth = "0.6.0"
+goauth = "0.6.1"
 smpl_jwt = "0.4.0"
 
 # External libs
@@ -146,7 +145,7 @@ logfmt = "0.0.2"
 atty = "0.2"
 
 [build-dependencies]
-prost-build = "0.4.0"
+prost-build = "0.5.0"
 built = "0.3"
 
 [dev-dependencies]

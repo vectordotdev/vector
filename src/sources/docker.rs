@@ -1,4 +1,5 @@
 use crate::{
+    event::merge_state::LogEventMergeState,
     event::{self, Event, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -37,12 +38,26 @@ lazy_static! {
 
 type DockerEvent = shiplift::rep::Event;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields, default)]
 pub struct DockerConfig {
     include_containers: Option<Vec<String>>,
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
+    partial_event_marker_field: Option<Atom>,
+    auto_partial_merge: bool,
+}
+
+impl Default for DockerConfig {
+    fn default() -> Self {
+        Self {
+            include_containers: None,
+            include_labels: None,
+            include_images: None,
+            partial_event_marker_field: Some(event::PARTIAL.clone()),
+            auto_partial_merge: true,
+        }
+    }
 }
 
 impl DockerConfig {
@@ -67,6 +82,15 @@ impl DockerConfig {
             true
         }
     }
+
+    fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
+        if let Some(val) = &self.partial_event_marker_field {
+            if val.is_empty() {
+                self.partial_event_marker_field = None;
+            }
+        }
+        self
+    }
 }
 
 inventory::submit! {
@@ -81,9 +105,12 @@ impl SourceConfig for DockerConfig {
         _globals: &GlobalOptions,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
-        DockerSource::new(self.clone(), out)
-            .map(Box::new)
-            .map(|source| source as Box<_>)
+        DockerSource::new(
+            self.clone().with_empty_partial_event_marker_field_as_none(),
+            out,
+        )
+        .map(Box::new)
+        .map(|source| source as Box<_>)
     }
 
     fn output_type(&self) -> DataType {
@@ -103,13 +130,12 @@ struct DockerSourceCore {
 }
 
 impl DockerSourceCore {
-    /// Only logs created at, or after this moment are logged.
     fn new(config: DockerConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = Docker::new();
 
-        // Only logs created at, or after this moment are logged.
+        // Only log events created at-or-after this moment are logged.
         let now = chrono::Local::now();
         info!(
             message = "Capturing logs from now on",
@@ -187,10 +213,12 @@ struct DockerSource {
     events: Box<dyn Stream<Item = DockerEvent, Error = shiplift::Error> + Send>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
-    /// collection of container_id not to be listened
-    ignore_container_id: Vec<ContainerId>,
     ///receives ContainerLogInfo comming from event stream futures
     main_recv: UnboundedReceiver<ContainerLogInfo>,
+    /// It may contain shortened container id.
+    hostname: Option<String>,
+    /// True if self needs to be excluded
+    exclude_self: bool,
 }
 
 impl DockerSource {
@@ -198,6 +226,19 @@ impl DockerSource {
         config: DockerConfig,
         out: Sender<Event>,
     ) -> crate::Result<impl Future<Item = (), Error = ()>> {
+        // Find out it's own container id, if it's inside a docker container.
+        // Since docker doesn't readily provide such information,
+        // various approches need to be made. As such the solution is not
+        // exact, but probable.
+        // This is to be used only if source is in state of catching everything.
+        // Or in other words, if includes are used then this is not necessary.
+        let exclude_self = config
+            .include_containers
+            .clone()
+            .unwrap_or_default()
+            .is_empty()
+            && config.include_labels.clone().unwrap_or_default().is_empty();
+
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
 
@@ -223,8 +264,9 @@ impl DockerSource {
             esb,
             events: Box::new(events) as Box<_>,
             containers: HashMap::new(),
-            ignore_container_id: Vec::new(),
             main_recv,
+            hostname: env::var("HOSTNAME").ok(),
+            exclude_self,
         }
         .running_containers()
         .and_then(|source| source))
@@ -250,37 +292,6 @@ impl DockerSource {
                 .collect(),
         );
 
-        // Find out it's own container id, if it's inside a docker container.
-        // Since docker doesn't readily provide such information,
-        // various approches need to be made. As such the solution is not
-        // exact, but probable.
-        // This is to be used only if source is in state of catching everything.
-        // Or in other words, if includes are used then this is not necessary.
-        let exclude_self = self
-            .esb
-            .core
-            .config
-            .include_containers
-            .clone()
-            .unwrap_or_default()
-            .is_empty()
-            && self
-                .esb
-                .core
-                .config
-                .include_labels
-                .clone()
-                .unwrap_or_default()
-                .is_empty();
-
-        // HOSTNAME hint
-        // It may contain shortened container id.
-        let hostname = env::var("HOSTNAME").ok();
-
-        // IMAGE hint
-        // If image name starts with this.
-        let image = VECTOR_IMAGE_NAME;
-
         // Future
         self.esb
             .core
@@ -295,23 +306,8 @@ impl DockerSource {
                         names = field::debug(&container.names)
                     );
 
-                    if exclude_self {
-                        let hostname_hint = hostname
-                            .as_ref()
-                            .map(|maybe_short_id| container.id.starts_with(maybe_short_id))
-                            .unwrap_or(false);
-                        let image_hint = container.image.starts_with(image);
-                        if hostname_hint || image_hint {
-                            // This container is probably itself.
-                            // So ignore it.
-                            info!(
-                                message = "Detected self container",
-                                id = field::display(&container.id)
-                            );
-                            self.ignore_container_id
-                                .push(ContainerId::new(container.id));
-                            continue;
-                        }
+                    if !self.exclude_vector(container.id.as_str(), container.image.as_str()) {
+                        continue;
                     }
 
                     // This check is necessary since shiplift doesn't have way to include
@@ -348,11 +344,31 @@ impl DockerSource {
                     self.containers.insert(id.clone(), self.esb.start(id));
                 }
 
-                // Sort for efficient lookup
-                self.ignore_container_id.sort();
                 self
             })
             .map_err(|error| error!(message="Listing currently running containers, failed",%error))
+    }
+
+    /// True if container with the given id and image must be excluded from logging,
+    /// because it's a vector instance, probably this one.
+    fn exclude_vector<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
+        if self.exclude_self {
+            let hostname_hint = self
+                .hostname
+                .as_ref()
+                .map(|maybe_short_id| id.starts_with(maybe_short_id))
+                .unwrap_or(false);
+            let image_hint = image
+                .into()
+                .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
+                .unwrap_or(false);
+            if hostname_hint || image_hint {
+                // This container is probably itself.
+                info!(message = "Detected self container", id);
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -404,11 +420,6 @@ impl Future for DockerSource {
                                             state.running();
                                             self.esb.restart(state);
                                         } else {
-                                            let ignore_flag = self
-                                                .ignore_container_id
-                                                .binary_search_by(|a| a.as_str().cmp(id.as_str()))
-                                                .is_ok();
-
                                             // This check is necessary since shiplift doesn't have way to include
                                             // names into request to docker.
                                             let include_name =
@@ -421,7 +432,16 @@ impl Future for DockerSource {
                                                         .map(|s| s.as_str()),
                                                 );
 
-                                            if !ignore_flag && include_name {
+                                            let self_check = self.exclude_vector(
+                                                id.as_str(),
+                                                event
+                                                    .actor
+                                                    .attributes
+                                                    .get("image")
+                                                    .map(|s| s.as_str()),
+                                            );
+
+                                            if include_name && self_check {
                                                 // Included
                                                 self.containers
                                                     .insert(id.clone(), self.esb.start(id));
@@ -537,6 +557,9 @@ impl EventStreamBuilder {
 
         // Create event streamer
         let mut state = Some((self.main_send.clone(), info));
+        let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
+        let auto_partial_merge = self.core.config.auto_partial_merge;
+        let mut partial_event_merge_state = None;
         tokio::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
@@ -544,7 +567,12 @@ impl EventStreamBuilder {
                 loop {
                     return match stream.poll() {
                         Ok(Async::Ready(Some(message))) => {
-                            if let Some(event) = info.new_event(message) {
+                            if let Some(event) = info.new_event(
+                                message,
+                                partial_event_marker_field.clone(),
+                                auto_partial_merge,
+                                &mut partial_event_merge_state,
+                            ) {
                                 Ok(Async::Ready(Some(event)))
                             } else {
                                 continue;
@@ -681,17 +709,20 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the begining of message
-    /// Expects messages to be ordered by timestamps
-    fn new_event(&mut self, message: Chunk) -> Option<Event> {
-        let mut log_event = Event::new_empty_log().into_log();
-
+    /// Expects timestamp at the begining of message.
+    /// Expects messages to be ordered by timestamps.
+    fn new_event(
+        &mut self,
+        message: Chunk,
+        partial_event_marker_field: Option<Atom>,
+        auto_partial_merge: bool,
+        partial_event_merge_state: &mut Option<LogEventMergeState>,
+    ) -> Option<Event> {
         let stream = match message.stream_type {
             StreamType::StdErr => STDERR.clone(),
             StreamType::StdOut => STDOUT.clone(),
             _ => return None,
         };
-        log_event.insert(STREAM.clone(), stream);
 
         let mut bytes_message = BytesMut::from(message.data);
 
@@ -699,7 +730,7 @@ impl ContainerLogInfo {
 
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
-        match DateTime::parse_from_rfc3339(timestamp_str) {
+        let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
@@ -719,46 +750,121 @@ impl ContainerLogInfo {
                         return None;
                     }
                 }
-                // Supply timestamp
-                log_event.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc));
 
                 self.last_log = Some((timestamp, self.generation));
 
                 let log = splitter.next()?;
                 let remove_len = message.len() - log.len();
                 bytes_message.advance(remove_len);
+
+                // Provide the timestamp.
+                Some(timestamp.with_timezone(&Utc))
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
                 error!(message="Didn't recieve rfc3339 timestamp from docker",%error);
-                // So log whole message
+                // So continue normally but without a timestamp.
+                None
             }
-        }
+        };
 
-        // Message is actually one line from stderr or stdout, and they are delimited with newline
-        // so that newline needs to be removed.
-        if bytes_message
+        // Message is actually one line from stderr or stdout, and they are
+        // delimited with newline, so that newline needs to be removed.
+        // If there's no newline, the event is considered partial, and will
+        // either be merged within the docker source, or marked accordingly
+        // before sending out, depending on the configuration.
+        let is_partial = if bytes_message
             .last()
             .map(|&b| b as char == '\n')
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
-        }
+            false
+        } else {
+            true
+        };
 
-        // Supply message
-        log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
+        // Prepare the log event.
+        let mut log_event = {
+            let mut log_event = Event::new_empty_log().into_log();
 
-        // Supply container
-        log_event.insert(CONTAINER.clone(), self.id.0.clone());
+            // The log message.
+            log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
 
-        // Add Metadata
-        for (key, value) in self.metadata.labels.iter() {
-            log_event.insert(key.clone(), value.clone());
-        }
-        log_event.insert(NAME.clone(), self.metadata.name.clone());
-        log_event.insert(IMAGE.clone(), self.metadata.image.clone());
-        log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+            // Stream we got the message from.
+            log_event.insert(STREAM.clone(), stream);
 
+            // Timestamp of the event.
+            if let Some(timestamp) = timestamp {
+                log_event.insert(event::TIMESTAMP.clone(), timestamp);
+            }
+
+            // Container ID.
+            log_event.insert(CONTAINER.clone(), self.id.0.clone());
+
+            // Labels.
+            for (key, value) in self.metadata.labels.iter() {
+                log_event.insert(key.clone(), value.clone());
+            }
+
+            // Container name.
+            log_event.insert(NAME.clone(), self.metadata.name.clone());
+
+            // Container image.
+            log_event.insert(IMAGE.clone(), self.metadata.image.clone());
+
+            // Timestamp of the container creation.
+            log_event.insert(CREATED_AT.clone(), self.metadata.created_at.clone());
+
+            // Return the resulting log event.
+            log_event
+        };
+
+        // If automatic partial event merging is requested - perform the
+        // merging.
+        // Otherwise mark partial events and return all the events with no
+        // merging.
+        let log_event = if auto_partial_merge {
+            // Partial event events merging logic.
+
+            // If event is partial, stash it and return `None`.
+            if is_partial {
+                // If we already have a partial event merge state, the current
+                // message has to be merged into that existing state.
+                // Otherwise, create a new partial event merge state with the
+                // current message being the initial one.
+                if let Some(partial_event_merge_state) = partial_event_merge_state {
+                    partial_event_merge_state
+                        .merge_in_next_event(log_event, &[event::MESSAGE.clone()]);
+                } else {
+                    *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
+                };
+                return None;
+            };
+
+            // This is not a parial event. If we have a partial event merge
+            // state from before, the current event must be a final event, that
+            // would give us a merged event we can return.
+            // Otherwise it's just a regular event that we return as-is.
+            match partial_event_merge_state.take() {
+                Some(partial_event_merge_state) => partial_event_merge_state
+                    .merge_in_final_event(log_event, &[event::MESSAGE.clone()]),
+                None => log_event,
+            }
+        } else {
+            // If the event is partial, just set the partial event marker field.
+            if is_partial {
+                // Only add partial event marker field if it's requested.
+                if let Some(partial_event_marker_field) = partial_event_marker_field {
+                    log_event.insert(partial_event_marker_field, true);
+                }
+            }
+            // Return the log event as is, partial or not. No merging here.
+            log_event
+        };
+
+        // Partial or not partial - we return the event we got here, because all
+        // other cases were handeled earlier.
         let event = Event::Log(log_event);
         trace!(message = "Received one event.", ?event);
         Some(event)

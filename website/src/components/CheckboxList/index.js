@@ -4,7 +4,7 @@ import humanizeString from 'humanize-string';
 
 import './styles.css';
 
-function CheckboxList({icon, values, currentState, setState}) {
+function CheckboxList({humanize, icon, values, currentState, setState}) {
   if (values.size == 0)
     return null;
 
@@ -13,7 +13,7 @@ function CheckboxList({icon, values, currentState, setState}) {
   return (
     <>
       {valuesArr.map((value, idx) => {
-        let label = typeof value === 'string' ? humanizeString(value) : value;
+        let label = (typeof value === 'string' && humanize) ? humanizeString(value) : value;
 
         return (
           <label key={idx}>
