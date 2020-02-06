@@ -51,7 +51,7 @@ impl<'a> FileSourceBuilder<'a> {
         let file_source = self
             .file_config
             .build("file_source", globals, file_send)
-            .map_err(|e| format!("Failed in creating file source with error: {:?}", e))?;
+            .map_err(|e| format!("Failed in creating file source with error: {}", e))?;
 
         Ok((file_recv, file_source))
     }
