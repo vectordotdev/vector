@@ -4,7 +4,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
 sidebar_label: "logfmt_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/logfmt_parser.rs
-status: "prod-ready"
+status: "beta"
 title: "Logfmt Parser Transform"
 ---
 

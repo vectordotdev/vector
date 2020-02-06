@@ -1,5 +1,6 @@
 [sources.syslog]
 title = "Syslog"
+beta = false
 common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"

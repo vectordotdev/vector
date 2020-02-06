@@ -3,6 +3,7 @@ title = "Logfmt Parser"
 allow_you_to_description = """\
 extract data from a logfmt-formatted log field\
 """
+beta = true
 common = true
 function_category = "parse"
 input_types = ["log"]
