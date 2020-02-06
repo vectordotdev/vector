@@ -3,8 +3,8 @@ services:
     # jobs
     build-x86_64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
       volumes:
@@ -17,8 +17,8 @@ services:
 
     build-armv7:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
       volumes:
@@ -31,8 +31,8 @@ services:
 
     build-aarch64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
       volumes:
@@ -45,8 +45,8 @@ services:
 
     bench:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
       volumes:
@@ -59,8 +59,8 @@ services:
 
     generate:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       environment:
         CHECK_URLS: "false"
       volumes:
@@ -71,8 +71,8 @@ services:
 
     check-code:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       environment:
         RUSTFLAGS: "-D warnings"
         CARGO_TERM_COLOR: always
@@ -86,8 +86,8 @@ services:
 
     check-fmt:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
       volumes:
@@ -100,8 +100,8 @@ services:
 
     check-style:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -110,8 +110,8 @@ services:
 
     check-generate:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -120,8 +120,8 @@ services:
 
     check-version:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -138,8 +138,8 @@ services:
 
     check-blog:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/checker/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/checker/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -147,8 +147,8 @@ services:
 
     build-archive-x86_64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         TARGET: x86_64-unknown-linux-musl
         FEATURES: default-musl
@@ -163,8 +163,8 @@ services:
 
     build-archive-armv7:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
       environment:
         TARGET: armv7-unknown-linux-musleabihf
         FEATURES: default-musl
@@ -179,8 +179,8 @@ services:
 
     build-archive-aarch64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
       environment:
         TARGET: aarch64-unknown-linux-musl
         FEATURES: default-musl
@@ -195,8 +195,8 @@ services:
 
     package-deb-x86_64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         TARGET: x86_64-unknown-linux-musl
       volumes:
@@ -209,8 +209,8 @@ services:
 
     package-deb-armv7:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
       environment:
         TARGET: armv7-unknown-linux-musleabihf
       volumes:
@@ -223,8 +223,8 @@ services:
 
     package-deb-aarch64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
       environment:
         TARGET: aarch64-unknown-linux-musl
       volumes:
@@ -237,8 +237,8 @@ services:
 
     package-rpm-x86_64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/packager-rpm/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
       environment:
         TARGET: x86_64-unknown-linux-musl
       volumes:
@@ -248,8 +248,8 @@ services:
 
     package-rpm-armv7:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/packager-rpm/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
       environment:
         TARGET: armv7-unknown-linux-musleabihf
       volumes:
@@ -259,8 +259,8 @@ services:
 
     package-rpm-aarch64:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/packager-rpm/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
       environment:
         TARGET: aarch64-unknown-linux-musl
       volumes:
@@ -270,8 +270,8 @@ services:
 
     verify-rpm-amazonlinux-1:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-amazonlinux-1/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-amazonlinux-1/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -279,8 +279,8 @@ services:
 
     verify-rpm-amazonlinux-2:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-amazonlinux-2/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-amazonlinux-2/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -288,8 +288,8 @@ services:
 
     verify-rpm-centos-7:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-centos-7/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-centos-7/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -297,8 +297,8 @@ services:
 
     verify-deb-artifact-on-deb-8:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-deb-8/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-deb-8/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -306,8 +306,8 @@ services:
 
     verify-deb-artifact-on-deb-9:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-deb-9/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-deb-9/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -315,8 +315,8 @@ services:
 
     verify-deb-artifact-on-deb-10:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-deb-10/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-deb-10/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -324,8 +324,8 @@ services:
 
     verify-deb-artifact-on-ubuntu-16-04:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-ubuntu-16-04/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-ubuntu-16-04/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -333,8 +333,8 @@ services:
 
     verify-deb-artifact-on-ubuntu-18-04:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-ubuntu-18-04/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-ubuntu-18-04/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -342,8 +342,8 @@ services:
 
     verify-deb-artifact-on-ubuntu-19-04:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-ubuntu-19-04/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-ubuntu-19-04/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -351,8 +351,8 @@ services:
 
     verify-nixos:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/verifier-nixos/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/verifier-nixos/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -360,8 +360,8 @@ services:
 
     target-graph:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/target-graph/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/target-graph/Dockerfile
       volumes:
         - $PWD:$PWD
       working_dir: $PWD
@@ -376,15 +376,15 @@ services:
 
     load-qemu-binfmt:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/loader-qemu-binfmt/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/loader-qemu-binfmt/Dockerfile
       privileged: true
       command: dpkg-reconfigure qemu-user-binfmt
 
     test:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
       volumes:
@@ -397,8 +397,8 @@ services:
 
     test-docker:
       build:
-        context: scripts
-        dockerfile: ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
         AWS_ACCESS_KEY_ID: dummy
