@@ -64,11 +64,11 @@ impl SourceConfig for KubernetesConfig {
         let now = TimeFilter::new();
 
         let (file_recv, file_source) =
-            self::file_source_builder::FileSourceBuilder::new(self).build(name, globals)?;
+            file_source_builder::FileSourceBuilder::new(self).build(name, globals)?;
 
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;
-        let mut parse_message = self::message_parser::build_message_parser()?;
+        let mut parse_message = message_parser::build_message_parser()?;
 
         // Kubernetes source
         let source = file_recv
