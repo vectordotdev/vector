@@ -200,7 +200,7 @@ jobs:
           command: |
             docker-compose up -d splunk
             sleep 30 # Splunk crashes when started simultaneously with other services
-            docker-compose up -d
+            docker-compose up -d test-runtime-deps
             sleep 180
       - run:
           name: Run tests
