@@ -80,7 +80,7 @@ pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> 
         }
         Ok((new_pieces, warnings)) => {
             for warning in warnings {
-                error!("Configuration warning: {}", warning);
+                warn!("Configuration warning: {}", warning);
             }
             Some(new_pieces)
         }

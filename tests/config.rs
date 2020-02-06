@@ -371,8 +371,8 @@ fn warnings() {
     assert_eq!(
         warnings,
         vec![
-            "Transform \"sampler2\" has no outputs",
-            "Source \"in2\" has no outputs",
+            "Transform \"sampler2\" has no consumers",
+            "Source \"in2\" has no consumers",
         ]
     )
 }
