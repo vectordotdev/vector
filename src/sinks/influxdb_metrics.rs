@@ -5,6 +5,13 @@ use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
 
+pub enum Field {
+    /// string
+    String(String),
+    /// Float
+    Float(f64),
+}
+
 fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
     events
         .into_iter()
@@ -13,7 +20,13 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone();
             match event.value {
-                MetricValue::Counter { value: _ } => Some(vec![influx_line_protocol(fullname, "counter", tags, ts)]),
+                MetricValue::Counter { value } => {
+                    let fields: HashMap<String, Field> = vec![
+                        ("value".to_owned(), Field::Float(value)),
+                    ].into_iter().collect();
+
+                    Some(vec![influx_line_protocol(fullname, "counter", tags, Some(fields),ts)])
+                },
                 _ => None
             }
         })
@@ -21,13 +34,17 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
         .collect()
 }
 
-fn influx_line_protocol(measurement: String, metric_type: &str, tags: Option<HashMap<String, String>>, timestamp: i64) -> String {
+fn influx_line_protocol(measurement: String, metric_type: &str, tags: Option<HashMap<String, String>>, fields: Option<HashMap<String, Field>>, timestamp: i64) -> String {
     let mut line_protocol = vec![encode_key(measurement)];
 
     // Tags
     let mut unwrapped_tags = tags.unwrap_or(HashMap::new());
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
     line_protocol.push(format!(",{}", encode_tags(unwrapped_tags)));
+
+    // Fields
+    let unwrapped_fields = fields.unwrap_or(HashMap::new());
+    line_protocol.push(format!(" {}", encode_fields(unwrapped_fields)));
 
     // Timestamp
     line_protocol.push(format!(" {}", timestamp));
@@ -61,6 +78,32 @@ fn encode_tags(tags: HashMap<String, String>) -> String {
         .collect();
 
     ordered.join(",")
+}
+
+fn encode_fields(fields: HashMap<String, Field>) -> String {
+    let encoded = fields
+        // sort by key
+        .iter().collect::<BTreeMap<_, _>>()
+        // map to key=value
+        .iter().map(|pair| {
+            let key = encode_key(pair.0.to_string());
+            let value = match pair.1 {
+                Field::String(s) => {
+                    let escaped = s.replace("\\", "\\\\").replace("\"", "\\\"");
+                    format!("\"{}\"", escaped)
+                },
+                Field::Float(f) => f.to_string(),
+            };
+            if !key.is_empty() && !value.is_empty() {
+                format!("{}={}", key, value)
+            } else {
+                "".to_string()
+            }
+        })
+        .filter(|field_value| !field_value.is_empty())
+        .collect::<Vec<String>>();
+
+    encoded.join(",")
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -133,6 +176,19 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_fields() {
+
+        let fields = vec![
+            ("field_string".to_owned(), Field::String("string value".to_owned())),
+            ("field_string_escape".to_owned(), Field::String("string\\val\"ue".to_owned())),
+            ("field_float".to_owned(), Field::Float(123.45)),
+            ("escape key".to_owned(), Field::Float(10.0)),
+        ].into_iter().collect();
+
+        assert_eq!(encode_fields(fields), "escape\\ key=10,field_float=123.45,field_string=\"string value\",field_string_escape=\"string\\\\val\\\"ue\"");
+    }
+
+    #[test]
     fn encode_counter() {
         let events = vec![
             Metric {
@@ -154,7 +210,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.total,metric_type=counter 1542182950000000011", "ns.check,metric_type=counter,normal_tag=value,true_tag=true 1542182950000000011", ]
+            vec!["ns.total,metric_type=counter value=1.5 1542182950000000011", "ns.check,metric_type=counter,normal_tag=value,true_tag=true value=1 1542182950000000011", ]
         );
     }
 }
