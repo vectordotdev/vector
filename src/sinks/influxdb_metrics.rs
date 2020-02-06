@@ -30,6 +30,11 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
 
                     Some(vec![influx_line_protocol(fullname, "gauge", tags, Some(fields), ts)])
                 }
+                MetricValue::Set { values } => {
+                    let fields = to_fields(values.len() as f64);
+
+                    Some(vec![influx_line_protocol(fullname, "set", tags, Some(fields), ts)])
+                }
                 _ => None
             }
         })
@@ -237,6 +242,25 @@ mod tests {
         assert_eq!(
             line_protocols,
             vec!["ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011", ]
+        );
+    }
+
+    #[test]
+    fn encode_set() {
+        let events = vec![Metric {
+            name: "users".into(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["alice".into(), "bob".into()].into_iter().collect(),
+            },
+        }];
+
+        let line_protocols = encode_events(events, "ns");
+        assert_eq!(
+            line_protocols,
+            vec!["ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011", ]
         );
     }
 }
