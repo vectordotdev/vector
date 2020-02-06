@@ -52,6 +52,15 @@ scopes:
   - rpm platform
   - msi platform
 
+  # providers
+  - aws provider
+  - datadog provider
+  - elastic provider
+  - google provider
+  - confluent provider
+  - new relic provider
+  - splunk provider
+
   # sources
   - docker source
   - file source

@@ -25,6 +25,11 @@ scopes:
   - <%= platform.name.downcase %> platform
   <%- end -%>
 
+  # providers
+  <%- metadata.service_providers.each do |service_provider| -%>
+  - <%= service_provider.downcase %> provider
+  <%- end -%>
+
   # sources
   <%- metadata.sources.to_h.values.sort.each do |source| -%>
   - <%= source.name.downcase %> source

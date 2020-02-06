@@ -148,6 +148,28 @@
   description: Anything MSI related
   color: ff9ff3
 
+- name: "provider: aws"
+  description: Anything AWS related
+  color: ff9f43
+- name: "provider: datadog"
+  description: Anything Datadog related
+  color: ff9f43
+- name: "provider: elastic"
+  description: Anything Elastic related
+  color: ff9f43
+- name: "provider: google"
+  description: Anything Google related
+  color: ff9f43
+- name: "provider: confluent"
+  description: Anything Confluent related
+  color: ff9f43
+- name: "provider: new relic"
+  description: Anything New Relic related
+  color: ff9f43
+- name: "provider: splunk"
+  description: Anything Splunk related
+  color: ff9f43
+
 - name: "source: docker"
   description: Anything `docker` source realted
   color: ff9ff3

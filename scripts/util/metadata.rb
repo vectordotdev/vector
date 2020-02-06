@@ -337,6 +337,10 @@ class Metadata
     releases
   end
 
+  def service_providers
+    @service_providers ||= components.collect(&:service_providers).flatten.uniq
+  end
+
   def sinks_list
     @sinks_list ||= sinks.to_h.values.sort
   end
