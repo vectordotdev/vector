@@ -21,12 +21,15 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
             let tags = event.tags.clone();
             match event.value {
                 MetricValue::Counter { value } => {
-                    let fields: HashMap<String, Field> = vec![
-                        ("value".to_owned(), Field::Float(value)),
-                    ].into_iter().collect();
+                    let fields = to_fields(value);
 
-                    Some(vec![influx_line_protocol(fullname, "counter", tags, Some(fields),ts)])
-                },
+                    Some(vec![influx_line_protocol(fullname, "counter", tags, Some(fields), ts)])
+                }
+                MetricValue::Gauge { value } => {
+                    let fields = to_fields(value);
+
+                    Some(vec![influx_line_protocol(fullname, "gauge", tags, Some(fields), ts)])
+                }
                 _ => None
             }
         })
@@ -65,14 +68,14 @@ fn encode_tags(tags: HashMap<String, String>) -> String {
         .iter().collect::<BTreeMap<_, _>>()
         // map to key=value
         .iter().map(|pair| {
-            let key = encode_key(pair.0.to_string());
-            let value = encode_key(pair.1.to_string());
-            if !key.is_empty() && !value.is_empty() {
-                format!("{}={}", key, value)
-            } else {
-                "".to_string()
-            }
-        })
+        let key = encode_key(pair.0.to_string());
+        let value = encode_key(pair.1.to_string());
+        if !key.is_empty() && !value.is_empty() {
+            format!("{}={}", key, value)
+        } else {
+            "".to_string()
+        }
+    })
         // filter empty
         .filter(|tag_value| !tag_value.is_empty())
         .collect();
@@ -86,20 +89,20 @@ fn encode_fields(fields: HashMap<String, Field>) -> String {
         .iter().collect::<BTreeMap<_, _>>()
         // map to key=value
         .iter().map(|pair| {
-            let key = encode_key(pair.0.to_string());
-            let value = match pair.1 {
-                Field::String(s) => {
-                    let escaped = s.replace("\\", "\\\\").replace("\"", "\\\"");
-                    format!("\"{}\"", escaped)
-                },
-                Field::Float(f) => f.to_string(),
-            };
-            if !key.is_empty() && !value.is_empty() {
-                format!("{}={}", key, value)
-            } else {
-                "".to_string()
+        let key = encode_key(pair.0.to_string());
+        let value = match pair.1 {
+            Field::String(s) => {
+                let escaped = s.replace("\\", "\\\\").replace("\"", "\\\"");
+                format!("\"{}\"", escaped)
             }
-        })
+            Field::Float(f) => f.to_string(),
+        };
+        if !key.is_empty() && !value.is_empty() {
+            format!("{}={}", key, value)
+        } else {
+            "".to_string()
+        }
+    })
         .filter(|field_value| !field_value.is_empty())
         .collect::<Vec<String>>();
 
@@ -120,6 +123,13 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     } else {
         name.to_string()
     }
+}
+
+fn to_fields(value: f64) -> HashMap<String, Field> {
+    let fields: HashMap<String, Field> = vec![
+        ("value".to_owned(), Field::Float(value)),
+    ].into_iter().collect();
+    fields
 }
 
 #[cfg(test)]
@@ -177,7 +187,6 @@ mod tests {
 
     #[test]
     fn test_encode_fields() {
-
         let fields = vec![
             ("field_string".to_owned(), Field::String("string value".to_owned())),
             ("field_string_escape".to_owned(), Field::String("string\\val\"ue".to_owned())),
@@ -211,6 +220,23 @@ mod tests {
         assert_eq!(
             line_protocols,
             vec!["ns.total,metric_type=counter value=1.5 1542182950000000011", "ns.check,metric_type=counter,normal_tag=value,true_tag=true value=1 1542182950000000011", ]
+        );
+    }
+
+    #[test]
+    fn encode_gauge() {
+        let events = vec![Metric {
+            name: "meter".to_owned(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Gauge { value: -1.5 },
+        }];
+
+        let line_protocols = encode_events(events, "ns");
+        assert_eq!(
+            line_protocols,
+            vec!["ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011", ]
         );
     }
 }
