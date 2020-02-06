@@ -1,6 +1,5 @@
-use super::Config;
 use crate::Error;
-use notify::{watcher, DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     path::{Path, PathBuf},
     sync::mpsc::{channel, Receiver},
@@ -26,35 +25,37 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 #[cfg(unix)]
 pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
     // Create watcher now so not to miss any changes happening between
-    // returning from this function and thread started.
-    let mut watcher = create_watcher(&config_path, delay);
+    // returning from this function and the thread starting.
+    let mut watcher = create_watcher(&config_path);
 
     info!("Watching configuration file.");
 
     thread::spawn(move || loop {
         if let Some((_, receiver)) = watcher.take() {
-            while let Ok(msg) = receiver.recv() {
-                match msg {
-                    DebouncedEvent::Write(_)
-                    | DebouncedEvent::Create(_)
-                    | DebouncedEvent::Remove(_) => {
-                        info!("Configuration file changed.");
-                        raise_sighup()
-                    }
-                    event => debug!(message = "Ignoring event", ?event),
+            while let Ok(RawEvent { op: Ok(event), .. }) = receiver.recv() {
+                if event.intersects(Op::CREATE | Op::REMOVE | Op::WRITE | Op::CLOSE_WRITE) {
+                    info!("Configuration file change detected.");
+
+                    // Consume events until delay amount of time has passed since the latest event.
+                    while let Ok(..) = receiver.recv_timeout(delay) {}
+
+                    info!("Configuration file changed.");
+                    raise_sighup();
+                } else {
+                    debug!(message = "Ignoring event", ?event)
                 }
             }
         }
 
         thread::sleep(RETRY_TIMEOUT);
 
-        watcher = create_watcher(&config_path, delay);
+        watcher = create_watcher(&config_path);
 
         if watcher.is_some() {
             // Config file could have changed while we weren't watching,
             // so for a good measure raise SIGHUP and let reload logic
             // determine if anything changed.
-            info!("Speculating that configuration file changed.");
+            info!("Speculating that configuration file has changed.");
             raise_sighup();
         }
     });
@@ -76,13 +77,10 @@ fn raise_sighup() {
     });
 }
 
-fn create_watcher(
-    config_path: &Path,
-    delay: Duration,
-) -> Option<(RecommendedWatcher, Receiver<DebouncedEvent>)> {
+fn create_watcher(config_path: &Path) -> Option<(RecommendedWatcher, Receiver<RawEvent>)> {
     info!("Creating configuration file watcher");
     let (sender, receiver) = channel();
-    match watcher(sender, delay) {
+    match raw_watcher(sender) {
         Ok(mut watcher) => match watcher.watch(&config_path, RecursiveMode::NonRecursive) {
             Ok(_) => {
                 return Some((watcher, receiver));
@@ -96,7 +94,6 @@ fn create_watcher(
 
 #[cfg(test)]
 mod tests {
-    use super::Config;
     use super::*;
     use crate::test_util::{runtime, temp_file};
     use futures::future;
@@ -114,10 +111,7 @@ mod tests {
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
-        let mut config = Config::empty();
-        config.global.reload_config = true;
-
-        let _ = config_watcher(&config, file_path, delay).unwrap();
+        let _ = config_watcher(file_path, delay).unwrap();
 
         file.write_all(&[0]).unwrap();
         std::mem::drop(file);
