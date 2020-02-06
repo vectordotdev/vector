@@ -280,7 +280,6 @@ impl PartialUid {
         if !partial_uid.chars().all(|c| {
             c.is_numeric() || ('A'..='F').contains(&c) || ('a'..='f').contains(&c) || c == '-'
         }) {
-            error!(message = "Configuration 'include_pod_uids' contains an illegal UID.", uid = ?partial_uid);
             return Err(BuildError::IllegalCharacterInUid {
                 uid: partial_uid.clone(),
             });
