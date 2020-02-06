@@ -46,8 +46,18 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
                     fields.insert("count".to_owned(), Field::UnsignedInt(count));
                     fields.insert("sum".to_owned(), Field::Float(sum));
 
-
                     Some(vec![influx_line_protocol(fullname, "histogram", tags, Some(fields), ts)])
+                }
+                MetricValue::AggregatedSummary { quantiles,
+                    values,
+                    count,
+                    sum, } => {
+                    let mut fields: HashMap<String, Field> = quantiles.iter().zip(values.iter())
+                        .map(|pair| (format!("quantile_{}", pair.0), Field::Float(*pair.1))).collect();
+                    fields.insert("count".to_owned(), Field::UnsignedInt(count));
+                    fields.insert("sum".to_owned(), Field::Float(sum));
+
+                    Some(vec![influx_line_protocol(fullname, "summary", tags, Some(fields), ts)])
                 }
                 _ => None
             }
@@ -278,6 +288,7 @@ mod tests {
             vec!["ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011", ]
         );
     }
+
     #[test]
     fn encode_histogram() {
         let events = vec![Metric {
@@ -297,6 +308,28 @@ mod tests {
         assert_eq!(
             line_protocols,
             vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1,bucket_2.1=2,bucket_3=3,count=6,sum=12.5 1542182950000000011", ]
+        );
+    }
+
+    #[test]
+    fn encode_summary() {
+        let events = vec![Metric {
+            name: "requests_sum".to_owned(),
+            timestamp:  Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedSummary {
+                quantiles: vec![0.01, 0.5, 0.99],
+                values: vec![1.5, 2.0, 3.0],
+                count: 6,
+                sum: 12.0,
+            },
+        }];
+
+        let line_protocols = encode_events(events, "ns");
+        assert_eq!(
+            line_protocols,
+            vec!["ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011", ]
         );
     }
 }
