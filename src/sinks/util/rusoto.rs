@@ -64,10 +64,6 @@ pub fn create_client<T: RusotoNewClient>(
 }
 
 macro_rules! impl_new_client {
-    ( $crate:ident :: $ty:ty ) => {
-        use $crate::$ty;
-        impl_new_client! { $ty }
-    };
     ( $ty:ty ) => {
         impl RusotoNewClient for $ty {
             fn new_client<P>(client: Client, creds: P, region: Region) -> Self
