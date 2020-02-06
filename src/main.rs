@@ -73,7 +73,7 @@ struct RootOpts {
     #[structopt(long)]
     color: Option<Color>,
 
-    /// Watch for changes in configuration file, and update accordingly.
+    /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long)]
     watch_config: bool,
 }
