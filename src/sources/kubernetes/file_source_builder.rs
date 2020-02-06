@@ -30,8 +30,16 @@ impl<'a> FileSourceBuilder<'a> {
         kube_name: &str,
         globals: &GlobalOptions,
     ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
-        self.file_source_include()?;
-        self.file_source_exclude();
+        self.file_config.include.extend(
+            Self::file_source_include(self.config)?
+                .into_iter()
+                .map(Into::into),
+        );
+        self.file_config.exclude.extend(
+            Self::file_source_exclude(self.config)
+                .into_iter()
+                .map(Into::into),
+        );
 
         self.file_config.start_at_beginning = true;
 
@@ -56,8 +64,8 @@ impl<'a> FileSourceBuilder<'a> {
         Ok((file_recv, file_source))
     }
 
-    /// Configures include in FileConfig
-    fn file_source_include(&mut self) -> crate::Result<()> {
+    /// Creates includes for FileConfig
+    fn file_source_include(config: &KubernetesConfig) -> crate::Result<Vec<String>> {
         // Paths to log files can contain: namespace, pod uid, and container name.
         // This property of paths is exploited by embeding config.include_* filters into globs.
         // https://en.wikipedia.org/wiki/Glob_(programming)
@@ -78,7 +86,7 @@ impl<'a> FileSourceBuilder<'a> {
         //    Because of this all globs of one filter need to be paired up with all globs of other filter.
         //    And then those pairs with globs of third filter.
 
-        let namespaces = if self.config.include_namespaces.is_empty() {
+        let namespaces = if config.include_namespaces.is_empty() {
             // Any namespace
             vec!["*".to_string()]
         } else {
@@ -89,10 +97,10 @@ impl<'a> FileSourceBuilder<'a> {
             //      "telemetry"
             //      "app"
             // ]
-            self.config.include_namespaces.clone()
+            config.include_namespaces.clone()
         };
 
-        let pod_uids = if self.config.include_pod_uids.is_empty() {
+        let pod_uids = if config.include_pod_uids.is_empty() {
             // Pattern that matches to all UIDs, and only UIDs per https://tools.ietf.org/html/rfc4122.
             // Will be:[
             //     "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
@@ -109,7 +117,7 @@ impl<'a> FileSourceBuilder<'a> {
             //      "8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]"
             //      "8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]"
             // ]
-            self.config
+            config
                 .include_pod_uids
                 .clone()
                 .into_iter()
@@ -120,7 +128,7 @@ impl<'a> FileSourceBuilder<'a> {
                 .collect()
         };
 
-        let container_names = if self.config.include_container_names.is_empty() {
+        let container_names = if config.include_container_names.is_empty() {
             // Any name
             vec!["*".to_string()]
         } else {
@@ -132,12 +140,15 @@ impl<'a> FileSourceBuilder<'a> {
             //      "busybox*"
             //      "redis*"
             // ]
-            self.config
+            config
                 .include_container_names
                 .iter()
                 .map(|name| name.clone() + "*")
                 .collect()
         };
+
+        // Glob includes
+        let mut include = Vec::new();
 
         // The following creates and adds globs of form:
         // LOG_DIRECTORY/uid/container_name/*.log
@@ -172,17 +183,17 @@ impl<'a> FileSourceBuilder<'a> {
         //  - include_container_names = ["busybox","redis"]
         // -------------------------------------------------------------------------------------------
         // Globs:
-        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
-        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
-        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
-        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log
+        //      LOG_DIRECTORY/a027f09d-8f18-2345-19fa-930f8fa71234/redis*/*.log
+        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/busybox*/*.log
+        //      LOG_DIRECTORY/a027f09d8f18234519fa930f8fa71234/redis*/*.log
+        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log
+        //      LOG_DIRECTORY/8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis*/*.log
+        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log
+        //      LOG_DIRECTORY/8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis*/*.log
         for uid in &pod_uids {
             for container_name in &container_names {
-                self.file_config.include.push(
+                include.push(
                     (LOG_DIRECTORY.to_owned()
                         + format!("{}/{}/*.log", uid, container_name).as_str())
                     .into(),
@@ -202,26 +213,26 @@ impl<'a> FileSourceBuilder<'a> {
         //  - include_container_names = ["busybox","redis"]
         // -------------------------------------------------------------------------------------------
         // Globs:
-        //      LOG_DIRECTORY/telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/telemetry_*_a027f09d8f18234519fa930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/telemetry_*_a027f09d8f18234519fa930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
-        //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
-        //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
-        //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
-        //      LOG_DIRECTORY/app_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/app_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/app_*_a027f09d8f18234519fa930f8fa71234/busybox/*.log
-        //      LOG_DIRECTORY/app_*_a027f09d8f18234519fa930f8fa71234/redis/*.log
-        //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
-        //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
-        //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox/*.log
-        //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis*/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d8f18234519fa930f8fa71234/busybox*/*.log
+        //      LOG_DIRECTORY/telemetry_*_a027f09d8f18234519fa930f8fa71234/redis*/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis*/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log
+        //      LOG_DIRECTORY/telemetry_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis*/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis*/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d8f18234519fa930f8fa71234/busybox*/*.log
+        //      LOG_DIRECTORY/app_*_a027f09d8f18234519fa930f8fa71234/redis*/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis*/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log
+        //      LOG_DIRECTORY/app_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/redis*/*.log
         for namespace in &namespaces {
             for uid in &pod_uids {
                 for container_name in &container_names {
-                    self.file_config.include.push(
+                    include.push(
                         (LOG_DIRECTORY.to_owned()
                             + format!("{}_*_{}/{}/*.log", namespace, uid, container_name).as_str())
                         .into(),
@@ -230,10 +241,10 @@ impl<'a> FileSourceBuilder<'a> {
             }
         }
 
-        Ok(())
+        Ok(include)
     }
 
-    /// Configures exclude in FileConfig.
+    /// Returns excludes for FileConfig.
     ///
     /// By default it's good to exclude "kube-system" namespace and "vector*" container name.
     /// But that default can/must be turned off if the user has anything included. The reason being:
@@ -241,12 +252,13 @@ impl<'a> FileSourceBuilder<'a> {
     ///    with include, so exclude isn't necessary.
     /// b) if user has included "kube-system" or "vector*", then that is a sign that user wants
     ///    to log it so excluding it is not valid.
-    fn file_source_exclude(&mut self) {
+    fn file_source_exclude(config: &KubernetesConfig) -> Vec<String> {
         // True if there is no includes
-        let no_include = self.config.include_container_names.is_empty()
-            && self.config.include_namespaces.is_empty()
-            && self.config.include_pod_uids.is_empty();
+        let no_include = config.include_container_names.is_empty()
+            && config.include_namespaces.is_empty()
+            && config.include_pod_uids.is_empty();
 
+        let mut exclude = Vec::new();
         // Default excludes
         if no_include {
             // Since there is no user intention in including specific namespace/pod/container,
@@ -254,15 +266,13 @@ impl<'a> FileSourceBuilder<'a> {
 
             // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
             // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
-            self.file_config
-                .exclude
-                .push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
+            exclude.push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
 
             // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
-            self.file_config
-                .exclude
-                .push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
+            exclude.push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
         }
+
+        exclude
     }
 }
 
@@ -328,7 +338,7 @@ impl PartialUid {
 
 #[cfg(test)]
 mod tests {
-    use super::PartialUid;
+    use super::{FileSourceBuilder, KubernetesConfig, PartialUid, LOG_DIRECTORY};
     use std::collections::HashSet;
     use std::iter::FromIterator;
 
@@ -373,6 +383,175 @@ mod tests {
             HashSet::<String>::from_iter(vec![
                 "8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]".to_owned(),
                 "8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]".to_owned()
+            ])
+        );
+    }
+
+    #[test]
+    fn empty_filters() {
+        let config = KubernetesConfig {
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+              LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+              LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+              LOG_DIRECTORY.to_owned() + "*_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+              LOG_DIRECTORY.to_owned() + "*_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn pod_uid_filter() {
+        let config = KubernetesConfig {
+            include_pod_uids: vec![
+                "a027f09d8f18234519fa930f8fa71234".to_owned(),
+                "8f0290f83cb28fff201a8fcc310928".to_owned(),
+            ],
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "a027f09d-8f18-2345-19fa-930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned() + "a027f09d8f18234519fa930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_a027f09d-8f18-2345-19fa-930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_a027f09d8f18234519fa930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "*_*_8f0290f8-3cb2-8fff-201a-8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "*_*_8f0290f83cb28fff201a8fcc310928[0-9A-Fa-f][0-9A-Fa-f]/*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn name_filter() {
+        let config = KubernetesConfig {
+            include_container_names: vec!["busybox".to_owned()],
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn namespace_filter() {
+        let config = KubernetesConfig {
+            include_namespaces: vec!["telemetry".to_owned()],
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+                LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+                LOG_DIRECTORY.to_owned() + "telemetry_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log",
+                LOG_DIRECTORY.to_owned() + "telemetry_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn pod_uid_and_name_filter() {
+        let config = KubernetesConfig {
+            include_pod_uids: vec!["a027f09d8f18234519fa930f8fa71234".to_owned()],
+            include_container_names: vec!["busybox".to_owned(), "redis".to_owned()],
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "a027f09d8f18234519fa930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "*_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_a027f09d8f18234519fa930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "a027f09d-8f18-2345-19fa-930f8fa71234/redis*/*.log",
+                LOG_DIRECTORY.to_owned() + "a027f09d8f18234519fa930f8fa71234/redis*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_a027f09d-8f18-2345-19fa-930f8fa71234/redis*/*.log",
+                LOG_DIRECTORY.to_owned() + "*_*_a027f09d8f18234519fa930f8fa71234/redis*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn pod_uid_and_namespace_filter() {
+        let config = KubernetesConfig {
+            include_pod_uids: vec!["a027f09d8f18234519fa930f8fa71234".to_owned()],
+            include_namespaces: vec!["telemetry".to_owned()],
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "a027f09d-8f18-2345-19fa-930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned() + "a027f09d8f18234519fa930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/*/*.log",
+                LOG_DIRECTORY.to_owned() + "telemetry_*_a027f09d8f18234519fa930f8fa71234/*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn name_and_namespace_filter() {
+        let config = KubernetesConfig {
+            include_container_names: vec!["busybox".to_owned()],
+            include_namespaces: vec!["telemetry".to_owned()],
+            ..KubernetesConfig::default()
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "telemetry_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "telemetry_*_[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/busybox*/*.log"
+            ])
+        );
+    }
+
+    #[test]
+    fn all_filters() {
+        let config = KubernetesConfig {
+            include_pod_uids: vec!["a027f09d8f18234519fa930f8fa71234".to_owned()],
+            include_container_names: vec!["busybox".to_owned()],
+            include_namespaces: vec!["telemetry".to_owned(), "app".to_owned()],
+        };
+
+        assert_eq!(
+            HashSet::<String>::from_iter(FileSourceBuilder::file_source_include(&config).unwrap()),
+            HashSet::from_iter(vec![
+                LOG_DIRECTORY.to_owned() + "a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "a027f09d8f18234519fa930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "telemetry_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "telemetry_*_a027f09d8f18234519fa930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned()
+                    + "app_*_a027f09d-8f18-2345-19fa-930f8fa71234/busybox*/*.log",
+                LOG_DIRECTORY.to_owned() + "app_*_a027f09d8f18234519fa930f8fa71234/busybox*/*.log",
             ])
         );
     }
