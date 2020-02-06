@@ -175,12 +175,11 @@ impl Serialize for Value {
         S: Serializer,
     {
         match &self {
-            Value::Bytes(_) => serializer.serialize_str(&self.to_string_lossy()),
             Value::Integer(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Timestamp(t) => {
-                serializer.serialize_str(&t.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+            Value::Bytes(_) | Value::Timestamp(_) => {
+                serializer.serialize_str(&self.to_string_lossy())
             }
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
