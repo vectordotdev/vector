@@ -223,7 +223,7 @@ fn main() {
     } else {
         DEFAULT_CONFIG_PATHS.to_vec()
     } {
-        let matches: Vec<PathBuf> = glob(config_pattern.to_str().expect("no ability to glob"))
+        let matches: Vec<PathBuf> = glob(config_pattern.to_str().expect("No ability to glob"))
             .expect("Failed to read glob pattern")
             .filter_map(Result::ok)
             .collect();
@@ -435,16 +435,9 @@ fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
             path = ?p
         );
 
-        match Config::load(file) {
-            Ok(next_config) => match config.append(next_config) {
-                Err(next_errors) => {
-                    errors.extend(next_errors.iter().map(|e| format!("{:?}: {}", p, e)))
-                }
-                _ => (),
-            },
-            Err(next_errors) => {
-                errors.extend(next_errors.iter().map(|e| format!("{:?}: {}", p, e)))
-            }
+        match Config::load(file).and_then(|n| config.append(n)) {
+            Err(errs) => errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e))),
+            _ => (),
         };
     });
 
