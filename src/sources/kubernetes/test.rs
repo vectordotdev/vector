@@ -112,7 +112,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-kube-filter:latest
+        image: ktff/vector-kube-watch-client:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
@@ -160,14 +160,14 @@ spec:
 type KubePod = Object<PodSpec, PodStatus>;
 type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
 
-struct Kube {
+pub struct Kube {
     client: APIClient,
     namespace: String,
 }
 
 impl Kube {
     // Also immedietely creates namespace
-    fn new(namespace: &str) -> Self {
+    pub fn new(namespace: &str) -> Self {
         trace_init();
         let config = config::load_kube_config().expect("failed to load kubeconfig");
         let client = APIClient::new(config);
@@ -331,7 +331,7 @@ fn echo_create(template: &str, kube: &Kube, name: &str, message: &str) -> KubePo
 }
 
 #[must_use]
-fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
+pub fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
     // Start echo
     let echo = echo_create(ECHO_YAML, kube, name, message);
 

@@ -1,4 +1,4 @@
-#![cfg(test)]
+#![cfg(feature = "kubernetes-integration-tests")]
 
 use dirs;
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,7 @@ pub fn load_kube_config() -> Option<Config> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub clusters: Vec<NamedCluster>,
-    pub users: Vec<NamedAuthInfo>,
+    pub users: Vec<NamedUserInfo>,
     pub contexts: Vec<NamedContext>,
     #[serde(rename = "current-context")]
     pub current_context: String,
@@ -53,14 +53,13 @@ pub struct Cluster {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedAuthInfo {
+pub struct NamedUserInfo {
     pub name: String,
-    #[serde(rename = "user")]
-    pub auth_info: AuthInfo,
+    pub user: UserInfo,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AuthInfo {
+pub struct UserInfo {
     pub username: Option<String>,
     pub password: Option<String>,
 

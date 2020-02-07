@@ -1,9 +1,6 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        http::https_client,
-        tls::{TlsOptions, TlsSettings},
-    },
+    sinks::util::{http::https_client, tls::TlsSettings},
 };
 use futures::stream::Stream;
 use futures03::compat::Future01CompatExt;
@@ -33,8 +30,12 @@ impl ClientConfig {
     //       implemented.
     /// Loads configuration from local kubeconfig file, the same
     /// one that kubectl uses.
-    #[cfg(test)]
-    pub fn load_kube_config(resolver: Resolver) -> Option<Self> {
+    #[cfg(feature = "kubernetes-integration-tests")]
+    fn load_kube_config(resolver: Resolver) -> Option<Self> {
+        use crate::sinks::util::tls::TlsOptions;
+        use std::path::PathBuf;
+        use std::str::FromStr;
+
         let config = super::kube_config::load_kube_config()?;
 
         // Get current context
@@ -76,11 +77,12 @@ impl ClientConfig {
             resolver,
             token: user.token.clone(),
             server: Uri::from_str(&cluster.server).unwrap(),
-            tls_settings: TlsSettings::from_options(Some(TlsOptions {
+            tls_settings: TlsSettings::from_options(&Some(TlsOptions {
                 verify_certificate: cluster.insecure_skip_tls_verify,
-                ca_path: cluster.certificate_authority.clone().map(PathBuf::from)?,
+                ca_path: cluster.certificate_authority.clone().map(PathBuf::from),
                 ..TlsOptions::default()
-            })),
+            }))
+            .ok()?,
         })
     }
 
@@ -89,7 +91,7 @@ impl ClientConfig {
     pub fn build_pod_watch(
         self,
         request_optional: WatchOptional<'static>,
-        mut updater: impl FnMut(&Pod) + Send + Sync + 'static,
+        mut updater: impl FnMut(&Pod) + Send + 'static,
     ) -> Result<WatchClient<WatchPodForAllNamespacesResponse>, BuildError> {
         let request_builder = move |version: Option<&Version>| {
             Pod::watch_pod_for_all_namespaces(WatchOptional {
@@ -123,7 +125,7 @@ impl ClientConfig {
             + Send
             + Sync
             + 'static,
-        updater: impl FnMut(T) -> WatchResult<Version> + Send + Sync + 'static,
+        updater: impl FnMut(T) -> WatchResult<Version> + Send + 'static,
     ) -> Result<WatchClient<T>, BuildError> {
         let client =
             https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
@@ -171,7 +173,7 @@ pub struct WatchClient<T: Response> {
     request_builder: Box<
         dyn Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError> + Send + Sync + 'static,
     >,
-    updater: Box<dyn FnMut(T) -> WatchResult<Version> + Send + Sync + 'static>,
+    updater: Box<dyn FnMut(T) -> WatchResult<Version> + Send + 'static>,
     config: ClientConfig,
     client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
 }
@@ -410,7 +412,7 @@ impl<T> WatchResult<WatchEvent<T>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Resolver, TlsSettings, WatchClient, WatchOptional};
+    use super::{ClientConfig, Resolver, TlsSettings, Uri, WatchOptional};
 
     #[test]
     fn buildable() {
@@ -418,11 +420,52 @@ mod tests {
         ClientConfig {
             resolver: Resolver::new(Vec::new(), rt.executor()).unwrap(),
             token: None,
-            host: "localhost".to_owned(),
-            port: "8001".to_owned(),
+            server: Uri::from_static("https://localhost:8001"),
             tls_settings: TlsSettings::from_options(&None).unwrap(),
         }
         .build_pod_watch(WatchOptional::default(), |_| ())
         .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod kube_tests {
+    #![cfg(feature = "kubernetes-integration-tests")]
+
+    use super::{ClientConfig, Resolver, WatchOptional};
+    use crate::sources::kubernetes::test::{echo, Kube};
+    use crate::test_util::runtime;
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+    use uuid::Uuid;
+
+    #[test]
+    fn watch_pod() {
+        let namespace = format!("watch-pod-{}", Uuid::new_v4());
+        let kube = Kube::new(namespace.as_str());
+
+        let rt = runtime();
+
+        let (sender, receiver) = channel();
+
+        // May pickup other pods, which is fine.
+        let mut client =
+            ClientConfig::load_kube_config(Resolver::new(Vec::new(), rt.executor()).unwrap())
+                .expect("Kubernetes configuration file present.")
+                .build_pod_watch(WatchOptional::default(), move |_| {
+                    sender.send(());
+                })
+                .unwrap();
+
+        rt.executor().spawn_std(async move {
+            client.run().await;
+        });
+
+        // Start echo
+        let _echo = echo(&kube, "echo", "210");
+
+        receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("Client watched Pod");
     }
 }
