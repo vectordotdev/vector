@@ -89,8 +89,10 @@ fn walk(
 }
 
 impl UnitTest {
-    pub fn run(&mut self) -> Vec<String> {
+    // Executes each test and provides a tuple of inspections and error lists.
+    pub fn run(&mut self) -> (Vec<String>, Vec<String>) {
         let mut errors = Vec::new();
+        let mut inspections = Vec::new();
         let mut results = HashMap::new();
 
         walk(
@@ -102,6 +104,15 @@ impl UnitTest {
 
         for check in &self.checks {
             if let Some((inputs, outputs)) = results.get(&check.extract_from) {
+                if check.conditions.is_empty() {
+                    inspections.push(format!(
+                        "check transform '{}' payloads (JSON encoded):\n{}\n{}",
+                        check.extract_from,
+                        events_to_string("input", inputs),
+                        events_to_string("output", outputs),
+                    ));
+                    continue;
+                }
                 let failed_conditions = check
                     .conditions
                     .iter()
@@ -139,7 +150,7 @@ impl UnitTest {
             }
         }
 
-        errors
+        (inspections, errors)
     }
 }
 
@@ -317,7 +328,13 @@ fn build_unit_test(
         .iter()
         .map(|o| {
             let mut conditions: Vec<Box<dyn Condition>> = Vec::new();
-            for (index, cond_conf) in o.conditions.iter().enumerate() {
+            for (index, cond_conf) in o
+                .conditions
+                .as_ref()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .enumerate()
+            {
                 match cond_conf {
                     TestCondition::Embedded(b) => match b.build() {
                         Ok(c) => {
@@ -332,9 +349,9 @@ fn build_unit_test(
                     },
                     TestCondition::String(_s) => {
                         errors.push(format!(
-              "failed to create test condition '{}': condition references are not yet supported",
-              index
-            ));
+                            "failed to create test condition '{}': condition references are not yet supported",
+                            index
+                        ));
                     }
                 }
             }
@@ -585,7 +602,7 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(&config).unwrap();
-        assert_eq!(tests[0].run(), Vec::<String>::new());
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
@@ -622,7 +639,7 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(&config).unwrap();
-        assert_eq!(tests[0].run(), Vec::<String>::new());
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
@@ -661,7 +678,7 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(&config).unwrap();
-        assert_eq!(tests[0].run(), Vec::<String>::new());
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
@@ -706,7 +723,7 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(&config).unwrap();
-        assert_eq!(tests[0].run(), Vec::<String>::new());
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
@@ -764,7 +781,7 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(&config).unwrap();
-        assert_eq!(tests[0].run(), Vec::<String>::new());
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
@@ -835,13 +852,13 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(&config).unwrap();
-        assert_ne!(tests[0].run(), Vec::<String>::new());
-        assert_ne!(tests[1].run(), Vec::<String>::new());
+        assert_ne!(tests[0].run().1, Vec::<String>::new());
+        assert_ne!(tests[1].run().1, Vec::<String>::new());
         // TODO: The json representations are randomly ordered so these checks
         // don't always pass:
         /*
                 assert_eq!(
-                    tests[0].run(),
+                    tests[0].run().1,
                     vec![r#"check transform 'bar' failed conditions:
           condition[0]: predicates failed: [ message.equals: 'not this' ]
           condition[1]: predicates failed: [ second_new_field.equals: 'and not this' ]
@@ -850,7 +867,7 @@ mod tests {
           output: {"message":"nah this doesnt matter","second_new_field":"also a string value"}"#.to_owned(),
                     ]);
                 assert_eq!(
-                    tests[1].run(),
+                    tests[1].run().1,
                     vec![r#"check transform 'baz' failed conditions:
           condition[0]: predicates failed: [ second_new_field.equals: 'nope not this', third_new_field.equals: 'and not this' ]
         payloads (JSON encoded):
