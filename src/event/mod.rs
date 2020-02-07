@@ -285,8 +285,8 @@ impl Value {
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
             Value::Boolean(b) => format!("{}", b),
-            Value::Map(_) => todo!(),
-            Value::Array(_) => todo!(),
+            Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
+            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
         }
     }
 
@@ -297,8 +297,10 @@ impl Value {
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
             Value::Boolean(b) => Bytes::from(format!("{}", b)),
-            Value::Map(_) => todo!(),
-            Value::Array(_) => todo!(),
+            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
+            Value::Array(arr) => {
+                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
+            }
         }
     }
 
