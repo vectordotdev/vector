@@ -1,15 +1,13 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{http::https_client, tls::TlsSettings},
+    sinks::util::{
+        http::https_client,
+        tls::{TlsOptions, TlsSettings},
+    },
 };
 use futures::stream::Stream;
 use futures03::compat::Future01CompatExt;
-use http::{
-    header,
-    status::StatusCode,
-    uri::{self, Scheme},
-    Request, Uri,
-};
+use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::client::HttpConnector;
 use hyper::Body;
 use hyper_tls::HttpsConnector;
@@ -25,12 +23,67 @@ use snafu::{ResultExt, Snafu};
 pub struct ClientConfig {
     resolver: Resolver,
     token: Option<String>,
-    host: String,
-    port: String,
+    server: Uri,
     tls_settings: TlsSettings,
 }
 
 impl ClientConfig {
+    // NOTE: Currently used only for tests, but can be later used in
+    //       other places, but then the unsupported feature should be
+    //       implemented.
+    /// Loads configuration from local kubeconfig file, the same
+    /// one that kubectl uses.
+    #[cfg(test)]
+    pub fn load_kube_config(resolver: Resolver) -> Option<Self> {
+        let config = super::kube_config::load_kube_config()?;
+
+        // Get current context
+        let context = &config
+            .contexts
+            .iter()
+            .find(|context| context.name == config.current_context)?
+            .context;
+
+        // Get current user
+        let user = &config
+            .users
+            .iter()
+            .find(|user| user.name == context.user)?
+            .user;
+
+        // Get current cluster
+        let cluster = &config
+            .clusters
+            .iter()
+            .find(|cluster| cluster.name == context.cluster)?
+            .cluster;
+
+        // The not yet supported features
+        assert!(user.username.is_none(), "Not yet supported");
+        assert!(user.password.is_none(), "Not yet supported");
+        assert!(user.token_file.is_none(), "Not yet supported");
+        assert!(
+            cluster.certificate_authority_data.is_none(),
+            "Not yet supported"
+        );
+        assert!(user.client_certificate.is_none(), "Not yet supported");
+        assert!(user.client_certificate_data.is_none(), "Not yet supported");
+        assert!(user.client_key.is_none(), "Not yet supported");
+        assert!(user.client_key_data.is_none(), "Not yet supported");
+
+        // Construction
+        Some(ClientConfig {
+            resolver,
+            token: user.token.clone(),
+            server: Uri::from_str(&cluster.server).unwrap(),
+            tls_settings: TlsSettings::from_options(Some(TlsOptions {
+                verify_certificate: cluster.insecure_skip_tls_verify,
+                ca_path: cluster.certificate_authority.clone().map(PathBuf::from)?,
+                ..TlsOptions::default()
+            })),
+        })
+    }
+
     /// Creates new watcher who will call updater function with freshest Pod data.
     /// Request to API server is made with given WatchOptional.
     pub fn build_pod_watch(
@@ -101,15 +154,9 @@ impl ClientConfig {
     }
 
     fn fill_uri(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
-        let mut uri = request.uri().clone().into_parts();
-        uri.scheme = Some(Scheme::HTTPS);
-        uri.authority = Some(
-            format!("{}:{}", self.host, self.port)
-                .parse()
-                .context(InvalidUri)?,
-        );
+        let mut uri = self.server.clone().into_parts();
+        uri.path_and_query = request.uri().clone().into_parts().path_and_query;
         *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
-
         Ok(())
     }
 }

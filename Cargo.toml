@@ -173,6 +173,7 @@ serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
+dirs = "2.0.2"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
