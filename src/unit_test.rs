@@ -81,6 +81,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 if !aggregated_test_errors.is_empty() {
                     failed_files.push((path_str.to_owned(), aggregated_test_errors));
                 }
+                if tests.is_empty() {
+                    println!("{}", "no tests found".yellow());
+                }
             }
             Err(errs) => {
                 error!("Failed to execute {} tests:\n{}", path_str, errs.join("\n"));
