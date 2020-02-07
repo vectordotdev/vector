@@ -12,7 +12,7 @@ install-rust: &install-rust
   run:
     name: Install Rust
     command: |
-      curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+      curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
 
 install-rust-windows: &install-rust-windows
   run:
@@ -20,6 +20,7 @@ install-rust-windows: &install-rust-windows
     shell: bash
     command: |
       curl https://sh.rustup.rs -sSf | sh -s -- -y \
+        --profile minimal \
         --default-toolchain stable \
         --default-host x86_64-pc-windows-msvc
       # see https://github.com/rust-lang/cargo/issues/2078
@@ -172,6 +173,7 @@ jobs:
           command: |
             curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
             source $HOME/.cargo/env
+            rustup set profile minimal
             rustup install stable
             rustup default stable
 
