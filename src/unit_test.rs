@@ -86,9 +86,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         for (path, failures) in failed_files {
             println!("\n--- {} ---", path);
             for (test_name, fails) in failures {
-                println!("\nTest '{}':", test_name);
+                println!("\nTest '{}':\n", test_name);
                 for fail in fails {
-                    println!("{}", fail);
+                    println!("{}\n", fail);
                 }
             }
         }

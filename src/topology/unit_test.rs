@@ -5,6 +5,7 @@ use crate::{
     topology::config::{TestCondition, TestDefinition, TestInputValue},
     transforms::Transform,
 };
+use indexmap::IndexMap;
 use std::collections::HashMap;
 
 //------------------------------------------------------------------------------
@@ -22,30 +23,55 @@ pub struct UnitTestTransform {
 pub struct UnitTest {
     pub name: String,
     input: (String, Event),
-    transforms: HashMap<String, UnitTestTransform>,
+    transforms: IndexMap<String, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
 }
 
 //------------------------------------------------------------------------------
 
-fn event_to_string(event: Event) -> String {
+fn event_to_string(event: &Event) -> String {
     match event {
-        Event::Log(log) => serde_json::to_string(&log.unflatten()).unwrap_or_else(|_| "{}".into()),
+        Event::Log(log) => {
+            serde_json::to_string(&log.clone().unflatten()).unwrap_or_else(|_| "{}".into())
+        }
         Event::Metric(metric) => serde_json::to_string(&metric).unwrap_or_else(|_| "{}".into()),
+    }
+}
+
+fn events_to_string(name: &str, events: &Vec<Event>) -> String {
+    if events.len() > 1 {
+        format!(
+            "  {}s:\n    {}",
+            name,
+            events
+                .iter()
+                .map(|e| event_to_string(e))
+                .collect::<Vec<_>>()
+                .join("\n    ")
+        )
+    } else {
+        format!(
+            "  {}: {}",
+            name,
+            events
+                .first()
+                .map(|e| event_to_string(e))
+                .unwrap_or("".to_string())
+        )
     }
 }
 
 fn walk(
     node: &str,
-    inputs: Vec<Event>,
-    transforms: &mut HashMap<String, UnitTestTransform>,
-    aggregated_results: &mut HashMap<String, Vec<Event>>,
+    mut inputs: Vec<Event>,
+    transforms: &mut IndexMap<String, UnitTestTransform>,
+    aggregated_results: &mut HashMap<String, (Vec<Event>, Vec<Event>)>,
 ) {
     let mut results = Vec::new();
     let mut targets = Vec::new();
 
     if let Some(target) = transforms.get_mut(node) {
-        for input in inputs {
+        for input in inputs.clone() {
             target.transform.transform_into(&mut results, input);
         }
         targets = target.next.clone();
@@ -54,7 +80,12 @@ fn walk(
     for child in targets {
         walk(&child, results.clone(), transforms, aggregated_results);
     }
-    aggregated_results.insert(node.into(), results);
+
+    if let Some((mut e_inputs, mut e_results)) = aggregated_results.remove(node) {
+        inputs.append(&mut e_inputs);
+        results.append(&mut e_results);
+    }
+    aggregated_results.insert(node.into(), (inputs, results));
 }
 
 impl UnitTest {
@@ -70,21 +101,34 @@ impl UnitTest {
         );
 
         for check in &self.checks {
-            if let Some(results) = results.get(&check.extract_from) {
-                let mut failed_conditions = Vec::new();
-                for (index, cond) in check.conditions.iter().enumerate() {
-                    if results.iter().find(|e| cond.check(e)).is_none() {
-                        failed_conditions.push(index);
-                    }
-                }
+            if let Some((inputs, outputs)) = results.get(&check.extract_from) {
+                let failed_conditions = check
+                    .conditions
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, cond)| {
+                        outputs
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(j, e)| {
+                                cond.check_with_context(e).err().map(|err| {
+                                    if outputs.len() > 1 {
+                                        format!("condition[{}], payload[{}]: {}", i, j, err)
+                                    } else {
+                                        format!("condition[{}]: {}", i, err)
+                                    }
+                                })
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
                 if !failed_conditions.is_empty() {
-                    let event_strings: Vec<String> =
-                        results.iter().map(|e| event_to_string(e.clone())).collect();
                     errors.push(format!(
-                        "check transform '{}' failed conditions: [ {} ], payloads (encoded in JSON format):\n  {}",
+                        "check transform '{}' failed conditions:\n  {}\npayloads (JSON encoded):\n{}\n{}",
                         check.extract_from,
-                        failed_conditions.iter().map(|i| format!("{}", i)).collect::<Vec<String>>().join(", "),
-                        event_strings.join("\n  "),
+                        failed_conditions.join("\n  "),
+                        events_to_string("input", inputs),
+                        events_to_string("output", outputs),
                     ));
                 }
             } else {
@@ -103,9 +147,9 @@ impl UnitTest {
 
 fn links_to_a_leaf(
     target: &str,
-    leaves: &HashMap<String, ()>,
-    link_checked: &mut HashMap<String, bool>,
-    transform_outputs: &HashMap<String, HashMap<String, ()>>,
+    leaves: &IndexMap<String, ()>,
+    link_checked: &mut IndexMap<String, bool>,
+    transform_outputs: &IndexMap<String, IndexMap<String, ()>>,
 ) -> bool {
     if let Some(check) = link_checked.get(target) {
         return *check;
@@ -128,10 +172,10 @@ fn links_to_a_leaf(
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
     root: &str,
-    leaves: &HashMap<String, ()>,
-    transform_outputs: &mut HashMap<String, HashMap<String, ()>>,
+    leaves: &IndexMap<String, ()>,
+    transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
 ) {
-    let mut link_checked: HashMap<String, bool> = HashMap::new();
+    let mut link_checked: IndexMap<String, bool> = IndexMap::new();
 
     if !links_to_a_leaf(root, leaves, &mut link_checked, transform_outputs) {
         transform_outputs.clear();
@@ -202,10 +246,10 @@ fn build_unit_test(
 
     // Maps transform names with their output targets (transforms that use it as
     // an input).
-    let mut transform_outputs: HashMap<String, HashMap<String, ()>> = config
+    let mut transform_outputs: IndexMap<String, IndexMap<String, ()>> = config
         .transforms
         .iter()
-        .map(|(k, _)| (k.clone(), HashMap::new()))
+        .map(|(k, _)| (k.clone(), IndexMap::new()))
         .collect();
 
     config.transforms.iter().for_each(|(k, t)| {
@@ -224,7 +268,7 @@ fn build_unit_test(
         return Err(errors);
     }
 
-    let mut leaves: HashMap<String, ()> = HashMap::new();
+    let mut leaves: IndexMap<String, ()> = IndexMap::new();
     definition.outputs.iter().for_each(|o| {
         leaves.insert(o.extract_from.clone(), ());
     });
@@ -234,7 +278,7 @@ fn build_unit_test(
     reduce_transforms(&definition.input.insert_at, &leaves, &mut transform_outputs);
 
     // Build reduced transforms.
-    let mut transforms: HashMap<String, UnitTestTransform> = HashMap::new();
+    let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
             match transform_config.inner.build(rt.executor()) {
@@ -796,16 +840,23 @@ mod tests {
         // TODO: The json representations are randomly ordered so these checks
         // don't always pass:
         /*
-                assert_eq!(tests[0].run(), vec![
-        r#"check transform 'bar' failed conditions: [ check_second_new_field, check_new_field ], payloads (encoded in JSON format):
-          {"second_new_field":"also a string value","message":"nah this doesnt matter"}
-        "#.to_owned(),
-                ]);
-                assert_eq!(tests[1].run(), vec![
-        r#"check transform 'baz' failed conditions: [ check_new_field ], payloads (encoded in JSON format):
-          {"message":"also this doesnt matter","second_new_field":"also a string value","new_field":"string value"}
-        "#.to_owned(),
-                ]);
+                assert_eq!(
+                    tests[0].run(),
+                    vec![r#"check transform 'bar' failed conditions:
+          condition[0]: predicates failed: [ message.equals: 'not this' ]
+          condition[1]: predicates failed: [ second_new_field.equals: 'and not this' ]
+        payloads (JSON encoded):
+          input: {"message":"nah this doesnt matter"}
+          output: {"message":"nah this doesnt matter","second_new_field":"also a string value"}"#.to_owned(),
+                    ]);
+                assert_eq!(
+                    tests[1].run(),
+                    vec![r#"check transform 'baz' failed conditions:
+          condition[0]: predicates failed: [ second_new_field.equals: 'nope not this', third_new_field.equals: 'and not this' ]
+        payloads (JSON encoded):
+          input: {"second_new_field":"also a string value","message":"also this doesnt matter"}
+          output: {"third_new_field":"also also a string value","second_new_field":"also a string value","message":"also this doesnt matter"}"#.to_owned(),
+                    ]);
                 */
     }
 }
