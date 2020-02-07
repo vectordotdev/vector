@@ -103,15 +103,12 @@ impl ClientConfig {
         };
 
         let updater = move |response| {
-            WatchResult::New(Some(response))
-                .then_response_to_event()
-                .then_event_to_data()
-                .peek(|pod| updater(pod))
-                .map(|pod| {
-                    pod.metadata
-                        .as_ref()
-                        .and_then(|metadata| metadata.resource_version.clone().map(Version))
-                })
+            let pod = event_to_data(response_to_event(response)?)?;
+            updater(&pod);
+            Ok(pod
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.resource_version.clone().map(Version)))
         };
 
         self.build(request_builder, updater)
@@ -125,7 +122,7 @@ impl ClientConfig {
             + Send
             + Sync
             + 'static,
-        updater: impl FnMut(T) -> WatchResult<Version> + Send + 'static,
+        updater: impl FnMut(T) -> Result<Option<Version>, RuntimeError> + Send + 'static,
     ) -> Result<WatchClient<T>, BuildError> {
         let client =
             https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
@@ -135,10 +132,14 @@ impl ClientConfig {
             updater: Box::new(updater) as Box<_>,
             client,
             config: self,
+            // If watch is initiated with None resource_version, we will receive initial
+            // list of data as synthetic "Added" events.
+            // https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
+            version: None,
         };
 
         // Test now if the only other source of errors passes.
-        client.build_request(None)?;
+        client.build_request()?;
 
         Ok(client)
     }
@@ -173,134 +174,120 @@ pub struct WatchClient<T: Response> {
     request_builder: Box<
         dyn Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError> + Send + Sync + 'static,
     >,
-    updater: Box<dyn FnMut(T) -> WatchResult<Version> + Send + 'static>,
+    updater: Box<dyn FnMut(T) -> Result<Option<Version>, RuntimeError> + Send + 'static>,
     config: ClientConfig,
     client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
+    /// Most recent watched resource version.
+    version: Option<Version>,
 }
 
 impl<T: Response> WatchClient<T> {
     /// Watches for data changes and propagates them to updater.
     /// Never returns
     pub async fn run(&mut self) {
-        // If watch is initiated with None resource_version, we will receive initial
-        // list of data as synthetic "Added" events.
-        // https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
-        let mut version = None;
-
         loop {
             let request = self
-                .build_request(version.clone())
+                .build_request()
                 .expect("Request succesfully builded before");
 
             // Restarts watch with new request.
-            version = self.watch(version, request).await;
+            match self.watch(request).await {
+                Ok(()) => (),
+                Err(RuntimeError::WatchEventError { status }) if status.code == Some(410) => {
+                    // 410 Gone, restart with new list.
+                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
+                    info!(
+                        message = "Watch list desynced for Kubernetes Object. Restarting watch.",
+                        object = std::any::type_name::<T>()
+                    );
+                    self.version = None;
+                }
+                Err(error) => debug!(%error),
+            }
         }
     }
 
     /// Watches for data with given watch request.
     /// Returns resource version from which watching can start.
     /// Accepts resource version from which request is starting to watch.
-    async fn watch(
-        &mut self,
-        mut version: Option<Version>,
-        request: Request<Body>,
-    ) -> Option<Version> {
+    async fn watch(&mut self, request: Request<Body>) -> Result<(), RuntimeError> {
         // Start watching
-        let response = self.client.request(request).compat().await;
-        match response {
-            Ok(response) => {
-                info!(message = "Watching list for changes.");
-                let status = response.status();
-                if status == StatusCode::OK {
-                    // Connected
+        let response = self
+            .client
+            .request(request)
+            .compat()
+            .await
+            .context(FailedConnecting)?;
 
-                    let mut unused = Vec::new();
-                    let mut body = response.into_body();
-                    loop {
-                        // Wait for responses from the API server.
-                        match body.into_future().compat().await {
-                            Ok((Some(chunk), tmp_body)) => {
-                                // Append new data to unused.
-                                unused.extend_from_slice(chunk.as_ref());
-                                body = tmp_body;
+        let status = response.status();
+        if status == StatusCode::OK {
+            // Connected succesfully
+            info!(message = "Watching list for changes.");
 
-                                // We need to process unused data as soon as we get
-                                // new data, because a watch on Kubernetes object behaves
-                                // like a never ending stream of bytes.
-                                match self.process_buffer(version, &mut unused) {
-                                    WatchResult::New(new_version) => {
-                                        version = new_version;
+            let mut unused = Vec::new();
+            let mut body = response.into_body();
+            loop {
+                // Wait for responses from the API server.
+                let (chunk, tmp_body) = body
+                    .into_future()
+                    .compat()
+                    .await
+                    .map_err(|(error, _)| error)
+                    .context(WatchConnectionErrored)?;
 
-                                        //Continue watching.
-                                        continue;
-                                    }
-                                    WatchResult::Reload(new_version) => return new_version,
-                                    WatchResult::Restart => return None,
-                                }
-                            }
-                            Ok((None, _)) => debug!("Watch connection unexpectedly ended."),
-                            Err(error) => debug!(message = "Watch request failed.", ?error),
-                        }
-                        break;
-                    }
-                } else {
-                    debug!(message="Status of response is not 200 OK.",%status);
-                }
+                body = tmp_body;
+                let chunk = chunk.ok_or(RuntimeError::WatchUnexpectedlyEnded)?;
+
+                // Append new data to unused.
+                unused.extend_from_slice(chunk.as_ref());
+
+                // We need to process unused data as soon as we get
+                // new data, because a watch on Kubernetes object behaves
+                // like a never ending stream of bytes.
+                self.process_buffer(&mut unused)?;
+
+                //Continue watching.
             }
-            Err(error) => debug!(message = "Failed resolving request.", ?error),
+        } else {
+            Err(RuntimeError::ConnectionStatusNotOK { status })
         }
-
-        version
     }
 
     /// Buffer contains unused data.
     /// Removes from buffer used data.
     /// StatusCode should be 200 OK.
-    fn process_buffer(
-        &mut self,
-        mut version: Option<Version>,
-        unused: &mut Vec<u8>,
-    ) -> WatchResult<Version> {
+    fn process_buffer(&mut self, unused: &mut Vec<u8>) -> Result<(), RuntimeError> {
         // Parse then process recieved unused data.
         loop {
-            return match T::try_from_parts(StatusCode::OK, &unused) {
+            match T::try_from_parts(StatusCode::OK, &unused) {
                 Ok((data, used_bytes)) => {
                     assert!(used_bytes > 0, "Parser must consume some data");
                     // Remove used data.
                     let _ = unused.drain(..used_bytes);
 
                     // Process watch event
+                    let new_version = (self.updater)(data)?;
                     // Store last resourceVersion
                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                    match (self.updater)(data) {
-                        WatchResult::New(new_version) => {
-                            version = new_version.or(version);
-                            // Continue parsing out data.
-                            continue;
-                        }
-                        WatchResult::Reload(new_version) => {
-                            WatchResult::Reload(new_version.or(version))
-                        }
-                        WatchResult::Restart => WatchResult::Restart,
-                    }
+                    self.version = new_version.or(self.version.take());
+
+                    // Continue parsing out data.
                 }
-                Err(ResponseError::NeedMoreData) => WatchResult::New(version),
+                Err(ResponseError::NeedMoreData) => return Ok(()),
                 Err(error) => {
-                    debug!(
-                        "Unable to parse {} from response. Error: {:?}",
-                        std::any::type_name::<T>(),
-                        error
-                    );
-                    WatchResult::Reload(version)
+                    return Err(RuntimeError::ParseResponseError {
+                        name: std::any::type_name::<T>().to_owned(),
+                        error,
+                    })
                 }
             };
         }
     }
 
     // Builds request to watch data.
-    fn build_request(&self, version: Option<Version>) -> Result<Request<Body>, BuildError> {
+    fn build_request(&self) -> Result<Request<Body>, BuildError> {
         // Prepare request
-        let mut request = (self.request_builder)(version.as_ref())?;
+        let mut request = (self.request_builder)(self.version.as_ref())?;
 
         self.config.authorize(&mut request)?;
         self.config.fill_uri(&mut request)?;
@@ -309,6 +296,10 @@ impl<T: Response> WatchClient<T> {
         Ok(Request::from_parts(parts, body.into()))
     }
 }
+
+/// Version of Kubernetes resource
+#[derive(Clone, Debug)]
+struct Version(String);
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -324,89 +315,57 @@ pub enum BuildError {
     InvalidToken { source: header::InvalidHeaderValue },
 }
 
-/// Version of Kubernetes resource
-#[derive(Clone, Debug)]
-struct Version(String);
-
-/// Data over which various transformations are applied in sequence.
-/// Transformations are short circuted on all cases except on New(Some(_)).
-#[derive(Clone, Debug)]
-enum WatchResult<T> {
-    /// Everything is Ok path.
-    /// Potentialy some data.
-    New(Option<T>),
-    /// Start new request with current version.
-    Reload(Option<Version>),
-    /// Start new request with None version.
-    Restart,
+#[derive(Debug, Snafu)]
+enum RuntimeError {
+    #[snafu(display("Received wrong object from Kubernetes API."))]
+    WrongObjectInResponse,
+    #[snafu(display("Failed parsing response: {}.", source))]
+    ResponseParseError { source: serde_json::error::Error },
+    #[snafu(display("Watch event error with status: {:?}.", status))]
+    WatchEventError {
+        status: k8s_openapi::apimachinery::pkg::apis::meta::v1::Status,
+    },
+    #[snafu(display("Encountered unknown error while watching: {:?}.", other))]
+    UnknownWatchEventError {
+        other: k8s_openapi::apimachinery::pkg::runtime::RawExtension,
+    },
+    #[snafu(display("Unable to parse {} from response. Error: {}", name, error))]
+    ParseResponseError {
+        name: String,
+        error: k8s_openapi::ResponseError,
+    },
+    #[snafu(display("Failed connecting to server: {}.", source))]
+    FailedConnecting { source: hyper::Error },
+    #[snafu(display("Status of response is not 200 OK, but: {}.", status))]
+    ConnectionStatusNotOK { status: StatusCode },
+    #[snafu(display("Watch connection unexpectedly ended."))]
+    WatchUnexpectedlyEnded,
+    #[snafu(display("Watch connection errored: {}", source))]
+    WatchConnectionErrored { source: hyper::Error },
 }
 
-impl<T> WatchResult<T> {
-    /// Applies function if data exists.
-    fn and_then<R>(self, map: impl FnOnce(T) -> WatchResult<R>) -> WatchResult<R> {
-        match self {
-            WatchResult::New(Some(data)) => map(data),
-            WatchResult::New(None) => WatchResult::New(None),
-            WatchResult::Reload(version) => WatchResult::Reload(version),
-            WatchResult::Restart => WatchResult::Restart,
+/// Processes WatchPodForAllNamespacesResponse into WatchEvent<Pod>.
+fn response_to_event(
+    response: WatchPodForAllNamespacesResponse,
+) -> Result<WatchEvent<Pod>, RuntimeError> {
+    match response {
+        WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
+        WatchPodForAllNamespacesResponse::Other(Ok(_)) => Err(RuntimeError::WrongObjectInResponse),
+        WatchPodForAllNamespacesResponse::Other(Err(error)) => {
+            Err(error).context(ResponseParseError)
         }
     }
-
-    /// Maps data if data exists.
-    fn map<R>(self, map: impl FnOnce(T) -> Option<R>) -> WatchResult<R> {
-        self.and_then(move |data| WatchResult::New(map(data)))
-    }
-
-    /// Peeks at existing data.
-    fn peek(self, fun: impl FnOnce(&T)) -> Self {
-        if let WatchResult::New(Some(ref data)) = &self {
-            fun(data);
-        }
-        self
-    }
 }
 
-impl WatchResult<WatchPodForAllNamespacesResponse> {
-    /// Processes WatchPodForAllNamespacesResponse into WatchEvent<Pod>.
-    fn then_response_to_event(self) -> WatchResult<WatchEvent<Pod>> {
-        self.and_then(|response| match response {
-            WatchPodForAllNamespacesResponse::Ok(event) => WatchResult::New(Some(event)),
-            WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
-                debug!(message = "Received wrong object from Kubernetes API.");
-                WatchResult::New(None)
-            }
-            WatchPodForAllNamespacesResponse::Other(Err(error)) => {
-                debug!(message = "Failed parsing watch event for Pods.", ?error);
-                WatchResult::Reload(None)
-            }
-        })
-    }
-}
-
-impl<T> WatchResult<WatchEvent<T>> {
-    /// Processes WatchEvent<T> into T.
-    fn then_event_to_data(self) -> WatchResult<T> {
-        self.and_then(|event| match event {
-            WatchEvent::Added(data)
-            | WatchEvent::Modified(data)
-            | WatchEvent::Bookmark(data)
-            | WatchEvent::Deleted(data) => WatchResult::New(Some(data)),
-            WatchEvent::ErrorStatus(status) => {
-                if status.code == Some(410) {
-                    // 410 Gone, restart with new list.
-                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
-                    warn!(message = "Watch list desynced. Restarting watch.", cause = ?status);
-                    WatchResult::Restart
-                } else {
-                    debug!("Watch event with error status: {:?}.", status);
-                    WatchResult::New(None)
-                }
-            }
-            WatchEvent::ErrorOther(value) => {
-                debug!(message="Encountered unknown error while watching.",error = ?value);
-                WatchResult::New(None)
-            }
-        })
+/// Processes WatchEvent<T> into T.
+fn event_to_data<T>(event: WatchEvent<T>) -> Result<T, RuntimeError> {
+    match event {
+        WatchEvent::Added(data)
+        | WatchEvent::Modified(data)
+        | WatchEvent::Bookmark(data)
+        | WatchEvent::Deleted(data) => Ok(data),
+        WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
+        WatchEvent::ErrorOther(other) => Err(RuntimeError::UnknownWatchEventError { other }),
     }
 }
 
