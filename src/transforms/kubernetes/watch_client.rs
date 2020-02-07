@@ -5,8 +5,7 @@ use crate::{
 use futures::stream::Stream;
 use futures03::compat::Future01CompatExt;
 use http::{header, status::StatusCode, uri, Request, Uri};
-use hyper::client::HttpConnector;
-use hyper::Body;
+use hyper::{client::HttpConnector, Body};
 use hyper_tls::HttpsConnector;
 use k8s_openapi::{
     api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
@@ -25,67 +24,6 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    // NOTE: Currently used only for tests, but can be later used in
-    //       other places, but then the unsupported feature should be
-    //       implemented.
-    /// Loads configuration from local kubeconfig file, the same
-    /// one that kubectl uses.
-    #[cfg(feature = "kubernetes-integration-tests")]
-    fn load_kube_config(resolver: Resolver) -> Option<Self> {
-        use crate::sinks::util::tls::TlsOptions;
-        use std::path::PathBuf;
-        use std::str::FromStr;
-
-        let config = super::kube_config::load_kube_config()?;
-
-        // Get current context
-        let context = &config
-            .contexts
-            .iter()
-            .find(|context| context.name == config.current_context)?
-            .context;
-
-        // Get current user
-        let user = &config
-            .users
-            .iter()
-            .find(|user| user.name == context.user)?
-            .user;
-
-        // Get current cluster
-        let cluster = &config
-            .clusters
-            .iter()
-            .find(|cluster| cluster.name == context.cluster)?
-            .cluster;
-
-        // The not yet supported features
-        assert!(user.username.is_none(), "Not yet supported");
-        assert!(user.password.is_none(), "Not yet supported");
-        assert!(user.token_file.is_none(), "Not yet supported");
-        assert!(
-            cluster.certificate_authority_data.is_none(),
-            "Not yet supported"
-        );
-        assert!(user.client_certificate.is_none(), "Not yet supported");
-        assert!(user.client_certificate_data.is_none(), "Not yet supported");
-        assert!(user.client_key.is_none(), "Not yet supported");
-        assert!(user.client_key_data.is_none(), "Not yet supported");
-
-        // Construction
-        Some(ClientConfig {
-            resolver,
-            token: user.token.clone(),
-            server: Uri::from_str(&cluster.server).unwrap(),
-            tls_settings: TlsSettings::from_options(&Some(TlsOptions {
-                verify_certificate: cluster.insecure_skip_tls_verify,
-                ca_path: cluster.certificate_authority.clone().map(PathBuf::from),
-                ..TlsOptions::default()
-            }))
-            .ok()?,
-        })
-    }
-
     /// Creates new watcher who will call updater function with freshest Pod data.
     /// Request to API server is made with given WatchOptional.
     pub fn build_pod_watch(
@@ -103,7 +41,7 @@ impl ClientConfig {
         };
 
         let updater = move |response| {
-            let pod = event_to_data(response_to_event(response)?)?;
+            let pod = Self::event_to_data(Self::response_to_event(response)?)?;
             updater(&pod);
             Ok(pod
                 .metadata
@@ -161,6 +99,33 @@ impl ClientConfig {
         uri.path_and_query = request.uri().clone().into_parts().path_and_query;
         *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
         Ok(())
+    }
+
+    /// Processes WatchPodForAllNamespacesResponse into WatchEvent<Pod>.
+    fn response_to_event(
+        response: WatchPodForAllNamespacesResponse,
+    ) -> Result<WatchEvent<Pod>, RuntimeError> {
+        match response {
+            WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
+            WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
+                Err(RuntimeError::WrongObjectInResponse)
+            }
+            WatchPodForAllNamespacesResponse::Other(Err(error)) => {
+                Err(error).context(ResponseParseError)
+            }
+        }
+    }
+
+    /// Processes WatchEvent<T> into T.
+    fn event_to_data<T>(event: WatchEvent<T>) -> Result<T, RuntimeError> {
+        match event {
+            WatchEvent::Added(data)
+            | WatchEvent::Modified(data)
+            | WatchEvent::Bookmark(data)
+            | WatchEvent::Deleted(data) => Ok(data),
+            WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
+            WatchEvent::ErrorOther(other) => Err(RuntimeError::UnknownWatchEventError { other }),
+        }
     }
 }
 
@@ -222,7 +187,7 @@ impl<T: Response> WatchClient<T> {
         let status = response.status();
         if status == StatusCode::OK {
             // Connected succesfully
-            info!(message = "Watching list for changes.");
+            info!(message = "Watching for changes.");
 
             let mut unused = Vec::new();
             let mut body = response.into_body();
@@ -242,9 +207,9 @@ impl<T: Response> WatchClient<T> {
                 unused.extend_from_slice(chunk.as_ref());
 
                 // We need to process unused data as soon as we get
-                // new data, because a watch on Kubernetes object behaves
+                // new them. Because a watch on Kubernetes object behaves
                 // like a never ending stream of bytes.
-                self.process_buffer(&mut unused)?;
+                self.process_unused(&mut unused)?;
 
                 //Continue watching.
             }
@@ -253,11 +218,12 @@ impl<T: Response> WatchClient<T> {
         }
     }
 
-    /// Buffer contains unused data.
-    /// Removes from buffer used data.
+    /// Decodes T from unused data and processes it further.
+    /// Repeats decoding so long as there is sufficient data.
+    /// Removes used data.
     /// StatusCode should be 200 OK.
-    fn process_buffer(&mut self, unused: &mut Vec<u8>) -> Result<(), RuntimeError> {
-        // Parse then process recieved unused data.
+    fn process_unused(&mut self, unused: &mut Vec<u8>) -> Result<(), RuntimeError> {
+        // Parse then process recieved data.
         loop {
             match T::try_from_parts(StatusCode::OK, &unused) {
                 Ok((data, used_bytes)) => {
@@ -344,34 +310,12 @@ enum RuntimeError {
     WatchConnectionErrored { source: hyper::Error },
 }
 
-/// Processes WatchPodForAllNamespacesResponse into WatchEvent<Pod>.
-fn response_to_event(
-    response: WatchPodForAllNamespacesResponse,
-) -> Result<WatchEvent<Pod>, RuntimeError> {
-    match response {
-        WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
-        WatchPodForAllNamespacesResponse::Other(Ok(_)) => Err(RuntimeError::WrongObjectInResponse),
-        WatchPodForAllNamespacesResponse::Other(Err(error)) => {
-            Err(error).context(ResponseParseError)
-        }
-    }
-}
-
-/// Processes WatchEvent<T> into T.
-fn event_to_data<T>(event: WatchEvent<T>) -> Result<T, RuntimeError> {
-    match event {
-        WatchEvent::Added(data)
-        | WatchEvent::Modified(data)
-        | WatchEvent::Bookmark(data)
-        | WatchEvent::Deleted(data) => Ok(data),
-        WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
-        WatchEvent::ErrorOther(other) => Err(RuntimeError::UnknownWatchEventError { other }),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{ClientConfig, Resolver, TlsSettings, Uri, WatchOptional};
+    use super::ClientConfig;
+    use crate::{dns::Resolver, sinks::util::tls::TlsSettings};
+    use http::Uri;
+    use k8s_openapi::WatchOptional;
 
     #[test]
     fn buildable() {
@@ -391,12 +335,72 @@ mod tests {
 mod kube_tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
-    use super::{ClientConfig, Resolver, WatchOptional};
-    use crate::sources::kubernetes::test::{echo, Kube};
-    use crate::test_util::runtime;
-    use std::sync::mpsc::channel;
-    use std::time::Duration;
+    use super::ClientConfig;
+    use crate::{
+        dns::Resolver,
+        sinks::util::tls::TlsOptions,
+        sinks::util::tls::TlsSettings,
+        sources::kubernetes::test::{echo, Kube},
+        test_util::runtime,
+        transforms::kubernetes::kube_config,
+    };
+    use http::Uri;
+    use k8s_openapi::WatchOptional;
+    use std::{path::PathBuf, str::FromStr, sync::mpsc::channel, time::Duration};
     use uuid::Uuid;
+
+    impl ClientConfig {
+        // NOTE: Currently used only for tests, but can be later used in
+        //       other places, but then the unsupported feature should be
+        //       implemented.
+        /// Loads configuration from local kubeconfig file, the same
+        /// one that kubectl uses.
+        fn load_kube_config(resolver: Resolver) -> Option<Self> {
+            let config = kube_config::load_kube_config()?;
+            // Get current context
+            let context = &config
+                .contexts
+                .iter()
+                .find(|context| context.name == config.current_context)?
+                .context;
+            // Get current user
+            let user = &config
+                .users
+                .iter()
+                .find(|user| user.name == context.user)?
+                .user;
+            // Get current cluster
+            let cluster = &config
+                .clusters
+                .iter()
+                .find(|cluster| cluster.name == context.cluster)?
+                .cluster;
+            // The not yet supported features
+            assert!(user.username.is_none(), "Not yet supported");
+            assert!(user.password.is_none(), "Not yet supported");
+            assert!(user.token_file.is_none(), "Not yet supported");
+            assert!(
+                cluster.certificate_authority_data.is_none(),
+                "Not yet supported"
+            );
+            assert!(user.client_certificate_data.is_none(), "Not yet supported");
+            assert!(user.client_key_data.is_none(), "Not yet supported");
+            // Construction
+            Some(ClientConfig {
+                resolver,
+                token: user.token.clone(),
+                server: Uri::from_str(&cluster.server).unwrap(),
+                tls_settings: TlsSettings::from_options(&Some(TlsOptions {
+                    verify_certificate: cluster.insecure_skip_tls_verify,
+                    ca_path: cluster.certificate_authority.clone().map(PathBuf::from),
+                    crt_path: user.client_certificate.clone().map(PathBuf::from),
+                    key_path: user.client_key.clone().map(PathBuf::from),
+                    ..TlsOptions::default()
+                }))
+                .unwrap(),
+            })
+        }
+    }
 
     #[test]
     fn watch_pod() {
@@ -410,9 +414,9 @@ mod kube_tests {
         // May pickup other pods, which is fine.
         let mut client =
             ClientConfig::load_kube_config(Resolver::new(Vec::new(), rt.executor()).unwrap())
-                .expect("Kubernetes configuration file present.")
+                .expect("Kubernetes configuration file not present.")
                 .build_pod_watch(WatchOptional::default(), move |_| {
-                    sender.send(());
+                    let _ = sender.send(());
                 })
                 .unwrap();
 
@@ -425,6 +429,6 @@ mod kube_tests {
 
         receiver
             .recv_timeout(Duration::from_secs(5))
-            .expect("Client watched Pod");
+            .expect("Client didn't saw Pod change.");
     }
 }
