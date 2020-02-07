@@ -20,6 +20,100 @@ use k8s_openapi::{
 };
 use snafu::{ResultExt, Snafu};
 
+/// Config which could be loaded from kubeconfig or local kubernetes cluster.
+#[derive(Clone, Debug)]
+pub struct ClientConfig {
+    resolver: Resolver,
+    token: Option<String>,
+    host: String,
+    port: String,
+    tls_settings: TlsSettings,
+}
+
+impl ClientConfig {
+    /// Creates new watcher who will call updater function with freshest Pod data.
+    /// Request to API server is made with given WatchOptional.
+    pub fn build_pod_watch(
+        self,
+        request_optional: WatchOptional<'static>,
+        mut updater: impl FnMut(&Pod) + Send + Sync + 'static,
+    ) -> Result<WatchClient<WatchPodForAllNamespacesResponse>, BuildError> {
+        let request_builder = move |version: Option<&Version>| {
+            Pod::watch_pod_for_all_namespaces(WatchOptional {
+                resource_version: version.map(|v| v.0.as_str()),
+                ..request_optional.clone()
+            })
+            .map(|(req, _)| req)
+            .context(K8SOpenapiError)
+        };
+
+        let updater = move |response| {
+            WatchResult::New(Some(response))
+                .then_response_to_event()
+                .then_event_to_data()
+                .peek(|pod| updater(pod))
+                .map(|pod| {
+                    pod.metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.resource_version.clone().map(Version))
+                })
+        };
+
+        self.build(request_builder, updater)
+    }
+
+    /// Should be used by other build_* functions which hide request_builder, and
+    /// simplify updater function.
+    fn build<T: Response>(
+        self,
+        request_builder: impl Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError>
+            + Send
+            + Sync
+            + 'static,
+        updater: impl FnMut(T) -> WatchResult<Version> + Send + Sync + 'static,
+    ) -> Result<WatchClient<T>, BuildError> {
+        let client =
+            https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
+
+        let client = WatchClient::<T> {
+            request_builder: Box::new(request_builder) as Box<_>,
+            updater: Box::new(updater) as Box<_>,
+            client,
+            config: self,
+        };
+
+        // Test now if the only other source of errors passes.
+        client.build_request(None)?;
+
+        Ok(client)
+    }
+
+    fn authorize(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
+        if let Some(token) = self.token.as_ref() {
+            request.headers_mut().insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
+                    .context(InvalidToken)?,
+            );
+        }
+
+        Ok(())
+    }
+
+    fn fill_uri(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
+        let mut uri = request.uri().clone().into_parts();
+        uri.scheme = Some(Scheme::HTTPS);
+        uri.authority = Some(
+            format!("{}:{}", self.host, self.port)
+                .parse()
+                .context(InvalidUri)?,
+        );
+        *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
+
+        Ok(())
+    }
+}
+
 /// Kubernetes client which watches for changes of T on one Kubernetes API endpoint.
 pub struct WatchClient<T: Response> {
     /// Must add:
@@ -31,42 +125,11 @@ pub struct WatchClient<T: Response> {
         dyn Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError> + Send + Sync + 'static,
     >,
     updater: Box<dyn FnMut(T) -> WatchResult<Version> + Send + Sync + 'static>,
-    token: Option<String>,
-    host: String,
-    port: String,
+    config: ClientConfig,
     client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
 }
 
 impl<T: Response> WatchClient<T> {
-    /// Should be used by other new_* functions which hide request_builder, and
-    /// simplify updater function.
-    fn new(
-        resolver: Resolver,
-        token: Option<String>,
-        host: String,
-        port: String,
-        tls_settings: TlsSettings,
-        request_builder: impl Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError>
-            + Send
-            + Sync
-            + 'static,
-        updater: impl FnMut(T) -> WatchResult<Version> + Send + Sync + 'static,
-    ) -> Result<Self, BuildError> {
-        let this = Self {
-            request_builder: Box::new(request_builder) as Box<_>,
-            updater: Box::new(updater) as Box<_>,
-            token,
-            host,
-            port,
-            client: https_client(resolver, tls_settings).context(HttpError)?,
-        };
-
-        // Test now if the only other source of errors passes.
-        this.watch_request(None)?;
-
-        Ok(this)
-    }
-
     /// Watches for data changes and propagates them to updater.
     /// Never returns
     pub async fn run(&mut self) {
@@ -77,7 +140,7 @@ impl<T: Response> WatchClient<T> {
 
         loop {
             let request = self
-                .watch_request(version.clone())
+                .build_request(version.clone())
                 .expect("Request succesfully builded before");
 
             // Restarts watch with new request.
@@ -186,85 +249,15 @@ impl<T: Response> WatchClient<T> {
     }
 
     // Builds request to watch data.
-    fn watch_request(&self, version: Option<Version>) -> Result<Request<Body>, BuildError> {
+    fn build_request(&self, version: Option<Version>) -> Result<Request<Body>, BuildError> {
         // Prepare request
         let mut request = (self.request_builder)(version.as_ref())?;
 
-        self.authorize(&mut request)?;
-        self.fill_uri(&mut request)?;
+        self.config.authorize(&mut request)?;
+        self.config.fill_uri(&mut request)?;
 
         let (parts, body) = request.into_parts();
         Ok(Request::from_parts(parts, body.into()))
-    }
-
-    fn authorize(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
-        if let Some(token) = self.token.as_ref() {
-            request.headers_mut().insert(
-                header::AUTHORIZATION,
-                header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
-                    .context(InvalidToken)?,
-            );
-        }
-
-        Ok(())
-    }
-
-    fn fill_uri(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
-        let mut uri = request.uri().clone().into_parts();
-        uri.scheme = Some(Scheme::HTTPS);
-        uri.authority = Some(
-            format!("{}:{}", self.host, self.port)
-                .parse()
-                .context(InvalidUri)?,
-        );
-        *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
-
-        Ok(())
-    }
-}
-
-impl WatchClient<WatchPodForAllNamespacesResponse> {
-    /// Creates new watcher who will call updater function with freshest Pod data.
-    /// Request to API server is made with given WatchOptional.
-    pub fn new_pod_watch(
-        resolver: Resolver,
-        token: Option<String>,
-        host: String,
-        port: String,
-        tls_settings: TlsSettings,
-        request_optional: WatchOptional<'static>,
-        mut updater: impl FnMut(&Pod) + Send + Sync + 'static,
-    ) -> Result<Self, BuildError> {
-        let request_builder = move |version: Option<&Version>| {
-            Pod::watch_pod_for_all_namespaces(WatchOptional {
-                resource_version: version.map(|v| v.0.as_str()),
-                ..request_optional.clone()
-            })
-            .map(|(req, _)| req)
-            .context(K8SOpenapiError)
-        };
-
-        let updater = move |response| {
-            WatchResult::New(Some(response))
-                .then_response_to_event()
-                .then_event_to_data()
-                .peek(|pod| updater(pod))
-                .map(|pod| {
-                    pod.metadata
-                        .as_ref()
-                        .and_then(|metadata| metadata.resource_version.clone().map(Version))
-                })
-        };
-
-        Self::new(
-            resolver,
-            token,
-            host,
-            port,
-            tls_settings,
-            request_builder,
-            updater,
-        )
     }
 }
 
@@ -284,12 +277,12 @@ pub enum BuildError {
 
 /// Version of Kubernetes resource
 #[derive(Clone, Debug)]
-pub struct Version(String);
+struct Version(String);
 
 /// Data over which various transformations are applied in sequence.
 /// Transformations are short circuted on all cases except on New(Some(_)).
 #[derive(Clone, Debug)]
-pub enum WatchResult<T> {
+enum WatchResult<T> {
     /// Everything is Ok path.
     /// Potentialy some data.
     New(Option<T>),
@@ -301,7 +294,7 @@ pub enum WatchResult<T> {
 
 impl<T> WatchResult<T> {
     /// Applies function if data exists.
-    pub fn and_then<R>(self, map: impl FnOnce(T) -> WatchResult<R>) -> WatchResult<R> {
+    fn and_then<R>(self, map: impl FnOnce(T) -> WatchResult<R>) -> WatchResult<R> {
         match self {
             WatchResult::New(Some(data)) => map(data),
             WatchResult::New(None) => WatchResult::New(None),
@@ -311,12 +304,12 @@ impl<T> WatchResult<T> {
     }
 
     /// Maps data if data exists.
-    pub fn map<R>(self, map: impl FnOnce(T) -> Option<R>) -> WatchResult<R> {
+    fn map<R>(self, map: impl FnOnce(T) -> Option<R>) -> WatchResult<R> {
         self.and_then(move |data| WatchResult::New(map(data)))
     }
 
     /// Peeks at existing data.
-    pub fn peek(self, fun: impl FnOnce(&T)) -> Self {
+    fn peek(self, fun: impl FnOnce(&T)) -> Self {
         if let WatchResult::New(Some(ref data)) = &self {
             fun(data);
         }
@@ -326,7 +319,7 @@ impl<T> WatchResult<T> {
 
 impl WatchResult<WatchPodForAllNamespacesResponse> {
     /// Processes WatchPodForAllNamespacesResponse into WatchEvent<Pod>.
-    pub fn then_response_to_event(self) -> WatchResult<WatchEvent<Pod>> {
+    fn then_response_to_event(self) -> WatchResult<WatchEvent<Pod>> {
         self.and_then(|response| match response {
             WatchPodForAllNamespacesResponse::Ok(event) => WatchResult::New(Some(event)),
             WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
@@ -343,7 +336,7 @@ impl WatchResult<WatchPodForAllNamespacesResponse> {
 
 impl<T> WatchResult<WatchEvent<T>> {
     /// Processes WatchEvent<T> into T.
-    pub fn then_event_to_data(self) -> WatchResult<T> {
+    fn then_event_to_data(self) -> WatchResult<T> {
         self.and_then(|event| match event {
             WatchEvent::Added(data)
             | WatchEvent::Modified(data)
@@ -365,5 +358,24 @@ impl<T> WatchResult<WatchEvent<T>> {
                 WatchResult::New(None)
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Resolver, TlsSettings, WatchClient, WatchOptional};
+
+    #[test]
+    fn buildable() {
+        let rt = crate::runtime::Runtime::new().unwrap();
+        ClientConfig {
+            resolver: Resolver::new(Vec::new(), rt.executor()).unwrap(),
+            token: None,
+            host: "localhost".to_owned(),
+            port: "8001".to_owned(),
+            tls_settings: TlsSettings::from_options(&None).unwrap(),
+        }
+        .build_pod_watch(WatchOptional::default(), |_| ())
+        .unwrap();
     }
 }
