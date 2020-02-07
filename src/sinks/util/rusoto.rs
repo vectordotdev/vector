@@ -13,7 +13,7 @@ pub type Client = HttpClient<HttpsConnector<HttpConnector<Resolver>>>;
 
 #[derive(Debug, Snafu)]
 enum RusotoError {
-    #[snafu(display("{}", source))]
+    #[snafu(display("Invalid AWS credentials: {}", source))]
     InvalidAWSCredentials { source: CredentialsError },
 }
 
