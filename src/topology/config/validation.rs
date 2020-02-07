@@ -1,12 +1,8 @@
 use crate::topology::{config::DataType, Config};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn typecheck(config: &Config) -> Result<(), Vec<String>> {
     Graph::from(config).typecheck()
-}
-
-pub fn contains_cycle(config: &Config) -> bool {
-    Graph::from(config).contains_cycle()
 }
 
 #[derive(Debug, Clone)]
@@ -69,12 +65,11 @@ impl Graph {
                 Node::Sink { .. } => Some(name),
                 _ => None,
             })
-            .flat_map(|node| match paths_rec(&self.nodes, node, Vec::new()) {
-                Ok(paths) => paths,
-                Err(err) => {
+            .flat_map(|node| {
+                paths_rec(&self.nodes, node, Vec::new()).unwrap_or_else(|err| {
                     errors.push(err);
                     Vec::new()
-                }
+                })
             })
             .collect();
 
@@ -94,14 +89,7 @@ impl Graph {
     fn typecheck(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        let paths = match self.paths() {
-            Ok(paths) => paths,
-            Err(errs) => {
-                return Err(errs);
-            }
-        };
-
-        for path in paths {
+        for path in self.paths()? {
             for pair in path.windows(2) {
                 let (x, y) = (&pair[0], &pair[1]);
                 if self.nodes.get(x).is_none() || self.nodes.get(y).is_none() {
@@ -131,55 +119,6 @@ impl Graph {
             errors.dedup();
             Err(errors)
         }
-    }
-
-    fn edges(&self) -> HashSet<(String, String)> {
-        let mut edges = HashSet::new();
-        let valid_names = self.nodes.keys().collect::<HashSet<_>>();
-        for (name, node) in self.nodes.iter() {
-            match node {
-                Node::Transform { inputs, .. } | Node::Sink { inputs, .. } => {
-                    for i in inputs {
-                        if valid_names.contains(i) {
-                            edges.insert((i.clone(), name.clone()));
-                        }
-                    }
-                }
-                Node::Source { .. } => {}
-            }
-        }
-        edges
-    }
-
-    // Modified version of Kahn's topological sort algorithm that ignores the actual sorted output and
-    // only cares if the sort was possible (i.e. whether or not there was a cycle in the input graph).
-    fn contains_cycle(&self) -> bool {
-        let nodes = self
-            .nodes
-            .keys()
-            .map(|k| k.to_string())
-            .collect::<HashSet<_>>();
-        let mut edges = self.edges();
-
-        let mut no_incoming = nodes
-            .into_iter()
-            .filter(|n| !edges.iter().any(|(_t, h)| h == n))
-            .collect::<Vec<String>>();
-        while let Some(node) = no_incoming.pop() {
-            let outgoing = edges
-                .iter()
-                .filter(|(tail, _head)| *tail == node)
-                .cloned()
-                .collect::<Vec<_>>();
-            for edge in outgoing {
-                edges.remove(&edge);
-                let successor = edge.1;
-                if edges.iter().filter(|(_t, head)| head == &successor).count() == 0 {
-                    no_incoming.push(successor);
-                }
-            }
-        }
-        !edges.is_empty()
     }
 }
 
@@ -253,18 +192,6 @@ mod test {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn detects_cycles() {
-        let mut graph = Graph::default();
-        graph.add_source("in", DataType::Log);
-        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
-        graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
-        graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
-        graph.add_sink("out", DataType::Log, vec!["three"]);
-
-        assert_eq!(true, graph.contains_cycle());
-    }
-
-    #[test]
     fn paths_detects_cycles() {
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
@@ -293,6 +220,12 @@ mod test {
             ]),
             graph.paths()
         );
+        assert_eq!(
+            Err(vec![
+                "Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()
+            ]),
+            graph.typecheck()
+        );
 
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
@@ -306,18 +239,6 @@ mod test {
             ]),
             graph.paths()
         );
-    }
-
-    #[test]
-    fn doesnt_detect_noncycles() {
-        let mut graph = Graph::default();
-        graph.add_source("in", DataType::Log);
-        graph.add_transform("one", DataType::Log, DataType::Log, vec!["in"]);
-        graph.add_transform("two", DataType::Log, DataType::Log, vec!["in"]);
-        graph.add_transform("three", DataType::Log, DataType::Log, vec!["one", "two"]);
-        graph.add_sink("out", DataType::Log, vec!["three"]);
-
-        assert_eq!(false, graph.contains_cycle());
     }
 
     #[test]
