@@ -1,8 +1,22 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::{
+    event::metric::{Metric, MetricValue},
+    sinks::util::{
+        http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
+        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+    },
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+};
 use chrono::{DateTime, Utc};
+use futures::{Future, Poll};
+use http::{Method, StatusCode, Uri};
+use hyper;
+use hyper_tls::HttpsConnector;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use tower::Service;
 
 pub enum Field {
     /// string
@@ -11,6 +25,134 @@ pub enum Field {
     Float(f64),
     /// unsigned integer
     UnsignedInt(u32),
+}
+
+#[derive(Clone)]
+struct InfluxDBSvc {
+    config: InfluxDBConfig,
+    inner: HttpService,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct InfluxDBConfig {
+    pub namespace: String,
+    pub host: String,
+    pub org: String,
+    pub bucket: String,
+    pub token: String,
+    #[serde(default)]
+    pub batch: BatchEventsConfig,
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        retry_attempts: Some(5),
+        ..Default::default()
+    };
+}
+
+// https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct InfluxDBRequest {
+    series: Vec<String>,
+}
+
+inventory::submit! {
+    SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
+}
+
+#[typetag::serde(name = "influxdb_metrics")]
+impl SinkConfig for InfluxDBConfig {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let sink = InfluxDBSvc::new(self.clone(), cx)?;
+        let healthcheck = InfluxDBSvc::healthcheck(self.clone())?;
+        Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Metric
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "influxdb_metrics"
+    }
+}
+
+impl InfluxDBSvc {
+    pub fn new(config: InfluxDBConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
+        let token = config.token.clone();
+        let batch = config.batch.unwrap_or(20, 1);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let uri = format!(
+            "{}/api/v2/write?org={}&bucket={}&precision=ns",
+            config.host, config.org, config.bucket
+        )
+        .parse::<Uri>()
+        .context(super::UriParseError)?;
+        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
+            let mut builder = hyper::Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
+
+            builder.header("Content-Type", "text/plain");
+            builder.header("Authorization", format!("Token {}", token));
+            builder.body(body).unwrap()
+        });
+
+        let influxdb_http_service = InfluxDBSvc {
+            config,
+            inner: http_service,
+        };
+
+        let sink = request
+            .batch_sink(HttpRetryLogic, influxdb_http_service, cx.acker())
+            .batched_with_min(MetricBuffer::new(), &batch);
+
+        Ok(Box::new(sink))
+    }
+
+    // https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
+    fn healthcheck(config: InfluxDBConfig) -> crate::Result<super::Healthcheck> {
+        let uri = format!("{}/health", config.host)
+            .parse::<Uri>()
+            .context(super::UriParseError)?;
+
+        let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+
+        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        let client = hyper::Client::builder().build(https);
+
+        let healthcheck = client
+            .request(request)
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                StatusCode::OK => Ok(()),
+                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            });
+
+        Ok(Box::new(healthcheck))
+    }
+}
+
+impl Service<Vec<Metric>> for InfluxDBSvc {
+    type Response = HttpResponse;
+    type Error = HttpError;
+    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        self.inner.poll_ready()
+    }
+
+    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
+        let input = encode_events(items, &self.config.namespace).join("\n");
+        let body: Vec<u8> = input.into_bytes();
+
+        self.inner.call(body)
+    }
 }
 
 fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
@@ -178,6 +320,7 @@ fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String,
     Some(fields)
 }
 
+// https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
 fn influx_line_protocol(
     measurement: String,
     metric_type: &str,
@@ -291,6 +434,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
 
