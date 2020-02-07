@@ -245,25 +245,19 @@ impl S3Sink {
         _assume_role: Option<String>,
         resolver: Resolver,
     ) -> crate::Result<S3Client> {
+        let client = rusoto::client(resolver)?;
+
+        #[cfg(not(test))]
+        let creds = rusoto::AwsCredentialsProvider::new(&region, _assume_role)?;
+
         // Hack around the fact that rusoto will not pick up runtime
         // env vars. This is designed to only for test purposes use
         // static credentials.
-        #[cfg(not(test))]
-        {
-            let client = rusoto::client(resolver)?;
-            let creds = rusoto::AwsCredentialsProvider::new(&region, _assume_role)?;
-            Ok(S3Client::new_with(client, creds, region))
-        }
-
         #[cfg(test)]
-        {
-            use rusoto_credential::StaticProvider;
+        let creds =
+            rusoto::AwsCredentialsProvider::new_minimal("test-access-key", "test-secret-key");
 
-            let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-            let d = rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
+        Ok(S3Client::new_with(client, creds, region))
     }
 }
 

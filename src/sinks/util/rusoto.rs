@@ -1,5 +1,8 @@
 use crate::dns::Resolver;
-use futures::{future::Future, Poll};
+use futures::{
+    future::{Future, FutureResult},
+    Poll,
+};
 use hyper::client::connect::HttpConnector;
 use hyper_openssl::{
     openssl::ssl::{SslConnector, SslMethod},
@@ -9,6 +12,7 @@ use rusoto_core::{CredentialsError, HttpClient, Region};
 use rusoto_credential::{
     AutoRefreshingProvider, AutoRefreshingProviderFuture, AwsCredentials,
     DefaultCredentialsProvider, DefaultCredentialsProviderFuture, ProvideAwsCredentials,
+    StaticProvider,
 };
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
@@ -25,6 +29,7 @@ enum RusotoError {
 pub enum AwsCredentialsProvider {
     Default(DefaultCredentialsProvider),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
+    Static(StaticProvider),
 }
 
 impl AwsCredentialsProvider {
@@ -49,6 +54,13 @@ impl AwsCredentialsProvider {
             Ok(Self::Default(creds))
         }
     }
+
+    pub fn new_minimal<A: Into<String>, S: Into<String>>(access_key: A, secret_key: S) -> Self {
+        Self::Static(StaticProvider::new_minimal(
+            access_key.into(),
+            secret_key.into(),
+        ))
+    }
 }
 
 impl ProvideAwsCredentials for AwsCredentialsProvider {
@@ -57,6 +69,7 @@ impl ProvideAwsCredentials for AwsCredentialsProvider {
         match self {
             Self::Default(p) => AwsCredentialsProviderFuture::Default(p.credentials()),
             Self::Role(p) => AwsCredentialsProviderFuture::Role(p.credentials()),
+            Self::Static(p) => AwsCredentialsProviderFuture::Static(p.credentials()),
         }
     }
 }
@@ -64,6 +77,7 @@ impl ProvideAwsCredentials for AwsCredentialsProvider {
 pub enum AwsCredentialsProviderFuture {
     Default(DefaultCredentialsProviderFuture),
     Role(AutoRefreshingProviderFuture<StsAssumeRoleSessionCredentialsProvider>),
+    Static(FutureResult<AwsCredentials, CredentialsError>),
 }
 
 impl Future for AwsCredentialsProviderFuture {
@@ -73,6 +87,7 @@ impl Future for AwsCredentialsProviderFuture {
         match self {
             Self::Default(f) => f.poll(),
             Self::Role(f) => f.poll(),
+            Self::Static(f) => f.poll(),
         }
     }
 }
