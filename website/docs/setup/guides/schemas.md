@@ -1,0 +1,335 @@
+---
+title: Managing Schemas in Vector
+sidebar_label: Managing Schemas
+description: Learn how to manage log schemas with Vector.
+---
+
+Data comes in all shapes and sizes. Vector has an array (let's call it a vector 😎) of composable functionality for
+decoding your events in the right format, transforming them into the right shape, and passing that data on downstream.
+
+## Defining Global Field Names
+
+> TODO: Not implemented, yet!
+
+By default, Vector primarily operates on three fields: `host`, `message`, and `timestamp`.
+
+```json
+{
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "timestamp": "2019-11-01T21:15:47+00:00"
+}
+```
+
+It may be that your data does not follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema` section of your `config.toml`.
+
+```toml
+[log_schema]
+host_key = "instance" # default "host"
+message_key = "info" # default "message"
+timestamp_key = "datetime" # default "timestamp"
+
+# Sources, transforms, and sinks...
+```
+
+> **Gotcha:** Not all sources use the `host` field.
+>
+> **Gotcha:** The timestamp and message fields are sometimes derived from the source itself. Eg for the file source `timestamp` is the exact time the event was injested, and not configurable.
+
+### Example: Custom timestamp field
+
+Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
+
+If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
+
+```toml
+# TODO: A simple config and a one-liner invocation.
+[log_schema]
+timestamp_key = "@timestamp"
+
+[sources.my_naming_confused_source]
+  type = "logplex"
+  address = "0.0.0.0:8088"
+```
+
+
+
+## Field filtering
+
+> TODO: https://github.com/timberio/vector/issues/1448 is exploring how to make this better.
+
+Sometimes it is advantageous to filter out specific fields during the pipeline. You can use a `remove_fields` transform transform to do this.
+
+Commonly you'll want to do this near either the source or sink of your pipeline. Some example use cases:
+
+* Dropping `email`, `passport_number`, or other personally identifiable information from logs before distributing them to third party services.
+* Filtering data for compliance with the GDPR or other regional laws. (eg EU to US dataflows)
+* Reducing the volume of data on a particular endpoint.
+
+A transform of this type looks like this:
+
+```toml
+[transforms.strip_personal_details]
+type = "remove_fields"
+inputs = ["my-source-id"]
+fields = ["email", "passport_number"]
+```
+
+### Example: Filtering data for GDPR compliance
+
+Let's pretend we have a nice well behaved application piping Vector logs like the following:
+
+```json
+{ "id": "user1", "gdpr": false, "email": "us-user1@timber.io" }
+{ "id": "user2", "gdpr": false, "email": "us-user2@timber.io" }
+{ "id": "user3", "gdpr": true, "email": "eu-user3@timber.io" }
+```
+
+In our theoretical product, we're expanding into the EU and want to comply with the GDPR. In our case, that means our application can't send EU user emails to our US based kafka.
+
+We can build a config that will do the first part of this, but we'll just output to console for ease of this example.
+
+```toml
+data_dir = "./data"
+dns_servers = []
+
+[sources.application]
+max_length = 102400
+type = "stdin"
+
+[transforms.parse]
+inputs = ["application"]
+drop_field = true
+drop_invalid = false
+type = "json_parser"
+
+[transforms.not_gdpr]
+type = "field_filter"
+inputs = ["parse"]
+field = "gdpr"
+value = "false"
+
+[transforms.gdpr_to_strip]
+type = "field_filter"
+inputs = ["parse"]
+field = "gdpr"
+value = "true"
+
+[transforms.gdpr_stripped]
+type = "remove_fields"
+inputs = ["gdpr_to_strip"]
+fields = ["email"]
+
+[sinks.console]
+healthcheck = true
+inputs = ["not_gdpr", "gdpr_stripped"]
+type = "console"
+encoding = "json"
+[sinks.console.buffer]
+type = "memory"
+max_events = 500
+when_full = "block"
+```
+
+Let's have a look:
+
+> TODO: A one-liner invocation.
+
+```
+Feb 05 16:13:59.241  INFO source{name=application type=stdin}: vector::sources::stdin: finished sending
+{"id":"user1","timestamp":"2020-02-06T00:13:59.241801798Z","host":"obsidian","email":"us-user1@timber.io","gdpr":false}
+{"gdpr":false,"host":"obsidian","email":"us-user2@timber.io","timestamp":"2020-02-06T00:13:59.241815255Z","id":"user2"}
+{"id":"user3","gdpr":true,"host":"obsidian","timestamp":"2020-02-06T00:13:59.241816010Z"}
+Feb 05 16:15:27.945  INFO vector: Shutting down.
+```
+
+Don't know where events are coming from? You can use the `geoip` transform an `ipv4` field and get a grip on that!
+
+## Moving and Concatenating Fields
+
+> TODO: This doesn't work, yet! See [#750](https://github.com/timberio/vector/issues/750)
+
+It's fairly common for one part of your pipeline to expect a field to be named differently than another part! Above we
+talked about setting global defaults for a vector instance.  Vector has an
+[`add_field`](/docs/reference/transforms/add_fields/) transform that you can use alongside the
+[`remove_fields`](/docs/reference/transforms/remove_fields/) transform to do just that!
+
+Other times, you need to concatenate two fields together. You can use the same strategy as renaming!
+
+It's useful for when:
+
+* You have a `timestamp` that needs to be `@timestamp` for the downstream.
+* You need to adapt or reshape data to fit into possibly older or newer systems.
+* You need to concatenate `first_name` and `last_name` into a `name` field. (Suppose they didn't read
+  [Falsehoods about names](https://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)).
+
+Here's an example of that transform chain:
+
+```toml
+[transforms.rename_timestamp]
+type = "add_fields"
+inputs = ["source0"]
+[transform.rename_timestamp.fields]
+field = "@timestamp"
+value = "{{timestamp}}"
+
+[transforms.drop_old_timestamp]
+type = "remove_fields"
+inputs = ["rename_timestamp"]
+fields = ["timestamp"]
+```
+
+### Example: Mooshing together name fields
+
+Let's pretend one of your teammates falsely assumed folks always have first and last names, so we have a `first_name`
+and a `last_name` field coming from a source, and we'd like to output a `name` field to a sink.
+
+```toml
+# TODO: A simple config and a one-liner invocation.
+[transforms.moosh_names]
+  type = "add_fields"
+  inputs = ["source0"]
+  [transform.moosh_names.fields]
+    field = "name"
+    value = "{{first_name}} {{last_name}}"
+
+[transforms.drop_old_names]
+  type = "remove_fields"
+  inputs = ["moosh_names"]
+  fields = ["first_name", "last_name"]
+```
+
+What if you had to do this in reverse? Try using the [`regex`](/docs/reference/transforms/regex_parser/) or
+[`split`](/docs/reference/transforms/split/) transforms.
+
+## Coercing Data Types
+
+Occasionally services will provide you with data that is in the right shape, but the types are wrong. Perhaps a string
+should be a number, or vice versa.
+
+The [`coercer`](/docs/reference/transforms/coercer/) transform is the correct tool for this job!
+
+```toml
+[transforms.correct_source_types]
+  type = "coercer"
+  inputs = ["source0"]
+  [transforms.correct_source_types.types]
+    count = "int"
+    date = "timestamp|%F"
+```
+
+### Example: Coercing between date formats
+
+There are a lot of ways to represent time. In the US folks tend to use `MM/DD/YYYY` or the (more reasonable)
+`YYYY/MM/DD` which Canada and China like. In the EU, South America, and Africa they prefer `DD/MM/YYYY`. Like personal
+identities, all are valid. Vector lets us take in timestamps and output specific formats easily.
+
+To do this we'll use `timestamp| $FORMAT`. To build a `$FORMAT`, we can reference the
+[`strftime`](https://docs.rs/chrono/0.4.10/chrono/format/strftime/index.html) documentation. Let's ship some Canadian
+friendly logs up to the great white north!
+
+```toml
+# TODO: A simple config and a one-liner invocation.
+[transforms.format_timestamp]
+  type = "coercer"
+[transforms.format_timestamp.types]
+  timestamp = "timestamp|%Y/%m/%d:%H:%M:%S %z"
+```
+
+## Working with data formats
+
+> This is covered by [#1472](https://github.com/timberio/vector/issues/1472)
+
+Not all logs come structured. Some services provide JSON, some provide plaintext, others ship around protobufs. With
+Vector you can handle them all.
+
+Generally Vector will be able to determine the encodings to use by the source or sink used. In some cases, multiple are
+supported. In these cases, you can use the `encoding` option.
+
+The [`console`](/docs/reference/sinks/console/#encoding) sink supports both `json` and `text` as its
+output format
+
+```toml
+[sinks.print]
+  type = "console"
+  inputs = ["source0"]
+  target = "stdout"
+```
+
+You can also use a transform like [`json_parser`](/docs/reference/transforms/json_parser/),
+[`grok_parser`](/docs/reference/transforms/grok_parser/) or [`protobuf_parser`]() to parse out data in a given field.
+
+### Example: Decoding a protobuf
+
+Let's pretend we have a source of protobufs which we need to parse and work with later in the pipeline.
+
+> **Tip:** Verify your `.proto` can parse a sourced message with
+> `protoc --decode MyType /proto/message.proto < message.bin`
+
+```toml
+# TODO: A simple config and a one-liner invocation.
+[transforms.parse]
+  inputs = ["application"]
+  type = "protobuf_parser"
+  field = "message"
+  definition = "./proto/message.pb"
+  decode_as = "MyType"
+```
+
+> **Gotcha:** We are currently not able to support **encoding** to custom protobufs due to limitations of our dynamic
+> protobuf library. We opened #TODO and are working with the library maintainer to add this feature.
+
+To explore this concept, try using Vector as a `protobuf` to `json` converter!
+
+## Using a Schema
+
+Instead of writing a custom filter or whitelist, you can reuse existing JSON schemas to validate or coerce data. Using
+the `json_parser` transform, specify an optional schema, and optionally specify coercion/filtering preferences.
+
+```toml
+# TODO The rests
+[transforms.parse]
+  inputs = ["application"]
+  type = "json_parser"
+  schema = "./schemas/message.json"
+  drop_invalid = true
+```
+
+If your organization uses AWS Glue you can have Vector fetch a schema for a table of a database and enforce it inside
+vector. The [`aws_glue`](/docs/reference/transforms/aws_glue/) transform will filter out events that don't match the
+specified schema, optionally coercing the types of conforming fields if needed.
+
+```toml
+[transforms.parse]
+  inputs = ["application"]
+  type = "aws_glue"
+  database = "datalake"
+  table = "events"
+  coerce_types = true
+```
+
+### Example: AWS Glue
+
+```toml
+# TODO: A simple config and a one-liner invocation.
+[transforms.parse]
+  inputs = ["application"]
+  type = "aws_glue"
+  database = "datalake"
+  table = "events"
+  coerce_types = true
+```
+
+## Parting thoughts
+
+Exploring this article, we can see that Vector is able to consume multiple (even non-standard) formats of logs. We saw
+that Vector can then reshape the data according to your needs. Then Vector can pass this data along.
+
+Let's consider some novel uses for Vector, given these tools! Vector can work as:
+
+* A sanitization tool, ensuring malformed events never reach a service.
+* A privacy tool, removing sensitive data before it leaves your infrastructure.
+* A protocol adapter, allowing a protobuf speaking service to notify to a JSON speaking service.
+* A data corrector, adapting legacy systems to more modern systems which have evolved.
+
+Where are you deploying Vector? Let us know, maybe we can help optimize it!
