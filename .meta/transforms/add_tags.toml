@@ -1,6 +1,7 @@
 [transforms.add_tags]
 title = "Add Tags"
 allow_you_to_description = "add one or more metric tags"
+beta = false
 common = false
 function_category = "shape"
 input_types = ["metric"]

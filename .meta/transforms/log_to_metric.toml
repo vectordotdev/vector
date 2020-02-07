@@ -1,6 +1,7 @@
 [transforms.log_to_metric]
 title = "Log to Metric"
 allow_you_to_description = "convert logs into one or more metrics"
+beta = false
 common = true
 function_category = "convert"
 input_types = ["log"]

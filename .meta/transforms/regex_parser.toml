@@ -3,6 +3,7 @@ title = "Regex Parser"
 allow_you_to_description = """\
 parse a log field's value with a [Regular Expression][urls.regex]\
 """
+beta = false
 common = true
 function_category = "parse"
 input_types = ["log"]

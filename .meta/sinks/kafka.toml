@@ -1,5 +1,6 @@
 [sinks.kafka]
 title = "Kafka"
+beta = false
 buffer = true
 common = true
 delivery_guarantee = "at_least_once"

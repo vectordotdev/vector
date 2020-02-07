@@ -8,6 +8,3 @@ RUN git clone https://github.com/lindenb/makefile2graph && \
   make install && \
   cd .. && \
   rm -rf makefile2graph
-
-COPY target-graph/target-graph.sh /usr/local/bin
-ENTRYPOINT ["target-graph.sh"]

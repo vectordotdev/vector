@@ -3,6 +3,7 @@ title = "New Relic Logs"
 batch_is_common = false
 batch_max_size = 524000
 batch_timeout_secs = 1
+beta = true
 buffer = true
 common = false
 delivery_guarantee = "at_least_once"

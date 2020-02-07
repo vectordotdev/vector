@@ -1,6 +1,7 @@
 [transforms.aws_ec2_metadata]
 title = "AWS EC2 Metadata"
 allow_you_to_description = "enrich logs with AWS EC2 instance metadata"
+beta = true
 common = false
 function_category = "enrich"
 input_types = ["log"]
