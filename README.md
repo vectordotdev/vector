@@ -10,15 +10,6 @@
   <img src="./website/static/img/readme_diagram.svg" alt="Vector">
 </p>
 
----
-
-<p align="center">
-  <strong>
-    New post! <a href="https://vector.dev/blog/prometheus-source">Prometheus Source</a>
-  </strong>
-</p>
-
----
 
 Vector is an [open-source][urls.vector_repo] utility for building observability
 pipelines. [Collect][docs.sources], [transform][docs.transforms], and
