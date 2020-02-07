@@ -1,6 +1,7 @@
 [transforms.json_parser]
 title = "JSON Parser"
 allow_you_to_description = "parse a log field value as JSON"
+beta = false
 common = true
 function_category = "parse"
 input_types = ["log"]

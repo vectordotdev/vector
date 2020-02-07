@@ -1,5 +1,6 @@
 [sinks.file]
 title = "File"
+beta = false
 buffer = false
 common = false
 delivery_guarantee = "best_effort"

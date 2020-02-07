@@ -1,5 +1,6 @@
 [sinks.vector]
 title = "Vector"
+beta = true
 buffer = true
 common = false
 delivery_guarantee = "best_effort"

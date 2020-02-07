@@ -1,5 +1,6 @@
 [sinks.socket]
 title = "Socket"
+beta = false
 buffer = true
 common = true
 delivery_guarantee = "best_effort"

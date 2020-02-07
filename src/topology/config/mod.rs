@@ -315,6 +315,54 @@ impl Config {
         toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
+    pub fn append(&mut self, mut with: Self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
+            self.global.data_dir = with.global.data_dir;
+        } else if with.global.data_dir != default_data_dir()
+            && self.global.data_dir != with.global.data_dir
+        {
+            // If two configs both set 'data_dir' and have conflicting values
+            // we consider this an error.
+            errors.push("conflicting values for 'data_dir' found".to_owned());
+        }
+        self.global.dns_servers.append(&mut with.global.dns_servers);
+        self.global.dns_servers.sort();
+        self.global.dns_servers.dedup();
+
+        with.sources.keys().for_each(|k| {
+            if self.sources.contains_key(k) {
+                errors.push(format!("duplicate source name found: {}", k));
+            }
+        });
+        with.sinks.keys().for_each(|k| {
+            if self.sinks.contains_key(k) {
+                errors.push(format!("duplicate sink name found: {}", k));
+            }
+        });
+        with.transforms.keys().for_each(|k| {
+            if self.transforms.contains_key(k) {
+                errors.push(format!("duplicate transform name found: {}", k));
+            }
+        });
+        with.tests.iter().for_each(|wt| {
+            if self.tests.iter().any(|t| t.name == wt.name) {
+                errors.push(format!("duplicate test name found: {}", wt.name));
+            }
+        });
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        self.sources.extend(with.sources);
+        self.sinks.extend(with.sinks);
+        self.transforms.extend(with.transforms);
+        self.tests.extend(with.tests);
+
+        Ok(())
+    }
+
     pub fn contains_cycle(&self) -> bool {
         validation::contains_cycle(self)
     }
@@ -365,5 +413,99 @@ mod test {
             Some(PathBuf::from("/var/lib/vector")),
             config.global.data_dir
         )
+    }
+
+    #[test]
+    fn config_append() {
+        let mut config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.append(
+                toml::from_str(
+                    r#"
+        data_dir = "/foobar"
+
+        [transforms.foo]
+        type = "json_parser"
+        inputs = [ "in" ]
+
+        [[tests]]
+        name = "check_simple_log"
+        [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+        [[tests.outputs]]
+        extract_from = "foo"
+        [[tests.outputs.conditions]]
+        type = "check_fields"
+        "message.equals" = "Sorry, I'm busy this week Cecil"
+            "#,
+                )
+                .unwrap()
+            ),
+            Ok(())
+        );
+
+        assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
+        assert!(config.sources.contains_key("in"));
+        assert!(config.sinks.contains_key("out"));
+        assert!(config.transforms.contains_key("foo"));
+        assert_eq!(config.tests.len(), 1);
+    }
+
+    #[test]
+    fn config_append_collisions() {
+        let mut config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.append(
+                toml::from_str(
+                    r#"
+        [sources.in]
+        type = "file"
+        include = ["/var/log/messages"]
+
+        [transforms.foo]
+        type = "json_parser"
+        inputs = [ "in" ]
+
+        [sinks.out]
+        type = "console"
+        inputs = ["in"]
+        encoding = "json"
+            "#,
+                )
+                .unwrap()
+            ),
+            Err(vec![
+                "duplicate source name found: in".into(),
+                "duplicate sink name found: out".into(),
+            ])
+        );
     }
 }

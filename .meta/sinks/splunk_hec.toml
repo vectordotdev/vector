@@ -2,6 +2,7 @@
 title = "Splunk HEC"
 batch_max_size = 1049000
 batch_timeout_secs = 1
+beta = false
 buffer = true
 common = true
 delivery_guarantee = "at_least_once"

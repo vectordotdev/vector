@@ -1,5 +1,6 @@
 [sources.stdin]
 title = "STDIN"
+beta = false
 common = false
 delivery_guarantee = "at_least_once"
 function_category = "receive"

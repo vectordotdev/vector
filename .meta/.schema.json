@@ -170,6 +170,7 @@
       "description": "A component that outputs/sends data from Vector.",
       "additionalProperties": false,
       "required": [
+        "beta",
         "common",
         "delivery_guarantee",
         "egress_method",
@@ -372,6 +373,7 @@
       "description": "A component that receives/ingests data.",
       "additionalProperties": false,
       "required": [
+        "beta",
         "common",
         "delivery_guarantee",
         "function_category",
@@ -456,6 +458,7 @@
       "additionalProperties": false,
       "required": [
         "allow_you_to_description",
+        "beta",
         "common",
         "function_category",
         "title"

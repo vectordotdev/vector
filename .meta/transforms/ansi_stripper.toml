@@ -1,6 +1,7 @@
 [transforms.ansi_stripper]
 title = "ANSI Stripper"
 allow_you_to_description = "strips ANSI characters from the specified field"
+beta = false
 common = false
 function_category = "sanitize"
 input_types = ["log"]
