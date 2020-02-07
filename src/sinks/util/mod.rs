@@ -50,7 +50,7 @@ pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
     let log = event.into_log();
 
     let b = match encoding {
-        Encoding::Json => serde_json::to_vec(&log.unflatten()),
+        Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
                 .get(&event::MESSAGE)

@@ -206,6 +206,7 @@ mod tests {
         test_util::{
             lines_from_file, random_lines_with_stream, random_nested_events_with_stream, temp_file,
         },
+        util::sort_kv_iter,
     };
     use futures::Stream;
     use std::path::PathBuf;
@@ -219,17 +220,6 @@ mod tests {
         for (input, output) in input.into_iter().zip(output) {
             assert_eq!(input, output);
         }
-    }
-
-    // converts an iterator over key-value pairs to an iterator with values sorted by keys
-    fn sort_kv_iter<K, V, I>(iter: I) -> impl Iterator<Item = (K, V)>
-    where
-        K: Ord,
-        I: Iterator<Item = (K, V)>,
-    {
-        let mut collected: Vec<_> = iter.collect();
-        collected.sort_by(|(k1, _), (k2, _)| k1.cmp(&k2));
-        collected.into_iter()
     }
 
     fn deep_cmp_ignore_order<'a, U, V>(first: U, second: V) -> bool

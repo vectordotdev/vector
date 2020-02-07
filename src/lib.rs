@@ -27,6 +27,7 @@ pub mod trace;
 pub mod transforms;
 pub mod types;
 pub mod unit_test;
+pub mod util;
 
 pub use event::Event;
 

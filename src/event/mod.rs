@@ -126,6 +126,9 @@ impl LogEvent {
     pub fn drain(&mut self) -> Drain<Atom, Value> {
         self.fields.drain()
     }
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
+    }
 }
 
 impl std::ops::Index<&Atom> for LogEvent {
