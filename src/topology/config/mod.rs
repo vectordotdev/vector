@@ -363,10 +363,6 @@ impl Config {
         Ok(())
     }
 
-    pub fn contains_cycle(&self) -> bool {
-        validation::contains_cycle(self)
-    }
-
     pub fn typecheck(&self) -> Result<(), Vec<String>> {
         validation::typecheck(self)
     }
