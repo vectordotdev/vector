@@ -12,6 +12,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::timer::Interval;
 
+pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver_logging;
 
