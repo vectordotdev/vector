@@ -6,7 +6,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto::create_client,
+        rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
         TowerRequestConfig, TowerRequestSettings,
     },
@@ -16,7 +16,7 @@ use crate::{
 use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{request::BufferedHttpResponse, RusotoError};
+use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
@@ -226,8 +226,7 @@ impl CloudwatchLogsSvc {
         resolver: Resolver,
     ) -> crate::Result<Self> {
         let region = config.region.clone().try_into()?;
-        let client =
-            create_client::<CloudWatchLogsClient>(region, config.assume_role.clone(), resolver)?;
+        let client = create_client(region, config.assume_role.clone(), resolver)?;
 
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
@@ -390,7 +389,7 @@ fn healthcheck(
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
 
-    let client = create_client::<CloudWatchLogsClient>(
+    let client = create_client(
         config.region.clone().try_into()?,
         config.assume_role,
         resolver,
@@ -435,6 +434,16 @@ fn healthcheck(
         });
 
     Ok(Box::new(fut))
+}
+
+fn create_client(
+    region: Region,
+    assume_role: Option<String>,
+    resolver: Resolver,
+) -> crate::Result<CloudWatchLogsClient> {
+    let http = rusoto::client(resolver)?;
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    Ok(CloudWatchLogsClient::new_with(http, creds, region))
 }
 
 #[derive(Debug, Clone)]
@@ -767,7 +776,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client::<CloudWatchLogsClient>(region, None, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let response = rt.block_on(client.get_log_events(request)).unwrap();
 
@@ -817,7 +826,7 @@ mod integration_tests {
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client::<CloudWatchLogsClient>(region, None, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let response = rt.block_on(client.get_log_events(request)).unwrap();
 
@@ -872,7 +881,7 @@ mod integration_tests {
         request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = create_client::<CloudWatchLogsClient>(region, None, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let response = rt.block_on(client.get_log_events(request)).unwrap();
 
@@ -898,7 +907,7 @@ mod integration_tests {
             endpoint: "http://localhost:6000".into(),
         };
 
-        let client = create_client::<CloudWatchLogsClient>(region.clone(), None, resolver).unwrap();
+        let client = create_client(region.clone(), None, resolver).unwrap();
         ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
@@ -999,7 +1008,7 @@ mod integration_tests {
         let mut rt = Runtime::single_threaded().unwrap();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let client = create_client::<CloudWatchLogsClient>(region, None, resolver).unwrap();
+        let client = create_client(region, None, resolver).unwrap();
 
         let req = CreateLogGroupRequest {
             log_group_name: GROUP_NAME.into(),

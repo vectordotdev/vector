@@ -3,8 +3,8 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
-        ServiceBuilderExt, SinkExt, TowerRequestConfig,
+        retries::RetryLogic, rusoto, BatchBytesConfig, Buffer, PartitionBuffer,
+        PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -250,7 +250,9 @@ impl S3Sink {
         // static credentials.
         #[cfg(not(test))]
         {
-            crate::sinks::util::rusoto::create_client::<S3Client>(region, _assume_role, resolver)
+            let client = rusoto::client(resolver)?;
+            let creds = rusoto::AwsCredentialsProvider::new(&region, _assume_role)?;
+            Ok(S3Client::new_with(client, creds, region))
         }
 
         #[cfg(test)]
@@ -258,7 +260,7 @@ impl S3Sink {
             use rusoto_credential::StaticProvider;
 
             let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-            let d = crate::sinks::util::rusoto::base_client(resolver)?;
+            let d = rusoto::client(resolver)?;
 
             Ok(S3Client::new_with(d, p, region))
         }

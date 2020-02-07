@@ -1,11 +1,15 @@
 use crate::dns::Resolver;
+use futures::{future::Future, Poll};
 use hyper::client::connect::HttpConnector;
 use hyper_openssl::{
     openssl::ssl::{SslConnector, SslMethod},
     HttpsConnector,
 };
 use rusoto_core::{CredentialsError, HttpClient, Region};
-use rusoto_credential::{DefaultCredentialsProvider, ProvideAwsCredentials};
+use rusoto_credential::{
+    AutoRefreshingProvider, AutoRefreshingProviderFuture, AwsCredentials,
+    DefaultCredentialsProvider, DefaultCredentialsProviderFuture, ProvideAwsCredentials,
+};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
 
@@ -17,7 +21,63 @@ enum RusotoError {
     InvalidAWSCredentials { source: CredentialsError },
 }
 
-pub fn base_client(resolver: Resolver) -> crate::Result<Client> {
+// A place-holder for the types of AWS credentials we support
+pub enum AwsCredentialsProvider {
+    Default(DefaultCredentialsProvider),
+    Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
+}
+
+impl AwsCredentialsProvider {
+    pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
+        if let Some(role) = assume_role {
+            let sts = StsClient::new(region.clone());
+
+            let provider = StsAssumeRoleSessionCredentialsProvider::new(
+                sts,
+                role,
+                "default".to_owned(),
+                None,
+                None,
+                None,
+                None,
+            );
+
+            let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
+            Ok(Self::Role(creds))
+        } else {
+            let creds = DefaultCredentialsProvider::new().context(InvalidAWSCredentials)?;
+            Ok(Self::Default(creds))
+        }
+    }
+}
+
+impl ProvideAwsCredentials for AwsCredentialsProvider {
+    type Future = AwsCredentialsProviderFuture;
+    fn credentials(&self) -> Self::Future {
+        match self {
+            Self::Default(p) => AwsCredentialsProviderFuture::Default(p.credentials()),
+            Self::Role(p) => AwsCredentialsProviderFuture::Role(p.credentials()),
+        }
+    }
+}
+
+pub enum AwsCredentialsProviderFuture {
+    Default(DefaultCredentialsProviderFuture),
+    Role(AutoRefreshingProviderFuture<StsAssumeRoleSessionCredentialsProvider>),
+}
+
+impl Future for AwsCredentialsProviderFuture {
+    type Item = AwsCredentials;
+    type Error = CredentialsError;
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        match self {
+            Self::Default(f) => f.poll(),
+            Self::Role(f) => f.poll(),
+        }
+    }
+}
+
+pub fn client(resolver: Resolver) -> crate::Result<Client> {
     let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
@@ -26,60 +86,3 @@ pub fn base_client(resolver: Resolver) -> crate::Result<Client> {
 
     Ok(HttpClient::from_connector(https))
 }
-
-pub trait RusotoNewClient {
-    fn new_client<P>(client: Client, credentials_provider: P, region: Region) -> Self
-    where
-        P: ProvideAwsCredentials + Send + Sync + 'static,
-        P::Future: Send;
-}
-
-pub fn create_client<T: RusotoNewClient>(
-    region: Region,
-    assume_role: Option<String>,
-    resolver: Resolver,
-) -> crate::Result<T> {
-    let client = base_client(resolver)?;
-
-    if let Some(role) = assume_role {
-        let sts = StsClient::new(region.clone());
-
-        let provider = StsAssumeRoleSessionCredentialsProvider::new(
-            sts,
-            role,
-            "default".to_owned(),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let creds = rusoto_credential::AutoRefreshingProvider::new(provider)
-            .context(InvalidAWSCredentials)?;
-        Ok(T::new_client(client, creds, region))
-    } else {
-        let creds = DefaultCredentialsProvider::new().context(InvalidAWSCredentials)?;
-        Ok(T::new_client(client, creds, region))
-    }
-}
-
-macro_rules! impl_new_client {
-    ( $ty:ty ) => {
-        impl RusotoNewClient for $ty {
-            fn new_client<P>(client: Client, creds: P, region: Region) -> Self
-            where
-                P: ProvideAwsCredentials + Send + Sync + 'static,
-                P::Future: Send,
-            {
-                Self::new_with(client, creds, region)
-            }
-        }
-    };
-}
-
-// Can't do a blanket impl, as the `new_with` method is not in a trait.
-impl_new_client! {rusoto_cloudwatch::CloudWatchClient}
-impl_new_client! {rusoto_firehose::KinesisFirehoseClient}
-impl_new_client! {rusoto_logs::CloudWatchLogsClient}
-impl_new_client! {rusoto_kinesis::KinesisClient}
-impl_new_client! {rusoto_s3::S3Client}

@@ -3,7 +3,9 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        retries::RetryLogic,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -133,7 +135,10 @@ impl CloudWatchMetricsSvc {
         } else {
             region
         };
-        rusoto::create_client::<CloudWatchClient>(region, assume_role, resolver)
+        let d = rusoto::client(resolver)?;
+        let p = AwsCredentialsProvider::new(&region, assume_role)?;
+
+        Ok(CloudWatchClient::new_with(d, p, region))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {

@@ -3,7 +3,9 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, rusoto::create_client, BatchEventsConfig, SinkExt, TowerRequestConfig,
+        retries::RetryLogic,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -11,7 +13,7 @@ use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rand::random;
-use rusoto_core::{RusotoError, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_kinesis::{
     Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
@@ -87,7 +89,7 @@ impl KinesisService {
         config: KinesisSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(create_client::<KinesisClient>(
+        let client = Arc::new(create_client(
             config.region.clone().try_into()?,
             config.assume_role.clone(),
             cx.resolver(),
@@ -176,7 +178,7 @@ enum HealthcheckError {
 }
 
 fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
-    let client = create_client::<KinesisClient>(
+    let client = create_client(
         config.region.try_into()?,
         config.assume_role.clone(),
         resolver,
@@ -203,6 +205,16 @@ fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<s
         });
 
     Ok(Box::new(fut))
+}
+
+fn create_client(
+    region: Region,
+    assume_role: Option<String>,
+    resolver: Resolver,
+) -> crate::Result<KinesisClient> {
+    let client = rusoto::client(resolver)?;
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    Ok(KinesisClient::new_with(client, creds, region))
 }
 
 fn encode_event(

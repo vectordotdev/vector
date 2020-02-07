@@ -3,14 +3,16 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, rusoto::create_client, BatchEventsConfig, SinkExt, TowerRequestConfig,
+        retries::RetryLogic,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{RusotoError, RusotoFuture};
+use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_firehose::{
     DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
     PutRecordBatchInput, PutRecordBatchOutput, Record,
@@ -84,7 +86,7 @@ impl KinesisFirehoseService {
         config: KinesisFirehoseSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = create_client::<KinesisFirehoseClient>(
+        let client = create_client(
             config.region.clone().try_into()?,
             config.assume_role.clone(),
             cx.resolver(),
@@ -170,11 +172,7 @@ fn healthcheck(
     config: KinesisFirehoseSinkConfig,
     resolver: Resolver,
 ) -> crate::Result<super::Healthcheck> {
-    let client = create_client::<KinesisFirehoseClient>(
-        config.region.try_into()?,
-        config.assume_role,
-        resolver,
-    )?;
+    let client = create_client(config.region.try_into()?, config.assume_role, resolver)?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -194,6 +192,17 @@ fn healthcheck(
         });
 
     Ok(Box::new(fut))
+}
+
+fn create_client(
+    region: Region,
+    assume_role: Option<String>,
+    resolver: Resolver,
+) -> crate::Result<KinesisFirehoseClient> {
+    let client = rusoto::client(resolver)?;
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+
+    Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
