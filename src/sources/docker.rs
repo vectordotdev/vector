@@ -9,13 +9,14 @@ use futures::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
+use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
     rep::ContainerDetails,
     tty::{Chunk, StreamType},
-    Docker,
+    Docker, Error,
 };
 use std::borrow::Borrow;
 use std::sync::Arc;
@@ -582,9 +583,19 @@ impl EventStreamBuilder {
                         Ok(Async::Ready(None)) => break,
                         Ok(Async::NotReady) => Ok(Async::NotReady),
                         Err(error) => {
-                            error!(message = "docker API container logging error",%error);
-                            // On any error, restart connection
-                            break;
+                            match error {
+                                Error::Fault { code, .. } if code == StatusCode::NOT_IMPLEMENTED => {
+                                    error!(r#"docker engine is not using either `jsonfile` or `journald`
+                                            logging driver. Please enable one of these logging drivers
+                                            to get logs from the docker daemon."#);
+                                    break;
+                                }
+                                error => {
+                                    error!(message = "docker API container logging error",%error);
+                                    // On any error, restart connection
+                                    break;
+                                }
+                            }
                         }
                     };
                 }

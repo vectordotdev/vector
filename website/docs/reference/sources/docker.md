@@ -425,6 +425,16 @@ situations if your current user is able to run `docker ps` then Vector will be a
 connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
 use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].
 
+### Docker logging drivers
+
+Docker out of the box supports multiple "logging drivers" which built in log
+shippers. These drivers are run by the docker daemon and can be configured via the `daemon.json`
+config file. Vector's docker source only supports the `json-file` and `journald` logging driver which
+are both available with docker community edition. By default, docker selects `json-file` for out of the box
+logging driver. If another driver has been setup then Vector's docker source will be unable to collect logs
+from the daemon. You can read more about docker logging drivers
+[here](https://docs.docker.com/config/containers/logging/configure/).
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
