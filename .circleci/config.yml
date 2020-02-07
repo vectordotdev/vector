@@ -330,6 +330,7 @@ jobs:
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "default-musl"
+            DOCKER_PRIVILEGED: "true"
           command: |
             ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build-archive package-deb
       - persist_to_workspace:
@@ -348,6 +349,7 @@ jobs:
           environment:
             PASS_RUST_LTO: "lto"
             PASS_FEATURES: "default-musl"
+            DOCKER_PRIVILEGED: "true"
           command: |
             ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build-archive package-deb
       - persist_to_workspace:
@@ -409,6 +411,7 @@ jobs:
             ./scripts/docker-run.sh packager-rpm make package-rpm
           environment:
             PASS_TARGET: aarch64-unknown-linux-musl
+            DOCKER_PRIVILEGED: "true"
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -425,6 +428,7 @@ jobs:
             ./scripts/docker-run.sh packager-rpm make package-rpm
           environment:
             PASS_TARGET: armv7-unknown-linux-musleabihf
+            DOCKER_PRIVILEGED: "true"
             PASS_ARCH: armv7hl
       - persist_to_workspace:
           root: target/artifacts
