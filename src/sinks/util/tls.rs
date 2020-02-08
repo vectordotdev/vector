@@ -109,7 +109,7 @@ impl TlsSettings {
                 match Identity::from_pkcs12(&cert_data, key_pass) {
                     Ok(_) => Some(IdentityStore(cert_data, key_pass.to_string())),
                     Err(err) => {
-                        if options.key_path.is_some() {
+                        if options.key_path.is_none() {
                             return Err(err.into());
                         }
                         let crt = load_x509(crt_path)?;
@@ -217,4 +217,47 @@ fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
         .with_context(|| FileReadFailed { note, filename })?;
 
     Ok(text)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn from_options_pkcs12() {
+        let options = TlsOptions {
+            crt_path: Some("tests/data/localhost.p12".into()),
+            key_pass: Some("NOPASS".into()),
+            ..Default::default()
+        };
+        let settings =
+            TlsSettings::from_options(&Some(options)).expect("Failed to load PKCS#12 certificate");
+        assert!(settings.identity.is_some());
+        assert!(settings.authority.is_none());
+    }
+
+    #[test]
+    fn from_options_pem() {
+        let options = TlsOptions {
+            crt_path: Some("tests/data/localhost.crt".into()),
+            key_path: Some("tests/data/localhost.key".into()),
+            ..Default::default()
+        };
+        let settings =
+            TlsSettings::from_options(&Some(options)).expect("Failed to load PEM certificate");
+        assert!(settings.identity.is_some());
+        assert!(settings.authority.is_none());
+    }
+
+    #[test]
+    fn from_options_ca() {
+        let options = TlsOptions {
+            ca_path: Some("tests/data/Vector_CA.crt".into()),
+            ..Default::default()
+        };
+        let settings = TlsSettings::from_options(&Some(options))
+            .expect("Failed to load authority certificate");
+        assert!(settings.identity.is_none());
+        assert!(settings.authority.is_some());
+    }
 }
