@@ -818,7 +818,6 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - verify-deb-artifact-on-ubuntu-19-04
     - verify-zip-artifact-on-wine
     - verify-docker
-    - verify-nixos
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
@@ -898,8 +897,6 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos:
-          <<: *prerelease-filters
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
@@ -989,8 +986,6 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos:
-          <<: *release-filters
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
@@ -1086,7 +1081,6 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
