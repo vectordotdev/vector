@@ -1817,6 +1817,13 @@ end
   # * relevant when host = ""
   region = "us-east-1"
 
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -1888,6 +1895,13 @@ end
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -2077,6 +2091,13 @@ end
   # * required
   # * type: string
   stream_name = "my-stream"
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -2273,6 +2294,13 @@ end
   # * type: string
   # * relevant when host = ""
   region = "us-east-1"
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
