@@ -9,8 +9,8 @@ function Fields({children, filters}) {
 
   let childrenArray = [];
 
-  if (children && !Array.isArray(children)) {
-    childrenArray = [children];
+  if (children) {
+    childrenArray = Array.isArray(children) ? children : [children];
   }
 
   let commonRelevant = childrenArray.some(child => child.props.common);
