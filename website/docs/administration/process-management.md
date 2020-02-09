@@ -103,7 +103,7 @@ test
 | `-t, --threads` | Limits the number of internal threads Vector can spawn. See the [Limiting Resources][docs.roles.agent#limiting-resources] in the [Agent role][docs.roles.agent] documentation. |
 | `-v, --verbose` | Drops the log level to `debug`. |
 | `-vv` | Drops the log level to `trace`, the lowest level possible. |
-| `-w, --watch-config` | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. |
+| `-w, --watch-config` | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |
 
 ### Daemonizing
 
