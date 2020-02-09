@@ -102,6 +102,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sinks.my_sink_id.query]
     X-Powered-By = "Vector" # example
 
+  # OPTIONAL - Request
+  [sinks.my_sink_id.request]
+    in_flight_limit = 5 # default, requests
+    rate_limit_duration_secs = 1 # default, seconds
+    rate_limit_num = 5 # default
+    retry_attempts = -1 # default
+    retry_initial_backoff_secs = 1 # default, seconds
+    retry_max_duration_secs = 10 # default, seconds
+    timeout_secs = 60 # default, seconds
+
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
@@ -590,6 +600,186 @@ A custom parameter to be added to each Elasticsearch request.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### request
+
+Configures the sink request behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"in_flight_limit"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"requests"}
+  >
+
+#### in_flight_limit
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### rate_limit_duration_secs
+
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"rate_limit_num"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+#### rate_limit_num
+
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={-1}
+  enumValues={null}
+  examples={[-1]}
+  name={"retry_attempts"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+#### retry_attempts
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"retry_initial_backoff_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### retry_initial_backoff_secs
+
+The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time, in seconds, to wait between retries.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={60}
+  enumValues={null}
+  examples={[60]}
+  name={"timeout_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### timeout_secs
+
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -897,6 +1087,27 @@ document][docs.data_model].
 
 
 
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the [`rate_limit_duration_secs`](#rate_limit_duration_secs) and
+`rate_limit_num` options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the [`in_flight_limit`](#in_flight_limit) option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][urls.new_elasticsearch_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
+`retry_backoff_secs` options.
+
 ### Template Syntax
 
 The [`index`](#index) options
@@ -934,4 +1145,5 @@ You can read more about the complete syntax in the
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

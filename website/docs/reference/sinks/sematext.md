@@ -70,6 +70,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   host = "http://127.0.0.1" # example, no default
   region = "na" # example, no default
 
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 10490000 # default, bytes
+    timeout_secs = 1 # default, seconds
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     # OPTIONAL
@@ -79,6 +84,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Request
+  [sinks.my_sink_id.request]
+    in_flight_limit = 5 # default, requests
+    rate_limit_duration_secs = 1 # default, seconds
+    rate_limit_num = 5 # default
+    retry_attempts = -1 # default
+    retry_initial_backoff_secs = 1 # default, seconds
+    retry_max_duration_secs = 10 # default, seconds
+    timeout_secs = 60 # default, seconds
 ```
 
 </TabItem>
@@ -93,6 +108,76 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={10490000}
+  enumValues={null}
+  examples={[10490000]}
+  name={"max_size"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  >
+
+#### max_size
+
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"timeout_secs"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### timeout_secs
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
 
 
 <Field
@@ -154,7 +239,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 #### max_size
 
-The maximum size of the buffer on the disk.
+The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -276,6 +361,186 @@ The region destination to send logs to. This option is required if [`host`](#hos
 
 
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"request"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### request
+
+Configures the sink request behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"in_flight_limit"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"requests"}
+  >
+
+#### in_flight_limit
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"rate_limit_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### rate_limit_duration_secs
+
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={5}
+  enumValues={null}
+  examples={[5]}
+  name={"rate_limit_num"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+#### rate_limit_num
+
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={-1}
+  enumValues={null}
+  examples={[-1]}
+  name={"retry_attempts"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+#### retry_attempts
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"retry_initial_backoff_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### retry_initial_backoff_secs
+
+The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={10}
+  enumValues={null}
+  examples={[10]}
+  name={"retry_max_duration_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### retry_max_duration_secs
+
+The maximum amount of time, in seconds, to wait between retries.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={60}
+  enumValues={null}
+  examples={[60]}
+  name={"timeout_secs"}
+  path={"request"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### timeout_secs
+
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -301,16 +566,24 @@ The token that will be used to write to Sematext.
 
 ## How It Works
 
-### Buffers
+### Buffers & Batches
 
 import SVG from 'react-inlinesvg';
 
-<SVG src="/img/buffers.svg" />
+<SVG src="/img/buffers-and-batches-serial.svg" />
 
-The `sematext` sink buffers events as shown in
-the diagram above. This helps to smooth out data processing if the downstream
-service applies backpressure. Buffers are controlled via the
-[`buffer.*`](#buffer) options.
+The `sematext` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
+
+*Batches* are flushed when 1 of 2 conditions are met:
+
+1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
+2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
 ### Environment Variables
 
@@ -349,9 +622,32 @@ If you'd like to disable health checks for this sink you can set the
 2. [Create a Logs App](https://apps.sematext.com/ui/integrations) to get a Logs Token
 for [Sematext Logs](http://www.sematext.com/logsene/)
 
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the [`rate_limit_duration_secs`](#rate_limit_duration_secs) and
+`rate_limit_num` options to ensure Vector does not exceed the specified
+number of requests in the specified window. You can further control the pace at
+which this window is saturated with the [`in_flight_limit`](#in_flight_limit) option, which
+will guarantee no more than the specified number of requests are in-flight at
+any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][urls.new_sematext_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
+`retry_backoff_secs` options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
+[docs.guarantees]: /docs/about/guarantees/
+[urls.new_sematext_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+sematext
 [urls.sematext]: https://sematext.com
 [urls.sematext_es]: https://sematext.com/docs/logs/index-events-via-elasticsearch-api/

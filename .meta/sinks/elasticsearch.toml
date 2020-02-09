@@ -20,7 +20,7 @@ write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API
 
 <%= render(
   "_partials/_request_options.toml",
-  namespace: "sinks.datadog_metrics.options",
+  namespace: "sinks.elasticsearch.options",
   common: false,
   in_flight_limit: 5,
   rate_limit_duration_secs: 1,

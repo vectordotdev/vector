@@ -58,13 +58,13 @@ class Metadata
       def load_metadata!(meta_dir)
         metadata = {}
 
-        Dir.glob("#{meta_dir}/**/[^_]*.toml").each do |file|
-          content = Template.render(file)
-          hash = TomlRB.parse(content)
-          metadata.deep_merge!(hash)
-        end
+        contents =
+          Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
+            Template.render(file)
+          end
 
-        metadata
+        content = contents.join("\n")
+        TomlRB.parse(content)
       end
 
       def posts
