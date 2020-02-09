@@ -17830,7 +17830,7 @@ module.exports = {
     "vector": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through another upstream [`vector` sink][docs.sources.vector] and outputs log and metric events.",
+      "description": "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events.",
       "event_types": [
         "log",
         "metric"

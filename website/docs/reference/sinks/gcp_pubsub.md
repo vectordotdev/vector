@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, seconds
+    max_size = 1049000 # default, bytes
     timeout_secs = 1 # default, seconds
 ```
 
@@ -79,14 +79,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, seconds
+    max_size = 1049000 # default, bytes
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     # OPTIONAL
-    max_events = 500 # default, events, relevant when type = "memory"
     type = "memory" # default, enum
+    max_events = 500 # default, events, relevant when type = "memory"
     when_full = "block" # default, enum
 
     # REQUIRED
@@ -179,7 +179,7 @@ Configures the sink batching behavior.
   required={true}
   templateable={false}
   type={"int"}
-  unit={"seconds"}
+  unit={"bytes"}
   >
 
 #### max_size
@@ -283,14 +283,14 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

@@ -19,7 +19,7 @@ type = "int"
 common = <%= common %>
 default = <%= max_size %>
 required = true
-unit = "seconds"
+unit = "bytes"
 description = "The maximum size of a batch, in bytes, before it is flushed."
 <%- end -%>
 

@@ -1667,7 +1667,7 @@ end
     # * required
     # * default: 1049000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
@@ -1683,6 +1683,15 @@ end
   #
 
   [sinks.aws_cloudwatch_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -1699,15 +1708,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -1944,6 +1944,15 @@ end
   #
 
   [sinks.aws_kinesis_firehose.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -1960,15 +1969,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -2132,6 +2132,15 @@ end
   #
 
   [sinks.aws_kinesis_streams.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -2148,15 +2157,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -2450,7 +2450,7 @@ end
     # * required
     # * default: 10490000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 10490000
 
     # The maximum age of a batch before it is flushed.
@@ -2466,6 +2466,15 @@ end
   #
 
   [sinks.aws_s3.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -2482,15 +2491,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -2696,7 +2696,7 @@ end
     # * required
     # * default: 1049000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
@@ -2712,6 +2712,15 @@ end
   #
 
   [sinks.clickhouse.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -2728,15 +2737,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3147,7 +3147,7 @@ end
     # * required
     # * default: 10490000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 10490000
 
     # The maximum age of a batch before it is flushed.
@@ -3163,6 +3163,15 @@ end
   #
 
   [sinks.elasticsearch.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -3179,15 +3188,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3404,7 +3404,7 @@ end
     # * required
     # * default: 1049000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
@@ -3420,6 +3420,15 @@ end
   #
 
   [sinks.gcp_pubsub.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -3436,15 +3445,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3670,6 +3670,15 @@ end
   #
 
   [sinks.gcp_stackdriver_logging.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -3686,15 +3695,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3955,6 +3955,15 @@ end
   #
 
   [sinks.http.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -3971,15 +3980,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4192,6 +4192,15 @@ end
   #
 
   [sinks.kafka.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -4208,15 +4217,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4363,7 +4363,7 @@ end
     # * required
     # * default: 10490000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 10490000
 
     # The maximum age of a batch before it is flushed.
@@ -4379,6 +4379,15 @@ end
   #
 
   [sinks.logdna.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -4395,15 +4404,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4542,7 +4542,7 @@ end
     # * required
     # * default: 524000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 524000
 
     # The maximum age of a batch before it is flushed.
@@ -4558,6 +4558,15 @@ end
   #
 
   [sinks.new_relic_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -4574,15 +4583,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4769,6 +4769,15 @@ end
   #
 
   [sinks.sematext.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -4785,15 +4794,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4871,6 +4871,15 @@ end
   #
 
   [sinks.socket.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -4887,15 +4896,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5044,7 +5044,7 @@ end
     # * required
     # * default: 1049000
     # * type: int
-    # * unit: seconds
+    # * unit: bytes
     max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
@@ -5060,6 +5060,15 @@ end
   #
 
   [sinks.splunk_hec.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -5076,15 +5085,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5296,6 +5296,15 @@ end
   #
 
   [sinks.vector.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * required
@@ -5312,15 +5321,6 @@ end
     # * unit: bytes
     # * relevant when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
