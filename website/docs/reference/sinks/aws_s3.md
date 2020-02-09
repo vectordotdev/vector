@@ -56,6 +56,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
+
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
+  # OPTIONAL - General
+  healthcheck = true # default
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 10490000 # default, seconds
+    timeout_secs = 300 # default, seconds
 ```
 
 </TabItem>
@@ -78,6 +89,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
 
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
   # OPTIONAL - General
   endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
@@ -89,32 +103,32 @@ import CodeHeader from '@site/src/components/CodeHeader';
   grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
   grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
   server_side_encryption = "AES256" # example, no default, enum
-  ssekms_key_id = nil # example, no default
+  ssekms_key_id = "abcd1234" # example, no default
   storage_class = "STANDARD" # example, no default, enum
   [sinks.my_sink_id.tags]
     Tag1 = "Value1" # example
 
-  # OPTIONAL - requests
-  encoding = "ndjson" # example, no default, enum
-
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = 10490000 # default, bytes
+    max_size = 10490000 # default, seconds
     timeout_secs = 300 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum
+    # OPTIONAL
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    type = "memory" # default, enum
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
+    in_flight_limit = 5 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 5 # default
-    retry_attempts = 5 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 30 # default, seconds
@@ -156,7 +170,7 @@ Canned ACL to apply to the created objects. For more information, see [Canned AC
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -184,15 +198,15 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
-  unit={"bytes"}
+  unit={"seconds"}
   >
 
 #### max_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -206,7 +220,7 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -263,20 +277,20 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -291,14 +305,14 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -315,7 +329,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 <Field
   common={false}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
@@ -328,7 +342,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -384,14 +398,14 @@ The compression mechanism to use.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -582,7 +596,7 @@ Allows the named [grantee][urls.aws_s3_grantee] to write the created objects' AC
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -679,7 +693,7 @@ Configures the sink request behavior.
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -706,7 +720,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -728,7 +742,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -736,9 +750,9 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={-1}
   enumValues={null}
-  examples={[5]}
+  examples={[-1]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -794,7 +808,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -853,7 +867,7 @@ The server-side encryption algorithm used when storing these objects. See [Serve
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["abcd1234"]}
   name={"ssekms_key_id"}
   path={null}
   relevantWhen={null}
@@ -1014,7 +1028,6 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
-
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';

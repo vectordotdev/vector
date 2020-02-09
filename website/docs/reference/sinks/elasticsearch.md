@@ -51,6 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL
   doc_type = "_doc" # default
   index = "vector-%F" # default
+  healthcheck = true # default
   host = "http://10.24.32.122:9000" # example, no default
 ```
 
@@ -79,15 +80,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = 10490000 # default, bytes
+    max_size = 10490000 # default, seconds
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum
+    # OPTIONAL
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
+    type = "memory" # default, enum
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
@@ -98,21 +102,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sinks.my_sink_id.query]
     X-Powered-By = "Vector" # example
 
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = 5 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
-
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "PassWord1" # example, no default
+    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
     verify_hostname = true # default
@@ -245,36 +239,36 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
-  unit={"bytes"}
+  unit={"seconds"}
   >
 
 #### max_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -309,20 +303,20 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -337,14 +331,14 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -361,7 +355,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 <Field
   common={false}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
@@ -374,7 +368,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -478,7 +472,7 @@ A custom header to be added to each outgoing Elasticsearch request.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -596,186 +590,6 @@ A custom parameter to be added to each Elasticsearch request.
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  name={"request"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### request
-
-Configures the sink request behavior.
-
-<Fields filters={false}>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"in_flight_limit"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### in_flight_limit
-
-The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  name={"rate_limit_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### rate_limit_duration_secs
-
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"rate_limit_num"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### rate_limit_num
-
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={5}
-  enumValues={null}
-  examples={[5]}
-  name={"retry_attempts"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={null}
-  >
-
-#### retry_attempts
-
-The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  name={"retry_initial_backoff_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### retry_initial_backoff_secs
-
-The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={10}
-  enumValues={null}
-  examples={[10]}
-  name={"retry_max_duration_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### retry_max_duration_secs
-
-The maximum amount of time to wait between retries.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={60}
-  enumValues={null}
-  examples={[60]}
-  name={"timeout_secs"}
-  path={"request"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  >
-
-#### timeout_secs
-
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-
-
-</Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -840,7 +654,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["PassWord1"]}
+  examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -852,7 +666,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
 
 
 </Field>
@@ -1025,7 +839,6 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
-
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';
@@ -1084,27 +897,6 @@ document][docs.data_model].
 
 
 
-### Rate Limits
-
-Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the [`rate_limit_duration_secs`](#rate_limit_duration_secs) and
-`rate_limit_num` options to ensure Vector does not exceed the specified
-number of requests in the specified window. You can further control the pace at
-which this window is saturated with the [`in_flight_limit`](#in_flight_limit) option, which
-will guarantee no more than the specified number of requests are in-flight at
-any given time.
-
-Please note, Vector's defaults are carefully chosen and it should be rare that
-you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_elasticsearch_sink_issue].
-
-### Retry Policy
-
-Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
-Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
-`retry_backoff_secs` options.
-
 ### Template Syntax
 
 The [`index`](#index) options
@@ -1142,5 +934,4 @@ You can read more about the complete syntax in the
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

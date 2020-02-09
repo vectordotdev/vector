@@ -121,13 +121,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -139,13 +143,17 @@ The raw log message, unaltered.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"splunk_channel"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### splunk_channel
@@ -157,13 +165,17 @@ The Splunk channel, value of the `X-Splunk-Request-Channel` header.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp

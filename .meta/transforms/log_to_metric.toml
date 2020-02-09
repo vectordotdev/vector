@@ -7,6 +7,8 @@ function_category = "convert"
 input_types = ["log"]
 output_types = ["metric"]
 
+<%= render("_partials/_component_options.toml", type: "transform", name: "log_to_metric") %>
+
 [transforms.log_to_metric.options.metrics]
 type = "[table]"
 common = true
@@ -16,26 +18,26 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.log_to_metric.options.metrics.options.type]
+[transforms.log_to_metric.options.metrics.children.type]
 type = "string"
 required = true
 common = true
 description = "The metric type."
 
-[transforms.log_to_metric.options.metrics.options.type.enum]
+[transforms.log_to_metric.options.metrics.children.type.enum]
 counter = "A [counter metric type][docs.data-model.metric#counter]."
 gauge = "A [gauge metric type][docs.data-model.metric#gauge]."
 histogram = "A [distribution metric type][docs.data-model.metric#distribution]."
 set = "A [set metric type][docs.data-model.metric#set]."
 
-[transforms.log_to_metric.options.metrics.options.field]
+[transforms.log_to_metric.options.metrics.children.field]
 type = "string"
 examples = ["duration"]
 required = true
 common = true
 description = "The log field to use as the metric."
 
-[transforms.log_to_metric.options.metrics.options.increment_by_value]
+[transforms.log_to_metric.options.metrics.children.increment_by_value]
 type = "bool"
 default = false
 required = true
@@ -45,7 +47,7 @@ If `true` the metric will be incremented by the `field` value. If `false` \
 the metric will be incremented by 1 regardless of the `field` value.\
 """
 
-[transforms.log_to_metric.options.metrics.options.name]
+[transforms.log_to_metric.options.metrics.children.name]
 type = "string"
 examples = ["duration_total"]
 required = true
@@ -55,13 +57,13 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
 """
 
-[transforms.log_to_metric.options.metrics.options.tags]
+[transforms.log_to_metric.options.metrics.children.tags]
 type = "table"
 display = "inline"
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
-[transforms.log_to_metric.options.metrics.options.tags.options."`[tag-name]`"]
+[transforms.log_to_metric.options.metrics.children.tags.children."`[tag-name]`"]
 type = "string"
 examples = [
   {"host" = "${HOSTNAME}"},

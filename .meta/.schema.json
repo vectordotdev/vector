@@ -42,20 +42,27 @@
         "enum": ["log", "metric"]
       }
     },
-    "operating_systems": {
-      "type": "string",
-      "description": "A list of Vector support operating systems.",
-      "enum": ["Linux", "MacOS", "Windows"]
-    },
-    "option": {
+    "fields": {
       "type": "object",
-      "description": "A Vector option, such as a component option, environment variable, etc.",
+      "description": "An object of fields keyed by the field's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/field"
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "description": "A Vector field, such as a component option, environment variable, log schema field, etc.",
       "additionalProperties": false,
       "required": ["description", "type"],
       "properties": {
         "category": {
           "type": "string",
-          "description": "The object category. This will group the option with other related category options."
+          "description": "The field category. This will group the option with other related category options."
+        },
+        "children": {
+          "$ref": "#/definitions/fields"
         },
         "common": {
           "type": "boolean",
@@ -88,9 +95,6 @@
           "type": "array",
           "description": "An array of example values used for documentation purposes."
         },
-        "options": {
-          "$ref": "#/definitions/options"
-        },
         "partition_key": {
           "type": "boolean",
           "description": "If this option can be used to partition data. For example, the `path` option in the `aws_s3` sink."
@@ -118,6 +122,7 @@
             "bool",
             "int",
             "string",
+            "struct",
             "table",
             "[float]",
             "[string]",
@@ -127,17 +132,16 @@
         "unit": {
           "type": "string",
           "description": "The unit of measurement for the option value",
-          "enum": ["bytes", "milliseconds", "seconds"]
+          "enum": ["bytes", "events", "milliseconds", "requests", "seconds"]
         }
       }
     },
-    "options": {
-      "type": "object",
-      "description": "An object of options keyed by the option's name.",
-      "patternProperties": {
-        "^[a-z0-9_]+$": {
-          "$ref": "#/definitions/option"
-        }
+    "operating_systems": {
+      "type": "array",
+      "description": "A list of Vector support operating systems.",
+      "items": {
+        "type": "string",
+        "enum": ["Linux", "MacOS", "Windows"]
       }
     },
     "output": {
@@ -162,6 +166,8 @@
               }
             }
           }
+        },
+        "fields": {
         }
       }
     },
@@ -184,7 +190,6 @@
             "egress_method": { "const": "batching" }
           },
           "required": [
-            "batch_timeout_secs"
           ]
         },
         {
@@ -201,44 +206,13 @@
         }
       ],
       "properties": {
-        "batch_is_common": {
-          "type": "boolean",
-          "description": "Should all of the batch option sbe set as `common`?"
-        },
-        "batch_max_events": {
-          "type": "integer",
-          "description": "The maximum number of events allowed in the batch.",
-          "minimum": 1
-        },
-        "batch_max_size": {
-          "type": "integer",
-          "description": "The maximum batch size in bytes.",
-          "minimum": 1
-        },
-        "batch_timeout_secs": {
-          "type": "integer",
-          "description": "The maximum time a batch can live before being flushed.",
-          "minimum": 1
-        },
         "beta": {
           "type": "boolean",
           "description": "Is this component in beta status?"
         },
-        "buffer": {
-          "type": "boolean",
-          "description": "Does this sink allow buffering?"
-        },
         "common": {
           "type": "boolean",
           "description": "Is this sink common? Shold it be highlighted in a list of all sinks?"
-        },
-        "compressions": {
-          "type": "array",
-          "description": "The compression methods available, if applicable.",
-          "items": {
-            "type": "string",
-            "enum": ["gzip"]
-          }
         },
         "delivery_guarantee": {
           "type": "string",
@@ -250,16 +224,8 @@
           "description": "The sink's egress method.",
           "enum": ["batching", "exposing", "streaming"]
         },
-        "encodings": {
-          "type": "array",
-          "description": "The encodings offered by the sink. How the output is encoded.",
-          "items": {
-            "type": "string",
-            "enum": ["json", "ndjson", "text"]
-          }
-        },
         "env_vars": {
-          "$ref": "#/definitions/options",
+          "$ref": "#/definitions/fields",
           "description": "The environment variables supported by this source, keyed by the variables's name."
         },
         "function_category": {
@@ -284,47 +250,12 @@
           }
         },
         "options": {
-          "$ref": "#/definitions/options",
+          "$ref": "#/definitions/fields",
           "description": "The options provided by this sink, keyed by the option's name."
         },
         "output": {
           "$ref": "#/definitions/output",
           "description": "Output examples of this sink."
-        },
-        "request_rate_limit_duration_secs": {
-          "type": "integer",
-          "description": "The request rate limit duration window.",
-          "minimum": 1
-        },
-        "request_rate_limit_num": {
-          "type": "integer",
-          "description": "The request limit allow in the rate limit window.",
-          "minimum": 1
-        },
-        "request_retry_attempts": {
-          "type": "integer",
-          "description": "The number of retry attempts allowed.",
-          "minimum": 1
-        },
-        "request_retry_initial_backoff_secs": {
-          "type": "integer",
-          "description": "The number of seconds to backoff on the first retry.",
-          "minimum": 1
-        },
-        "request_retry_max_duration_secs": {
-          "type": "integer",
-          "description": "The maximum number of seconds to backoff after repeated retries.",
-          "minimum": 1
-        },
-        "request_in_flight_limit": {
-          "type": "integer",
-          "description": "The maximum number of requests allowed to be in-flight at one time.",
-          "minimum": 1
-        },
-        "request_timeout_secs": {
-          "type": "integer",
-          "description": "The maximum time a request can take to complete.",
-          "minimum": 1
         },
         "service_limits_short_link": {
           "type": "string",
@@ -352,14 +283,6 @@
           "description": "Short title for the sink",
           "minLength": 1,
           "max_lenfth": 50
-        },
-        "tls_options": {
-          "type": "array",
-          "description": "Allowed TLS options, used for quick TLS option building.",
-          "items": {
-            "type": "string",
-            "enum": ["+enabled", "-verify"]
-          }
         },
         "write_to_description": {
           "type": "string",
@@ -395,11 +318,11 @@
           "enum": ["at_least_once", "best_effort"]
         },
         "env_vars": {
-          "$ref": "#/definitions/options",
+          "$ref": "#/definitions/fields",
           "description": "The environment variables supported by this source, keyed by the variables's name."
         },
         "except_operating_systems": {
-          "#ref": "#/definitions/operating_systems",
+          "$ref": "#/definitions/operating_systems",
           "description": "A blacklist of operating systems not supported by this source."
         },
         "function_category": {
@@ -412,11 +335,11 @@
           ]
         },
         "only_operating_systems": {
-          "#ref": "#/definitions/operating_systems",
+          "$ref": "#/definitions/operating_systems",
           "description": "A whitelist of operating systems supported by this source."
         },
         "options": {
-          "$ref": "#/definitions/options",
+          "$ref": "#/definitions/fields",
           "description": "Options provided by this source, keyed by the option name."
         },
         "output": {
@@ -425,10 +348,10 @@
           "additionalProperties": false,
           "properties": {
             "log": {
-              "#ref": "#/definitions/output"
+              "$ref": "#/definitions/output"
             },
             "metric": {
-              "#ref": "#/definitions/output"
+              "$ref": "#/definitions/output"
             }
           }
         },
@@ -478,7 +401,7 @@
           "description": "Is this a common transform that should be highlighted in a full list of transforms?"
         },
         "env_vars": {
-          "$ref": "#/definitions/options",
+          "$ref": "#/definitions/fields",
           "description": "A list of supported environment variables by this transform."
         },
         "function_category": {
@@ -500,7 +423,7 @@
           "description": "The types of events that this transform can receive."
         },
         "options": {
-          "$ref": "#/definitions/options",
+          "$ref": "#/definitions/fields",
           "description": "The options provided by this transform, keyed by the option name."
         },
         "output": {
@@ -509,10 +432,10 @@
           "additionalProperties": false,
           "properties": {
             "log": {
-              "#ref": "#/definitions/output"
+              "$ref": "#/definitions/output"
             },
             "metric": {
-              "#ref": "#/definitions/output"
+              "$ref": "#/definitions/output"
             }
           }
         },

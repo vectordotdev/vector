@@ -44,10 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example, relevant when host = ""
+
+  # OPTIONAL
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -57,15 +61,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
   region = "us-east-1" # example, relevant when host = ""
 
-  # OPTIONAL
+  # OPTIONAL - General
   endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_events = 20 # default, events
+    timeout_secs = 1 # default, seconds
 ```
 
 </TabItem>
@@ -79,6 +88,76 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={20}
+  enumValues={null}
+  examples={[20]}
+  name={"max_events"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  >
+
+#### max_events
+
+The maximum size of a batch, in events, before it is flushed.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"timeout_secs"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### timeout_secs
+
+The maximum age of a batch before it is flushed.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
 
 
 <Field
@@ -104,7 +183,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}

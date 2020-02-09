@@ -162,13 +162,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["ami-00068cd7555f543d5"]}
   name={"ami-id"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### ami-id
@@ -180,13 +184,17 @@ The `ami-id` that the current EC2 instance is using.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["54.234.246.107"]}
   name={"availability-zone"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### availability-zone
@@ -198,13 +206,17 @@ The `availability-zone` that the current EC2 instance is running in.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["i-096fba6d03d36d262"]}
   name={"instance-id"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### instance-id
@@ -216,13 +228,17 @@ The `instance-id` of the current EC2 instance.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["ip-172-31-93-227.ec2.internal"]}
   name={"local-hostname"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### local-hostname
@@ -234,13 +250,17 @@ The `local-hostname` of the current EC2 instance.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["172.31.93.227"]}
   name={"local-ipv4"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### local-ipv4
@@ -252,13 +272,17 @@ The `local-ipv4` of the current EC2 instance.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["ec2-54-234-246-107.compute-1.amazonaws.com"]}
   name={"public-hostname"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### public-hostname
@@ -270,13 +294,17 @@ The `public-hostname` of the current EC2 instance.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["54.234.246.107"]}
   name={"public-ipv4"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### public-ipv4
@@ -288,13 +316,17 @@ The `public-ipv4` of the current EC2 instance.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
   name={"region"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### region
@@ -306,13 +338,17 @@ The [`region`](#region) that the current EC2 instance is running in.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["some_iam_role"]}
   name={"role-name"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### role-name
@@ -324,13 +360,17 @@ The `role-name` that the current EC2 instance is using.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["subnet-9d6713b9"]}
   name={"subnet-id"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### subnet-id
@@ -342,13 +382,17 @@ The `subnet-id` of the current EC2 instance's default network interface.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["vpc-a51da4dc"]}
   name={"vpc-id"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### vpc-id
