@@ -44,19 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "gcp_pubsub" # must be: "gcp_pubsub"
   inputs = ["my-source-id"] # example
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
 
-  # OPTIONAL - General
+  # OPTIONAL
   healthcheck = true # default
-
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
-    timeout_secs = 1 # default, seconds
 ```
 
 </TabItem>
@@ -79,7 +74,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
+    max_size = 10485760 # default, bytes
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
@@ -148,7 +143,7 @@ A Google Cloud API key used to authenticate access the pubsub project and topic.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -170,9 +165,9 @@ Configures the sink batching behavior.
 
 <Field
   common={true}
-  defaultValue={1049000}
+  defaultValue={10485760}
   enumValues={null}
-  examples={[1049000]}
+  examples={[10485760]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}

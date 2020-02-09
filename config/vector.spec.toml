@@ -3430,10 +3430,10 @@ end
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * required
-    # * default: 1049000
+    # * default: 10485760
     # * type: int
     # * unit: bytes
-    max_size = 1049000
+    max_size = 10485760
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3692,6 +3692,27 @@ end
   # * no default
   # * type: string
   organization_id = "622418129737"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_stackdriver_logging.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer
