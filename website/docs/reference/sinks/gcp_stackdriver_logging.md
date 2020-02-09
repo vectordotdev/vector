@@ -44,20 +44,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
   inputs = ["my-source-id"] # example
   credentials_path = "/path/to/credentials.json" # example
   log_id = "vector-logs" # example
   project_id = "vector-123456" # example
 
-  # OPTIONAL - General
+  # OPTIONAL
   healthcheck = true # default
-
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
-    timeout_secs = 1 # default, seconds
 ```
 
 </TabItem>
@@ -82,7 +77,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
+    max_size = 5242880 # default, bytes
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
@@ -138,7 +133,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -160,9 +155,9 @@ Configures the sink batching behavior.
 
 <Field
   common={true}
-  defaultValue={1049000}
+  defaultValue={5242880}
   enumValues={null}
-  examples={[1049000]}
+  examples={[5242880]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}

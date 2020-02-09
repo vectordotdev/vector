@@ -3701,10 +3701,10 @@ end
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * required
-    # * default: 1049000
+    # * default: 5242880
     # * type: int
     # * unit: bytes
-    max_size = 1049000
+    max_size = 5242880
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3998,6 +3998,27 @@ end
     # * relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.http.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
 
   #
   # Buffer

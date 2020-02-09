@@ -58,6 +58,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - requests
   compression = "none" # default, enum
 
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 1049000 # default, bytes
+    timeout_secs = 1 # default, seconds
+
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
     in_flight_limit = 10 # default, requests
@@ -96,6 +101,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
     strategy = "basic" # must be: "basic"
     password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
     user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 1049000 # default, bytes
+    timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -238,6 +248,76 @@ The basic authentication user name.
 
 
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={1049000}
+  enumValues={null}
+  examples={[1049000]}
+  name={"max_size"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  >
+
+#### max_size
+
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"timeout_secs"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### timeout_secs
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -296,7 +376,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 #### max_size
 
-The maximum size of the buffer on the disk.
+The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -656,7 +736,7 @@ The maximum amount of time, in seconds, to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -924,16 +1004,24 @@ scheme][urls.basic_auth].
 
 
 
-### Buffers
+### Buffers & Batches
 
 import SVG from 'react-inlinesvg';
 
-<SVG src="/img/buffers.svg" />
+<SVG src="/img/buffers-and-batches-serial.svg" />
 
-The `http` sink buffers events as shown in
-the diagram above. This helps to smooth out data processing if the downstream
-service applies backpressure. Buffers are controlled via the
-[`buffer.*`](#buffer) options.
+The `http` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
+
+*Batches* are flushed when 1 of 2 conditions are met:
+
+1. The batch age meets or exceeds the configured [`timeout_secs`](#timeout_secs).
+2. The batch size meets or exceeds the configured [`max_size`](#max_size).
+
+*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
 ### Environment Variables
 
@@ -992,6 +1080,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
+[docs.guarantees]: /docs/about/guarantees/
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.gzip]: https://www.gzip.org/
 [urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http
