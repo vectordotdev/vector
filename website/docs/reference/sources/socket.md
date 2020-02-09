@@ -232,7 +232,21 @@ The `socket` source ingests data through a socket, such as a TCP, UDP, or Unix s
 For example:
 
 
+Given the following input line:
 
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+
+A log event will be output with the following structure:
+
+```json
+{
+  "timestamp": <current_timestamp>,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "host": "<upstream_hostname>"
+}
+```
 
 More detail on the output schema is below.
 
@@ -240,13 +254,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### host
@@ -259,13 +277,17 @@ The upstream hostname.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -278,13 +300,17 @@ The raw message, unaltered.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp

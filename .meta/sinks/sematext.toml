@@ -1,23 +1,32 @@
 [sinks.sematext]
 title = "Sematext"
-batch_max_size = 10490000
-batch_timeout_secs = 1
 beta = true
-buffer = true
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num = 5
-request_retry_attempts = 5
-request_retry_initial_backoff_secs = 1
-request_retry_max_duration_secs = 10
-request_in_flight_limit = 5
-request_timeout_secs = 60
 write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es]"
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "sematext") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.sematext.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.sematext.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.sematext.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
 
 [sinks.sematext.options.region]
 type = "string"

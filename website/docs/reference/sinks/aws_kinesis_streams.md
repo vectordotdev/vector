@@ -44,13 +44,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
-  # OPTIONAL
+  # REQUIRED - requests
+  encoding = "json" # example, enum
+
+  # OPTIONAL - General
   partition_key_field = "user_id" # example, no default
 ```
 
@@ -67,33 +70,35 @@ import CodeHeader from '@site/src/components/CodeHeader';
   region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
+  # REQUIRED - requests
+  encoding = "json" # example, enum
+
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
-  healthcheck = true # default
   partition_key_field = "user_id" # example, no default
-
-  # OPTIONAL - requests
-  encoding = "json" # example, no default, enum
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_events = 500 # default, bytes
+    max_events = 500 # default, events
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
+    in_flight_limit = 5 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 5 # default
-    retry_attempts = 5 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 30 # default, seconds
@@ -156,36 +161,36 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
-  unit={"bytes"}
+  unit={"events"}
   >
 
 #### max_events
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in events, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -220,20 +225,20 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -248,14 +253,14 @@ The maximum number of [events][docs.data-model] allowed in the buffer. See [Buff
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -270,14 +275,14 @@ The maximum size of the buffer on the disk.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -285,7 +290,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -319,14 +324,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -357,28 +362,6 @@ The encoding format used to serialize the events before outputting.
 ### endpoint
 
 Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
 
 </Field>
@@ -460,7 +443,7 @@ Configures the sink request behavior.
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -487,7 +470,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -509,7 +492,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -517,9 +500,9 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={-1}
   enumValues={null}
-  examples={[5]}
+  examples={[-1]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -575,7 +558,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -744,7 +727,6 @@ how to do this.
 Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
 optional setting that is helpful for a variety of use cases, such as cross
 account access.
-
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';

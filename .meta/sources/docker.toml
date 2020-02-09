@@ -24,6 +24,8 @@ remote host. Do NOT set this to `false` unless you understand the risks of \
 not verifying the remote certificate.\
 """
 
+<%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
+
 [sources.docker.options.include_containers]
 type = "[string]"
 common = true
@@ -126,11 +128,14 @@ The raw log message, unaltered.\
 
 [sources.docker.output.log.fields.stream]
 type = "string"
-enum = ["stdout", "stderr"]
 required = true
 description = """\
 The [standard stream][urls.standard_streams] that the log was collected from.\
 """
+
+[sources.docker.output.log.fields.stream.enum]
+stdout = "The STDOUT stream"
+stderr = "The STDERR stream"
 
 [sources.docker.output.log.fields.timestamp]
 type = "timestamp"

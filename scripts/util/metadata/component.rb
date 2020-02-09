@@ -1,6 +1,6 @@
 #encoding: utf-8
 
-require_relative "option"
+require_relative "field"
 
 class Component
   DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
@@ -27,7 +27,7 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
     @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
@@ -36,7 +36,7 @@ class Component
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
-    @options = Option.build_struct(hash["options"] || {})
+    @options = (hash["options"] || {}).to_struct_with_name(Field)
 
     # Operating Systems
 
@@ -49,30 +49,6 @@ class Component
     end
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
-
-    # Default options
-
-    @options.type =
-      Option.new({
-        "name" => "type",
-        "description" => "The component type. This is a required field that tells Vector which component to use. The value _must_ be `#{name}`.",
-        "enum" => {
-          name => "The name of this component"
-        },
-        "required" => true,
-        "type" => "string"
-      })
-
-    if type != "source"
-      @options.inputs =
-        Option.new({
-          "name" => "inputs",
-          "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
-          "examples" => [["my-source-id"]],
-          "required" => true,
-          "type" => "[string]"
-        })
-    end
   end
 
   def <=>(other)

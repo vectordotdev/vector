@@ -7,6 +7,8 @@ function_category = "receive"
 output_types = ["log"]
 through_description = "the Syslog 5424 protocol"
 
+<%= render("_partials/_component_options.toml", type: "source", name: "syslog") %>
+
 [sources.syslog.options.address]
 type = "string"
 common = true

@@ -10,6 +10,8 @@ function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
 
+<%= render("_partials/_component_options.toml", type: "transform", name: "split") %>
+
 [transforms.split.options.field]
 type = "string"
 common = true

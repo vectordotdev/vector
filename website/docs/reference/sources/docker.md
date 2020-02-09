@@ -271,13 +271,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
   name={"`[label-key]`"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### `[label-key]`
@@ -289,13 +293,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"container_created_at"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### container_created_at
@@ -307,13 +315,17 @@ A UTC timestamp representing when the container was created.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["9b6247364a03","715ebfcee040"]}
   name={"container_id"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### container_id
@@ -325,13 +337,17 @@ The Docker container ID that the log was collected from.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["evil_ptolemy","nostalgic_stallman"]}
   name={"container_name"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### container_name
@@ -343,13 +359,17 @@ The Docker container name that the log was collected from.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["ubuntu:latest","busybox","timberio/vector:latest-alpine"]}
   name={"image"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### image
@@ -361,13 +381,17 @@ The image name that the container is based on.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -379,13 +403,17 @@ The raw log message, unaltered.
 
 
 <Field
+  common={true}
   defaultValue={null}
-  enumValues={["stdout","stderr"]}
+  enumValues={{"stdout":"The STDOUT stream","stderr":"The STDERR stream"}}
   examples={["stdout","stderr"]}
   name={"stream"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### stream
@@ -397,13 +425,17 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp

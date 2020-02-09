@@ -1,53 +1,74 @@
 [sinks.clickhouse]
 title = "Clickhouse"
-batch_max_size = 1049000
-batch_timeout_secs = 1
 beta = true
-buffer = true
 common = true
-compressions = ["gzip"]
 delivery_guarantee = "best_effort"
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num =5
-request_retry_attempts = 9223372036854775807
-request_retry_initial_backoff_secs = 1
-request_retry_max_duration_secs = 10
-request_in_flight_limit = 5
-request_timeout_secs = 30
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
-tls_options = []
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "clickhouse") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.clickhouse.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.clickhouse.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.clickhouse.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 30
+) %>
 
 [sinks.clickhouse.options.auth]
 type = "table"
 common = false
 description = "Options for the authentication strategy."
 
-[sinks.clickhouse.options.auth.options.strategy]
+[sinks.clickhouse.options.auth.children.strategy]
 type = "string"
 prioritize = true
 required = true
 description = "The authentication strategy to use."
 
-[sinks.clickhouse.options.auth.options.strategy.enum]
+[sinks.clickhouse.options.auth.children.strategy.enum]
 basic = "The [basic authentication strategy][urls.basic_auth]."
 
-[sinks.clickhouse.options.auth.options.password]
+[sinks.clickhouse.options.auth.children.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
-[sinks.clickhouse.options.auth.options.user]
+[sinks.clickhouse.options.auth.children.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
+
+[sinks.clickhouse.options.compression]
+type = "string"
+category = "requests"
+common = true
+default = "none"
+description = """\
+The compression strategy used to compress the encoded event data before \
+outputting.\
+"""
+
+[sinks.clickhouse.options.compression.enum]
+none = "The payload will not be compressed."
+gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
 
 [sinks.clickhouse.options.host]
 type = "string"
@@ -62,6 +83,8 @@ common = true
 examples = ["mytable"]
 required = true
 description = "The table that data will be inserted into."
+
+<%= render("_partials/_tls_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify: true) %>
 
 [sinks.clickhouse.options.database]
 type = "string"

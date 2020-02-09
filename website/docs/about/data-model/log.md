@@ -81,13 +81,17 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"my-key":"my-value"}]}
   name={"`[key]`"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"*"}
+  unit={null}
   >
 
 ### `[key]`
@@ -99,13 +103,17 @@ In addition to the defined fields, you are welcome to add your own fields.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### host
@@ -117,13 +125,17 @@ Represents the originating host of the log. This is commonly used in [sources][d
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -135,13 +147,17 @@ Represents the log message. This is the key used when ingesting raw string data.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp
