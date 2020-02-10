@@ -39,7 +39,7 @@ The encoding format used to serialize the events before outputting.\
 """
 
 [sinks.splunk_hec.options.encoding.enum]
-ndjson = "Each event is encoded into JSON and the payload is new line delimited."
+json = "Each event is encoded into JSON and the payload is new line delimited."
 text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
 
 [sinks.splunk_hec.options.host]

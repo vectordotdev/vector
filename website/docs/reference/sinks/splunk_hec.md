@@ -51,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   token = "${TOKEN_ENV_VAR}" # example
 
   # REQUIRED - requests
-  encoding = "ndjson" # example, enum
+  encoding = "json" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -72,7 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   token = "${TOKEN_ENV_VAR}" # example
 
   # REQUIRED - requests
-  encoding = "ndjson" # example, enum
+  encoding = "json" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -313,8 +313,8 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
