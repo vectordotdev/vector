@@ -5433,8 +5433,8 @@ end
   #
   # * required
   # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
+  # * enum: "json" or "text"
+  encoding = "json"
   encoding = "text"
 
   #
