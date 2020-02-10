@@ -17,6 +17,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub mod component;
 mod validation;
 mod vars;
+pub mod watcher;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
