@@ -3,8 +3,8 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
-        ServiceBuilderExt, SinkExt, TowerRequestConfig,
+        retries::RetryLogic, rusoto, BatchBytesConfig, Buffer, PartitionBuffer,
+        PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -49,6 +49,7 @@ pub struct S3SinkConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub assume_role: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -179,7 +180,7 @@ impl S3Sink {
         let region = config.region.clone().try_into()?;
 
         let s3 = S3Sink {
-            client: Self::create_client(cx.resolver(), region)?,
+            client: Self::create_client(region, config.assume_role.clone(), cx.resolver())?,
         };
 
         let filename_extension = config.filename_extension.clone();
@@ -212,7 +213,11 @@ impl S3Sink {
         config: &S3SinkConfig,
         resolver: Resolver,
     ) -> crate::Result<super::Healthcheck> {
-        let client = Self::create_client(resolver, config.region.clone().try_into()?)?;
+        let client = Self::create_client(
+            config.region.clone().try_into()?,
+            config.assume_role.clone(),
+            resolver,
+        )?;
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
@@ -235,29 +240,24 @@ impl S3Sink {
         Ok(Box::new(healthcheck))
     }
 
-    pub fn create_client(resolver: Resolver, region: Region) -> crate::Result<S3Client> {
+    pub fn create_client(
+        region: Region,
+        _assume_role: Option<String>,
+        resolver: Resolver,
+    ) -> crate::Result<S3Client> {
+        let client = rusoto::client(resolver)?;
+
+        #[cfg(not(test))]
+        let creds = rusoto::AwsCredentialsProvider::new(&region, _assume_role)?;
+
         // Hack around the fact that rusoto will not pick up runtime
         // env vars. This is designed to only for test purposes use
         // static credentials.
-        #[cfg(not(test))]
-        {
-            use rusoto_credential::DefaultCredentialsProvider;
-
-            let p = DefaultCredentialsProvider::new()?;
-            let d = crate::sinks::util::rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
-
         #[cfg(test)]
-        {
-            use rusoto_credential::StaticProvider;
+        let creds =
+            rusoto::AwsCredentialsProvider::new_minimal("test-access-key", "test-secret-key");
 
-            let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-            let d = crate::sinks::util::rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
+        Ok(S3Client::new_with(client, creds, region))
     }
 }
 

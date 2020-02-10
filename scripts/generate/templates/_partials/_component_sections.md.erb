@@ -17,7 +17,7 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
-<%- if component.options.assume_role -%>
+<%- if component.options.respond_to?(:assume_role) -%>
 
 #### Assuming Roles
 
@@ -26,8 +26,8 @@ optional setting that is helpful for a variety of use cases, such as cross
 account access.
 <%- end -%>
 <%- end -%>
-<%- if component.sink? && component.buffer? && component.batching? -%>
-
+<%- if component.options.respond_to?(:buffer) -%>
+<%- if component.options.respond_to?(:batch) -%>
 ### Buffers & Batches
 
 <%- if component.partition_options.any? -%>
@@ -45,9 +45,19 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 *Batches* are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `timeout_secs`.
-2. The batch size meets or exceeds the configured <% if component.options.batch.options.max_size %>`max_size`<% else %>`max_events`<% end %>.
+2. The batch size meets or exceeds the configured <% if component.options.batch.children.respond_to?(:max_size) %>`max_size`<% else %>`max_events`<% end %>.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
+<%- else -%>
+### Buffers
+
+<SVG src="/img/buffers.svg" />
+
+The `<%= component.name %>` <%= component.type %> buffers events as shown in
+the diagram above. This helps to smooth out data processing if the downstream
+service applies backpressure. Buffers are controlled via the
+[`buffer.*`](#buffer) options.
+<%- end -%>
 <%- end -%>
 <% if component.context_options.any? -%>
 
@@ -96,7 +106,7 @@ error will be [logged][docs.monitoring#logs].
 
 Health checks ensure that the downstream service is accessible and ready to
 accept data. This check is performed upon sink initialization.
-<%- if !component.options.healthcheck_uri.nil? -%>
+<%- if component.options.respond_to?(:healthcheck_uri) -%>
 In order to run this check you must provide a value for the `healthcheck_uri`
 option.
 <%- end -%>
@@ -128,7 +138,7 @@ You'll notice that Vector's [template sytax](#field-interpolation) is supported
 for these options, enabling you to use field values as the partition's key.
 <%- end -%>
 <%- end -%>
-<%- if !component.options.request.nil? -%>
+<%- if component.options.respond_to?(:request) -%>
 
 ### Rate Limits
 
@@ -144,7 +154,8 @@ Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
 with the Vector team by [opening an issie][urls.new_<%= component.id %>_issue].
 <%- end -%>
-<%- if !component.options.request.nil? -%>
+<%- if component.options.respond_to?(:request)
+ -%>
 
 ### Retry Policy
 

@@ -7,6 +7,8 @@ function_category = "collect"
 output_types = ["log"]
 through_description = "Kafka 0.9 or later"
 
+<%= render("_partials/_component_options.toml", type: "source", name: "kafka") %>
+
 [sources.kafka.options.bootstrap_servers]
 type = "string"
 common = true

@@ -3,7 +3,7 @@ type = "table"
 common = <%= common %>
 description = "Key/Value pairs representing mapped log field types."
 
-[<%= namespace %>.options.types.options."`[field-name]`"]
+[<%= namespace %>.options.types.children."`[field-name]`"]
 type = "string"
 common = <%= common %>
 examples = [
@@ -20,7 +20,7 @@ the value is the type. [`strptime` specifiers][urls.strptime_specifiers] are \
 supported for the `timestamp` type.\
 """
 
-[<%= namespace %>.options.types.options."`[field-name]`".enum]
+[<%= namespace %>.options.types.children."`[field-name]`".enum]
 bool = "Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean."
 float = "Coerce to a 64 bit float."
 int = "Coerce to a 64 bit integer."

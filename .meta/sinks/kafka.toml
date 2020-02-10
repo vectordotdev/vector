@@ -1,17 +1,18 @@
 [sinks.kafka]
 title = "Kafka"
 beta = false
-buffer = true
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
-encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 service_providers = ["AWS", "Confluent"]
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
-tls_options = ["+enabled", "-verify"]
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "kafka") %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.kafka.options") %>
 
 [sinks.kafka.options.bootstrap_servers]
 type = "string"
@@ -23,6 +24,20 @@ A comma delimited list of host and port pairs that the Kafka client should conta
 its cluster metadata.\
 """
 
+[sinks.kafka.options.encoding]
+type = "string"
+category = "requests"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.kafka.options.encoding.enum]
+json = "Each event is encoded into JSON and the payload is represented as a JSON array."
+text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+
+
 [sinks.kafka.options.key_field]
 type = "string"
 common = true
@@ -33,6 +48,8 @@ The log field name to use for the topic key. If unspecified, the key will be \
 randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
+
+<%= render("_partials/_tls_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify: false) %>
 
 [sinks.kafka.options.topic]
 type = "string"

@@ -182,8 +182,8 @@ class Templates
     hash = {}
 
     fields.each do |field|
-      if field.fields_list.any?
-        hash[field.name] = fields_hash(field.fields_list)
+      if field.children_list.any?
+        hash[field.name] = fields_hash(field.children_list)
       else
         example = field.examples.first
 
@@ -298,14 +298,6 @@ class Templates
 
   def option_names(options)
     options.collect { |option| "`#{option.name}`" }
-  end
-
-  def options(options, filters: true, heading_depth: 1, level: 1, path: nil)
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-    render("#{partials_path}/_options.md", binding).strip
   end
 
   def partial?(template_path)

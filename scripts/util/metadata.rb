@@ -58,13 +58,20 @@ class Metadata
       def load_metadata!(meta_dir)
         metadata = {}
 
-        Dir.glob("#{meta_dir}/**/[^_]*.toml").each do |file|
-          content = Template.render(file)
-          hash = TomlRB.parse(content)
-          metadata.deep_merge!(hash)
-        end
+        contents =
+          Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
+            Template.render(file)
+          end
 
-        metadata
+        content = contents.join("\n")
+        TomlRB.parse(content)
+      end
+
+      def posts
+        @posts ||=
+          Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+            Post.new(path)
+          end.sort_by { |post| [ post.date, post.id ] }
       end
 
       def read_json(path)
@@ -75,7 +82,7 @@ class Metadata
       def validate_schema!(schema, metadata)
         schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
         errors = schemer.validate(metadata).to_a
-        limit = 5
+        limit = 50
 
         if errors.any?
           error_messages =
@@ -118,14 +125,14 @@ class Metadata
 
   def initialize(hash, docs_root, pages_root)
     @installation = OpenStruct.new()
-    @log_fields = Field.build_struct(hash["log_fields"] || {})
-    @metric_fields = Field.build_struct(hash["metric_fields"] || {})
-    @options = Option.build_struct(hash.fetch("options"))
+    @log_fields = hash.fetch("log_fields").to_struct_with_name(Field)
+    @metric_fields = hash.fetch("metric_fields").to_struct_with_name(Field)
+    @options = hash.fetch("options").to_struct_with_name(Field)
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
-    @testing = Option.build_struct(hash.fetch("testing"))
+    @testing = hash.fetch("testing").to_struct_with_name(Field)
 
     # domains
 
@@ -218,11 +225,11 @@ class Metadata
 
     # env vars
 
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
 
     components.each do |component|
       component.env_vars.to_h.each do |key, val|
-        @env_vars.send("#{key}=", val)
+        @env_vars["#{key}"] = val
       end
     end
 

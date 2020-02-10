@@ -7,6 +7,8 @@ function_category = "receive"
 output_types = ["log"]
 through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol]"
 
+<%= render("_partials/_component_options.toml", type: "source", name: "splunk_hec") %>
+
 [sources.splunk_hec.options.address]
 type = "string"
 common = true
