@@ -442,6 +442,7 @@ services:
         - ec2_metadata
         - gcloud-pubsub
         - loki
+        - influxdb
 
     localstack:
       image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
