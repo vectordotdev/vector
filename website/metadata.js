@@ -17345,6 +17345,30 @@ module.exports = {
 
       ]
     },
+    "humio_logs": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "humio_logs_sink",
+      "name": "humio_logs",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "kafka": {
       "beta": false,
       "delivery_guarantee": "at_least_once",

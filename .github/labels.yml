@@ -310,6 +310,9 @@
 - name: "sink: http"
   description: Anything `http` sink related
   color: 4ddbfb
+- name: "sink: humio_logs"
+  description: Anything `humio_logs` sink related
+  color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related
   color: 4ddbfb

@@ -112,6 +112,7 @@ scopes:
   - gcp_pubsub sink
   - gcp_stackdriver_logging sink
   - http sink
+  - humio_logs sink
   - kafka sink
   - logdna sink
   - new_relic_logs sink
