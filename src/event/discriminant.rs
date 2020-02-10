@@ -1,5 +1,4 @@
 use super::{LogEvent, Value};
-use crate::util::sort_kv_iter;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
@@ -121,8 +120,8 @@ fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
 }
 
 fn hash_map<H: Hasher>(hasher: &mut H, map: &HashMap<Atom, Value>) {
-    // FIXME: sorting and copying will be avoided after we replace HashMap by IndexMap
-    for (key, val) in sort_kv_iter(map.iter()) {
+    // FIXME: until we replaced HashMap by IndexMap this might be broken
+    for (key, val) in map.iter() {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);
     }
