@@ -526,7 +526,7 @@ More detail on the output schema is below.
 
 ### file
 
-The _full_ path of the file tha the log originated from. See [Checkpointing](#checkpointing) and [Context](#context) for more info.
+The _full_ path of the file tha the log originated from. This can be renamed via the [`file_key`](#file_key) option. See [Checkpointing](#checkpointing) and [Context](#context) for more info.
 
 
 </Field>
@@ -548,7 +548,7 @@ The _full_ path of the file tha the log originated from. See [Checkpointing](#ch
 
 ### host
 
-The current hostname, equivalent to the `gethostname` command.
+The current hostname, equivalent to the `gethostname` command. This can be renamed via the [`host_key`](#host_key) option.
 
 
 </Field>

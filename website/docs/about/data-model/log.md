@@ -118,7 +118,7 @@ In addition to the defined fields, you are welcome to add your own fields.
 
 ### host
 
-Represents the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_field` option for relevant sources.
+Represents the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_key` option for relevant sources.
 
 
 </Field>

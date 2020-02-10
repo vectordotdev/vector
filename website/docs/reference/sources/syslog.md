@@ -285,7 +285,7 @@ The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a facil
 
 ### host
 
-The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the socket path will be used.
+The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the socket path will be used. This key can be renamed via the [`host_key`](#host_key) option.
 
 
 </Field>
