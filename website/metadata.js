@@ -17394,8 +17394,32 @@ module.exports = {
 
       ]
     },
+    "logdna": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "logdna_sink",
+      "name": "logdna",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "new_relic_logs": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api].",
       "event_types": [
@@ -17412,7 +17436,7 @@ module.exports = {
       "service_providers": [
         "New Relic"
       ],
-      "status": "prod-ready",
+      "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -17539,7 +17563,7 @@ module.exports = {
       ]
     },
     "vector": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": "best_effort",
       "description": "Streams log events to another downstream [`vector` source][docs.sources.vector].",
       "event_types": [
@@ -17556,7 +17580,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "status": "prod-ready",
+      "status": "beta",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -17579,7 +17603,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17601,7 +17627,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17621,7 +17649,9 @@ module.exports = {
       "operating_systems": [
         "Linux"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17644,7 +17674,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17666,7 +17698,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17688,7 +17722,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17710,7 +17746,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17732,7 +17770,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17754,7 +17794,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17776,7 +17818,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17798,7 +17842,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17821,7 +17867,9 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "source",
       "unsupported_operating_systems": [
@@ -17910,7 +17958,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17930,7 +17980,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17950,7 +18002,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -17958,7 +18012,7 @@ module.exports = {
       ]
     },
     "aws_ec2_metadata": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": null,
       "description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
       "event_types": [
@@ -17970,8 +18024,10 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
-      "status": "prod-ready",
+      "service_providers": [
+
+      ],
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -17990,7 +18046,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18010,7 +18068,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18031,7 +18091,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18039,7 +18101,7 @@ module.exports = {
       ]
     },
     "geoip": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": null,
       "description": "Accepts log events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.",
       "event_types": [
@@ -18051,8 +18113,10 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
-      "status": "prod-ready",
+      "service_providers": [
+
+      ],
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -18071,7 +18135,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18091,7 +18157,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18112,7 +18180,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18120,7 +18190,7 @@ module.exports = {
       ]
     },
     "logfmt_parser": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": null,
       "description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
       "event_types": [
@@ -18132,8 +18202,10 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
-      "status": "prod-ready",
+      "service_providers": [
+
+      ],
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -18152,7 +18224,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18160,7 +18234,7 @@ module.exports = {
       ]
     },
     "merge": {
-      "beta": false,
+      "beta": true,
       "delivery_guarantee": null,
       "description": "Accepts log events and allows you to merge partial log events into a single event.",
       "event_types": [
@@ -18172,8 +18246,10 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
-      "status": "prod-ready",
+      "service_providers": [
+
+      ],
+      "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -18192,7 +18268,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18212,7 +18290,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18232,7 +18312,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18252,7 +18334,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "beta",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18272,7 +18356,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
@@ -18292,7 +18378,9 @@ module.exports = {
       "operating_systems": [
 
       ],
-      "service_providers": null,
+      "service_providers": [
+
+      ],
       "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [

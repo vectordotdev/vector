@@ -2,6 +2,7 @@
 extern crate tracing;
 
 use futures::{future, Future, Stream};
+use glob::glob;
 use std::{
     cmp::{max, min},
     fs::File,
@@ -30,15 +31,11 @@ struct Opts {
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 struct RootOpts {
-    /// Read configuration from the specified file
-    #[structopt(
-        name = "config",
-        value_name = "FILE",
-        short,
-        long,
-        default_value = "/etc/vector/vector.toml"
-    )]
-    config_path: PathBuf,
+    /// Read configuration from one or more files. Wildcard paths are supported.
+    /// If zero files are specified the default config path
+    /// `/etc/vector/vector.toml` will be targeted.
+    #[structopt(name = "config", short, long)]
+    config_paths: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long)]
@@ -220,23 +217,35 @@ fn main() {
         }
     }
 
-    info!(
-        message = "Loading config.",
-        path = ?opts.config_path
-    );
-
-    let file = if let Some(file) = open_config(&opts.config_path) {
-        file
+    let mut config_paths = Vec::new();
+    for config_pattern in if !opts.config_paths.is_empty() {
+        opts.config_paths
     } else {
-        std::process::exit(exitcode::CONFIG);
-    };
+        DEFAULT_CONFIG_PATHS.to_vec()
+    } {
+        let matches: Vec<PathBuf> = glob(config_pattern.to_str().expect("No ability to glob"))
+            .expect("Failed to read glob pattern")
+            .filter_map(Result::ok)
+            .collect();
 
-    trace!(
-        message = "Parsing config.",
-        path = ?opts.config_path
+        if matches.is_empty() {
+            error!(message = "Config file not found in path.", path = ?config_pattern);
+            std::process::exit(exitcode::CONFIG);
+        }
+
+        for path in matches {
+            config_paths.push(path);
+        }
+    }
+    config_paths.sort();
+    config_paths.dedup();
+
+    info!(
+        message = "Loading configs.",
+        path = ?config_paths
     );
 
-    let config = vector::topology::Config::load(file);
+    let config = read_configs(&config_paths);
     let config = handle_config_errors(config);
     let config = config.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
@@ -323,18 +332,12 @@ fn main() {
 
             // Reload config
             info!(
-                message = "Reloading config.",
-                path = ?opts.config_path
+                message = "Reloading configs.",
+                path = ?config_paths
             );
-
-            let file = if let Some(file) = open_config(&opts.config_path) {
-                file
-            } else {
-                continue;
-            };
+            let config = read_configs(&config_paths);
 
             trace!("Parsing config");
-            let config = vector::topology::Config::load(file);
             let config = handle_config_errors(config);
             if let Some(config) = config {
                 let success =
@@ -412,6 +415,36 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
             None
         }
         Ok(config) => Some(config),
+    }
+}
+
+fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
+    let mut config = vector::topology::Config::empty();
+    let mut errors = Vec::new();
+
+    config_paths.iter().for_each(|p| {
+        let file = if let Some(file) = open_config(&p) {
+            file
+        } else {
+            errors.push(format!("Config file not found in path: {:?}.", p));
+            return;
+        };
+
+        trace!(
+            message = "Parsing config.",
+            path = ?p
+        );
+
+        match Config::load(file).and_then(|n| config.append(n)) {
+            Err(errs) => errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e))),
+            _ => (),
+        };
+    });
+
+    if !errors.is_empty() {
+        Err(errors)
+    } else {
+        Ok(config)
     }
 }
 

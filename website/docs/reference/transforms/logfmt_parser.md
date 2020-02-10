@@ -4,7 +4,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
 sidebar_label: "logfmt_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/logfmt_parser.rs
-status: "prod-ready"
+status: "beta"
 title: "Logfmt Parser Transform"
 ---
 
@@ -36,6 +36,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
+    status = "int" # example
+    duration = "float" # example
+    success = "bool" # example
+    timestamp = "timestamp|%F" # example
+    timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options
@@ -113,10 +118,10 @@ Key/Value pairs representing mapped log field types.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%s"},{"timestamp":"timestamp|%+"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
   name={"`[field-name]`"}
   path={"types"}
   relevantWhen={null}

@@ -44,10 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "gcp_pubsub" # must be: "gcp_pubsub"
   inputs = ["my-source-id"] # example
   project = "vector-123456" # example
   topic = "this-is-a-topic" # example
+
+  # OPTIONAL
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -64,8 +68,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   topic = "this-is-a-topic" # example
 
   # OPTIONAL - General
-  api_key = nil # example, no default
-  credentials_path = nil # example, no default
+  api_key = "${GCP_API_KEY_ENV_VAR}" # example, no default
+  credentials_path = "/path/to/credentials.json" # example, no default
   healthcheck = true # default
 
   # OPTIONAL - Batch
@@ -75,17 +79,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
+    in_flight_limit = 5 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 100 # default
-    retry_attempts = 9223372036854775807 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 60 # default, seconds
@@ -94,7 +101,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "PassWord1" # example, no default
+    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
     verify_hostname = true # default
@@ -117,7 +124,7 @@ import Field from '@site/src/components/Field';
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["${GCP_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
   name={"api_key"}
   path={null}
   relevantWhen={null}
@@ -157,14 +164,14 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={10485760}
   enumValues={null}
   examples={[10485760]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -172,21 +179,21 @@ Configures the sink batching behavior.
 
 #### max_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -221,20 +228,20 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -249,14 +256,14 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -271,14 +278,14 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -286,7 +293,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -323,7 +330,7 @@ The behavior when the buffer becomes full.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["/path/to/credentials.json"]}
   name={"credentials_path"}
   path={null}
   relevantWhen={null}
@@ -342,7 +349,7 @@ The filename for a Google Cloud service account credentials JSON file used to au
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -417,7 +424,7 @@ Configures the sink request behavior.
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -444,7 +451,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -466,7 +473,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -474,9 +481,9 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={9223372036854775807}
+  defaultValue={-1}
   enumValues={null}
-  examples={[9223372036854775807]}
+  examples={[-1]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -532,7 +539,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -634,7 +641,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["PassWord1"]}
+  examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -646,7 +653,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
 
 
 </Field>

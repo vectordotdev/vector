@@ -19,7 +19,7 @@ class Source < Component
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
     @output = OpenStruct.new
-    @log_fields = Field.build_struct(hash["log_fields"] || {})
+    @log_fields = (hash["log_fields"] || {}).to_struct_with_name(Field)
     @output_types = hash.fetch("output_types")
     @through_description = hash.fetch("through_description")
 

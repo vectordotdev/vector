@@ -11,6 +11,10 @@ types:
 
 scopes:
 
+  - new source
+  - new transform
+  - new sink
+
   # domains
   <%- metadata.domains.each do |domain| -%>
   - <%= domain.name.downcase %>
@@ -19,6 +23,11 @@ scopes:
   # platforms
   <%- metadata.platforms.each do |platform|  -%>
   - <%= platform.name.downcase %> platform
+  <%- end -%>
+
+  # providers
+  <%- metadata.service_providers.each do |service_provider| -%>
+  - <%= service_provider.downcase %> provider
   <%- end -%>
 
   # sources

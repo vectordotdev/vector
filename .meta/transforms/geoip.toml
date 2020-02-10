@@ -1,10 +1,13 @@
 [transforms.geoip]
 title = "GeoIP"
 allow_you_to_description = "enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases"
+beta = true
 common = false
 function_category = "enrich"
 input_types = ["log"]
 output_types = ["log"]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "geoip") %>
 
 [transforms.geoip.options.database]
 type = "string"

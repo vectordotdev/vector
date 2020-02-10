@@ -1,10 +1,13 @@
 [transforms.add_fields]
 title = "Add Fields"
 allow_you_to_description = "add one or more log fields"
+beta = false
 common = false
 function_category = "shape"
 input_types = ["log"]
 output_types = ["log"]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "add_fields") %>
 
 [transforms.add_fields.options.fields]
 type = "table"
@@ -15,7 +18,7 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.fields.options."`[field-name]`"]
+[transforms.add_fields.options.fields.children."`[field-name]`"]
 type = "*"
 required = true
 examples = [

@@ -1,25 +1,33 @@
 [sinks.gcp_stackdriver_logging]
 title = "GCP Stackdriver Logging"
-batch_max_size = 5242880
-batch_timeout_secs = 1
 beta = true
-buffer = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num = 1000
-request_retry_attempts = 9223372036854775807
-request_retry_initial_backoff_secs = 1
-request_retry_max_duration_secs = 10
-request_in_flight_limit = 5
-request_timeout_secs = 60
 service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]"
-tls_options = []
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_stackdriver_logging") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.gcp_stackdriver_logging.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.gcp_stackdriver_logging.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 1000,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
 
 [sinks.gcp_stackdriver_logging.env_vars.GOOGLE_APPLICATION_CREDENTIALS]
 type = "string"
@@ -35,8 +43,9 @@ required = true
 examples = ["/path/to/credentials.json"]
 description = """\
 The filename for a Google Cloud service account credentials JSON file \
-used to authenticate access to the stackdriver logging API. \
-If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\
+used to authenticate access to the stackdriver logging API. If this is unset, \
+Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for \
+a filename.\
 """
 
 [sinks.gcp_stackdriver_logging.options.project_id]
@@ -103,7 +112,7 @@ Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or \
 type = "table"
 description = "Options for describing the logging resource."
 
-[sinks.gcp_stackdriver_logging.options.resource.options.type]
+[sinks.gcp_stackdriver_logging.options.resource.children.type]
 type = "string"
 required = true
 examples = ["global", "gce_instance"]
@@ -115,7 +124,7 @@ See the [Google Cloud Platform monitored resource documentation][urls.gcp_resour
 for more details.\
 """
 
-[sinks.gcp_stackdriver_logging.options.resource.options."`[label]`"]
+[sinks.gcp_stackdriver_logging.options.resource.children."`[label]`"]
 type = "string"
 examples = [
   {projectId = "vector-123456"},
@@ -127,3 +136,5 @@ Values for all of the labels listed in the associated monitored resource descrip
 For example, Compute Engine VM instances use the labels `projectId`, \
 `instanceId`, and `zone`.\
 """
+
+<%= render("_partials/_tls_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", can_enable: false, can_verify: true) %>

@@ -9,6 +9,8 @@
 
 set -eou pipefail
 
+DOCKER=${USE_CONTAINER:-docker}
+
 #
 # Requirements
 #
@@ -27,6 +29,7 @@ fi
 # Variables
 #
 
+DOCKER_PRIVILEGED=${DOCKER_PRIVILEGED:-false}
 tag="$1"
 image="timberiodev/vector-$tag:latest"
 
@@ -34,18 +37,26 @@ image="timberiodev/vector-$tag:latest"
 # Execute
 #
 
-docker build \
+$DOCKER build \
   -t $image \
   -f scripts/ci-docker-images/$tag/Dockerfile \
-  scripts
+  .
 
 # Set flags for "docker run".
-# Note that the `--privileged` flags is set by default because it is
-# required to register `binfmt` handlers, whaich allow to run builders
-# for ARM achitectures which need to use `qemu-user`.
-docker_flags=("--privileged" "--interactive")
-if [ -t 0 ]; then # the script's input is connected to a terminal
+# The `--rm` flag is used to delete containers on exit.
+# The `--interactive` flag is used to keep `stdin` open.
+docker_flags=("--rm" "--interactive")
+# If the script's input is connected to a terminal, then
+# use `--tty` to allocate a pseudo-TTY.
+if [ -t 0 ]; then
   docker_flags+=("--tty")
+fi
+# If `DOCKER_PRIVILEGED` environment variable is set to true,
+# pass `--privileged`. One use case is to register `binfmt`
+# handlers in order to run builders for ARM architectures
+# using `qemu-user`.
+if [ "$DOCKER_PRIVILEGED" == "true" ]; then
+  docker_flags+=("--privileged")
 fi
 
 # pass environment variables prefixed with `PASS_` to the container
@@ -56,7 +67,7 @@ for line in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
 done
 unset IFS
 
-docker run \
+$DOCKER run \
   "${docker_flags[@]}" \
   -w "$PWD" \
   -v "$PWD":"$PWD" \

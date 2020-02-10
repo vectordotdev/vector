@@ -11,6 +11,10 @@ types:
 
 scopes:
 
+  - new source
+  - new transform
+  - new sink
+
   # domains
   - blog
   - buffers
@@ -47,6 +51,15 @@ scopes:
   - homebrew platform
   - rpm platform
   - msi platform
+
+  # providers
+  - aws provider
+  - datadog provider
+  - elastic provider
+  - google provider
+  - confluent provider
+  - new relic provider
+  - splunk provider
 
   # sources
   - docker source
@@ -101,6 +114,7 @@ scopes:
   - http sink
   - humio sink
   - kafka sink
+  - logdna sink
   - new_relic_logs sink
   - prometheus sink
   - sematext sink

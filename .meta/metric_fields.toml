@@ -44,14 +44,14 @@ A metric must be one of 6 types.\
 """
 
 
-[metric_fields.type.fields.counter]
+[metric_fields.type.children.counter]
 type = "struct"
 description = """\
 A single value that can _only_ be incremented or reset to zero value, it \
 cannot be decremented.\
 """
 
-[metric_fields.type.fields.counter.fields.value]
+[metric_fields.type.children.counter.children.value]
 type = "double"
 examples = [2.6, 5.0]
 required = true
@@ -60,7 +60,7 @@ The value to increment the counter by. Can only be positive.\
 """
 
 
-[metric_fields.type.fields.gauge]
+[metric_fields.type.children.gauge]
 type = "struct"
 description = """\
 A gauge represents a point-in-time value that can increase and decrease. \
@@ -68,7 +68,7 @@ Vector's internal gauge type represents changes to that value. Gauges should be 
 used to track fluctuations in values, like current memory or CPU usage.\
 """
 
-[metric_fields.type.fields.gauge.fields.value]
+[metric_fields.type.children.gauge.children.value]
 type = "double"
 examples = [554222.0]
 required = true
@@ -77,13 +77,13 @@ A specific point-in-time value for the gauge.\
 """
 
 
-[metric_fields.type.fields.set]
+[metric_fields.type.children.set]
 type = "struct"
 description = """\
 A set represents a count of unique values, AKA the cardinality.\
 """
 
-[metric_fields.type.fields.set.fields.values]
+[metric_fields.type.children.set.children.values]
 type = "[string]"
 examples = [["unique item 1", "unique item 2"]]
 required = true
@@ -92,13 +92,13 @@ The list of unique values.\
 """
 
 
-[metric_fields.type.fields.distribution]
+[metric_fields.type.children.distribution]
 type = "struct"
 description = """\
 A dsitribution represents a distribution of sampled values.\
 """
 
-[metric_fields.type.fields.distribution.fields.values]
+[metric_fields.type.children.distribution.children.values]
 type = "[double]"
 examples = [[12.0, 43.3, 25.2]]
 required = true
@@ -106,7 +106,7 @@ description = """\
 The list of values contained within the distribution.\
 """
 
-[metric_fields.type.fields.distribution.fields.sample_rates]
+[metric_fields.type.children.distribution.children.sample_rates]
 type = "[int]"
 examples = [[12, 43, 25]]
 required = true
@@ -115,7 +115,7 @@ The rate at which each individual value was sampled.\
 """
 
 
-[metric_fields.type.fields.aggregated_histogram]
+[metric_fields.type.children.aggregated_histogram]
 type = "struct"
 description = """\
 Also called a "timer". A `aggregated_histogram` samples observations (usually \
@@ -123,7 +123,7 @@ things like request durations or response sizes) and counts them in \
 configurable buckets. It also provides a sum of all observed values.\
 """
 
-[metric_fields.type.fields.aggregated_histogram.fields.buckets]
+[metric_fields.type.children.aggregated_histogram.children.buckets]
 type = "[double]"
 examples = [[1, 2, 5, 10, 25]]
 required = true
@@ -131,7 +131,7 @@ description = """\
 The buckets contained within this histogram.\
 """
 
-[metric_fields.type.fields.aggregated_histogram.fields.counts]
+[metric_fields.type.children.aggregated_histogram.children.counts]
 type = "[int]"
 examples = [[1, 5, 25, 2, 5]]
 required = true
@@ -139,7 +139,7 @@ description = """\
 The number of values contained within each bucket.\
 """
 
-[metric_fields.type.fields.aggregated_histogram.fields.count]
+[metric_fields.type.children.aggregated_histogram.children.count]
 type = "int"
 examples = [54]
 required = true
@@ -147,7 +147,7 @@ description = """\
 The total number of values contained within the histogram.\
 """
 
-[metric_fields.type.fields.aggregated_histogram.fields.sum]
+[metric_fields.type.children.aggregated_histogram.children.sum]
 type = "double"
 examples = [524.0]
 required = true
@@ -156,7 +156,7 @@ The sum of all values contained within the histogram.\
 """
 
 
-[metric_fields.type.fields.aggregated_summary]
+[metric_fields.type.children.aggregated_summary]
 type = "struct"
 description = """\
 Similar to a histogram, a summary samples observations (usually things like \
@@ -165,7 +165,7 @@ of observations and a sum of all observed values, it calculates configurable \
 quantiles over a sliding time window.
 """
 
-[metric_fields.type.fields.aggregated_summary.fields.quantiles]
+[metric_fields.type.children.aggregated_summary.children.quantiles]
 type = "[double]"
 examples = [[0.1, 0.5, 0.75, 1.0]]
 required = true
@@ -173,7 +173,7 @@ description = """\
 The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.\
 """
 
-[metric_fields.type.fields.aggregated_summary.fields.values]
+[metric_fields.type.children.aggregated_summary.children.values]
 type = "[double]"
 examples = [[2.1, 4.68, 23.02, 120.1]]
 required = true
@@ -181,7 +181,7 @@ description = """\
 The values contained within the summary that align with the `quantiles`.\
 """
 
-[metric_fields.type.fields.aggregated_summary.fields.count]
+[metric_fields.type.children.aggregated_summary.children.count]
 type = "int"
 examples = [54]
 required = true
@@ -189,7 +189,7 @@ description = """\
 The total number of values contained within the summary.\
 """
 
-[metric_fields.type.fields.aggregated_summary.fields.sum]
+[metric_fields.type.children.aggregated_summary.children.sum]
 type = "double"
 examples = [524.0]
 required = true

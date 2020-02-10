@@ -1,11 +1,13 @@
 [transforms.coercer]
 title = "Coercer"
 allow_you_to_description = "coerce log fields into fixed types"
+beta = false
 common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-types_coercion = true
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "coercer") %>
 
 [transforms.coercer.options.drop_unspecified]
 type = "bool"
@@ -17,6 +19,8 @@ Make sure both `message` and `timestamp` are specified in the `types` table \
 as their absense will cause the original message data to be dropped along \
 with other extraneous fields.\
 """
+
+<%= render("_partials/_types.toml", namespace: "transforms.coercer", common: true) %>
 
 [[transforms.coercer.output.log.examples]]
 label = "Generic"

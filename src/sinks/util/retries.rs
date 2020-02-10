@@ -1,12 +1,20 @@
 use crate::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::{
-    borrow::Cow,
     cmp,
     time::{Duration, Instant},
 };
 use tokio::timer::Delay;
 use tower::{retry::Policy, timeout::error::Elapsed};
+
+pub enum RetryAction {
+    /// Indicate that this request should be retried with a reason
+    Retry(String),
+    /// Indicate that this request should not be retried with a reason
+    DontRetry(String),
+    /// Indicate that this request should not be retried but the request was successful
+    Successful,
+}
 
 pub trait RetryLogic: Clone {
     type Error: std::error::Error + Send + Sync + 'static;
@@ -14,8 +22,9 @@ pub trait RetryLogic: Clone {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
-    fn should_retry_response(&self, _response: &Self::Response) -> Option<Cow<str>> {
-        None
+    fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
+        // Treat the default as the request is successful
+        RetryAction::Successful
     }
 }
 
@@ -90,12 +99,18 @@ where
                     return None;
                 }
 
-                if let Some(ref reason) = self.logic.should_retry_response(response) {
-                    warn!(message = "retrying after response.", %reason);
-                    Some(self.build_retry())
-                } else {
-                    warn!("request is not retryable; dropping the request.");
-                    None
+                match self.logic.should_retry_response(response) {
+                    RetryAction::Retry(reason) => {
+                        warn!(message = "retrying after response.", %reason);
+                        Some(self.build_retry())
+                    }
+
+                    RetryAction::DontRetry(reason) => {
+                        warn!(message = "request is not retryable; dropping the request.", %reason);
+                        None
+                    }
+
+                    RetryAction::Successful => None,
                 }
             }
             Err(error) => {
@@ -138,6 +153,32 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
             .poll()
             .map_err(|error| panic!("timer error: {}; this is a bug!", error)));
         Ok(Async::Ready(self.policy.clone()))
+    }
+}
+
+impl RetryAction {
+    pub fn is_retryable(&self) -> bool {
+        if let RetryAction::Retry(_) = &self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_not_retryable(&self) -> bool {
+        if let RetryAction::DontRetry(_) = &self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_successful(&self) -> bool {
+        if let RetryAction::Successful = &self {
+            true
+        } else {
+            false
+        }
     }
 }
 

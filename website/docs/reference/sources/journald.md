@@ -275,13 +275,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"_SYSTEMD_UNIT":"ntpd.service"},{"_BOOT_ID":"124c781146e841ae8d9b4590df8b9231"}]}
   name={"`[record-key]`"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"*"}
+  unit={null}
   >
 
 ### `[record-key]`
@@ -294,13 +298,17 @@ Additional Journald fields are passed through as log fields.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### host
@@ -312,13 +320,17 @@ The value of the journald `_HOSTNAME` field.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -330,13 +342,17 @@ The value of the journald `MESSAGE` field.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp

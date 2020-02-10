@@ -4,11 +4,13 @@ allow_you_to_description = """\
 split a field's value on a given separator \
 and zip the tokens into ordered field names\
 """
+beta = false
 common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-types_coercion = true
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "split") %>
 
 [transforms.split.options.field]
 type = "string"
@@ -41,3 +43,5 @@ common = true
 default = true
 required = true
 description = "If `true` the `field` will be dropped after parsing."
+
+<%= render("_partials/_types.toml", namespace: "transforms.split", common: true) %>
