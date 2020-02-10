@@ -1,7 +1,7 @@
 use crate::Error;
 use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::mpsc::{channel, Receiver},
     thread,
     time::Duration,
@@ -23,12 +23,12 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 /// Has best effort guarante of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
-pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
+pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(), Error> {
     // Create watcher now so not to miss any changes happening between
     // returning from this function and the thread starting.
-    let mut watcher = Some(create_watcher(&config_path)?);
+    let mut watcher = Some(create_watcher(&config_paths)?);
 
-    info!("Watching configuration file.");
+    info!("Watching configuration files.");
 
     thread::spawn(move || loop {
         if let Some((_, receiver)) = watcher.take() {
@@ -42,22 +42,22 @@ pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error
                     info!("Configuration file changed.");
                     raise_sighup();
                 } else {
-                    debug!(message = "Ignoring event", ?event)
+                    debug!(message = "Ignoring event.", ?event)
                 }
             }
         }
 
         thread::sleep(RETRY_TIMEOUT);
 
-        watcher = create_watcher(&config_path)
-            .map_err(|error| error!(message = "Failed to create file watcher", ?error))
+        watcher = create_watcher(&config_paths)
+            .map_err(|error| error!(message = "Failed to create file watcher.", ?error))
             .ok();
 
         if watcher.is_some() {
-            // Config file could have changed while we weren't watching,
+            // Config files could have changed while we weren't watching,
             // so for a good measure raise SIGHUP and let reload logic
             // determine if anything changed.
-            info!("Speculating that configuration file has changed.");
+            info!("Speculating that configuration files have changed.");
             raise_sighup();
         }
     });
@@ -67,7 +67,7 @@ pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error
 
 #[cfg(windows)]
 /// Errors on Windows.
-pub fn config_watcher(config_path: PathBuf, delay: Duration) -> Result<(), Error> {
+pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(), Error> {
     Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())
 }
 
@@ -79,11 +79,15 @@ fn raise_sighup() {
     });
 }
 
-fn create_watcher(config_path: &Path) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
-    info!("Creating configuration file watcher");
+fn create_watcher(
+    config_paths: &Vec<PathBuf>,
+) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
+    info!("Creating configuration file watcher.");
     let (sender, receiver) = channel();
     let mut watcher = raw_watcher(sender)?;
-    watcher.watch(&config_path, RecursiveMode::NonRecursive)?;
+    for path in config_paths {
+        watcher.watch(path, RecursiveMode::NonRecursive)?;
+    }
     Ok((watcher, receiver))
 }
 
@@ -106,7 +110,7 @@ mod tests {
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
-        let _ = config_watcher(file_path, delay).unwrap();
+        let _ = config_watcher(vec![file_path], delay).unwrap();
 
         file.write_all(&[0]).unwrap();
         std::mem::drop(file);
