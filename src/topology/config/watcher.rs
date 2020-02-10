@@ -67,7 +67,7 @@ pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(),
 
 #[cfg(windows)]
 /// Errors on Windows.
-pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(), Error> {
+pub fn config_watcher(_config_paths: Vec<PathBuf>, _delay: Duration) -> Result<(), Error> {
     Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())
 }
 
