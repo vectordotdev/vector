@@ -4288,20 +4288,6 @@ end
   token = "${TOKEN_ENV_VAR}"
   token = "A94A8FE5CCB19BA61C4C08"
 
-  # The encoding type that will be used to send logs. If `text` is selected
-  # Vector will attempt to use the `message` field to send as the main event
-  # payload. If `json` is selected the entire event will be encoded as a json
-  # object and set as the event field.
-  #
-  # For more information on how these specific details are handled within Humio
-  # check out the Humio HEC docs.
-  #
-  # * optional
-  # * default: "json"
-  # * type: string
-  encoding = "text"
-  encoding = "json"
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional

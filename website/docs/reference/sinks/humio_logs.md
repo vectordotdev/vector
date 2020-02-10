@@ -66,7 +66,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   token = "${TOKEN_ENV_VAR}" # example
 
   # OPTIONAL - General
-  encoding = "json" # default
   healthcheck = true # default
   host = "http://myhumiohost.com" # example, no default
 
@@ -289,30 +288,6 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={"json"}
-  enumValues={null}
-  examples={["text","json"]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding type that will be used to send logs. If `text` is selected Vector will attempt to use the `message` field to send as the main event payload. If `json` is selected the entire event will be encoded as a json object and set as the event field.
-
-For more information on how these specific details are handled within Humio check out the [Humio HEC][urls.humio_hec] docs.
-
 
 </Field>
 

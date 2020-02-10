@@ -11,7 +11,6 @@ const HOST: &str = "https://cloud.humio.com";
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
-    encoding: Option<Encoding>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -28,12 +27,11 @@ inventory::submit! {
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
-        let encoding = self.encoding.clone().unwrap_or(Encoding::Json);
 
         HecSinkConfig {
             token: self.token.clone(),
             host,
-            encoding,
+            encoding: Encoding::Json,
             batch: self.batch.clone(),
             request: self.request.clone(),
             ..Default::default()
