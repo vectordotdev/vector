@@ -222,7 +222,7 @@ module.exports = {
             
               "reference/sinks/http",
             
-              "reference/sinks/humio",
+              "reference/sinks/humio_logs",
             
               "reference/sinks/kafka",
             

@@ -17345,7 +17345,7 @@ module.exports = {
 
       ]
     },
-    "humio": {
+    "humio_logs": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
@@ -17353,8 +17353,8 @@ module.exports = {
         "log"
       ],
       "function_category": "transmit",
-      "id": "humio_sink",
-      "name": "humio",
+      "id": "humio_logs_sink",
+      "name": "humio_logs",
       "operating_systems": [
         "Linux",
         "MacOS",

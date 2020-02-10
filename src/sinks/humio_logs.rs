@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HumioConfig {
+pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
     encoding: Option<Encoding>,
@@ -21,11 +21,11 @@ pub struct HumioConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HumioConfig>("humio")
+    SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
 }
 
 #[typetag::serde(name = "humio")]
-impl SinkConfig for HumioConfig {
+impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
         let encoding = self.encoding.clone().unwrap_or(Encoding::Json);
@@ -46,7 +46,7 @@ impl SinkConfig for HumioConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "humio"
+        "humio_logs"
     }
 }
 
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn smoke() {
-        load_sink::<HumioConfig>(
+        load_sink::<HumioLogsConfig>(
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"

@@ -4262,7 +4262,7 @@ end
     verify_hostname = false
 
 # Batches `log` events to Humio via the HEC API.
-[sinks.humio]
+[sinks.humio_logs]
   #
   # General
   #
@@ -4272,8 +4272,8 @@ end
   #
   # * required
   # * type: string
-  # * must be: "humio"
-  type = "humio"
+  # * must be: "humio_logs"
+  type = "humio_logs"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -4321,7 +4321,7 @@ end
   # Batch
   #
 
-  [sinks.humio.batch]
+  [sinks.humio_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * required
@@ -4342,7 +4342,7 @@ end
   # Buffer
   #
 
-  [sinks.humio.buffer]
+  [sinks.humio_logs.buffer]
     # The buffer's type and storage mechanism.
     #
     # * required
@@ -4382,7 +4382,7 @@ end
   # Request
   #
 
-  [sinks.humio.request]
+  [sinks.humio_logs.request]
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
