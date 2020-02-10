@@ -618,7 +618,7 @@ If you'd like to disable health checks for this sink you can set the
 
 ### Obtaining a Humio ingestion token
 
-1. Register for a free account at [Humio.com](https://apps.sematext.com/ui/registration)
+1. Register for a free account at [Humio.com](https://www.humio.com/getting-started)
 
 2. Get your Ingest token following these  [docs](https://docs.humio.com/ingesting-data/ingest-tokens/).
 
