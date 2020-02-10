@@ -161,11 +161,14 @@ transform will be checked against a table of conditions.\
 [tests.children.outputs.children.conditions]
 type = "[table]"
 common = true
-required = true
+required = false
 description = """\
 A table that defines a collection of conditions to check against the output of a \
 transform. A test is considered to have passed when each condition has resolved \
 true for one or more events extracted from the target transform.\
+\
+An expected output without conditions instead prints the input and output of a \
+target without checking its values.\
 """
 
 [tests.children.outputs.children.conditions.children.type]
