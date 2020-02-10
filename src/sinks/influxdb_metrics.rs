@@ -731,8 +731,14 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use crate::event::metric::{MetricKind, MetricValue};
+    use crate::event::Metric;
     use crate::runtime::Runtime;
     use crate::sinks::influxdb_metrics::{InfluxDBConfig, InfluxDBSvc};
+    use crate::topology::SinkContext;
+    use crate::Event;
+    use chrono::Utc;
+    use futures::{stream, Sink};
 
     const ORG: &str = "my-org";
     const BUCKET: &str = "my-bucket";
@@ -805,6 +811,106 @@ mod integration_tests {
 
     #[test]
     fn influxdb_metrics_put_data() {
-        onboarding()
+        onboarding();
+
+        let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let config = InfluxDBConfig {
+            namespace: "ns".to_string(),
+            host: "http://localhost:9999".to_string(),
+            org: ORG.to_string(),
+            bucket: BUCKET.to_string(),
+            token: TOKEN.to_string(),
+            batch: Default::default(),
+            request: Default::default(),
+        };
+
+        let metric = format!("counter-{}", Utc::now().timestamp_nanos());
+        let mut events = Vec::new();
+        for i in 0..10 {
+            let event = Event::Metric(Metric {
+                name: metric.to_string(),
+                timestamp: None,
+                tags: Some(
+                    vec![
+                        ("region".to_owned(), "us-west-1".to_owned()),
+                        ("production".to_owned(), "true".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: i as f64 },
+            });
+            events.push(event);
+        }
+
+        let sink = InfluxDBSvc::new(config, cx).unwrap();
+
+        let stream = stream::iter_ok(events.clone().into_iter());
+
+        let pump = sink.send_all(stream);
+        let _ = rt.block_on(pump).unwrap();
+
+        let mut body = std::collections::HashMap::new();
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+        body.insert("type", "flux".to_owned());
+
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+
+        let mut res = client
+            .post("http://localhost:9999/api/v2/query?org=my-org")
+            .json(&body)
+            .header("accept", "application/json")
+            .header("Authorization", "Token my-token")
+            .send()
+            .unwrap();
+        let result = res.text();
+        let string = result.unwrap();
+
+        let lines = string.split("\n").collect::<Vec<&str>>();
+        let header = lines[0].split(",").collect::<Vec<&str>>();
+        let record = lines[1].split(",").collect::<Vec<&str>>();
+
+        assert_eq!(
+            record[header
+                .iter()
+                .position(|&r| r.trim() == "metric_type")
+                .unwrap()]
+            .trim(),
+            "counter"
+        );
+        assert_eq!(
+            record[header
+                .iter()
+                .position(|&r| r.trim() == "production")
+                .unwrap()]
+            .trim(),
+            "true"
+        );
+        assert_eq!(
+            record[header.iter().position(|&r| r.trim() == "region").unwrap()].trim(),
+            "us-west-1"
+        );
+        assert_eq!(
+            record[header
+                .iter()
+                .position(|&r| r.trim() == "_measurement")
+                .unwrap()]
+            .trim(),
+            format!("ns.{}", metric)
+        );
+        assert_eq!(
+            record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
+            "value"
+        );
+        assert_eq!(
+            record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
+            "45"
+        );
     }
 }
