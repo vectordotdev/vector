@@ -1,6 +1,6 @@
 use crate::{
+    config_paths,
     topology::{config::Config, unit_test::UnitTest},
-    types::DEFAULT_CONFIG_PATHS,
 };
 use colored::*;
 use std::{fs::File, path::PathBuf};
@@ -47,11 +47,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
     let mut inspected_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
-    let paths = if !opts.paths.is_empty() {
-        &opts.paths
-    } else {
-        &DEFAULT_CONFIG_PATHS
-    };
+    let paths = config_paths::expand(opts.paths.clone()).unwrap_or_else(|| {
+        std::process::exit(exitcode::CONFIG);
+    });
 
     for (i, p) in paths.iter().enumerate() {
         let path_str = p.to_str().unwrap_or("");
