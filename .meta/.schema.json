@@ -124,6 +124,7 @@
             "string",
             "struct",
             "table",
+            "timestamp",
             "[float]",
             "[string]",
             "[table]"
@@ -168,6 +169,7 @@
           }
         },
         "fields": {
+          "$ref": "#/definitions/fields"
         }
       }
     },
