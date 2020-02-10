@@ -616,7 +616,7 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
-### Obtaining a Sematext token
+### Obtaining a Humio ingestion token
 
 1. Register for a free account at [Humio.com](https://apps.sematext.com/ui/registration)
 
