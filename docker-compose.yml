@@ -528,7 +528,10 @@ services:
         - 8681-8682:8681-8682
       environment:
         - PUBSUB_PROJECT1=testproject,topic1:subscription1
-
+    influxdb:
+      image: quay.io/influxdb/influxdb:2.0.0-beta
+      ports:
+        - "9999:9999"
     loki:
       image: grafana/loki
       ports:

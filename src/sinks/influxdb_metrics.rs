@@ -727,3 +727,84 @@ mod tests {
         assert_eq!(line_protocols.len(), 0);
     }
 }
+
+#[cfg(feature = "influxdb-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use crate::runtime::Runtime;
+    use crate::sinks::influxdb_metrics::{InfluxDBConfig, InfluxDBSvc};
+
+    const ORG: &str = "my-org";
+    const BUCKET: &str = "my-bucket";
+    const TOKEN: &str = "my-token";
+
+    fn onboarding() {
+        let mut body = std::collections::HashMap::new();
+        body.insert("username", "my-user");
+        body.insert("password", "my-password");
+        body.insert("org", ORG);
+        body.insert("bucket", BUCKET);
+        body.insert("token", TOKEN);
+
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+
+        let res = client
+            .post("http://localhost:9999/api/v2/setup")
+            .json(&body)
+            .header("accept", "application/json")
+            .send()
+            .unwrap();
+
+        let status = res.status();
+
+        assert!(
+            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
+
+    #[test]
+    fn influxdb_metrics_healthchecks_ok() {
+        onboarding();
+        let mut rt = Runtime::new().unwrap();
+        let config = InfluxDBConfig {
+            namespace: "ns".to_string(),
+            host: "http://localhost:9999".to_string(),
+            org: ORG.to_string(),
+            bucket: BUCKET.to_string(),
+            token: TOKEN.to_string(),
+            batch: Default::default(),
+            request: Default::default(),
+        };
+
+        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        rt.block_on(healthcheck).unwrap();
+    }
+
+    #[test]
+    fn influxdb_metrics_healthchecks_fail() {
+        onboarding();
+
+        let mut rt = Runtime::new().unwrap();
+        let config = InfluxDBConfig {
+            namespace: "ns".to_string(),
+            host: "http://not_exist:9999".to_string(),
+            org: ORG.to_string(),
+            bucket: BUCKET.to_string(),
+            token: TOKEN.to_string(),
+            batch: Default::default(),
+            request: Default::default(),
+        };
+
+        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        rt.block_on(healthcheck).unwrap_err();
+    }
+
+    #[test]
+    fn influxdb_metrics_put_data() {
+        onboarding()
+    }
+}
