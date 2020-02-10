@@ -1,6 +1,5 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use string_cache::DefaultAtom as Atom;
 
 use crate::{
@@ -9,24 +8,18 @@ use crate::{
     Event,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
+#[derivative(Debug)]
 pub enum CheckFieldsPredicateArg {
+    #[derivative(Debug = "transparent")]
     String(String),
+    #[derivative(Debug = "transparent")]
     Integer(i64),
+    #[derivative(Debug = "transparent")]
     Float(f64),
+    #[derivative(Debug = "transparent")]
     Boolean(bool),
-}
-
-impl fmt::Display for CheckFieldsPredicateArg {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            CheckFieldsPredicateArg::String(s) => write!(f, "'{}'", s),
-            CheckFieldsPredicateArg::Integer(i) => write!(f, "{}", i),
-            CheckFieldsPredicateArg::Float(fl) => write!(f, "{}", fl),
-            CheckFieldsPredicateArg::Boolean(b) => write!(f, "{}", b),
-        }
-    }
 }
 
 pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync {
@@ -198,7 +191,7 @@ fn build_predicates(
                 target.truncate(target.len() - 1);
                 match build_predicate(&pred, target, arg) {
                     Ok(pred) => {
-                        predicates.insert(format!("{}: {}", target_pred, arg), pred);
+                        predicates.insert(format!("{}: {:?}", target_pred, arg), pred);
                     }
                     Err(err) => errors.push(err),
                 }
@@ -345,14 +338,17 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.equals: 'foo', other_thing.eq: 'bar' ]".to_owned())
+            Err(
+                "predicates failed: [ message.equals: \"foo\", other_thing.eq: \"bar\" ]"
+                    .to_owned()
+            )
         );
 
         event.as_mut_log().insert("message", "foo");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.eq: 'bar' ]".to_owned())
+            Err("predicates failed: [ other_thing.eq: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "bar");
@@ -363,7 +359,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.equals: 'foo' ]".to_owned())
+            Err("predicates failed: [ message.equals: \"foo\" ]".to_owned())
         );
     }
 
@@ -385,7 +381,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.neq: 'bar' ]".to_owned())
+            Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "not bar");
@@ -396,7 +392,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.neq: 'bar' ]".to_owned())
+            Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("message", "foo");
@@ -404,7 +400,7 @@ mod test {
         assert_eq!(
             cond.check_with_context(&event),
             Err(
-                "predicates failed: [ message.not_equals: 'foo', other_thing.neq: 'bar' ]"
+                "predicates failed: [ message.not_equals: \"foo\", other_thing.neq: \"bar\" ]"
                     .to_owned()
             )
         );

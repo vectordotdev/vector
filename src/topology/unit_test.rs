@@ -50,14 +50,10 @@ fn events_to_string(name: &str, events: &Vec<Event>) -> String {
                 .join("\n    ")
         )
     } else {
-        format!(
-            "  {}: {}",
-            name,
-            events
-                .first()
-                .map(|e| event_to_string(e))
-                .unwrap_or("".to_string())
-        )
+        events
+            .first()
+            .map(|e| format!("  {}: {}", name, event_to_string(e)))
+            .unwrap_or(format!("  no {}", name))
     }
 }
 
@@ -106,7 +102,7 @@ impl UnitTest {
             if let Some((inputs, outputs)) = results.get(&check.extract_from) {
                 if check.conditions.is_empty() {
                     inspections.push(format!(
-                        "check transform '{}' payloads (JSON encoded):\n{}\n{}",
+                        "check transform '{}' payloads (events encoded as JSON):\n{}\n{}",
                         check.extract_from,
                         events_to_string("input", inputs),
                         events_to_string("output", outputs),
@@ -135,7 +131,7 @@ impl UnitTest {
                     .collect::<Vec<_>>();
                 if !failed_conditions.is_empty() {
                     errors.push(format!(
-                        "check transform '{}' failed conditions:\n  {}\npayloads (JSON encoded):\n{}\n{}",
+                        "check transform '{}' failed conditions:\n  {}\npayloads (events encoded as JSON):\n{}\n{}",
                         check.extract_from,
                         failed_conditions.join("\n  "),
                         events_to_string("input", inputs),
