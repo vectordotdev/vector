@@ -3,7 +3,6 @@
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
 export USE_CONTAINER ?= docker
-export REBUILD_CONTAINER_IMAGE ?= true
 
 
 help:

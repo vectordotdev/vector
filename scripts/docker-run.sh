@@ -28,14 +28,13 @@ fi
 #
 
 DOCKER=${USE_CONTAINER:-docker}
-DOCKER_PRIVILEGED=${DOCKER_PRIVILEGED:-false}
 tag="$1"
 image="timberiodev/vector-$tag:latest"
 
 #
 # (Re)Build
 #
-if ! $DOCKER inspect $image >/dev/null 2>&1 || [ "$REBUILD_CONTAINER_IMAGE" == true ]
+if ! $DOCKER inspect $image >/dev/null 2>&1 || [ "${REBUILD_CONTAINER_IMAGE:-true}" == true ]
 then
   $DOCKER build \
     --file scripts/ci-docker-images/$tag/Dockerfile \
@@ -60,7 +59,7 @@ fi
 # pass `--privileged`. One use case is to register `binfmt`
 # handlers in order to run builders for ARM architectures
 # using `qemu-user`.
-if [ "$DOCKER_PRIVILEGED" == "true" ]; then
+if [ "${DOCKER_PRIVILEGED:-false}" == true ]; then
   docker_flags+=("--privileged")
 fi
 
