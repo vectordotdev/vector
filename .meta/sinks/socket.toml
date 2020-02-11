@@ -1,16 +1,30 @@
 [sinks.socket]
 title = "Socket"
 beta = false
-buffer = true
 common = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
-encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 write_to_description = "a socket, such as a TCP or Unix domain socket"
-tls_options = ["+enabled"]
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "socket") %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.socket.options") %>
+
+[sinks.socket.options.encoding]
+type = "string"
+category = "requests"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.socket.options.encoding.enum]
+json = "Each event is encoded into JSON."
+text = "Each event is encoded into text via the `message` key."
 
 [sinks.socket.options.mode]
 type = "string"
@@ -38,3 +52,6 @@ required = true
 relevant_when = {mode = "unix"}
 description = """The unix socket path. This should be the absolute path.\
 """
+
+<%= render("_partials/_tls_options.toml", namespace: "sinks.socket.options", can_enable: true, can_verify: true) %>
+

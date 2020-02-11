@@ -7,7 +7,12 @@ function Fields({children, filters}) {
   const [onlyRequired, setOnlyRequired] = useState(false);
   const [searchTerm, setSearchTerm] = useState(null);
 
-  let childrenArray = Array.isArray(children) ? children : [children];
+  let childrenArray = [];
+
+  if (children) {
+    childrenArray = Array.isArray(children) ? children : [children];
+  }
+
   let commonRelevant = childrenArray.some(child => child.props.common);
   let requiredRelevant = childrenArray.some(child => child.props.required);
   let filteredChildren = childrenArray;

@@ -1,28 +1,51 @@
 [sinks.aws_kinesis_firehose]
 title = "AWS Kinesis Firehose"
-batch_max_events = 500
-batch_timeout_secs = 1
 beta = true
-buffer = true
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
-encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num =5
-request_retry_attempts = 5
-request_retry_initial_backoff_secs = 1
-request_retry_max_duration_secs = 10
-request_in_flight_limit = 5
-request_timeout_secs = 30
 service_limits_short_link = "aws_kinesis_firehose_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)"
 
 <%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_firehose.env_vars") %>
+
+<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_kinesis_firehose.options") %>
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "aws_kinesis_firehose") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_kinesis_firehose.options", common: false, max_events: 500, max_size: nil, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.aws_kinesis_firehose.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.aws_kinesis_firehose.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 30
+) %>
+
+[sinks.aws_kinesis_firehose.options.encoding]
+type = "string"
+category = "requests"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.aws_kinesis_firehose.options.encoding.enum]
+json = "Each event is encoded into JSON and the payload is represented as a JSON array."
+text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
 
 [sinks.aws_kinesis_firehose.options.stream_name]
 type = "string"
@@ -30,8 +53,6 @@ common = true
 examples = ["my-stream"]
 required = true
 description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Firehose delivery stream."
-
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_kinesis_firehose.options") %>
 
 [[sinks.aws_kinesis_firehose.output.examples]]
 label = "Generic"

@@ -226,13 +226,17 @@ More detail on the output schema is below.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["app-name"]}
   name={"appname"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### appname
@@ -244,13 +248,17 @@ The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a appnam
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["1"]}
   name={"facility"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### facility
@@ -262,31 +270,39 @@ The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a facil
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### host
 
-The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the socket path will be used.
+The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a hostname is not found, then Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the socket path will be used. This key can be renamed via the [`host_key`](#host_key) option.
 
 
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -299,13 +315,17 @@ The raw message, unaltered.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["ID47"]}
   name={"msgid"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### msgid
@@ -317,13 +337,17 @@ The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a msgid is
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[8710]}
   name={"procid"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
+  unit={null}
   >
 
 ### procid
@@ -335,13 +359,17 @@ The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a procid 
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["notice"]}
   name={"severity"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### severity
@@ -353,13 +381,17 @@ The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a sever
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp
@@ -371,13 +403,17 @@ The timestamp extracted from the incoming line. If a timestamp is not found, the
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[1]}
   name={"version"}
   path={null}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"int"}
+  unit={null}
   >
 
 ### version

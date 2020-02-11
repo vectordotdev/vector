@@ -1,61 +1,94 @@
 [sinks.http]
 title = "HTTP"
-batch_is_common = true
-batch_max_size = 1049000
-batch_timeout_secs = 1
 beta = false
-buffer = true
 common = true
-compressions = ["gzip"]
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
-encodings = ["ndjson", "json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num = 10
-request_retry_attempts = 10
-request_retry_initial_backoff_secs = 1
-request_retry_max_duration_secs = 10
-request_in_flight_limit = 10
-request_timeout_secs = 30
 write_to_description = "a generic HTTP endpoint"
-tls_options = []
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "http") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.http.options", common: true, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.http.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.http.options",
+  common: true,
+  in_flight_limit: 10,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 1000,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 30
+) %>
 
 [sinks.http.options.auth]
 type = "table"
 common = false
 description = "Options for the authentication strategy."
 
-[sinks.http.options.auth.options.strategy]
+[sinks.http.options.auth.children.strategy]
 type = "string"
 prioritize = true
 required = true
 description = "The authentication strategy to use."
 
-[sinks.http.options.auth.options.strategy.enum]
+[sinks.http.options.auth.children.strategy.enum]
 basic = "The [basic authentication strategy][urls.basic_auth]."
 
-[sinks.http.options.auth.options.password]
+[sinks.http.options.auth.children.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
-[sinks.http.options.auth.options.user]
+[sinks.http.options.auth.children.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
 
+[sinks.http.options.compression]
+type = "string"
+category = "requests"
+common = true
+default = "none"
+description = """\
+The compression strategy used to compress the encoded event data before \
+outputting.\
+"""
+
+[sinks.http.options.compression.enum]
+none = "The payload will not be compressed."
+gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
+
+[sinks.http.options.encoding]
+type = "string"
+category = "requests"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.http.options.encoding.enum]
+json = "Each event is encoded into JSON and the payload is represented as a JSON array."
+ndjson = "Each event is encoded into JSON and the payload is new line delimited."
+text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+
 [sinks.http.options.headers]
 type = "table"
 description = "Options for custom headers."
 
-[sinks.http.options.headers.options."`[header-key]`"]
+[sinks.http.options.headers.children."`[header-key]`"]
 type = "string"
 examples = [
   {"Authorization" = "${TOKEN_ENV_VAR}"},
@@ -68,6 +101,8 @@ description = "A custom header to be added to each outgoing HTTP request."
 type = "string"
 examples = ["https://10.22.212.22:9000/_health"]
 description = "A URI that Vector can request in order to determine the service health."
+
+<%= render("_partials/_tls_options.toml", namespace: "sinks.http.options", can_enable: false, can_verify: true) %>
 
 [sinks.http.options.uri]
 type = "string"

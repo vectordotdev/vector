@@ -16,6 +16,8 @@ This ensures that this source works across all platforms. Please see the \
 section for more info.\
 """
 
+<%= render("_partials/_component_options.toml", type: "source", name: "journald") %>
+
 [sources.journald.options.current_boot_only]
 type = "bool"
 common = true
