@@ -115,7 +115,7 @@ class Metadata
     :log_fields,
     :metric_fields,
     :options,
-    :testing,
+    :tests,
     :posts,
     :releases,
     :sinks,
@@ -132,7 +132,7 @@ class Metadata
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
-    @testing = hash.fetch("testing").to_struct_with_name(Field)
+    @tests = Field.new(hash.fetch("tests").merge({"name" => "tests"}))
 
     # domains
 
