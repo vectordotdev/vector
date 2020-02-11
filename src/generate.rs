@@ -300,7 +300,7 @@ type = "memory"
 max_events = 500
 when_full = "block"
 "#
-            .to_string(),)
+            .to_string())
         );
 
         assert_eq!(
@@ -328,7 +328,7 @@ type = "memory"
 max_events = 500
 when_full = "block"
 "#
-            .to_string(),)
+            .to_string())
         );
 
         assert_eq!(
@@ -350,7 +350,7 @@ type = "memory"
 max_events = 500
 when_full = "block"
 "#
-            .to_string(),)
+            .to_string())
         );
 
         assert_eq!(
@@ -368,7 +368,7 @@ type = "memory"
 max_events = 500
 when_full = "block"
 "#
-            .to_string(),)
+            .to_string())
         );
 
         assert_eq!(
@@ -390,7 +390,7 @@ type = "json_parser"
 inputs = ["transform1"]
 type = "remove_fields"
 "#
-            .to_string(),)
+            .to_string())
         );
     }
 }
