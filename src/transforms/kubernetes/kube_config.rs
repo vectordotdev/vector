@@ -3,6 +3,7 @@
 use dirs;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
+use snafu::{ResultExt, Snafu};
 use std::{fs::File, path::PathBuf};
 
 /// Enviorment variable that can containa path to kubernetes config file.
@@ -10,18 +11,30 @@ const CONFIG_PATH: &str = "KUBECONFIG";
 
 /// Loads configuration from local kubeconfig file, the same
 /// one that kubectl uses.
-pub fn load_kube_config() -> Option<Config> {
+/// None if such file doesn't exist.
+pub fn load_kube_config() -> Option<Result<Config, KubeConfigLoadError>> {
     let path = std::env::var(CONFIG_PATH)
         .ok()
         .map(PathBuf::from)
         .or_else(|| dirs::home_dir().map(|home| home.join(".kube").join("config")))?;
 
-    let file = File::open(path)
-        .map_err(|error| debug!(message = "Error opening Kubernetes config file.",%error))
-        .ok()?;
-    serde_yaml::from_reader(file)
-        .map_err(|error| debug!(message = "Error parsing Kubernetes config file.",%error))
-        .ok()
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(error) => {
+            return Some(Err(KubeConfigLoadError::FileError { source: error }));
+        }
+    };
+
+    Some(serde_yaml::from_reader(file).context(ParsingError))
+}
+
+#[derive(Debug, Snafu)]
+pub enum KubeConfigLoadError {
+    #[snafu(display("Error opening Kubernetes config file: {}.", source))]
+    FileError { source: std::io::Error },
+    #[snafu(display("Error parsing Kubernetes config file: {}.", source))]
+    ParsingError { source: serde_yaml::Error },
 }
 
 /// Config defines currently relevant data that can be found in

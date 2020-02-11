@@ -368,7 +368,7 @@ mod kube_tests {
         /// Loads configuration from local kubeconfig file, the same
         /// one that kubectl uses.
         fn load_kube_config(resolver: Resolver) -> Option<Self> {
-            let config = kube_config::load_kube_config()?;
+            let config = kube_config::load_kube_config()?.unwrap();
             // Get current context
             let context = &config
                 .contexts
