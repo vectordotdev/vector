@@ -1,0 +1,203 @@
+---
+title: Developing Complex Vector Config Files
+sidebar_label: Advanced Configs
+description: Strategies for building and maintaining complex Vector configs
+---
+
+Writing large configuration files is not yet an official olympic event. However,
+it's still a good idea to get yourself ahead of the competition. In this guide
+we're going to cover some tips and tricks that will help you write clear, bug
+free Vector configs that are easy to maintain.
+
+## Building Pipeline Structure
+
+In Vector each component of a pipeline specifies which components it consumes
+events from. This makes it very easy to build multiplexed topologies. However,
+hooking up transforms this way can sometimes be frustrating and brittle as the
+number of transforms increases.
+
+Luckily, the Vector team are desperate for your approval and have worked hard to
+mitigate this with the following tools.
+
+### TODO: Talk about compose transform or pipelines
+
+TODO: Once added we can reduce the `generate` section to just a side note, or
+tip.
+
+This saves you the burden of maintaining the links between chained transforms.
+Instead you can simply insert transforms exactly where they need to be within
+the chain, and remove them without breaking the topology.
+
+### Generating Chains
+
+In cases where we simply want to chain a few components together we can avoid
+writing most of the boilerplate with the `generate` subcommand. This allows us
+to express a list of components, where it generates a config with all of those
+components connected in a linear chain.
+
+For example, if we wished to create a chain of three transforms; `json_parser`,
+`add_fields`, and `remove_fields`, we can run:
+
+```bash
+vector generate /json_parser,add_fields,remove_fields > example.toml
+# Find out more with `vector generate --help`
+```
+
+And most of the boilerplate will be written for us, with each component printed
+with an `inputs` field that specifies the component before it:
+
+```toml
+[transforms.transform0]
+  inputs = [ "TODO" ]
+  type = "json_parser"
+  # etc ...
+
+[transforms.transform1]
+  inputs = [ "transform0" ]
+  type = "add_fields"
+  # etc ...
+
+[transforms.transform2]
+  inputs = [ "transform1" ]
+  type = "remove_fields"
+  # etc ...
+```
+
+The names of the generated components are sequential (`transform0`,
+`transform1`, and so on). It's therefore worth doing a search and replace with
+your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
+
+### Swimlanes
+
+It's very common to want to execute different transforms depending on the
+contents of an event. This is made easy in Vector with the
+[`swimlanes` transform]\[docs.transform.swimlanes]:
+
+```toml
+TODO
+```
+
+## Test Driven Configuration
+
+Test driven configuration is a paradigm I just made up, so there's still time
+for you to adopt it _before_ it's cool. Vector supports complementing your
+configs with [unit tests][docs.guides.unit-testing], and as it turns out they're
+also pretty useful during the building stage.
+
+Let's imagine we are in the process of building the config from the [unit test
+guide][docs.guides.unit-testing], we might start off with our source and
+the grok parser:
+
+```toml
+[sources.over_tcp]
+  type = "socket"
+  mode = "tcp"
+  address = "0.0.0.0:9000"
+
+[transforms.foo]
+  type = "grok_parser"
+  inputs = ["over_tcp"]
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+```
+
+A common way to test this transform might be to temporarily change the source
+into a `stdin` type, add a `console` sink pointed to our target transform, and
+run it with some sample data. However, this is awkward as it means distorting
+our config to run tests rather than focusing on features.
+
+Instead, we can leave our source as a `socket` type and add a unit test to the
+end of our config:
+
+```toml
+[[tests]]
+  name = "check_simple_log"
+
+  [tests.input]
+    insert_at = "foo"
+    type = "raw"
+    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+
+  [[tests.outputs]]
+    extract_from = "foo"
+```
+
+When we add a unit test output without any conditions it will simply print the
+input and output events of a transform, allowing us to inspect its behavior:
+
+```sh
+$ vector test ./example.toml
+Running example.toml tests
+test example.toml: check_simple_log ... passed
+
+inspections:
+
+--- example.toml ---
+
+test 'check_simple_log':
+
+check transform 'foo' payloads (events encoded as JSON):
+  input: {"timestamp":"2020-02-11T15:04:02.361999Z", "message":"2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"}
+  output: {"level":"info","message":"Sorry, I'm busy this week Cecil", "timestamp":"2019-11-28T12:00:00+00:00"}
+```
+
+As we introduce new transforms to our config we can change the test output
+to check the latest transform. Or, occasionally, we can add conditions to an
+output in order to turn it into a regression test:
+
+```toml
+[[tests]]
+  name = "check_simple_log"
+
+  [tests.input]
+    insert_at = "foo"
+    type = "raw"
+    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+
+  # This is now a regression test
+  [[tests.outputs]]
+    extract_from = "foo"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.equals" = "Sorry, I'm busy this week Cecil"
+
+  # And we add a new output without conditions for inspecting
+  # a new transform
+  [[tests.outputs]]
+    extract_from = "bar"
+```
+
+How many tests you add is at your discretion, but you probably don't need to
+test every single transform. I recommend every four transforms, except during a
+full moon when you should test every two just to be sure.
+
+## Organizing Configs
+
+Building configs is only the beginning. Once it's built you need to make sure
+pesky meddlers don't ruin it. The best way to keep on top of that is to break
+large configs down into smaller more manageable pieces.
+
+With Vector you can split a config down into as many files as you like and run
+them all as a larger topology:
+
+```bash
+# These three examples run the same two configs together:
+$ vector -c ./configs/foo.toml -c ./configs/bar.toml
+$ vector -c ./configs/*.toml
+$ vector -c ./configs/foo.toml ./configs/bar.toml
+```
+
+If you have a large chain of components it's a good idea to break them out into
+their own file, each with its own unit tests.
+
+TODO: What does this look like? Config example in `./config/examples`?
+
+### Recycled Pipelines
+
+TODO: When compose or pipelines allows config reuse.
+
+Sometimes we might need to build a chain of transforms for a specific purpose
+that might appear multiple times in a topology.
+
+\[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+
+[docs.guides.unit-testing]: /docs/setup/guides/unit-testing/
