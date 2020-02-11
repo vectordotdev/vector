@@ -341,13 +341,25 @@ mod kube_tests {
         sinks::util::tls::TlsOptions,
         sinks::util::tls::TlsSettings,
         sources::kubernetes::test::{echo, Kube},
-        test_util::runtime,
+        test_util::{runtime, temp_file},
         transforms::kubernetes::kube_config,
     };
     use http::Uri;
     use k8s_openapi::WatchOptional;
+    use std::fs::OpenOptions;
+    use std::io::Write;
     use std::{path::PathBuf, str::FromStr, sync::mpsc::channel, time::Duration};
     use uuid::Uuid;
+
+    fn store_to_file(data: &[u8]) -> Result<PathBuf, std::io::Error> {
+        let path = temp_file();
+
+        let mut file = OpenOptions::new().write(true).open(path.clone())?;
+        file.write_all(data)?;
+        file.sync_all()?;
+
+        Ok(path)
+    }
 
     impl ClientConfig {
         // NOTE: Currently used only for tests, but can be later used in
@@ -379,12 +391,29 @@ mod kube_tests {
             assert!(user.username.is_none(), "Not yet supported");
             assert!(user.password.is_none(), "Not yet supported");
             assert!(user.token_file.is_none(), "Not yet supported");
-            assert!(
-                cluster.certificate_authority_data.is_none(),
-                "Not yet supported"
-            );
-            assert!(user.client_certificate_data.is_none(), "Not yet supported");
             assert!(user.client_key_data.is_none(), "Not yet supported");
+
+            let certificate_authority_path = cluster
+                .certificate_authority
+                .clone()
+                .map(PathBuf::from)
+                .or_else(|| {
+                    cluster.certificate_authority_data.as_ref().map(|data| {
+                        store_to_file(data.as_bytes())
+                            .expect("Failed to store certificate authority public key.")
+                    })
+                });
+
+            let client_certificate_path = user
+                .client_certificate
+                .clone()
+                .map(PathBuf::from)
+                .or_else(|| {
+                    user.client_certificate_data.as_ref().map(|data| {
+                        store_to_file(data.as_bytes()).expect("Failed to store clients public key.")
+                    })
+                });
+
             // Construction
             Some(ClientConfig {
                 resolver,
@@ -392,8 +421,8 @@ mod kube_tests {
                 server: Uri::from_str(&cluster.server).unwrap(),
                 tls_settings: TlsSettings::from_options(&Some(TlsOptions {
                     verify_certificate: cluster.insecure_skip_tls_verify,
-                    ca_path: cluster.certificate_authority.clone().map(PathBuf::from),
-                    crt_path: user.client_certificate.clone().map(PathBuf::from),
+                    ca_path: certificate_authority_path,
+                    crt_path: client_certificate_path,
                     key_path: user.client_key.clone().map(PathBuf::from),
                     ..TlsOptions::default()
                 }))
