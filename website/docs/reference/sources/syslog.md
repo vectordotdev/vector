@@ -308,7 +308,7 @@ The hostname extracted from the  Syslog line. If a hostname is not found, then V
 ### message
 
 The raw message, unaltered.
-
+ See [Parsing](#parsing) for more info.
 
 
 </Field>
@@ -453,10 +453,10 @@ Vector makes a _best effort_ to parse the various Syslog formats out in the
 wild. This includes [RFC 5424][urls.syslog_5424], [RFC 3164][urls.syslog_3164],
 and other common variations (such as the Nginx Syslog style). It's unfortunate
 that the Syslog specification is not more accurately followed, but we hope
-Vector insulates you from all of these divations.
+Vector insulates you from these diviations.
 
-If parsing fails, the event will be dropped and `warning` log line will be
-emitted. If this is the case, we recommend using the
+If parsing fails, Vector will include the entire Syslog line in the [`message`](#message)
+key. If you find this happening often, we recommend using the
 [`socket` source][docs.sources.socket] combined with the
 [`regex_parser` transform][docs.transforms.regex_parser] to implement your own
 ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
