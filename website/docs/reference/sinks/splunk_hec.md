@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"] # example
-  host = "my-splunk-host.com" # example
+  host = "http://my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
   # REQUIRED - requests
@@ -68,7 +68,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"] # example
-  host = "my-splunk-host.com" # example
+  host = "http://my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
   # REQUIRED - requests
@@ -358,7 +358,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["my-splunk-host.com"]}
+  examples={["http://my-splunk-host.com"]}
   name={"host"}
   path={null}
   relevantWhen={null}

@@ -5386,7 +5386,7 @@ end
   #
   # * required
   # * type: string
-  host = "my-splunk-host.com"
+  host = "http://my-splunk-host.com"
 
   # Your Splunk HEC token.
   #

@@ -45,7 +45,7 @@ text = "Each event is encoded into text via the `message` key and the payload is
 [sinks.splunk_hec.options.host]
 type = "string"
 common = true
-examples = ["my-splunk-host.com"]
+examples = ["http://my-splunk-host.com"]
 required = true
 description = "Your Splunk HEC host."
 
