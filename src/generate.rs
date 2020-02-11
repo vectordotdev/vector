@@ -265,14 +265,6 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 mod tests {
     use super::*;
 
-    // !IF YOU MODIFIED COMPONENT FIELDS AND NOW THESE TESTS FAIL!
-    //
-    // Sorry, you've been visited by the "test against static config examples"
-    // fairy. Either edit the following config comparisons in order to get the
-    // tests working again. Or, if you're strapped for time, simply comment
-    // these tests out, they can be revived the next time someone edits
-    // `vector generate`.
-
     #[test]
     fn generate_basic() {
         assert_eq!(
