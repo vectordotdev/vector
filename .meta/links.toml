@@ -98,6 +98,7 @@ iam_instance_profile = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_role
 iana_time_zone_format = "https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones"
 iana_time_zones = "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
 initd = "https://bash.cyberciti.biz/guide//etc/init.d"
+influxdb = "https://www.influxdata.com"
 inode = "https://en.wikipedia.org/wiki/Inode"
 iso3166-2 = "https://en.wikipedia.org/wiki/ISO_3166-2"
 jemalloc = "https://github.com/jemalloc/jemalloc"

@@ -280,6 +280,7 @@
               "Datadog",
               "Elastic",
               "Google",
+              "InfluxData",
               "New Relic",
               "Splunk"
             ]
