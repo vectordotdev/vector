@@ -73,12 +73,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
-name = "assert_matches"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7deb0a829ca7bcfaf5da70b073a8d128619259a7be8216a355e23f00763059e5"
-
-[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3633,13 +3627,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "syslog_rfc5424"
-version = "0.6.1"
+name = "syslog_loose"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1f5c427514a0cd2a4a7e28d307672e56ddd4af03c6685e8b8e7f148a8b77e7b"
+checksum = "fa9111fd093edea4c3e08ea5c98ba7ec718f7fcd4ad6ebc662612c4c7dc0191e"
 dependencies = [
- "assert_matches",
- "time",
+ "chrono",
+ "nom 5.1.0",
 ]
 
 [[package]]
@@ -4713,7 +4707,7 @@ dependencies = [
  "string_cache",
  "strip-ansi-escapes",
  "structopt",
- "syslog_rfc5424",
+ "syslog_loose",
  "tempfile",
  "tokio",
  "tokio-retry",

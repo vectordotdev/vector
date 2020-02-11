@@ -17830,7 +17830,7 @@ module.exports = {
     "syslog": {
       "beta": false,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the Syslog 5424 protocol and outputs log events.",
+      "description": "Ingests data through the Syslog protocol and outputs log events.",
       "event_types": [
         "log"
       ],

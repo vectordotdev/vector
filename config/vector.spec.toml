@@ -572,7 +572,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
-# Ingests data through the Syslog 5424 protocol and outputs `log` events.
+# Ingests data through the Syslog protocol and outputs `log` events.
 [sources.syslog]
   #
   # General
