@@ -2,7 +2,6 @@
 extern crate tracing;
 
 use futures::{future, Future, Stream};
-use glob::glob;
 use std::{
     cmp::{max, min},
     fs::File,
@@ -14,9 +13,7 @@ use structopt::{clap::AppSettings, StructOpt};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{
-    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
-};
+use vector::{config_paths, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -91,6 +88,7 @@ enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
+    /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
 }
 
@@ -221,26 +219,9 @@ fn main() {
         }
     }
 
-    let mut config_paths = Vec::new();
-    for config_pattern in if !opts.config_paths.is_empty() {
-        opts.config_paths
-    } else {
-        DEFAULT_CONFIG_PATHS.to_vec()
-    } {
-        let matches: Vec<PathBuf> = glob(config_pattern.to_str().expect("No ability to glob"))
-            .expect("Failed to read glob pattern")
-            .filter_map(Result::ok)
-            .collect();
-
-        if matches.is_empty() {
-            error!(message = "Config file not found in path.", path = ?config_pattern);
-            std::process::exit(exitcode::CONFIG);
-        }
-
-        for path in matches {
-            config_paths.push(path);
-        }
-    }
+    let mut config_paths = config_paths::expand(opts.config_paths.clone()).unwrap_or_else(|| {
+        std::process::exit(exitcode::CONFIG);
+    });
     config_paths.sort();
     config_paths.dedup();
 
@@ -480,11 +461,9 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate) -> exitcode::ExitCode {
-    let paths = if opts.paths.len() > 0 {
-        &opts.paths
-    } else {
-        &DEFAULT_CONFIG_PATHS
-    };
+    let paths = config_paths::expand(opts.paths.clone()).unwrap_or_else(|| {
+        std::process::exit(exitcode::CONFIG);
+    });
 
     for config_path in paths {
         let file = if let Some(file) = open_config(&config_path) {
