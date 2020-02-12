@@ -11,19 +11,19 @@ use toml::Value;
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Generate expression, e.g. 'stdin|json_parser,add_fields|console'
+    /// Generate expression, e.g. 'stdin/json_parser,add_fields/console'
     ///
-    /// Three comma-separated lists of sources, transforms and sinks, separated
-    /// by pipes. If subsequent component types are not needed then their pipes
-    /// can be omitted from the expression.
+    /// Three comma-separated lists of sources, transforms and sinks, divided by
+    /// forward slashes. If subsequent component types are not needed then
+    /// their dividers can be omitted from the expression.
     ///
     /// For example:
     ///
-    /// `|json_parser` prints a `json_parser` transform.
+    /// `/json_parser` prints a `json_parser` transform.
     ///
-    /// `||file,http` prints a `file` and `http` sink.
+    /// `//file,http` prints a `file` and `http` sink.
     ///
-    /// `stdin||http` prints a `stdin` source and an `http` sink.
+    /// `stdin//http` prints a `stdin` source and an `http` sink.
     ///
     /// Vector makes a best attempt at constructing a sensible topology. The
     /// first transform generated will consume from all sources and subsequent
@@ -55,27 +55,28 @@ pub struct TransformOuter {
 
 #[derive(Serialize, Default)]
 pub struct Config {
-    #[serde(flatten)]
-    pub global: GlobalOptions,
     pub sources: Option<IndexMap<String, Value>>,
     pub transforms: Option<IndexMap<String, TransformOuter>>,
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let components: Vec<Vec<_>> = opts
-        .expression
-        .split('|')
+fn generate_example(expression: &str) -> Result<String, Vec<String>> {
+    let components: Vec<Vec<_>> = expression
+        .split(|c| c == '|' || c == '/')
         .map(|s| {
             s.split(',')
-                .map(|s| s.trim())
+                .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect()
         })
         .collect();
 
+    let globals = {
+        let mut globals = GlobalOptions::default();
+        globals.data_dir = crate::topology::config::default_data_dir();
+        globals
+    };
     let mut config = Config::default();
-    config.global.data_dir = crate::topology::config::default_data_dir();
 
     let mut errs = Vec::new();
 
@@ -91,7 +92,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(err);
+                        errs.push(format!("{}", err));
                     }
                     Value::Table(BTreeMap::new())
                 }
@@ -130,7 +131,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(err);
+                        errs.push(format!("{}", err));
                     }
                     Value::Table(BTreeMap::new())
                 }
@@ -162,7 +163,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(err);
+                        errs.push(format!("{}", err));
                     }
                     Value::Table(BTreeMap::new())
                 }
@@ -199,18 +200,189 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     if !errs.is_empty() {
-        errs.iter().for_each(|e| eprintln!("Generate error: {}", e));
-        return exitcode::CONFIG;
+        return Err(errs);
     }
 
-    match toml::to_string_pretty(&config) {
+    let mut builder = match toml::to_string(&globals) {
+        Ok(s) => s,
+        Err(err) => {
+            errs.push(format!("failed to marshal globals: {}", err));
+            return Err(errs);
+        }
+    };
+    if let Some(sources) = config.sources {
+        match toml::to_string(&{
+            let mut sub = Config::default();
+            sub.sources = Some(sources);
+            sub
+        }) {
+            Ok(v) => builder = [builder, v].join("\n"),
+            Err(e) => errs.push(format!("failed to marshal sources: {}", e)),
+        }
+    }
+    if let Some(transforms) = config.transforms {
+        match toml::to_string(&{
+            let mut sub = Config::default();
+            sub.transforms = Some(transforms);
+            sub
+        }) {
+            Ok(v) => builder = [builder, v].join("\n"),
+            Err(e) => errs.push(format!("failed to marshal transforms: {}", e)),
+        }
+    }
+    if let Some(sinks) = config.sinks {
+        match toml::to_string(&{
+            let mut sub = Config::default();
+            sub.sinks = Some(sinks);
+            sub
+        }) {
+            Ok(v) => builder = [builder, v].join("\n"),
+            Err(e) => errs.push(format!("failed to marshal sinks: {}", e)),
+        }
+    }
+
+    if !errs.is_empty() {
+        Err(errs)
+    } else {
+        Ok(builder)
+    }
+}
+
+pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+    match generate_example(&opts.expression) {
         Ok(s) => {
             println!("{}", s);
             exitcode::OK
         }
-        Err(e) => {
-            eprintln!("Failed to generate config: {}.", e);
+        Err(errs) => {
+            errs.iter().for_each(|e| eprintln!("Generate error: {}", e));
             exitcode::SOFTWARE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_basic() {
+        assert_eq!(
+            generate_example("stdin/json_parser/console"),
+            Ok(r#"data_dir = "/var/lib/vector/"
+dns_servers = []
+
+[sources.source0]
+max_length = 102400
+type = "stdin"
+
+[transforms.transform0]
+inputs = ["source0"]
+drop_field = true
+drop_invalid = false
+type = "json_parser"
+
+[sinks.sink0]
+healthcheck = true
+inputs = ["transform0"]
+type = "console"
+
+[sinks.sink0.buffer]
+type = "memory"
+max_events = 500
+when_full = "block"
+"#
+            .to_string())
+        );
+
+        assert_eq!(
+            generate_example("stdin|json_parser|console"),
+            Ok(r#"data_dir = "/var/lib/vector/"
+dns_servers = []
+
+[sources.source0]
+max_length = 102400
+type = "stdin"
+
+[transforms.transform0]
+inputs = ["source0"]
+drop_field = true
+drop_invalid = false
+type = "json_parser"
+
+[sinks.sink0]
+healthcheck = true
+inputs = ["transform0"]
+type = "console"
+
+[sinks.sink0.buffer]
+type = "memory"
+max_events = 500
+when_full = "block"
+"#
+            .to_string())
+        );
+
+        assert_eq!(
+            generate_example("stdin//console"),
+            Ok(r#"data_dir = "/var/lib/vector/"
+dns_servers = []
+
+[sources.source0]
+max_length = 102400
+type = "stdin"
+
+[sinks.sink0]
+healthcheck = true
+inputs = ["source0"]
+type = "console"
+
+[sinks.sink0.buffer]
+type = "memory"
+max_events = 500
+when_full = "block"
+"#
+            .to_string())
+        );
+
+        assert_eq!(
+            generate_example("//console"),
+            Ok(r#"data_dir = "/var/lib/vector/"
+dns_servers = []
+
+[sinks.sink0]
+healthcheck = true
+inputs = ["TODO"]
+type = "console"
+
+[sinks.sink0.buffer]
+type = "memory"
+max_events = 500
+when_full = "block"
+"#
+            .to_string())
+        );
+
+        assert_eq!(
+            generate_example("/add_fields,json_parser,remove_fields"),
+            Ok(r#"data_dir = "/var/lib/vector/"
+dns_servers = []
+
+[transforms.transform0]
+inputs = []
+type = "add_fields"
+
+[transforms.transform1]
+inputs = ["transform0"]
+drop_field = true
+drop_invalid = false
+type = "json_parser"
+
+[transforms.transform2]
+inputs = ["transform1"]
+type = "remove_fields"
+"#
+            .to_string())
+        );
     }
 }
