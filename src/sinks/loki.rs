@@ -143,7 +143,8 @@ impl HttpSink for LokiConfig {
         };
 
         // If no labels are provided we set our own default
-        // `{agent="vector"}` label.
+        // `{agent="vector"}` label. This can happen if the only
+        // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
