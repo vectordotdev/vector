@@ -17591,7 +17591,7 @@ module.exports = {
     "docker": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the docker engine daemon and outputs log events.",
+      "description": "Ingests data through the [Docker engine daemon][urls.docker_daemon] and outputs log events.",
       "event_types": [
         "log"
       ],
