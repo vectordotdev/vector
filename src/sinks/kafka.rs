@@ -282,7 +282,7 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], "value".as_bytes());
-        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map[&event::schema().message_key.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());
     }

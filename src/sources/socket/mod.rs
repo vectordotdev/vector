@@ -144,7 +144,10 @@ mod test {
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
-        assert_eq!(event.as_log()[&event::HOST], "127.0.0.1".into());
+        assert_eq!(
+            event.as_log()[&event::schema().host_key],
+            "127.0.0.1".into()
+        );
     }
 
     #[test]
@@ -172,11 +175,14 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(event.unwrap().as_log()[&event::MESSAGE], "short".into());
+        assert_eq!(
+            event.unwrap().as_log()[&event::schema().message_key],
+            "short".into()
+        );
 
         let (event, _rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::MESSAGE],
+            event.unwrap().as_log()[&event::schema().message_key],
             "more short".into()
         );
     }
@@ -237,7 +243,10 @@ mod test {
         send_lines_udp(address, vec!["test"]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "test".into()
+        );
     }
 
     #[test]
@@ -249,8 +258,14 @@ mod test {
         send_lines_udp(address, vec!["test\ntest2"]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::schema().message_key],
+            "test2".into()
+        );
     }
 
     #[test]
@@ -262,8 +277,14 @@ mod test {
         send_lines_udp(address, vec!["test", "test2"]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::schema().message_key],
+            "test2".into()
+        );
     }
 
     #[test]
@@ -275,7 +296,10 @@ mod test {
         let from = send_lines_udp(address, vec!["test"]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::HOST], format!("{}", from).into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().host_key],
+            format!("{}", from).into()
+        );
     }
 
     ////////////// UNIX TESTS //////////////

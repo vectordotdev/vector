@@ -130,7 +130,7 @@ mod tests {
         let log = event.into_log();
 
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(log[&event::MESSAGE], "hello world".into());
+        assert_eq!(log[&event::schema().message_key], "hello world".into());
     }
 
     #[test]
@@ -149,14 +149,16 @@ mod tests {
         assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world".into())),
-            event.map(|event| event.map(|event| event.as_log()[&event::MESSAGE].to_string_lossy()))
+            event.map(|event| event
+                .map(|event| event.as_log()[&event::schema().message_key].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
         assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world again".into())),
-            event.map(|event| event.map(|event| event.as_log()[&event::MESSAGE].to_string_lossy()))
+            event.map(|event| event
+                .map(|event| event.as_log()[&event::schema().message_key].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();

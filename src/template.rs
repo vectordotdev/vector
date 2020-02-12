@@ -255,7 +255,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::schema().timestamp_key.clone(), ts);
 
         let template = Template::from("abcd-%F");
 
@@ -269,7 +269,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::schema().timestamp_key.clone(), ts);
 
         let template = Template::from("abcd-%F_%T");
 
@@ -287,7 +287,7 @@ mod tests {
         event.as_mut_log().insert("foo", "butts");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::schema().timestamp_key.clone(), ts);
 
         let template = Template::from("{{ foo }}-%F_%T");
 
@@ -305,7 +305,7 @@ mod tests {
         event.as_mut_log().insert("format", "%F");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::schema().timestamp_key.clone(), ts);
 
         let template = Template::from("nested {{ format }} %T");
 
@@ -323,7 +323,7 @@ mod tests {
         event.as_mut_log().insert("%F", "foo");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::schema().timestamp_key.clone(), ts);
 
         let template = Template::from("nested {{ %F }} %T");
 

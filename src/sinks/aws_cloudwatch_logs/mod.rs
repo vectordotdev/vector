@@ -689,7 +689,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(Default::default()).encode_log(event.clone());
 
-        let ts = if let Value::Timestamp(ts) = event[&event::TIMESTAMP] {
+        let ts = if let Value::Timestamp(ts) = event[&event::schema().timestamp_key] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -708,7 +708,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&event::TIMESTAMP).is_none());
+        assert!(map.get(&event::schema().timestamp_key).is_none());
     }
 
     #[test]

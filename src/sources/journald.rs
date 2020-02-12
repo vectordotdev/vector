@@ -492,11 +492,11 @@ mod tests {
         let received = run_journal(&[], None);
         assert_eq!(received.len(), 2);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE],
+            received[0].as_log()[&event::schema().message_key],
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[1].as_log()[&event::MESSAGE],
+            received[1].as_log()[&event::schema().message_key],
             Value::Bytes("unit message".into())
         );
     }
@@ -506,7 +506,7 @@ mod tests {
         let received = run_journal(&["unit.service"], None);
         assert_eq!(received.len(), 1);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE],
+            received[0].as_log()[&event::schema().message_key],
             Value::Bytes("unit message".into())
         );
     }
@@ -516,7 +516,7 @@ mod tests {
         let received = run_journal(&[], Some("1"));
         assert_eq!(received.len(), 1);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE],
+            received[0].as_log()[&event::schema().message_key],
             Value::Bytes("unit message".into())
         );
     }

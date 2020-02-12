@@ -769,8 +769,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(event.as_log()[&event::schema().message_key], message.into());
+        assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
     }
 
     #[test]
@@ -780,8 +780,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(event.as_log()[&event::schema().message_key], message.into());
+        assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
     }
 
     #[test]
@@ -796,8 +796,8 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source, &mut rt);
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
-            assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+            assert_eq!(event.as_log()[&event::schema().message_key], msg.into());
+            assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
         }
     }
 
@@ -808,8 +808,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(event.as_log()[&event::schema().message_key], message.into());
+        assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
     }
 
     #[test]
@@ -824,8 +824,8 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source, &mut rt);
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
-            assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+            assert_eq!(event.as_log()[&event::schema().message_key], msg.into());
+            assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
         }
     }
 
@@ -843,7 +843,7 @@ mod tests {
 
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
     }
 
     #[test]
@@ -857,7 +857,7 @@ mod tests {
         let _ = rt.block_on(pump).unwrap();
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], "hello".into());
+        assert_eq!(event.as_log()[&event::schema().message_key], "hello".into());
     }
 
     #[test]
@@ -869,9 +869,9 @@ mod tests {
         assert_eq!(200, post(address, "services/collector/raw", message));
 
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+        assert_eq!(event.as_log()[&event::schema().message_key], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
     }
 
     #[test]
@@ -908,8 +908,8 @@ mod tests {
         assert_eq!(400, post(address, "services/collector/event", message));
 
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
-        assert_eq!(event.as_log()[&event::MESSAGE], "first".into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(event.as_log()[&event::schema().message_key], "first".into());
+        assert!(event.as_log().get(&event::schema().timestamp_key).is_some());
     }
 
     #[test]
@@ -922,13 +922,22 @@ mod tests {
 
         let events = rt.block_on(collect_n(source, 3)).unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "first".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "first".into()
+        );
         assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "second".into());
+        assert_eq!(
+            events[1].as_log()[&event::schema().message_key],
+            "second".into()
+        );
         assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
-        assert_eq!(events[2].as_log()[&event::MESSAGE], "third".into());
+        assert_eq!(
+            events[2].as_log()[&event::schema().message_key],
+            "third".into()
+        );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
     }
 }

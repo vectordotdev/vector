@@ -24,14 +24,24 @@ pub mod proto {
 }
 
 pub fn schema<'a>() -> &'a Schema {
+    // TODO: Help Rust project support before_each
+    // Support uninitialized schemas in tests to help our contributors.
+    // Don't do it in release because that is scary.
+    #[cfg(debug_assertions)]
+    {
+        if SCHEMA.get().is_none() {
+            error!("You are not initializing a schema in this test -- This could fail in release");
+            SCHEMA.set(Schema::default()).ok(); // If this fails it means some other test set it while we were trying to.
+        }
+    }
     SCHEMA.get().expect("Schema was not initialized")
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Schema {
-    pub(crate) message_key: Atom,
-    pub(crate) timestamp_key: Atom,
-    pub(crate) host_key: Atom,
+    pub message_key: Atom,
+    pub timestamp_key: Atom,
+    pub host_key: Atom,
 }
 
 impl Default for Schema {
@@ -589,7 +599,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&super::TIMESTAMP),
+            "timestamp": event.as_log().get(&super::schema().timestamp_key),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();

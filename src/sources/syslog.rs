@@ -313,7 +313,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::schema().timestamp_key.clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert("host", "74794bfb6795");
@@ -420,7 +420,7 @@ mod test {
 
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert(
-            event::TIMESTAMP.clone(),
+            event::schema().timestamp_key.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
         );
         expected.as_mut_log().insert("host", "74794bfb6795");
@@ -438,7 +438,7 @@ mod test {
 
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert(
-            event::TIMESTAMP.clone(),
+            event::schema().timestamp_key.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
         );
         expected.as_mut_log().insert("host", "74794bfb6795");
@@ -456,7 +456,7 @@ mod test {
 
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert(
-            event::TIMESTAMP.clone(),
+            event::schema().timestamp_key.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
         );
         expected.as_mut_log().insert("host", "74794bfb6795");

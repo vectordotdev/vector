@@ -3,7 +3,7 @@ use crate::event::{self, Event};
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
-use std::{ffi, fmt, io, path};
+use std::{fmt, io, path};
 use tokio::{
     codec::Encoder,
     fs::{self, file},

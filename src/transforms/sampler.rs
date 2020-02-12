@@ -146,7 +146,11 @@ mod tests {
         let mut sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| {
+                !s.as_log()[&event::schema().message_key]
+                    .to_string_lossy()
+                    .contains("na")
+            })
             .find_map(|event| sampler.transform(event))
             .unwrap();
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
@@ -155,7 +159,11 @@ mod tests {
         let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| {
+                !s.as_log()[&event::schema().message_key]
+                    .to_string_lossy()
+                    .contains("na")
+            })
             .find_map(|event| sampler.transform(event))
             .unwrap();
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());

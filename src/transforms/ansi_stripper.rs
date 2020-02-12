@@ -82,7 +82,7 @@ impl Transform for AnsiStripper {
 mod tests {
     use super::AnsiStripper;
     use crate::{
-        event::{Event, Value, MESSAGE},
+        event::{self, Event, Value},
         transforms::Transform,
     };
 
@@ -97,7 +97,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&MESSAGE).unwrap(),
+                    event.into_log().remove(&event::schema().message_key).unwrap(),
                     Value::from("foo bar")
                 );
             )+

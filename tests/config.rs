@@ -1,10 +1,11 @@
-use crate::event::SCHEMA;
-use vector::topology::{self, Config};
+use vector::{
+    event::SCHEMA,
+    topology::{self, Config},
+};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     let rt = vector::runtime::Runtime::single_threaded().unwrap();
     Config::load(config.as_bytes())
-        .and_then(|c| SCHEMA.set(config.globals.schema).map(c))
         .and_then(|c| topology::builder::build_pieces(&c, rt.executor()))
         .map(|(_topology, warnings)| warnings)
 }

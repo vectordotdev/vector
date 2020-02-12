@@ -184,9 +184,14 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("help i'm stuck in an http server"),
-            event[&event::MESSAGE]
+            event[&event::schema().message_key]
         );
-        assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
+        assert!(
+            event[&event::schema().timestamp_key]
+                .to_string_lossy()
+                .len()
+                > 0
+        );
     }
 
     #[test]
@@ -229,9 +234,14 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&event::MESSAGE]
+            event[&event::schema().message_key]
         );
-        assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
+        assert!(
+            event[&event::schema().timestamp_key]
+                .to_string_lossy()
+                .len()
+                > 0
+        );
     }
 
     #[test]
