@@ -1,3 +1,4 @@
+use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     dns::Resolver,
     event::{self, Event},
@@ -54,6 +55,8 @@ pub struct GcsSinkConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(flatten)]
+    auth: GcpAuthConfig,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -80,6 +83,19 @@ enum S3CannedAcl {
     AwsExecRead,
     AuthenticatedRead,
     LogDeliveryWrite,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "kebab-case")]
+enum GcsPredefinedAcl {
+    AuthenticatedRead,
+    BucketOwnerFullControl,
+    BucketOwnerRead,
+    #[derivative(Default)]
+    Private,
+    PublicRead,
+    ProjectPrivate,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -134,8 +150,9 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let healthcheck = GcsSink::healthcheck(self, cx.resolver())?;
-        let sink = GcsSink::new(self, cx)?;
+        let creds = self.auth.make_credentials(Scope::DevStorageReadWrite)?;
+        let healthcheck = GcsSink::healthcheck(self, cx.resolver(), &creds)?;
+        let sink = GcsSink::new(self, cx, &creds)?;
 
         Ok((sink, healthcheck))
     }
@@ -160,7 +177,11 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    pub fn new(config: &GcsSinkConfig, cx: SinkContext) -> crate::Result<RouterSink> {
+    pub fn new(
+        config: &GcsSinkConfig,
+        cx: SinkContext,
+        _creds: &Option<GcpCredentials>,
+    ) -> crate::Result<RouterSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -210,7 +231,11 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(config: &GcsSinkConfig, resolver: Resolver) -> crate::Result<Healthcheck> {
+    pub fn healthcheck(
+        config: &GcsSinkConfig,
+        resolver: Resolver,
+        _creds: &Option<GcpCredentials>,
+    ) -> crate::Result<Healthcheck> {
         let client = Self::create_client(resolver, config.region.clone().try_into()?)?;
 
         let request = HeadBucketRequest {
@@ -524,7 +549,7 @@ mod integration_tests {
 
         let config = config(1000000);
         let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx).unwrap();
+        let sink = GcsSink::new(&config, cx, &None).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 10);
 
@@ -558,7 +583,7 @@ mod integration_tests {
             ..config(1000)
         };
         let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx).unwrap();
+        let sink = GcsSink::new(&config, cx, &None).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30);
 
@@ -606,7 +631,7 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx).unwrap();
+        let sink = GcsSink::new(&config, cx, &None).unwrap();
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -669,7 +694,7 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx).unwrap();
+        let sink = GcsSink::new(&config, cx, &None).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 500);
 
@@ -700,7 +725,7 @@ mod integration_tests {
         let mut rt = Runtime::new().unwrap();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
-        let healthcheck = GcsSink::healthcheck(&config(1), resolver).unwrap();
+        let healthcheck = GcsSink::healthcheck(&config(1), resolver, &None).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -713,7 +738,7 @@ mod integration_tests {
             bucket: "asdflkjadskdaadsfadf".to_string(),
             ..config(1)
         };
-        let healthcheck = GcsSink::healthcheck(&config, resolver).unwrap();
+        let healthcheck = GcsSink::healthcheck(&config, resolver, &None).unwrap();
         assert_downcast_matches!(
             rt.block_on(healthcheck).unwrap_err(),
             HealthcheckError,
