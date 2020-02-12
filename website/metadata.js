@@ -17372,7 +17372,7 @@ module.exports = {
     "influxdb_metrics": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Batches metric events to [InfluxDB][urls.influxdb] using [HTTP API](https://v2.docs.influxdata.com/v2.0/api/#tag/Write).",
+      "description": "Batches metric events to [InfluxDB][urls.influxdb] using [HTTP API][urls.influxdb_http_api].",
       "event_types": [
         "metric"
       ],

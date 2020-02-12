@@ -4538,8 +4538,8 @@ end
   #
   # * required
   # * type: string
-  host = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  host = "http://influxdb:9999"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  endpoint = "http://influxdb:9999"
 
   # A prefix that will be added to all metric names.
   #

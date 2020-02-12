@@ -533,6 +533,7 @@ services:
       image: quay.io/influxdb/influxdb:2.0.0-beta
       ports:
         - "9999:9999"
+      command: influxd --reporting-disabled
     loki:
       image: grafana/loki
       ports:

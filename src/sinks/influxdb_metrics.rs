@@ -37,7 +37,7 @@ struct InfluxDBSvc {
 #[serde(deny_unknown_fields)]
 pub struct InfluxDBConfig {
     pub namespace: String,
-    pub host: String,
+    pub endpoint: String,
     pub org: String,
     pub bucket: String,
     pub token: String,
@@ -83,16 +83,14 @@ impl SinkConfig for InfluxDBConfig {
 
 impl InfluxDBSvc {
     pub fn new(config: InfluxDBConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
+        let endpoint = config.endpoint.clone();
+        let org = config.org.clone();
+        let bucket = config.bucket.clone();
         let token = config.token.clone();
         let batch = config.batch.unwrap_or(20, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = format!(
-            "{}/api/v2/write?org={}&bucket={}&precision=ns",
-            config.host, config.org, config.bucket
-        )
-        .parse::<Uri>()
-        .context(super::UriParseError)?;
+        let uri = encode_uri(&endpoint, &org, &bucket)?;
         let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
@@ -117,7 +115,7 @@ impl InfluxDBSvc {
 
     // https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
     fn healthcheck(config: InfluxDBConfig) -> crate::Result<super::Healthcheck> {
-        let uri = format!("{}/health", config.host)
+        let uri = format!("{}/health", config.endpoint)
             .parse::<Uri>()
             .context(super::UriParseError)?;
 
@@ -136,6 +134,22 @@ impl InfluxDBSvc {
 
         Ok(Box::new(healthcheck))
     }
+}
+
+fn encode_uri(endpoint: &str, org: &str, bucket: &str) -> crate::Result<Uri> {
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("org", org)
+        .append_pair("bucket", bucket)
+        .append_pair("precision", "ns")
+        .finish();
+
+    let url = if endpoint.ends_with('/') {
+        format!("{}api/v2/write?{}", endpoint, query)
+    } else {
+        format!("{}/api/v2/write?{}", endpoint, query)
+    };
+
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
@@ -394,7 +408,7 @@ fn encode_fields(fields: HashMap<String, Field>) -> String {
                     format!("\"{}\"", escaped)
                 }
                 Field::Float(f) => f.to_string(),
-                Field::UnsignedInt(i) => format!("{}i", i.to_string()),
+                Field::UnsignedInt(i) => format!("{}u", i.to_string()),
             };
             if !key.is_empty() && !value.is_empty() {
                 format!("{}={}", key, value)
@@ -450,6 +464,29 @@ mod tests {
         ]
         .into_iter()
         .collect()
+    }
+
+    #[test]
+    fn test_encode_uri_valid() {
+        let uri = encode_uri("http://localhost:9999", "my-org", "my-bucket").unwrap();
+        assert_eq!(
+            uri,
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+        );
+
+        let uri = encode_uri("http://localhost:9999/", "my-org", "my-bucket").unwrap();
+        assert_eq!(
+            uri,
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+        );
+
+        let uri = encode_uri("http://localhost:9999", "Orgazniation name", "Bucket=name").unwrap();
+        assert_eq!(uri, "http://localhost:9999/api/v2/write?org=Orgazniation+name&bucket=Bucket%3Dname&precision=ns");
+    }
+
+    #[test]
+    fn test_encode_uri_invalid() {
+        encode_uri("localhost:9999", "my-org", "my-bucket").unwrap_err();
     }
 
     #[test]
@@ -516,12 +553,13 @@ mod tests {
                 Field::String("string\\val\"ue".to_owned()),
             ),
             ("field_float".to_owned(), Field::Float(123.45)),
+            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
             ("escape key".to_owned(), Field::Float(10.0)),
         ]
         .into_iter()
         .collect();
 
-        assert_eq!(encode_fields(fields), "escape\\ key=10,field_float=123.45,field_string=\"string value\",field_string_escape=\"string\\\\val\\\"ue\"");
+        assert_eq!(encode_fields(fields), "escape\\ key=10,field_float=123.45,field_string=\"string value\",field_string_escape=\"string\\\\val\\\"ue\",field_unsigned_int=657u");
     }
 
     #[test]
@@ -604,7 +642,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1i,bucket_2.1=2i,bucket_3=3i,count=6i,sum=12.5 1542182950000000011", ]
+            vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1u,bucket_2.1=2u,bucket_3=3u,count=6u,sum=12.5 1542182950000000011", ]
         );
     }
 
@@ -626,7 +664,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6i,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011", ]
+            vec!["ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6u,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011", ]
         );
     }
 
@@ -778,7 +816,7 @@ mod integration_tests {
         let mut rt = Runtime::new().unwrap();
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
-            host: "http://localhost:9999".to_string(),
+            endpoint: "http://localhost:9999".to_string(),
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
@@ -797,7 +835,7 @@ mod integration_tests {
         let mut rt = Runtime::new().unwrap();
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
-            host: "http://not_exist:9999".to_string(),
+            endpoint: "http://not_exist:9999".to_string(),
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
@@ -818,7 +856,7 @@ mod integration_tests {
 
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
-            host: "http://localhost:9999".to_string(),
+            endpoint: "http://localhost:9999".to_string(),
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
