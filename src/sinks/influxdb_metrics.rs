@@ -162,14 +162,14 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(items, &self.config.namespace).join("\n");
+        let input = encode_events(items, &self.config.namespace);
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
     }
 }
 
-fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
+fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
     events
         .into_iter()
         .filter_map(|event| {
@@ -271,7 +271,8 @@ fn encode_events(events: Vec<Metric>, namespace: &str) -> Vec<String> {
         })
         .flatten()
         .filter(|lp| !lp.is_empty())
-        .collect()
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String, Field>> {
@@ -342,84 +343,101 @@ fn influx_line_protocol(
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
 ) -> String {
-    let mut line_protocol = vec![encode_key(measurement)];
+    let mut line_protocol = String::new();
+    encode_string(measurement, &mut line_protocol);
+    line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or(HashMap::new());
+    let mut unwrapped_tags = tags.unwrap_or_else(|| HashMap::new());
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
-    line_protocol.push(format!(",{}", encode_tags(unwrapped_tags)));
+    encode_tags(unwrapped_tags, &mut line_protocol);
+    line_protocol.push(' ');
 
     // Fields
-    let unwrapped_fields = fields.unwrap_or(HashMap::new());
-    let encoded_fields = encode_fields(unwrapped_fields);
-    if encoded_fields.is_empty() {
+    let unwrapped_fields = fields.unwrap_or_else(|| HashMap::new());
+    encode_fields(unwrapped_fields, &mut line_protocol);
+    if line_protocol.is_empty() {
         return "".to_owned();
     }
-    line_protocol.push(format!(" {}", encoded_fields));
+    line_protocol.push(' ');
 
     // Timestamp
-    line_protocol.push(format!(" {}", timestamp));
+    line_protocol.push_str(&timestamp.to_string());
 
-    line_protocol.join("")
+    line_protocol
 }
 
-fn encode_key(key: String) -> String {
-    key.replace("\\", "\\\\")
-        .replace(",", "\\,")
-        .replace(" ", "\\ ")
-        .replace("=", "\\=")
+fn encode_string(key: String, output: &mut String) {
+    for c in key.chars() {
+        if "\\, =".contains(c) {
+            output.push('\\');
+        }
+        output.push(c);
+    }
 }
 
-fn encode_tags(tags: HashMap<String, String>) -> String {
-    let ordered: Vec<String> = tags
+fn encode_tags(tags: HashMap<String, String>, output: &mut String) {
+    let sorted = tags
         // sort by key
         .iter()
-        .collect::<BTreeMap<_, _>>()
-        // map to key=value
-        .iter()
-        .map(|pair| {
-            let key = encode_key(pair.0.to_string());
-            let value = encode_key(pair.1.to_string());
-            if !key.is_empty() && !value.is_empty() {
-                format!("{}={}", key, value)
-            } else {
-                "".to_string()
-            }
-        })
-        // filter empty
-        .filter(|tag_value| !tag_value.is_empty())
-        .collect();
+        .collect::<BTreeMap<_, _>>();
 
-    ordered.join(",")
+    for (key, value) in sorted {
+        if key.is_empty() || value.is_empty() {
+            continue;
+        }
+        encode_string(key.to_string(), output);
+        output.push('=');
+        encode_string(value.to_string(), output);
+        output.push(',');
+    }
+
+    // remove last ','
+    output.pop();
 }
 
-fn encode_fields(fields: HashMap<String, Field>) -> String {
-    let encoded = fields
+fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
+    let sorted = fields
         // sort by key
         .iter()
-        .collect::<BTreeMap<_, _>>()
-        // map to key=value
-        .iter()
-        .map(|pair| {
-            let key = encode_key(pair.0.to_string());
-            let value = match pair.1 {
-                Field::String(s) => {
-                    let escaped = s.replace("\\", "\\\\").replace("\"", "\\\"");
-                    format!("\"{}\"", escaped)
+        .collect::<BTreeMap<_, _>>();
+
+    let mut was_add = false;
+
+    for (key, value) in sorted {
+        if key.is_empty() {
+            continue;
+        }
+        encode_string(key.to_string(), output);
+        output.push('=');
+        match value {
+            Field::String(s) => {
+                output.push('"');
+                for c in s.chars() {
+                    if "\\\"".contains(c) {
+                        output.push('\\');
+                    }
+                    output.push(c);
                 }
-                Field::Float(f) => f.to_string(),
-                Field::UnsignedInt(i) => format!("{}u", i.to_string()),
-            };
-            if !key.is_empty() && !value.is_empty() {
-                format!("{}={}", key, value)
-            } else {
-                "".to_string()
+                output.push('"');
             }
-        })
-        .filter(|field_value| !field_value.is_empty())
-        .collect::<Vec<String>>();
+            Field::Float(f) => output.push_str(&f.to_string()),
+            Field::UnsignedInt(i) => {
+                output.push_str(&i.to_string());
+                output.push('u')
+            }
+        };
+        output.push(',');
+        was_add = true;
+    }
 
-    encoded.join(",")
+    // remove last ','
+    output.pop();
+
+    // line protocol cannot be without fields
+    if !was_add {
+        output.clear()
+    }
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -504,27 +522,29 @@ mod tests {
 
     #[test]
     fn test_encode_key() {
-        assert_eq!(
-            encode_key("measurement_name".to_string()),
-            "measurement_name"
-        );
-        assert_eq!(
-            encode_key("measurement name".to_string()),
-            "measurement\\ name"
-        );
-        assert_eq!(
-            encode_key("measurement=name".to_string()),
-            "measurement\\=name"
-        );
-        assert_eq!(
-            encode_key("measurement,name".to_string()),
-            "measurement\\,name"
-        );
+        let mut value = String::new();
+        encode_string("measurement_name".to_string(), &mut value);
+        assert_eq!(value, "measurement_name");
+
+        let mut value = String::new();
+        encode_string("measurement name".to_string(), &mut value);
+        assert_eq!(value, "measurement\\ name");
+
+        let mut value = String::new();
+        encode_string("measurement=name".to_string(), &mut value);
+        assert_eq!(value, "measurement\\=name");
+
+        let mut value = String::new();
+        encode_string("measurement,name".to_string(), &mut value);
+        assert_eq!(value, "measurement\\,name");
     }
 
     #[test]
     fn test_encode_tags() {
-        assert_eq!(encode_tags(tags()), "normal_tag=value,true_tag=true");
+        let mut value = String::new();
+        encode_tags(tags(), &mut value);
+
+        assert_eq!(value, "normal_tag=value,true_tag=true");
 
         let tags_to_escape = vec![
             ("tag".to_owned(), "val=ue".to_owned()),
@@ -535,8 +555,10 @@ mod tests {
         .into_iter()
         .collect();
 
+        let mut value = String::new();
+        encode_tags(tags_to_escape, &mut value);
         assert_eq!(
-            encode_tags(tags_to_escape),
+            value,
             "a_first_place=10,name\\ escape=true,tag=val\\=ue,value_escape=value\\ escape"
         );
     }
@@ -559,7 +581,9 @@ mod tests {
         .into_iter()
         .collect();
 
-        assert_eq!(encode_fields(fields), "escape\\ key=10,field_float=123.45,field_string=\"string value\",field_string_escape=\"string\\\\val\\\"ue\",field_unsigned_int=657u");
+        let mut value = String::new();
+        encode_fields(fields, &mut value);
+        assert_eq!(value, "escape\\ key=10,field_float=123.45,field_string=\"string value\",field_string_escape=\"string\\\\val\\\"ue\",field_unsigned_int=657u");
     }
 
     #[test]
@@ -584,7 +608,8 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.total,metric_type=counter value=1.5 1542182950000000011", "ns.check,metric_type=counter,normal_tag=value,true_tag=true value=1 1542182950000000011", ]
+            "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
+            ns.check,metric_type=counter,normal_tag=value,true_tag=true value=1 1542182950000000011"
         );
     }
 
@@ -601,7 +626,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011", ]
+            "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
         );
     }
 
@@ -620,7 +645,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011", ]
+            "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
         );
     }
 
@@ -642,7 +667,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1u,bucket_2.1=2u,bucket_3=3u,count=6u,sum=12.5 1542182950000000011", ]
+            "ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1u,bucket_2.1=2u,bucket_3=3u,count=6u,sum=12.5 1542182950000000011"
         );
     }
 
@@ -664,7 +689,7 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec!["ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6u,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011", ]
+                "ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6u,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011"
         );
     }
 
@@ -706,11 +731,9 @@ mod tests {
         let line_protocols = encode_events(events, "ns");
         assert_eq!(
             line_protocols,
-            vec![
-                "ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011",
-                "ns.dense_stats,metric_type=distribution avg=9.5,count=20,max=19,median=9,min=0,quantile_0.95=18,sum=190 1542182950000000011",
-                "ns.sparse_stats,metric_type=distribution avg=3,count=10,max=4,median=3,min=1,quantile_0.95=4,sum=30 1542182950000000011",
-            ]
+                "ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011\n\
+                ns.dense_stats,metric_type=distribution avg=9.5,count=20,max=19,median=9,min=0,quantile_0.95=18,sum=190 1542182950000000011\n\
+                ns.sparse_stats,metric_type=distribution avg=3,count=10,max=4,median=3,min=1,quantile_0.95=4,sum=30 1542182950000000011"
         );
     }
 
