@@ -63,7 +63,10 @@ where
     Box::new(future::lazy(move || {
         info!("Capturing STDIN");
 
-        let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or(event::schema().host_key.to_string());
         let hostname = hostname::get_hostname();
         let (mut tx, rx) = futures::sync::mpsc::channel(1024);
 

@@ -247,11 +247,12 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
-            ts.timestamp_millis()
-        } else {
-            chrono::Utc::now().timestamp_millis()
-        };
+        let timestamp =
+            if let Some(Value::Timestamp(ts)) = log.remove(&event::schema().timestamp_key) {
+                ts.timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
 
         match self.encoding {
             Encoding::Json => {
@@ -260,7 +261,7 @@ impl CloudwatchLogsSvc {
             }
             Encoding::Text => {
                 let message = log
-                    .get(&event::MESSAGE)
+                    .get(&event::schema().message_key)
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 InputLogEvent { message, timestamp }

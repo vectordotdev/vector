@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     conditions,
     dns::Resolver,
-    event::{Event, Metric},
+    event::{self, Event, Metric},
     runtime::TaskExecutor,
     sinks, sources, transforms,
 };
@@ -39,6 +39,8 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
+    #[serde(default)]
+    pub schema: event::Schema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -259,6 +261,7 @@ impl Config {
             global: GlobalOptions {
                 data_dir: None,
                 dns_servers: Vec::new(),
+                schema: event::Schema::default(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
@@ -330,6 +333,31 @@ impl Config {
         self.global.dns_servers.append(&mut with.global.dns_servers);
         self.global.dns_servers.sort();
         self.global.dns_servers.dedup();
+
+        let default_schema = event::Schema::default();
+        if with.global.schema != default_schema {
+            if self.global.schema.host_key != default_schema.host_key
+                && self.global.schema.host_key != with.global.schema.host_key
+            {
+                errors.push("conflicting values for 'schema.host_key' found".to_owned());
+            } else {
+                self.global.schema.host_key = with.global.schema.host_key;
+            }
+            if self.global.schema.message_key != default_schema.message_key
+                && self.global.schema.message_key != with.global.schema.message_key
+            {
+                errors.push("conflicting values for 'schema.message_key' found".to_owned());
+            } else {
+                self.global.schema.message_key = with.global.schema.message_key;
+            }
+            if self.global.schema.timestamp_key != default_schema.timestamp_key
+                && self.global.schema.timestamp_key != with.global.schema.timestamp_key
+            {
+                errors.push("conflicting values for 'schema.timestamp_key' found".to_owned());
+            } else {
+                self.global.schema.timestamp_key = with.global.schema.timestamp_key;
+            }
+        }
 
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {

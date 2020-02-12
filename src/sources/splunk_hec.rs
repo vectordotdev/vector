@@ -300,7 +300,7 @@ impl<R: Read> EventStream<R> {
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
-                    &event::HOST,
+                    &event::schema().host_key,
                     host.map(|value| value.as_bytes().into()),
                 ),
                 DefaultExtractor::new("index", &INDEX),
@@ -358,7 +358,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(event::MESSAGE.clone(), string)
+                    log.insert(event::schema().message_key.clone(), string)
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -373,7 +373,11 @@ impl<R: Read> Stream for EventStream<R> {
                                 event::flatten::insert(log, "line", line)
                             }
                             _ => {
-                                event::flatten::insert(log, event::MESSAGE.clone(), line);
+                                event::flatten::insert(
+                                    log,
+                                    event::schema().message_key.clone(),
+                                    line,
+                                );
                             }
                         }
                     }
@@ -422,8 +426,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert(event::TIMESTAMP.clone(), time),
-            Time::Now(time) => log.insert(event::TIMESTAMP.clone(), time),
+            Time::Provided(time) => log.insert(event::schema().timestamp_key.clone(), time),
+            Time::Now(time) => log.insert(event::schema().timestamp_key.clone(), time),
         }
 
         // Extract default extracted fields
@@ -514,18 +518,18 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(event::MESSAGE.clone(), message);
+    log.insert(event::schema().message_key.clone(), message);
 
     // Add channel
     log.insert(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert(event::HOST.clone(), host.as_bytes());
+        log.insert(event::schema().host_key.clone(), host.as_bytes());
     }
 
     // Add timestamp
-    log.insert(event::TIMESTAMP.clone(), Utc::now());
+    log.insert(event::schema().timestamp_key.clone(), Utc::now());
 
     Ok(event)
 }

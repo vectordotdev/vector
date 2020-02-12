@@ -57,7 +57,7 @@ impl Transform for Sampler {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
-            .get(&event::MESSAGE)
+            .get(&event::schema().message_key)
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 

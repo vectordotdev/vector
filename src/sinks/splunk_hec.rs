@@ -60,7 +60,7 @@ pub enum Encoding {
 }
 
 fn default_host_field() -> Atom {
-    event::HOST.clone()
+    event::Schema::default().host_key.clone()
 }
 
 inventory::submit! {
@@ -202,7 +202,8 @@ fn encode_event(
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
-    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
+    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::schema().timestamp_key)
+    {
         ts.timestamp()
     } else {
         chrono::Utc::now().timestamp()
@@ -211,7 +212,7 @@ fn encode_event(
     let mut body = match encoding {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
-            "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
+            "event": event.get(&event::schema().message_key).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
     };

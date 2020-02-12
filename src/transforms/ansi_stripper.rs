@@ -21,7 +21,7 @@ inventory::submit! {
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+        let field = self.field.as_ref().unwrap_or(&event::schema().message_key);
 
         Ok(Box::new(AnsiStripper {
             field: field.clone(),

@@ -106,10 +106,10 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(event::TIMESTAMP.clone(), ts);
+            log.insert(event::schema().timestamp_key.clone(), ts);
         }
 
-        log.insert(event::HOST.clone(), hostname);
+        log.insert(event::schema().host_key.clone(), hostname);
 
         log.insert("app_name", app_name);
         log.insert("proc_id", proc_id);

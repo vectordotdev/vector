@@ -241,7 +241,12 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(&event::MESSAGE)
+            .get(
+                &event::SCHEMA
+                    .get()
+                    .expect("schema is not initialized")
+                    .message_key,
+            )
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };

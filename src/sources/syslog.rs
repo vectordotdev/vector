@@ -74,7 +74,10 @@ impl SourceConfig for SyslogConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(event::schema().host_key.to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address } => {
@@ -206,7 +209,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
                 .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
-                .insert(event::TIMESTAMP.clone(), timestamp);
+                .insert(event::schema().timestamp_key.clone(), timestamp);
 
             insert_fields_from_rfc5424(&mut event, parsed);
 

@@ -3,7 +3,8 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
-use serde::{Serialize, Serializer};
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{hash_map::Drain, HashMap};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
@@ -22,10 +23,29 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
+pub fn schema<'a>() -> &'a Schema {
+    SCHEMA.get().expect("Schema was not initialized")
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Schema {
+    pub(crate) message_key: Atom,
+    pub(crate) timestamp_key: Atom,
+    pub(crate) host_key: Atom,
+}
+
+impl Default for Schema {
+    fn default() -> Self {
+        Schema {
+            message_key: Atom::from("message"),
+            timestamp_key: Atom::from("timestamp"),
+            host_key: Atom::from("host"),
+        }
+    }
+}
+
 lazy_static! {
-    pub static ref MESSAGE: Atom = Atom::from("message");
-    pub static ref HOST: Atom = Atom::from("host");
-    pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
+    pub static ref SCHEMA: OnceCell<Schema> = OnceCell::new();
     pub static ref PARTIAL: Atom = Atom::from("_partial");
 }
 
@@ -483,7 +503,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .remove(&MESSAGE)
+            .remove(&schema().message_key)
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -496,8 +516,12 @@ impl From<Bytes> for Event {
             fields: HashMap::new(),
         });
 
-        event.as_mut_log().insert(MESSAGE.clone(), message);
-        event.as_mut_log().insert(TIMESTAMP.clone(), Utc::now());
+        event
+            .as_mut_log()
+            .insert(schema().message_key.clone(), message);
+        event
+            .as_mut_log()
+            .insert(schema().timestamp_key.clone(), Utc::now());
 
         event
     }

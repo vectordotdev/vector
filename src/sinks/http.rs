@@ -137,7 +137,12 @@ impl HttpSink for HttpSinkConfig {
 
         let body = match &self.encoding {
             Encoding::Text => {
-                if let Some(v) = event.get(&event::MESSAGE) {
+                if let Some(v) = event.get(
+                    &event::SCHEMA
+                        .get()
+                        .expect("schema is not initialized")
+                        .message_key,
+                ) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b

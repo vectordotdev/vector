@@ -178,7 +178,10 @@ pub fn file_source(
     };
 
     let file_key = config.file_key.clone();
-    let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+    let host_key = config
+        .host_key
+        .clone()
+        .unwrap_or(event::schema().host_key.to_string());
     let hostname = hostname::get_hostname();
 
     let include = config.include.clone();

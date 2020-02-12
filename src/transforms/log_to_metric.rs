@@ -141,7 +141,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&event::TIMESTAMP)
+        .get(&event::schema().timestamp_key)
         .and_then(Value::as_timestamp)
         .cloned();
 

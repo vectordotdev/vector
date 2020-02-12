@@ -61,7 +61,7 @@ impl From<JsonParserConfig> for JsonParser {
         let field = if let Some(field) = &config.field {
             field
         } else {
-            &event::MESSAGE
+            &event::schema().message_key
         };
 
         JsonParser {

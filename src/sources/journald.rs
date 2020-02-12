@@ -153,10 +153,10 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(event::MESSAGE.clone(), message);
+        log.insert(event::schema().message_key.clone(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(event::HOST.clone(), host);
+        log.insert(event::schema().host_key.clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log.get(&TIMESTAMP) {
@@ -166,7 +166,10 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(event::TIMESTAMP.clone(), Value::Timestamp(timestamp));
+                log.insert(
+                    event::schema().timestamp_key.clone(),
+                    Value::Timestamp(timestamp),
+                );
             }
         }
     }

@@ -250,7 +250,7 @@ fn encode_event(
         }
 
         Encoding::Text => log
-            .get(&event::MESSAGE)
+            .get(&event::schema().message_key)
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };

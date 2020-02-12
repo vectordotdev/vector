@@ -213,7 +213,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
         }
 
         Encoding::Text => log
-            .get(&event::MESSAGE)
+            .get(&event::schema().message_key)
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };

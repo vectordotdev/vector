@@ -15,7 +15,8 @@ use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
 use vector::{
-    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
+    event, generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS,
+    unit_test,
 };
 
 #[derive(StructOpt, Debug)]
@@ -250,6 +251,10 @@ fn main() {
     let config = config.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
+    println!("{:?}", config);
+    event::SCHEMA
+        .set(config.global.schema.clone())
+        .expect("Couldn't set schema");
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));

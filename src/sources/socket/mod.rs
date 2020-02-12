@@ -80,7 +80,10 @@ impl SourceConfig for SocketConfig {
                 tcp.run(config.address, config.shutdown_timeout_secs, out)
             }
             Mode::Udp(config) => {
-                let host_key = config.host_key.clone().unwrap_or(event::HOST.clone());
+                let host_key = config
+                    .host_key
+                    .clone()
+                    .unwrap_or(event::schema().host_key.clone());
                 Ok(udp::udp(config.address, host_key, out))
             }
             #[cfg(unix)]

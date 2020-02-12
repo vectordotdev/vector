@@ -400,7 +400,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         &Encoding::Text => {
             let mut bytes = log
-                .get(&event::MESSAGE)
+                .get(&event::schema().message_key)
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
