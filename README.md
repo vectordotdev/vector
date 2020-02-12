@@ -14,7 +14,7 @@
 
 <p align="center">
   <strong>
-    New post! <a href="https://vector.dev/blog/prometheus-source">Prometheus Source</a>
+    New post! <a href="https://vector.dev/blog/how-we-test-vector">How we test Vector</a>
   </strong>
 </p>
 
@@ -129,11 +129,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Posts & Announcements
 
+* [How we test Vector](https://vector.dev/blog/how-we-test-vector)
 * [Prometheus Source](https://vector.dev/blog/prometheus-source)
 * [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
 * [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
 * [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
-* [How we test Vector](https://vector.dev/blog/how-we-test-vector)
 
 [view all...][urls.vector_blog]
 

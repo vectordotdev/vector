@@ -369,6 +369,8 @@ paramount. At the same time, those needs must be balanced with increasing
 Vector's functional capabilities. Finding the right balance is an ongoing
 challenge as the project grows and matures.
 
+
+
 [1]:http://www.cse.chalmers.se/~rjmh/QuickCheck/manual.html
 [2]: https://hypothesis.works/articles/what-is-property-based-testing/
 [3]: https://github.com/AltSysrq/proptest
@@ -385,3 +387,6 @@ challenge as the project grows and matures.
 [14]: https://github.com/timberio/vector/blob/9fe1eeb4786b27843673c05ff012f6b5cf5c3e45/src/transforms/tokenizer.rs#L240-L249
 [15]: https://www.youtube.com/watch?v=4fFDFbi3toc
 [16]: https://www.hillelwayne.com/post/metamorphic-testing/
+
+
+
