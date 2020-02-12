@@ -16,7 +16,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, Value},
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::tls::TlsSettings,
+    sinks::util::tls::{TlsOptions, TlsSettings},
     sinks::util::{BatchBytesConfig, TowerRequestConfig, UriSerde},
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -28,10 +28,6 @@ use serde_json::json;
 use std::collections::HashMap;
 
 type Labels = Vec<(String, String)>;
-
-// TODO: potential additional features
-// 1) auto kube label detection, we already know the names of
-// kube labels that we will enrich via `kube_pod_metadata`.
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LokiConfig {
@@ -51,6 +47,8 @@ pub struct LokiConfig {
 
     #[serde(default)]
     batch: BatchBytesConfig,
+
+    tls: Option<TlsOptions>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Derivative)]
@@ -75,13 +73,14 @@ impl SinkConfig for LokiConfig {
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let tls = TlsSettings::from_options(&self.tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
             Vec::new(),
             request_settings,
             batch_settings,
-            None,
+            Some(tls),
             &cx,
         );
 

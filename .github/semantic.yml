@@ -115,6 +115,7 @@ scopes:
   - humio_logs sink
   - kafka sink
   - logdna sink
+  - loki sink
   - new_relic_logs sink
   - prometheus sink
   - sematext sink

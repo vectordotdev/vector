@@ -228,6 +228,8 @@ module.exports = {
             
               "reference/sinks/logdna",
             
+              "reference/sinks/loki",
+            
               "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
