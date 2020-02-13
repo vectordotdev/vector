@@ -298,7 +298,7 @@ fn main() {
     }
 
     let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
-    let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
+    let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 

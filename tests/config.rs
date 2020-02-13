@@ -1,5 +1,4 @@
 use vector::{
-    event::SCHEMA,
     topology::{self, Config},
 };
 
