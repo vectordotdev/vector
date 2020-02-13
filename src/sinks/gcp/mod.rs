@@ -1,3 +1,4 @@
+use crate::sinks::HealthcheckError;
 use futures::{Future, Stream};
 use goauth::scopes::Scope;
 use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr};
@@ -107,6 +108,24 @@ fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>>
     let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
     let rsa_key = creds.rsa_key().context(InvalidRsaKey)?;
     Ok(Jwt::new(claims, rsa_key, None))
+}
+
+// Use this to map a healthcheck response, as it handles setting up the renewal task.
+pub fn healthcheck_response(
+    creds: Option<GcpCredentials>,
+) -> impl FnOnce(http::Response<hyper::Body>) -> crate::Result<()> {
+    move |response| match response.status() {
+        hyper::StatusCode::OK => {
+            // If there are credentials configured, the
+            // generated OAuth token needs to be periodically
+            // regenerated. Since the health check runs at
+            // startup, after a successful health check is a
+            // good place to create the regeneration task.
+            creds.map(|creds| creds.spawn_regenerate_token());
+            Ok(())
+        }
+        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+    }
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::Event,
     sinks::{
@@ -7,7 +7,7 @@ use crate::{
             tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, RouterSink, UriParseError,
+        Healthcheck, RouterSink, UriParseError,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -116,20 +116,8 @@ impl PubsubConfig {
         let creds = creds.clone();
         let healthcheck = client
             .request(request)
-            .map_err(|err| err.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => {
-                    // If there are credentials configured, the
-                    // generated OAuth token needs to be periodically
-                    // regenerated. Since the health check runs at
-                    // startup, after a successful health check is a
-                    // good place to create the regeneration task.
-                    creds.map(|creds| creds.spawn_regenerate_token());
-                    Ok(())
-                }
-                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-            });
-
+            .map_err(Into::into)
+            .and_then(healthcheck_response(creds));
         Ok(Box::new(healthcheck))
     }
 

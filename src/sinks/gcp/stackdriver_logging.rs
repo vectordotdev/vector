@@ -1,4 +1,4 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{Event, Unflatten},
     sinks::{
@@ -7,7 +7,7 @@ use crate::{
             tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, RouterSink,
+        Healthcheck, RouterSink,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -154,17 +154,8 @@ impl StackdriverConfig {
         let creds = creds.clone();
         let healthcheck = client
             .request(request)
-            .map_err(|err| err.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => {
-                    // If there are credentials configured, the
-                    // generated token needs to be periodically
-                    // regenerated.
-                    creds.map(|creds| creds.spawn_regenerate_token());
-                    Ok(())
-                }
-                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-            });
+            .map_err(Into::into)
+            .and_then(healthcheck_response(creds));
 
         Ok(Box::new(healthcheck))
     }
