@@ -44,11 +44,11 @@ impl TransformConfig for SwimlaneConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn transform_type(&self) -> &'static str {
@@ -115,11 +115,11 @@ impl TransformConfig for SwimlanesConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn transform_type(&self) -> &'static str {

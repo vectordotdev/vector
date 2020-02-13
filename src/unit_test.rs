@@ -33,7 +33,7 @@ fn build_tests(i: usize, path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
         }
     };
 
-    let config = match Config::load(file) {
+    let mut config = match Config::load(file) {
         Err(load_errs) => {
             return Err(load_errs);
         }
@@ -45,7 +45,7 @@ fn build_tests(i: usize, path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
             .expect("Couldn't set schema");
     }
 
-    crate::topology::unit_test::build_unit_tests(&config)
+    crate::topology::unit_test::build_unit_tests(&mut config)
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {

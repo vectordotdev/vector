@@ -338,28 +338,46 @@ impl Config {
     }
 
     /// Some component configs can act like macros and expand themselves into
-    /// multiple replacement configs.
-    pub fn expand_macros(&mut self) {
+    /// multiple replacement configs. Returns a map of components to their
+    /// expanded child names.
+    pub fn expand_macros(&mut self) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
         let mut expanded_transforms = IndexMap::new();
+        let mut expansions = IndexMap::new();
+        let mut errors = Vec::new();
 
         while let Some((k, mut t)) = self.transforms.pop() {
             if let Some(expanded) = t.inner.expand() {
-                for (name, child) in expanded {
+                let mut children = Vec::new();
+                for (name, mut child) in expanded {
                     let full_name = format!("{}.{}", k, name);
+                    if !child.expand().is_none() {
+                        errors.push(format!(
+                            "transform '{}' would result in nested expansion",
+                            full_name
+                        ));
+                        continue;
+                    }
                     expanded_transforms.insert(
-                        full_name,
+                        full_name.clone(),
                         TransformOuter {
                             inputs: t.inputs.clone(),
                             inner: child,
                         },
                     );
+                    children.push(full_name);
                 }
+                expansions.insert(k.clone(), children);
             } else {
                 expanded_transforms.insert(k, t);
             }
         }
-
         self.transforms = expanded_transforms;
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(expansions)
+        }
     }
 
     pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {
@@ -376,12 +394,7 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars)
-            .map_err(|e| vec![e.to_string()])
-            .map(|mut c: Config| {
-                c.expand_macros();
-                c
-            })
+        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn append(&mut self, mut with: Self) -> Result<(), Vec<String>> {
