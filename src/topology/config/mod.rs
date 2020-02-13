@@ -334,8 +334,12 @@ impl Config {
         self.global.dns_servers.sort();
         self.global.dns_servers.dedup();
 
+        // If the user has multiple config files, we must *merge* log schemas until we meet a
+        // conflict, then we are allowed to error.
         let default_schema = event::LogSchema::default();
         if with.global.log_schema != default_schema {
+            // If the set value is the default, override it. If it's already overridden, error.
+
             if self.global.log_schema.host_key != default_schema.host_key
                 && self.global.log_schema.host_key != with.global.log_schema.host_key
             {
