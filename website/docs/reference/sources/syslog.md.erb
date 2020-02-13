@@ -42,12 +42,15 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 ### Parsing
 
-Vector will _only_ parse messages in the [Syslog 5424 format][urls.syslog_5424],
-Vector will _not_ parse the [Syslog 3164 format][urls.syslog_3164] since 3164
-is not an exact specification, but an observation of behavior.
+Vector makes a _best effort_ to parse the various Syslog formats out in the
+wild. This includes [RFC 5424][urls.syslog_5424], [RFC 3164][urls.syslog_3164],
+and other common variations (such as the Nginx Syslog style). It's unfortunate
+that the Syslog specification is not more accurately followed, but we hope
+Vector insulates you from these diviations.
 
-Vector makes a _best effort_ to parse the Syslog 5424 format. If parsing
-fails, the event will be dropped and `warning` log line will be emitted. If
-this is the case, we recommend using the [`socket` source][docs.sources.socket]
-combined with the [`regex_parser` transform][docs.transforms.regex_parser] to
-implement your own ingestion and parsing scheme.
+If parsing fails, Vector will include the entire Syslog line in the `message`
+key. If you find this happening often, we recommend using the
+[`socket` source][docs.sources.socket] combined with the
+[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
+ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
+requesting support for your specific format.

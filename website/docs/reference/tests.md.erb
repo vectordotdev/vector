@@ -35,7 +35,7 @@ vector test /etc/vector/*.toml
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.testing.tests.children_list, path: "tests", array: true, common: true) %>
+<%= config_example(metadata.tests.children_list, path: "tests", array: true, common: true) %>
 ```
 
 </TabItem>
@@ -48,7 +48,7 @@ vector test /etc/vector/*.toml
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.testing.tests.children_list, path: "tests", array: true, common: false) %>
+<%= config_example(metadata.tests.children_list, path: "tests", array: true, common: false) %>
 ```
 
 </TabItem>
@@ -59,4 +59,4 @@ For more information about unit tests check out [this guide][docs.setup.guides.u
 
 ## Options
 
-<%= fields(metadata.testing.tests.children_list, heading_depth: 3) %>
+<%= fields(metadata.tests.children_list, heading_depth: 3) %>

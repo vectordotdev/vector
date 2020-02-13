@@ -1,3 +1,5 @@
 *
-!scripts
+!scripts/Gemfile
+!scripts/Gemfile.lock
+!scripts/ci-docker-images/verifier-nixos/Gemfile
 !rust-toolchain

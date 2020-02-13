@@ -95,7 +95,7 @@ The list of unique values.\
 [metric_fields.type.children.distribution]
 type = "struct"
 description = """\
-A dsitribution represents a distribution of sampled values.\
+A distribution represents a distribution of sampled values.\
 """
 
 [metric_fields.type.children.distribution.children.values]

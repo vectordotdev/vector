@@ -17345,6 +17345,30 @@ module.exports = {
 
       ]
     },
+    "humio_logs": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "humio_logs_sink",
+      "name": "humio_logs",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "kafka": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -17567,7 +17591,7 @@ module.exports = {
     "docker": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the docker engine daemon and outputs log events.",
+      "description": "Ingests data through the [Docker engine daemon][urls.docker_daemon] and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -17806,7 +17830,7 @@ module.exports = {
     "syslog": {
       "beta": false,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the Syslog 5424 protocol and outputs log events.",
+      "description": "Ingests data through the Syslog protocol and outputs log events.",
       "event_types": [
         "log"
       ],

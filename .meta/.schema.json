@@ -23,6 +23,10 @@
         }
       }
     },
+    "tests": {
+      "description": "Vector configuration unit tests reference.",
+      "$ref": "#/definitions/field"
+    },
     "transforms": {
       "type": "object",
       "description": "An object represeting all Vector transforms keyed by the transform's name.",
@@ -120,10 +124,12 @@
           "description": "The option value type.",
           "enum": [
             "bool",
+            "float",
             "int",
             "string",
             "struct",
             "table",
+            "timestamp",
             "[float]",
             "[string]",
             "[table]"
@@ -168,6 +174,7 @@
           }
         },
         "fields": {
+          "$ref": "#/definitions/fields"
         }
       }
     },

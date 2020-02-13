@@ -182,7 +182,7 @@ class Templates
     hash = {}
 
     fields.each do |field|
-      if field.children_list.any?
+      if field.children?
         hash[field.name] = fields_hash(field.children_list)
       else
         example = field.examples.first

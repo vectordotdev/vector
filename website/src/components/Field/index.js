@@ -53,8 +53,14 @@ function Enum({values}) {
   return elements;
 }
 
-function Example({name, path, value}) {
-  return <code>{exampleToTOML(null, value)}</code>;
+function Example({name, path, unit, value}) {
+  let unitText = '';
+
+  if (unit) {
+    unitText = <> ({unit})</>;
+  }
+
+  return <><code>{exampleToTOML(null, value)}</code>{unitText}</>;
 }
 
 function Examples({name, path, values}) {
@@ -94,7 +100,7 @@ function RelevantWhen({value}) {
   );
 }
 
-function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWhen}) {
+function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWhen, unit}) {
   const [showExamples, setShowExamples] = useState(false);
 
   if (defaultValue || enumValues || (examples && examples.length > 0)) {
@@ -102,7 +108,7 @@ function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWh
       <div className="info">
         {defaultValue !== undefined ?
           (defaultValue ?
-            <div>Default: <Example name={name} path={path} value={defaultValue} /></div> :
+            <div>Default: <Example name={name} path={path} value={defaultValue} unit={unit} /></div> :
             <div>No default</div>) :
           null}
         {enumValues ?
@@ -147,7 +153,7 @@ function Field({children, common, defaultValue, enumValues, examples, name, path
       </div>
       {filteredChildren}
       {!collapse &&
-        <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} />}
+        <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} unit={unit} />}
     </div>
   );
 }
