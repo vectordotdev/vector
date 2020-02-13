@@ -499,10 +499,7 @@ mod test {
 
         assert_eq!("this", config.global.log_schema.host_key().to_string());
         assert_eq!("that", config.global.log_schema.message_key().to_string());
-        assert_eq!(
-            "then",
-            config.global.log_schema().timestamp_key().to_string()
-        );
+        assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
     }
 
     #[test]
