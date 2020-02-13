@@ -22,6 +22,7 @@ use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type Response = hyper::Response<Bytes>;
 pub type Error = hyper::Error;
+pub type HttpsClient = hyper::Client<HttpsConnector<HttpConnector<Resolver>>>;
 
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
@@ -215,10 +216,7 @@ pub fn connector(
     Ok(https)
 }
 
-pub fn https_client(
-    resolver: Resolver,
-    tls: TlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector<Resolver>>>> {
+pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<HttpsClient> {
     let https = connector(resolver, tls)?;
     Ok(hyper::Client::builder().build(https))
 }

@@ -1,12 +1,10 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    dns::Resolver,
     event::{self, Event},
-    region::RegionOrEndpoint,
     sinks::{
         util::{
-            http::https_client,
-            retries::RetryLogic,
+            http::{https_client, HttpsClient},
+            retries::{RetryAction, RetryLogic},
             tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
             SinkExt, TowerRequestConfig,
@@ -19,26 +17,26 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
-use http::{Method, Uri};
-use hyper::{Body, Request};
+use http::{Method, StatusCode, Uri};
+use hyper::{
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Body, Request,
+};
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
-use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
-use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
 const BASE_URL: &str = "https://storage.googleapis.com/";
 
 #[derive(Clone)]
-pub struct GcsSink {
-    client: S3Client,
+struct GcsSink {
+    client: HttpsClient,
+    creds: Option<GcpCredentials>,
 }
 
 #[derive(Debug, Snafu)]
@@ -56,29 +54,21 @@ pub struct GcsSinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
-    options: GcsOptions,
-    #[serde(flatten)]
-    pub region: RegionOrEndpoint,
-    pub encoding: Encoding,
+    pub options: GcsOptions,
+    encoding: Encoding,
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(flatten)]
-    auth: GcpAuthConfig,
-    tls: Option<TlsOptions>,
+    pub auth: GcpAuthConfig,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct GcsOptions {
+pub struct GcsOptions {
     acl: Option<GcsPredefinedAcl>,
-    grant_full_control: Option<String>,
-    grant_read: Option<String>,
-    grant_read_acp: Option<String>,
-    grant_write_acp: Option<String>,
-    server_side_encryption: Option<GcsServerSideEncryption>,
-    ssekms_key_id: Option<String>,
     storage_class: Option<GcsStorageClass>,
     tags: Option<HashMap<String, String>>,
 }
@@ -86,7 +76,7 @@ struct GcsOptions {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "kebab-case")]
-enum GcsPredefinedAcl {
+pub enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
     BucketOwnerRead,
@@ -97,17 +87,15 @@ enum GcsPredefinedAcl {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-enum GcsServerSideEncryption {
+pub enum GcsServerSideEncryption {
     #[serde(rename = "AES256")]
     AES256,
-    #[serde(rename = "aws:kms")]
-    AwsKms,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum GcsStorageClass {
+pub enum GcsStorageClass {
     #[derivative(Default)]
     Standard,
     Nearline,
@@ -150,7 +138,7 @@ impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::DevStorageReadWrite)?;
         let healthcheck = GcsSink::healthcheck(self, &cx, &creds)?;
-        let sink = GcsSink::new(self, cx, &creds)?;
+        let sink = GcsSink::new(self, cx, creds)?;
 
         Ok((sink, healthcheck))
     }
@@ -178,7 +166,7 @@ impl GcsSink {
     pub fn new(
         config: &GcsSinkConfig,
         cx: SinkContext,
-        _creds: &Option<GcpCredentials>,
+        creds: Option<GcpCredentials>,
     ) -> crate::Result<RouterSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
@@ -197,14 +185,10 @@ impl GcsSink {
             Template::from("date=%F/")
         };
 
-        let region = config.region.clone().try_into()?;
-
-        let s3 = GcsSink {
-            client: Self::create_client(cx.resolver(), region)?,
-        };
-
         let tls = TlsSettings::from_options(&config.tls)?;
-        let _client = https_client(cx.resolver(), tls)?;
+        let client = https_client(cx.resolver(), tls)?;
+
+        let gcs = GcsSink { client, creds };
 
         let filename_extension = config.filename_extension.clone();
         let bucket = config.bucket.clone();
@@ -223,7 +207,7 @@ impl GcsSink {
                 )
             })
             .settings(request, GcsRetryLogic)
-            .service(s3);
+            .service(gcs);
 
         let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
             .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
@@ -263,74 +247,65 @@ impl GcsSink {
 
         Ok(Box::new(healthcheck))
     }
-
-    pub fn create_client(resolver: Resolver, region: Region) -> crate::Result<S3Client> {
-        // Hack around the fact that rusoto will not pick up runtime
-        // env vars. This is designed to only for test purposes use
-        // static credentials.
-        #[cfg(not(test))]
-        {
-            use rusoto_credential::DefaultCredentialsProvider;
-
-            let p = DefaultCredentialsProvider::new()?;
-            let d = crate::sinks::util::rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
-
-        #[cfg(test)]
-        {
-            use rusoto_credential::StaticProvider;
-
-            let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-            let d = crate::sinks::util::rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
-    }
 }
 
-impl Service<InsertRequest> for GcsSink {
-    type Response = PutObjectOutput;
-    type Error = RusotoError<PutObjectError>;
-    type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
+impl Service<RequestWrapper> for GcsSink {
+    type Response = hyper::Response<Body>;
+    type Error = hyper::Error;
+    type Future = hyper::client::ResponseFuture;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
     }
 
-    fn call(&mut self, request: InsertRequest) -> Self::Future {
+    fn call(&mut self, request: RequestWrapper) -> Self::Future {
         let options = request.options;
-        let mut tagging = url::form_urlencoded::Serializer::new(String::new());
+
+        let uri = format!("{}{}/{}", BASE_URL, request.bucket, request.key)
+            .parse::<Uri>()
+            .unwrap();
+        let mut builder = Request::builder();
+        builder.method(Method::PUT);
+        builder.uri(uri);
+        let headers = builder.headers_mut().unwrap();
+        add_header(headers, "content-type", "text/plain"); // FIXME needs proper content type
+        add_header(headers, "content-length", format!("{}", request.body.len()));
+        request
+            .content_encoding
+            .map(|ce| add_header(headers, "content-encoding", ce));
+        options
+            .acl
+            .map(|acl| add_header(headers, "x-goog-acl", to_string(acl)));
+        options
+            .storage_class
+            .map(|sc| add_header(headers, "x-goog-storage-class", to_string(sc)));
         if let Some(tags) = options.tags {
             for (p, v) in tags {
-                tagging.append_pair(&p, &v);
+                headers.insert(
+                    HeaderName::from_bytes(p.as_bytes()).unwrap(),
+                    HeaderValue::from_str(&v).unwrap(),
+                );
             }
         }
-        let tagging = tagging.finish();
-        self.client
-            .put_object(PutObjectRequest {
-                body: Some(request.body.into()),
-                bucket: request.bucket,
-                key: request.key,
-                content_encoding: request.content_encoding,
-                acl: options.acl.map(to_string),
-                grant_full_control: options.grant_full_control,
-                grant_read: options.grant_read,
-                grant_read_acp: options.grant_read_acp,
-                grant_write_acp: options.grant_write_acp,
-                server_side_encryption: options.server_side_encryption.map(to_string),
-                ssekms_key_id: options.ssekms_key_id,
-                storage_class: options.storage_class.map(to_string),
-                tagging: Some(tagging),
-                ..Default::default()
-            })
-            .instrument(info_span!("request"))
+
+        let mut request = builder.body(Body::from(request.body)).unwrap();
+        if let Some(creds) = &self.creds {
+            creds.apply(&mut request);
+        }
+
+        self.client.request(request)
     }
 }
 
 fn to_string(value: impl Serialize) -> String {
     serde_json::to_value(&value).unwrap().to_string()
+}
+
+fn add_header(headers: &mut HeaderMap, name: &'static str, value: impl AsRef<str>) {
+    headers.insert(
+        HeaderName::from_static(name),
+        HeaderValue::from_str(value.as_ref()).unwrap(),
+    );
 }
 
 fn build_request(
@@ -341,8 +316,8 @@ fn build_request(
     gzip: bool,
     bucket: String,
     options: GcsOptions,
-) -> InsertRequest {
-    let (inner, key) = req.into_parts();
+) -> RequestWrapper {
+    let (body, key) = req.into_parts();
 
     // TODO: pull the seconds from the last event
     let filename = {
@@ -356,7 +331,7 @@ fn build_request(
         }
     };
 
-    let extension = extension.unwrap_or_else(|| if gzip { "log.gz".into() } else { "log".into() });
+    let extension = extension.unwrap_or_else(|| if gzip { "log.gz" } else { "log" }.into());
 
     let key = String::from_utf8_lossy(&key[..]).into_owned();
 
@@ -364,13 +339,13 @@ fn build_request(
 
     debug!(
         message = "sending events.",
-        bytes = &field::debug(inner.len()),
+        bytes = &field::debug(body.len()),
         bucket = &field::debug(&bucket),
         key = &field::debug(&key)
     );
 
-    InsertRequest {
-        body: inner,
+    RequestWrapper {
+        body,
         bucket,
         key,
         content_encoding: if gzip { Some("gzip".to_string()) } else { None },
@@ -378,29 +353,13 @@ fn build_request(
     }
 }
 
-#[derive(Debug, Clone)]
-struct InsertRequest {
+#[derive(Clone, Debug)]
+struct RequestWrapper {
     body: Vec<u8>,
     bucket: String,
     key: String,
     content_encoding: Option<String>,
     options: GcsOptions,
-}
-
-#[derive(Debug, Clone)]
-struct GcsRetryLogic;
-
-impl RetryLogic for GcsRetryLogic {
-    type Error = RusotoError<PutObjectError>;
-    type Response = PutObjectOutput;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::HttpDispatch(_) => true,
-            RusotoError::Unknown(res) if res.status.is_server_error() => true,
-            _ => false,
-        }
-    }
 }
 
 fn encode_event(
@@ -438,6 +397,33 @@ fn encode_event(
     };
 
     Some(PartitionInnerBuffer::new(bytes, key.into()))
+}
+
+#[derive(Clone)]
+pub struct GcsRetryLogic;
+
+// This is a clone of HttpRetryLogic for the Body type, should get merged
+impl RetryLogic for GcsRetryLogic {
+    type Error = hyper::Error;
+    type Response = hyper::Response<Body>;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_connect() || error.is_closed()
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        let status = response.status();
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status)),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -522,325 +508,5 @@ mod tests {
             GcsOptions::default(),
         );
         assert_ne!(req.key, "key/date.log.gz".to_string());
-    }
-}
-
-#[cfg(feature = "gcs-integration-tests")]
-#[cfg(test)]
-mod integration_tests {
-    use super::*;
-    use crate::{
-        assert_downcast_matches,
-        event::Event,
-        region::RegionOrEndpoint,
-        runtime::Runtime,
-        test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
-    };
-    use flate2::read::GzDecoder;
-    use futures::{Future, Sink};
-    use pretty_assertions::assert_eq;
-    use rusoto_core::region::Region;
-    use rusoto_s3::{S3Client, S3};
-    use std::io::{BufRead, BufReader};
-
-    const BUCKET: &str = "router-tests";
-
-    #[test]
-    fn gcs_insert_message_into() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
-
-        let config = config(1000000);
-        let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx, &None).unwrap();
-
-        let (lines, events) = random_lines_with_stream(100, 10);
-
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
-
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 1);
-
-        let key = keys[0].clone();
-        assert!(key.ends_with(".log"));
-
-        let obj = get_object(key);
-        assert_eq!(obj.content_encoding, None);
-
-        let response_lines = get_lines(obj);
-        assert_eq!(lines, response_lines);
-    }
-
-    #[test]
-    fn gcs_rotate_files_after_the_buffer_size_is_reached() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
-
-        ensure_bucket(&client());
-
-        let config = GcsSinkConfig {
-            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
-            filename_time_format: Some("waitsforfullbatch".into()),
-            filename_append_uuid: Some(false),
-            ..config(1000)
-        };
-        let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx, &None).unwrap();
-
-        let (lines, _events) = random_lines_with_stream(100, 30);
-
-        let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-            let mut e = Event::from(line);
-            let i = if i < 10 {
-                1
-            } else if i < 20 {
-                2
-            } else {
-                3
-            };
-            e.as_mut_log().insert("i", format!("{}", i));
-            e
-        });
-
-        let pump = sink.send_all(futures::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
-
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 3);
-
-        let response_lines = keys
-            .into_iter()
-            .map(|key| get_lines(get_object(key)))
-            .collect::<Vec<_>>();
-
-        assert_eq!(&lines[00..10], response_lines[0].as_slice());
-        assert_eq!(&lines[10..20], response_lines[1].as_slice());
-        assert_eq!(&lines[20..30], response_lines[2].as_slice());
-    }
-
-    #[test]
-    fn gcs_waits_for_full_batch_or_timeout_before_sending() {
-        let rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
-
-        ensure_bucket(&client());
-
-        let config = GcsSinkConfig {
-            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
-            filename_time_format: Some("waitsforfullbatch".into()),
-            filename_append_uuid: Some(false),
-            ..config(1000)
-        };
-
-        let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx, &None).unwrap();
-
-        let (lines, _) = random_lines_with_stream(100, 30);
-
-        let (tx, rx) = futures::sync::mpsc::channel(1);
-        let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
-
-        let mut rt = Runtime::new().unwrap();
-        rt.spawn(pump);
-
-        let mut tx = tx.wait();
-
-        for (i, line) in lines.iter().enumerate().take(15) {
-            let mut event = Event::from(line.as_str());
-
-            let i = if i < 10 { 1 } else { 2 };
-
-            event.as_mut_log().insert("i", format!("{}", i));
-            tx.send(event).unwrap();
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
-        for (i, line) in lines.iter().skip(15).enumerate() {
-            let mut event = Event::from(line.as_str());
-
-            let i = if i < 5 { 2 } else { 3 };
-
-            event.as_mut_log().insert("i", format!("{}", i));
-            tx.send(event).unwrap();
-        }
-
-        drop(tx);
-
-        crate::test_util::shutdown_on_idle(rt);
-
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 3);
-
-        let response_lines = keys
-            .into_iter()
-            .map(|key| get_lines(get_object(key)))
-            .collect::<Vec<_>>();
-
-        assert_eq!(&lines[00..10], response_lines[0].as_slice());
-        assert_eq!(&lines[10..20], response_lines[1].as_slice());
-        assert_eq!(&lines[20..30], response_lines[2].as_slice());
-    }
-
-    #[test]
-    fn gcs_gzip() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
-
-        ensure_bucket(&client());
-
-        let config = GcsSinkConfig {
-            compression: Compression::Gzip,
-            filename_time_format: Some("%S%f".into()),
-            ..config(1000)
-        };
-
-        let prefix = config.key_prefix.clone();
-        let sink = GcsSink::new(&config, cx, &None).unwrap();
-
-        let (lines, events) = random_lines_with_stream(100, 500);
-
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
-
-        let keys = get_keys(prefix.unwrap());
-        assert_eq!(keys.len(), 2);
-
-        let response_lines = keys
-            .into_iter()
-            .map(|key| {
-                assert!(key.ends_with(".log.gz"));
-
-                let obj = get_object(key);
-                assert_eq!(obj.content_encoding, Some("gzip".to_string()));
-
-                get_gzipped_lines(obj)
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-
-        assert_eq!(lines, response_lines);
-    }
-
-    #[test]
-    fn gcs_healthchecks() {
-        let mut rt = Runtime::new().unwrap();
-        let context = SinkContext::new_test(rt.executor());
-
-        let healthcheck = GcsSink::healthcheck(&config(1), &context, &None).unwrap();
-        rt.block_on(healthcheck).unwrap();
-    }
-
-    #[test]
-    fn gcs_healthchecks_invalid_bucket() {
-        let mut rt = Runtime::new().unwrap();
-        let context = SinkContext::new_test(rt.executor());
-
-        let config = GcsSinkConfig {
-            bucket: "asdflkjadskdaadsfadf".to_string(),
-            ..config(1)
-        };
-        let healthcheck = GcsSink::healthcheck(&config, &context, &None).unwrap();
-        assert_downcast_matches!(
-            rt.block_on(healthcheck).unwrap_err(),
-            HealthcheckError,
-            HealthcheckError::UnknownBucket{ .. }
-        );
-    }
-
-    fn client() -> S3Client {
-        let region = Region::Custom {
-            name: "minio".to_owned(),
-            endpoint: "http://localhost:9000".to_owned(),
-        };
-
-        use rusoto_core::HttpClient;
-        use rusoto_credential::StaticProvider;
-
-        let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-        let d = HttpClient::new().unwrap();
-
-        S3Client::new_with(d, p, region)
-    }
-
-    fn config(batch_size: usize) -> GcsSinkConfig {
-        ensure_bucket(&client());
-
-        GcsSinkConfig {
-            key_prefix: Some(random_string(10) + "/date=%F/"),
-            bucket: BUCKET.to_string(),
-            compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(batch_size),
-                timeout_secs: Some(5),
-            },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
-            ..Default::default()
-        }
-    }
-
-    fn ensure_bucket(client: &S3Client) {
-        use rusoto_s3::{CreateBucketError, CreateBucketRequest};
-
-        let req = CreateBucketRequest {
-            bucket: BUCKET.to_string(),
-            ..Default::default()
-        };
-
-        let res = client.create_bucket(req);
-
-        match res.sync() {
-            Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
-            Err(e) => match e {
-                RusotoError::Unknown(b) => {
-                    let body = String::from_utf8_lossy(&b.body[..]);
-                    panic!("Couldn't create bucket: {:?}; Body {}", b, body);
-                }
-                _ => panic!("Couldn't create bucket: {}", e),
-            },
-        }
-    }
-
-    fn get_keys(prefix: String) -> Vec<String> {
-        let prefix = prefix.split("/").into_iter().next().unwrap().to_string();
-
-        let list_res = client()
-            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: BUCKET.to_string(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .sync()
-            .unwrap();
-
-        list_res
-            .contents
-            .unwrap()
-            .into_iter()
-            .map(|obj| obj.key.unwrap())
-            .collect()
-    }
-
-    fn get_object(key: String) -> rusoto_s3::GetObjectOutput {
-        client()
-            .get_object(rusoto_s3::GetObjectRequest {
-                bucket: BUCKET.to_string(),
-                key,
-                ..Default::default()
-            })
-            .sync()
-            .unwrap()
-    }
-
-    fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
-        let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
-        buf_read.lines().map(|l| l.unwrap()).collect()
-    }
-
-    fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
-        let buf_read = BufReader::new(GzDecoder::new(obj.body.unwrap().into_blocking_read()));
-        buf_read.lines().map(|l| l.unwrap()).collect()
     }
 }
