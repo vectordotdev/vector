@@ -1,12 +1,12 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::{
         util::{
-            retries::RetryLogic, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
-            ServiceBuilderExt, SinkExt, TowerRequestConfig,
+            http::https_client, retries::RetryLogic, tls::TlsSettings, BatchBytesConfig, Buffer,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -16,11 +16,11 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
+use http::{Method, Uri};
+use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
-use rusoto_s3::{
-    HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
-};
+use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
@@ -151,7 +151,7 @@ inventory::submit! {
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::DevStorageReadWrite)?;
-        let healthcheck = GcsSink::healthcheck(self, cx.resolver(), &creds)?;
+        let healthcheck = GcsSink::healthcheck(self, &cx, &creds)?;
         let sink = GcsSink::new(self, cx, &creds)?;
 
         Ok((sink, healthcheck))
@@ -233,28 +233,27 @@ impl GcsSink {
 
     pub fn healthcheck(
         config: &GcsSinkConfig,
-        resolver: Resolver,
-        _creds: &Option<GcpCredentials>,
+        cx: &SinkContext,
+        creds: &Option<GcpCredentials>,
     ) -> crate::Result<Healthcheck> {
-        let client = Self::create_client(resolver, config.region.clone().try_into()?)?;
+        let mut builder = Request::builder();
+        builder.method(Method::HEAD);
+        builder.uri(format!("https://storage.googleapis.com/{}/", config.bucket).parse::<Uri>()?);
 
-        let request = HeadBucketRequest {
-            bucket: config.bucket.clone(),
-        };
+        let mut request = builder.body(Body::empty()).unwrap();
+        if let Some(creds) = &creds {
+            creds.apply(&mut request);
+        }
 
-        let response = client.head_bucket(request);
+        let client = https_client(
+            cx.resolver(),
+            TlsSettings::from_options(&Default::default())?,
+        )?;
 
-        let bucket = config.bucket.clone();
-        let healthcheck = response.map_err(|err| match err {
-            RusotoError::Unknown(response) => match response.status {
-                http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                http::status::StatusCode::NOT_FOUND => {
-                    HealthcheckError::UnknownBucket { bucket }.into()
-                }
-                status => HealthcheckError::UnknownStatus { status }.into(),
-            },
-            err => err.into(),
-        });
+        let healthcheck = client
+            .request(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(creds.clone()));
 
         Ok(Box::new(healthcheck))
     }
@@ -285,7 +284,7 @@ impl GcsSink {
     }
 }
 
-impl Service<Request> for GcsSink {
+impl Service<PutRequest> for GcsSink {
     type Response = PutObjectOutput;
     type Error = RusotoError<PutObjectError>;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -294,7 +293,7 @@ impl Service<Request> for GcsSink {
         Ok(().into())
     }
 
-    fn call(&mut self, request: Request) -> Self::Future {
+    fn call(&mut self, request: PutRequest) -> Self::Future {
         let options = request.options;
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
         if let Some(tags) = options.tags {
@@ -336,7 +335,7 @@ fn build_request(
     gzip: bool,
     bucket: String,
     options: S3Options,
-) -> Request {
+) -> PutRequest {
     let (inner, key) = req.into_parts();
 
     // TODO: pull the seconds from the last event
@@ -364,7 +363,7 @@ fn build_request(
         key = &field::debug(&key)
     );
 
-    Request {
+    PutRequest {
         body: inner,
         bucket,
         key,
@@ -374,7 +373,7 @@ fn build_request(
 }
 
 #[derive(Debug, Clone)]
-struct Request {
+struct PutRequest {
     body: Vec<u8>,
     bucket: String,
     key: String,
@@ -526,7 +525,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
-        dns::Resolver,
         event::Event,
         region::RegionOrEndpoint,
         runtime::Runtime,
@@ -723,22 +721,22 @@ mod integration_tests {
     #[test]
     fn gcs_healthchecks() {
         let mut rt = Runtime::new().unwrap();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let context = SinkContext::new_test(rt.executor());
 
-        let healthcheck = GcsSink::healthcheck(&config(1), resolver, &None).unwrap();
+        let healthcheck = GcsSink::healthcheck(&config(1), &context, &None).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
     #[test]
     fn gcs_healthchecks_invalid_bucket() {
         let mut rt = Runtime::new().unwrap();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
+        let context = SinkContext::new_test(rt.executor());
 
         let config = GcsSinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
             ..config(1)
         };
-        let healthcheck = GcsSink::healthcheck(&config, resolver, &None).unwrap();
+        let healthcheck = GcsSink::healthcheck(&config, &context, &None).unwrap();
         assert_downcast_matches!(
             rt.block_on(healthcheck).unwrap_err(),
             HealthcheckError,
