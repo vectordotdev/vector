@@ -31,6 +31,7 @@ use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
+const BASE_URL: &str = "https://storage.googleapis.com/";
 
 #[derive(Clone)]
 pub struct GcsSink {
@@ -52,7 +53,7 @@ pub struct GcsSinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
-    options: S3Options,
+    options: GcsOptions,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: Encoding,
@@ -66,29 +67,16 @@ pub struct GcsSinkConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct S3Options {
-    acl: Option<S3CannedAcl>,
+struct GcsOptions {
+    acl: Option<GcsPredefinedAcl>,
     grant_full_control: Option<String>,
     grant_read: Option<String>,
     grant_read_acp: Option<String>,
     grant_write_acp: Option<String>,
-    server_side_encryption: Option<S3ServerSideEncryption>,
+    server_side_encryption: Option<GcsServerSideEncryption>,
     ssekms_key_id: Option<String>,
     storage_class: Option<GcsStorageClass>,
     tags: Option<HashMap<String, String>>,
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
-#[serde(rename_all = "kebab-case")]
-enum S3CannedAcl {
-    #[derivative(Default)]
-    Private,
-    PublicRead,
-    PublicReadWrite,
-    AwsExecRead,
-    AuthenticatedRead,
-    LogDeliveryWrite,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -105,7 +93,7 @@ enum GcsPredefinedAcl {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-enum S3ServerSideEncryption {
+enum GcsServerSideEncryption {
     #[serde(rename = "AES256")]
     AES256,
     #[serde(rename = "aws:kms")]
@@ -211,6 +199,9 @@ impl GcsSink {
             client: Self::create_client(cx.resolver(), region)?,
         };
 
+        let tls = TlsSettings::from_options(&config.tls)?;
+        let _client = https_client(cx.resolver(), tls)?;
+
         let filename_extension = config.filename_extension.clone();
         let bucket = config.bucket.clone();
         let options = config.options.clone();
@@ -227,7 +218,7 @@ impl GcsSink {
                     options.clone(),
                 )
             })
-            .settings(request, S3RetryLogic)
+            .settings(request, GcsRetryLogic)
             .service(s3);
 
         let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
@@ -244,7 +235,7 @@ impl GcsSink {
     ) -> crate::Result<Healthcheck> {
         let mut builder = Request::builder();
         builder.method(Method::HEAD);
-        builder.uri(format!("https://storage.googleapis.com/{}/", config.bucket).parse::<Uri>()?);
+        builder.uri(format!("{}{}/", BASE_URL, config.bucket).parse::<Uri>()?);
 
         let mut request = builder.body(Body::empty()).unwrap();
         if let Some(creds) = &creds {
@@ -297,7 +288,7 @@ impl GcsSink {
     }
 }
 
-impl Service<PutRequest> for GcsSink {
+impl Service<InsertRequest> for GcsSink {
     type Response = PutObjectOutput;
     type Error = RusotoError<PutObjectError>;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -306,7 +297,7 @@ impl Service<PutRequest> for GcsSink {
         Ok(().into())
     }
 
-    fn call(&mut self, request: PutRequest) -> Self::Future {
+    fn call(&mut self, request: InsertRequest) -> Self::Future {
         let options = request.options;
         let mut tagging = url::form_urlencoded::Serializer::new(String::new());
         if let Some(tags) = options.tags {
@@ -347,8 +338,8 @@ fn build_request(
     uuid: bool,
     gzip: bool,
     bucket: String,
-    options: S3Options,
-) -> PutRequest {
+    options: GcsOptions,
+) -> InsertRequest {
     let (inner, key) = req.into_parts();
 
     // TODO: pull the seconds from the last event
@@ -376,7 +367,7 @@ fn build_request(
         key = &field::debug(&key)
     );
 
-    PutRequest {
+    InsertRequest {
         body: inner,
         bucket,
         key,
@@ -386,18 +377,18 @@ fn build_request(
 }
 
 #[derive(Debug, Clone)]
-struct PutRequest {
+struct InsertRequest {
     body: Vec<u8>,
     bucket: String,
     key: String,
     content_encoding: Option<String>,
-    options: S3Options,
+    options: GcsOptions,
 }
 
 #[derive(Debug, Clone)]
-struct S3RetryLogic;
+struct GcsRetryLogic;
 
-impl RetryLogic for S3RetryLogic {
+impl RetryLogic for GcsRetryLogic {
     type Error = RusotoError<PutObjectError>;
     type Response = PutObjectOutput;
 
@@ -493,7 +484,7 @@ mod tests {
             false,
             false,
             "bucket".into(),
-            S3Options::default(),
+            GcsOptions::default(),
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
@@ -504,7 +495,7 @@ mod tests {
             false,
             false,
             "bucket".into(),
-            S3Options::default(),
+            GcsOptions::default(),
         );
         assert_eq!(req.key, "key/date.log".to_string());
 
@@ -515,7 +506,7 @@ mod tests {
             false,
             true,
             "bucket".into(),
-            S3Options::default(),
+            GcsOptions::default(),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
@@ -526,7 +517,7 @@ mod tests {
             true,
             true,
             "bucket".into(),
-            S3Options::default(),
+            GcsOptions::default(),
         );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
