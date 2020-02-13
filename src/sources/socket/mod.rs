@@ -83,7 +83,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or(event::log_schema().host_key.clone());
+                    .unwrap_or(event::log_schema().host_key().clone());
                 Ok(udp::udp(config.address, host_key, out))
             }
             #[cfg(unix)]
@@ -91,7 +91,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or(event::log_schema().host_key.to_string());
+                    .unwrap_or(event::log_schema().host_key().to_string());
                 Ok(unix::unix(config.path, config.max_length, host_key, out))
             }
         }
@@ -148,7 +148,7 @@ mod test {
 
         let event = rx.wait().next().unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&event::log_schema().host_key],
+            event.as_log()[&event::log_schema().host_key()],
             "127.0.0.1".into()
         );
     }
@@ -179,13 +179,13 @@ mod test {
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key],
+            event.unwrap().as_log()[&event::log_schema().message_key()],
             "short".into()
         );
 
         let (event, _rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key],
+            event.unwrap().as_log()[&event::log_schema().message_key()],
             "more short".into()
         );
     }
@@ -247,7 +247,7 @@ mod test {
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
         );
     }
@@ -262,11 +262,11 @@ mod test {
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key],
+            events[1].as_log()[&event::log_schema().message_key()],
             "test2".into()
         );
     }
@@ -281,11 +281,11 @@ mod test {
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key],
+            events[1].as_log()[&event::log_schema().message_key()],
             "test2".into()
         );
     }
@@ -300,7 +300,7 @@ mod test {
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().host_key],
+            events[0].as_log()[&event::log_schema().host_key()],
             format!("{}", from).into()
         );
     }
@@ -361,7 +361,7 @@ mod test {
 
         assert_eq!(1, events.len());
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
         );
     }
@@ -378,11 +378,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key],
+            events[1].as_log()[&event::log_schema().message_key()],
             "test2".into()
         );
     }
@@ -399,11 +399,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key],
+            events[1].as_log()[&event::log_schema().message_key()],
             "test2".into()
         );
     }

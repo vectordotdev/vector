@@ -72,7 +72,7 @@ impl RegexParser {
         let field = config
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key);
+            .unwrap_or(&event::log_schema().message_key());
 
         let regex = Regex::new(&config.regex).context(super::InvalidRegex)?;
 

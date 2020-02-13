@@ -340,27 +340,32 @@ impl Config {
         let default_schema = event::LogSchema::default();
         if with.global.log_schema != default_schema {
             // If the set value is the default, override it. If it's already overridden, error.
-
-            if self.global.log_schema.host_key != default_schema.host_key
-                && self.global.log_schema.host_key != with.global.log_schema.host_key
+            if self.global.log_schema.host_key() != default_schema.host_key()
+                && self.global.log_schema.host_key() != with.global.log_schema.host_key()
             {
-                errors.push("conflicting values for 'schema.host_key' found".to_owned());
+                errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
             } else {
-                self.global.log_schema.host_key = with.global.log_schema.host_key;
+                self.global
+                    .log_schema
+                    .set_host_key(with.global.log_schema.host_key().clone());
             }
-            if self.global.log_schema.message_key != default_schema.message_key
-                && self.global.log_schema.message_key != with.global.log_schema.message_key
+            if self.global.log_schema.message_key() != default_schema.message_key()
+                && self.global.log_schema.message_key() != with.global.log_schema.message_key()
             {
-                errors.push("conflicting values for 'schema.message_key' found".to_owned());
+                errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
             } else {
-                self.global.log_schema.message_key = with.global.log_schema.message_key;
+                self.global
+                    .log_schema
+                    .set_message_key(with.global.log_schema.message_key().clone());
             }
-            if self.global.log_schema.timestamp_key != default_schema.timestamp_key
-                && self.global.log_schema.timestamp_key != with.global.log_schema.timestamp_key
+            if self.global.log_schema.timestamp_key() != default_schema.timestamp_key()
+                && self.global.log_schema.timestamp_key() != with.global.log_schema.timestamp_key()
             {
-                errors.push("conflicting values for 'schema.timestamp_key' found".to_owned());
+                errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
             } else {
-                self.global.log_schema.timestamp_key = with.global.log_schema.timestamp_key;
+                self.global
+                    .log_schema
+                    .set_timestamp_key(with.global.log_schema.timestamp_key().clone());
             }
         }
 
@@ -460,11 +465,14 @@ mod test {
         )
         .unwrap();
 
-        assert_eq!("host", config.global.log_schema.host_key.to_string());
-        assert_eq!("message", config.global.log_schema.message_key.to_string());
+        assert_eq!("host", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "message",
+            config.global.log_schema.message_key().to_string()
+        );
         assert_eq!(
             "timestamp",
-            config.global.log_schema.timestamp_key.to_string()
+            config.global.log_schema.timestamp_key().to_string()
         );
     }
 

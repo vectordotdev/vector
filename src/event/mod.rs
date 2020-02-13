@@ -1,6 +1,7 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use getset::{Getters, Setters};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
 use once_cell::sync::OnceCell;
@@ -23,8 +24,9 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
+pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
+
 lazy_static! {
-    pub static ref LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
     pub static ref PARTIAL: Atom = Atom::from("_partial");
 }
 
@@ -158,7 +160,7 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     }
 }
 
-pub fn log_schema<'a>() -> &'a LogSchema {
+pub fn log_schema() -> &'static LogSchema {
     // TODO: Help Rust project support before_each
     // Support uninitialized schemas in tests to help our contributors.
     // Don't do it in release because that is scary.
@@ -172,11 +174,14 @@ pub fn log_schema<'a>() -> &'a LogSchema {
     LOG_SCHEMA.get().expect("Schema was not initialized")
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
 pub struct LogSchema {
-    pub message_key: Atom,
-    pub timestamp_key: Atom,
-    pub host_key: Atom,
+    #[getset(get = "pub", set = "pub")]
+    message_key: Atom,
+    #[getset(get = "pub", set = "pub")]
+    timestamp_key: Atom,
+    #[getset(get = "pub", set = "pub")]
+    host_key: Atom,
 }
 
 impl Default for LogSchema {
@@ -513,7 +518,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .remove(&log_schema().message_key)
+            .remove(&log_schema().message_key())
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -528,10 +533,10 @@ impl From<Bytes> for Event {
 
         event
             .as_mut_log()
-            .insert(log_schema().message_key.clone(), message);
+            .insert(log_schema().message_key().clone(), message);
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key.clone(), Utc::now());
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
 
         event
     }
@@ -599,7 +604,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&super::log_schema().timestamp_key),
+            "timestamp": event.as_log().get(&super::log_schema().timestamp_key()),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();

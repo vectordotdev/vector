@@ -60,7 +60,7 @@ pub enum Encoding {
 }
 
 fn default_host_field() -> Atom {
-    event::LogSchema::default().host_key.clone()
+    event::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -203,7 +203,7 @@ fn encode_event(
 
     let host = event.get(&host_field).cloned();
     let timestamp =
-        if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key) {
+        if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key()) {
             ts.timestamp()
         } else {
             chrono::Utc::now().timestamp()
@@ -212,7 +212,7 @@ fn encode_event(
     let mut body = match encoding {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
-            "event": event.get(&event::log_schema().message_key).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
+            "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
     };
@@ -256,11 +256,11 @@ mod tests {
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
-            event[&event::log_schema().message_key.to_string()],
+            event[&event::log_schema().message_key().to_string()],
             "hello world".to_string()
         );
         assert!(event
-            .get(&event::log_schema().timestamp_key.to_string())
+            .get(&event::log_schema().timestamp_key().to_string())
             .is_none());
     }
 

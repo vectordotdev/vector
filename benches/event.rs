@@ -75,7 +75,7 @@ fn create_event(json: Value) -> LogEvent {
     let mut event = Event::new_empty_log();
     event
         .as_mut_log()
-        .insert(event::log_schema().message_key.clone(), s);
+        .insert(event::log_schema().message_key().clone(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
     parser.transform(event).unwrap().into_log()

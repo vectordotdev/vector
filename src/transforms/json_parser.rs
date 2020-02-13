@@ -61,7 +61,7 @@ impl From<JsonParserConfig> for JsonParser {
         let field = if let Some(field) = &config.field {
             field
         } else {
-            &event::log_schema().message_key
+            &event::log_schema().message_key()
         };
 
         JsonParser {
@@ -152,7 +152,7 @@ mod test {
 
         assert!(event
             .as_log()
-            .get(&event::log_schema().message_key)
+            .get(&event::log_schema().message_key())
             .is_none());
     }
 
@@ -169,7 +169,7 @@ mod test {
 
         assert!(event
             .as_log()
-            .get(&event::log_schema().message_key)
+            .get(&event::log_schema().message_key())
             .is_some());
     }
 
@@ -187,7 +187,7 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
         assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key],
+            event.as_log()[&event::log_schema().message_key()],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
     }
@@ -269,7 +269,7 @@ mod test {
 
         assert_eq!(event, parsed);
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key],
+            event.as_log()[&event::log_schema().message_key()],
             invalid.into()
         );
 

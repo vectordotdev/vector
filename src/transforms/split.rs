@@ -30,7 +30,7 @@ impl TransformConfig for SplitConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key);
+            .unwrap_or(&event::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;

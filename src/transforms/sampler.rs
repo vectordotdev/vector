@@ -57,7 +57,7 @@ impl Transform for Sampler {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
-            .get(&event::log_schema().message_key)
+            .get(&event::log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 
@@ -147,7 +147,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&event::log_schema().message_key]
+                !s.as_log()[&event::log_schema().message_key()]
                     .to_string_lossy()
                     .contains("na")
             })
@@ -160,7 +160,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&event::log_schema().message_key]
+                !s.as_log()[&event::log_schema().message_key()]
                     .to_string_lossy()
                     .contains("na")
             })

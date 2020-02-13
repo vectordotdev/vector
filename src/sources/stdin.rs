@@ -66,7 +66,7 @@ where
         let host_key = config
             .host_key
             .clone()
-            .unwrap_or(event::log_schema().host_key.to_string());
+            .unwrap_or(event::log_schema().host_key().to_string());
         let hostname = hostname::get_hostname();
         let (mut tx, rx) = futures::sync::mpsc::channel(1024);
 
@@ -130,7 +130,10 @@ mod tests {
         let log = event.into_log();
 
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(log[&event::log_schema().message_key], "hello world".into());
+        assert_eq!(
+            log[&event::log_schema().message_key()],
+            "hello world".into()
+        );
     }
 
     #[test]
@@ -150,7 +153,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world".into())),
             event.map(|event| event
-                .map(|event| event.as_log()[&event::log_schema().message_key].to_string_lossy()))
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
@@ -158,7 +161,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world again".into())),
             event.map(|event| event
-                .map(|event| event.as_log()[&event::log_schema().message_key].to_string_lossy()))
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
