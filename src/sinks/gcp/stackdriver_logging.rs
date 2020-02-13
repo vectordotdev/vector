@@ -16,7 +16,14 @@ use http::{Method, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::collections::HashMap;
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Resource not found"))]
+    NotFound,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -152,10 +159,14 @@ impl StackdriverConfig {
 
         let client = https_client(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
         let creds = creds.clone();
-        let healthcheck = client
-            .request(request)
-            .map_err(Into::into)
-            .and_then(healthcheck_response(creds));
+        let healthcheck =
+            client
+                .request(request)
+                .map_err(Into::into)
+                .and_then(healthcheck_response(
+                    creds,
+                    HealthcheckError::NotFound.into(),
+                ));
 
         Ok(Box::new(healthcheck))
     }

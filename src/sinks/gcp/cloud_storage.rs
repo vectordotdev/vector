@@ -37,6 +37,12 @@ pub struct GcsSink {
     client: S3Client,
 }
 
+#[derive(Debug, Snafu)]
+enum GcsHealthcheckError {
+    #[snafu(display("Bucket {:?} not found", bucket))]
+    BucketNotFound { bucket: String },
+}
+
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
@@ -250,10 +256,17 @@ impl GcsSink {
             TlsSettings::from_options(&Default::default())?,
         )?;
 
-        let healthcheck = client
-            .request(request)
-            .map_err(Into::into)
-            .and_then(healthcheck_response(creds.clone()));
+        let healthcheck =
+            client
+                .request(request)
+                .map_err(Into::into)
+                .and_then(healthcheck_response(
+                    creds.clone(),
+                    GcsHealthcheckError::BucketNotFound {
+                        bucket: config.bucket.clone(),
+                    }
+                    .into(),
+                ));
 
         Ok(Box::new(healthcheck))
     }

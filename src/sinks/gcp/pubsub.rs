@@ -16,7 +16,13 @@ use futures::{stream::iter_ok, Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Configured topic not found"))]
+    TopicNotFound,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -114,10 +120,14 @@ impl PubsubConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = https_client(cx.resolver(), tls)?;
         let creds = creds.clone();
-        let healthcheck = client
-            .request(request)
-            .map_err(Into::into)
-            .and_then(healthcheck_response(creds));
+        let healthcheck =
+            client
+                .request(request)
+                .map_err(Into::into)
+                .and_then(healthcheck_response(
+                    creds,
+                    HealthcheckError::TopicNotFound.into(),
+                ));
         Ok(Box::new(healthcheck))
     }
 

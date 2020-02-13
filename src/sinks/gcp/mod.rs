@@ -4,7 +4,7 @@ use goauth::scopes::Scope;
 use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr};
 use hyper::{
     header::{HeaderValue, AUTHORIZATION},
-    Request,
+    Request, StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
@@ -22,7 +22,9 @@ enum GcpError {
     #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
     MissingAuth,
     #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials { source: GOErr },
+    InvalidCredentials0,
+    #[snafu(display("Invalid GCP credentials"))]
+    InvalidCredentials1 { source: GOErr },
     #[snafu(display("Invalid RSA key in GCP credentials"))]
     InvalidRsaKey { source: GOErr },
     #[snafu(display("Failed to get OAuth token"))]
@@ -59,7 +61,7 @@ pub struct GcpCredentials {
 
 impl GcpCredentials {
     pub fn new(path: &str, scope: Scope) -> crate::Result<Self> {
-        let creds = Credentials::from_file(path).context(InvalidCredentials)?;
+        let creds = Credentials::from_file(path).context(InvalidCredentials1)?;
         let jwt = make_jwt(&creds, &scope)?;
         let token = goauth::get_token_with_creds(&jwt, &creds).context(GetTokenFailed)?;
         let token = Arc::new(RwLock::new(token));
@@ -113,9 +115,10 @@ fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>>
 // Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
     creds: Option<GcpCredentials>,
+    not_found_error: crate::Error,
 ) -> impl FnOnce(http::Response<hyper::Body>) -> crate::Result<()> {
     move |response| match response.status() {
-        hyper::StatusCode::OK => {
+        StatusCode::OK => {
             // If there are credentials configured, the
             // generated OAuth token needs to be periodically
             // regenerated. Since the health check runs at
@@ -124,6 +127,8 @@ pub fn healthcheck_response(
             creds.map(|creds| creds.spawn_regenerate_token());
             Ok(())
         }
+        StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
+        StatusCode::NOT_FOUND => Err(not_found_error),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
