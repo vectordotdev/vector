@@ -176,11 +176,11 @@ pub fn log_schema() -> &'static LogSchema {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
 pub struct LogSchema {
-    #[getset(get = "pub", set = "pub")]
+    #[getset(get = "pub", set = "pub(crate)")]
     message_key: Atom,
-    #[getset(get = "pub", set = "pub")]
+    #[getset(get = "pub", set = "pub(crate)")]
     timestamp_key: Atom,
-    #[getset(get = "pub", set = "pub")]
+    #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
 }
 
