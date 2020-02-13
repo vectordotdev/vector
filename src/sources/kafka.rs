@@ -260,7 +260,7 @@ mod integration_test {
         rt.spawn(kafka_source(config, tx).unwrap());
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
         assert_eq!(
-            events[0].as_log()[&event::schema().message_key],
+            events[0].as_log()[&event::log_schema().message_key],
             "my message".into()
         );
         assert_eq!(
