@@ -252,8 +252,8 @@ fn main() {
         std::process::exit(exitcode::CONFIG);
     });
     println!("{:?}", config);
-    event::SCHEMA
-        .set(config.global.schema.clone())
+    event::LOG_SCHEMA
+        .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
     let mut rt = {

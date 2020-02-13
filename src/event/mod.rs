@@ -23,30 +23,30 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub fn schema<'a>() -> &'a Schema {
+pub fn log_schema<'a>() -> &'a LogSchema {
     // TODO: Help Rust project support before_each
     // Support uninitialized schemas in tests to help our contributors.
     // Don't do it in release because that is scary.
     #[cfg(debug_assertions)]
     {
-        if SCHEMA.get().is_none() {
+        if LOG_SCHEMA.get().is_none() {
             error!("You are not initializing a schema in this test -- This could fail in release");
-            SCHEMA.set(Schema::default()).ok(); // If this fails it means some other test set it while we were trying to.
+            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
         }
     }
-    SCHEMA.get().expect("Schema was not initialized")
+    LOG_SCHEMA.get().expect("Schema was not initialized")
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Schema {
+pub struct LogSchema {
     pub message_key: Atom,
     pub timestamp_key: Atom,
     pub host_key: Atom,
 }
 
-impl Default for Schema {
+impl Default for LogSchema {
     fn default() -> Self {
-        Schema {
+        LogSchema {
             message_key: Atom::from("message"),
             timestamp_key: Atom::from("timestamp"),
             host_key: Atom::from("host"),
@@ -55,7 +55,7 @@ impl Default for Schema {
 }
 
 lazy_static! {
-    pub static ref SCHEMA: OnceCell<Schema> = OnceCell::new();
+    pub static ref LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
     pub static ref PARTIAL: Atom = Atom::from("_partial");
 }
 
@@ -513,7 +513,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .remove(&schema().message_key)
+            .remove(&log_schema().message_key)
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -528,10 +528,10 @@ impl From<Bytes> for Event {
 
         event
             .as_mut_log()
-            .insert(schema().message_key.clone(), message);
+            .insert(log_schema().message_key.clone(), message);
         event
             .as_mut_log()
-            .insert(schema().timestamp_key.clone(), Utc::now());
+            .insert(log_schema().timestamp_key.clone(), Utc::now());
 
         event
     }
@@ -599,7 +599,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&super::schema().timestamp_key),
+            "timestamp": event.as_log().get(&super::log_schema().timestamp_key),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();

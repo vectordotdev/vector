@@ -92,7 +92,7 @@ impl TimeFilter {
 
     fn filter(&self, event: Event) -> Option<Event> {
         // Only logs created at, or after now are logged.
-        if let Some(Value::Timestamp(ts)) = event.as_log().get(&event::schema().timestamp_key) {
+        if let Some(Value::Timestamp(ts)) = event.as_log().get(&event::log_schema().timestamp_key) {
             if ts < &self.start {
                 trace!(message = "Recieved older log.", from = %ts.to_rfc3339());
                 return None;
@@ -159,7 +159,7 @@ fn parse_message() -> crate::Result<ApplicableTransform> {
 }
 
 fn remove_ending_newline(mut event: Event) -> Event {
-    if let Some(Value::Bytes(msg)) = event.as_mut_log().get_mut(&event::schema().timestamp_key) {
+    if let Some(Value::Bytes(msg)) = event.as_mut_log().get_mut(&event::log_schema().timestamp_key) {
         if msg.ends_with(&['\n' as u8]) {
             msg.truncate(msg.len() - 1);
         }
@@ -187,7 +187,7 @@ impl Transform for DockerMessageTransformer {
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
                 Ok(timestamp) => log.insert(
-                    event::schema().timestamp_key.clone(),
+                    event::log_schema().timestamp_key.clone(),
                     timestamp.with_timezone(&Utc),
                 ),
                 Err(error) => {
@@ -202,7 +202,7 @@ impl Transform for DockerMessageTransformer {
 
         // log -> message
         if let Some(message) = log.remove(&self.atom_log) {
-            log.insert(event::schema().message_key.clone(), message);
+            log.insert(event::log_schema().message_key.clone(), message);
         } else {
             debug!(message = "Missing field.", field = %self.atom_log, rate_limit_secs = 10);
             return None;
@@ -237,7 +237,7 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
             .to_owned();
     // drop field
     rp_config.types.insert(
-        event::schema().timestamp_key.clone(),
+        event::log_schema().timestamp_key.clone(),
         "timestamp|%+".to_owned(),
     );
     // stream is a string
@@ -405,12 +405,12 @@ mod tests {
 
         let event = transform.transform(event).expect("Transformed");
 
-        has(&event, event::schema().message_key.as_ref(), "12");
+        has(&event, event::log_schema().message_key.as_ref(), "12");
         has(&event, "multiline_tag", "F");
         has(&event, "stream", "stdout");
         has(
             &event,
-            event::schema().timestamp_key.as_ref(),
+            event::log_schema().timestamp_key.as_ref(),
             DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
                 .unwrap()
                 .with_timezone(&Utc),

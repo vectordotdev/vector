@@ -78,7 +78,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
             Encoding::Text => {
                 let s = log
                     .get(
-                        &event::SCHEMA
+                        &event::LOG_SCHEMA
                             .get()
                             .expect("schema is not initialized")
                             .message_key,

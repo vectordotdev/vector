@@ -138,7 +138,7 @@ impl HttpSink for HttpSinkConfig {
         let body = match &self.encoding {
             Encoding::Text => {
                 if let Some(v) = event.get(
-                    &event::SCHEMA
+                    &event::LOG_SCHEMA
                         .get()
                         .expect("schema is not initialized")
                         .message_key,

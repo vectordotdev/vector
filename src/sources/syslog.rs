@@ -77,7 +77,7 @@ impl SourceConfig for SyslogConfig {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or(event::schema().host_key.to_string());
+            .unwrap_or(event::log_schema().host_key.to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address } => {
@@ -209,7 +209,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
                 .unwrap_or_else(Utc::now);
             event
                 .as_mut_log()
-                .insert(event::schema().timestamp_key.clone(), timestamp);
+                .insert(event::log_schema().timestamp_key.clone(), timestamp);
 
             insert_fields_from_rfc5424(&mut event, parsed);
 
@@ -313,7 +313,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::schema().timestamp_key.clone(),
+                event::log_schema().timestamp_key.clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert("host", "74794bfb6795");
@@ -420,7 +420,7 @@ mod test {
 
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert(
-            event::schema().timestamp_key.clone(),
+            event::log_schema().timestamp_key.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
         );
         expected.as_mut_log().insert("host", "74794bfb6795");
@@ -438,7 +438,7 @@ mod test {
 
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert(
-            event::schema().timestamp_key.clone(),
+            event::log_schema().timestamp_key.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
         );
         expected.as_mut_log().insert("host", "74794bfb6795");
@@ -456,7 +456,7 @@ mod test {
 
         let mut expected = Event::from(raw);
         expected.as_mut_log().insert(
-            event::schema().timestamp_key.clone(),
+            event::log_schema().timestamp_key.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
         );
         expected.as_mut_log().insert("host", "74794bfb6795");

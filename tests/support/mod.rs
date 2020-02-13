@@ -92,11 +92,11 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&event::schema().message_key)
+                    .get(&event::log_schema().message_key)
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert(event::schema().message_key.clone(), Value::from(v));
+                log.insert(event::log_schema().message_key.clone(), Value::from(v));
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {

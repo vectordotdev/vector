@@ -242,7 +242,7 @@ fn encode_event(
         Encoding::Text => event
             .as_log()
             .get(
-                &event::SCHEMA
+                &event::LOG_SCHEMA
                     .get()
                     .expect("schema is not initialized")
                     .message_key,
@@ -282,7 +282,7 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], "value".as_bytes());
-        assert_eq!(map[&event::schema().message_key.to_string()], message);
+        assert_eq!(map[&event::log_schema().message_key.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());
     }

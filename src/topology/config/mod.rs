@@ -40,7 +40,7 @@ pub struct GlobalOptions {
     #[serde(default)]
     pub dns_servers: Vec<String>,
     #[serde(default)]
-    pub schema: event::Schema,
+    pub log_schema: event::LogSchema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -261,7 +261,7 @@ impl Config {
             global: GlobalOptions {
                 data_dir: None,
                 dns_servers: Vec::new(),
-                schema: event::Schema::default(),
+                log_schema: event::LogSchema::default(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
@@ -334,28 +334,28 @@ impl Config {
         self.global.dns_servers.sort();
         self.global.dns_servers.dedup();
 
-        let default_schema = event::Schema::default();
-        if with.global.schema != default_schema {
-            if self.global.schema.host_key != default_schema.host_key
-                && self.global.schema.host_key != with.global.schema.host_key
+        let default_schema = event::LogSchema::default();
+        if with.global.log_schema != default_schema {
+            if self.global.log_schema.host_key != default_schema.host_key
+                && self.global.log_schema.host_key != with.global.log_schema.host_key
             {
                 errors.push("conflicting values for 'schema.host_key' found".to_owned());
             } else {
-                self.global.schema.host_key = with.global.schema.host_key;
+                self.global.log_schema.host_key = with.global.log_schema.host_key;
             }
-            if self.global.schema.message_key != default_schema.message_key
-                && self.global.schema.message_key != with.global.schema.message_key
+            if self.global.log_schema.message_key != default_schema.message_key
+                && self.global.log_schema.message_key != with.global.log_schema.message_key
             {
                 errors.push("conflicting values for 'schema.message_key' found".to_owned());
             } else {
-                self.global.schema.message_key = with.global.schema.message_key;
+                self.global.log_schema.message_key = with.global.log_schema.message_key;
             }
-            if self.global.schema.timestamp_key != default_schema.timestamp_key
-                && self.global.schema.timestamp_key != with.global.schema.timestamp_key
+            if self.global.log_schema.timestamp_key != default_schema.timestamp_key
+                && self.global.log_schema.timestamp_key != with.global.log_schema.timestamp_key
             {
                 errors.push("conflicting values for 'schema.timestamp_key' found".to_owned());
             } else {
-                self.global.schema.timestamp_key = with.global.schema.timestamp_key;
+                self.global.log_schema.timestamp_key = with.global.log_schema.timestamp_key;
             }
         }
 
@@ -437,6 +437,71 @@ mod test {
             Some(PathBuf::from("/var/lib/vector")),
             config.global.data_dir
         )
+    }
+
+    #[test]
+    fn default_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+            .unwrap();
+
+        assert_eq!(
+            "host",
+            config.global.log_schema.host_key.to_string()
+        );
+        assert_eq!(
+            "message",
+            config.global.log_schema.message_key.to_string()
+        );
+        assert_eq!(
+            "timestamp",
+            config.global.log_schema.timestamp_key.to_string()
+        );
+    }
+
+    #[test]
+    fn custom_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [log_schema]
+      host_key = "this"
+      message_key = "that"
+      timestamp_key = "then"
+
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+            .unwrap();
+
+        assert_eq!(
+            "this",
+            config.global.log_schema.host_key.to_string()
+        );
+        assert_eq!(
+            "that",
+            config.global.log_schema.message_key.to_string()
+        );
+        assert_eq!(
+            "then",
+            config.global.log_schema.timestamp_key.to_string()
+        );
     }
 
     #[test]

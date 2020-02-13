@@ -789,14 +789,14 @@ impl ContainerLogInfo {
             let mut log_event = Event::new_empty_log().into_log();
 
             // The log message.
-            log_event.insert(event::schema().message_key.clone(), bytes_message.freeze());
+            log_event.insert(event::log_schema().message_key.clone(), bytes_message.freeze());
 
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
-                log_event.insert(event::schema().timestamp_key.clone(), timestamp);
+                log_event.insert(event::log_schema().timestamp_key.clone(), timestamp);
             }
 
             // Container ID.
@@ -835,7 +835,7 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, &[event::schema().message_key.clone()]);
+                        .merge_in_next_event(log_event, &[event::log_schema().message_key.clone()]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -848,7 +848,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[event::schema().message_key.clone()]),
+                    .merge_in_final_event(log_event, &[event::log_schema().message_key.clone()]),
                 None => log_event,
             }
         } else {
