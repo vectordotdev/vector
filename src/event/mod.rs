@@ -23,37 +23,6 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub fn log_schema<'a>() -> &'a LogSchema {
-    // TODO: Help Rust project support before_each
-    // Support uninitialized schemas in tests to help our contributors.
-    // Don't do it in release because that is scary.
-    #[cfg(debug_assertions)]
-    {
-        if LOG_SCHEMA.get().is_none() {
-            error!("You are not initializing a schema in this test -- This could fail in release");
-            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
-        }
-    }
-    LOG_SCHEMA.get().expect("Schema was not initialized")
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct LogSchema {
-    pub message_key: Atom,
-    pub timestamp_key: Atom,
-    pub host_key: Atom,
-}
-
-impl Default for LogSchema {
-    fn default() -> Self {
-        LogSchema {
-            message_key: Atom::from("message"),
-            timestamp_key: Atom::from("timestamp"),
-            host_key: Atom::from("host"),
-        }
-    }
-}
-
 lazy_static! {
     pub static ref LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
     pub static ref PARTIAL: Atom = Atom::from("_partial");
@@ -186,6 +155,37 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
         let mut log_event = Event::new_empty_log().into_log();
         log_event.extend(iter);
         log_event
+    }
+}
+
+pub fn log_schema<'a>() -> &'a LogSchema {
+    // TODO: Help Rust project support before_each
+    // Support uninitialized schemas in tests to help our contributors.
+    // Don't do it in release because that is scary.
+    #[cfg(debug_assertions)]
+    {
+        if LOG_SCHEMA.get().is_none() {
+            error!("You are not initializing a schema in this test -- This could fail in release");
+            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
+        }
+    }
+    LOG_SCHEMA.get().expect("Schema was not initialized")
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LogSchema {
+    pub message_key: Atom,
+    pub timestamp_key: Atom,
+    pub host_key: Atom,
+}
+
+impl Default for LogSchema {
+    fn default() -> Self {
+        LogSchema {
+            message_key: Atom::from("message"),
+            timestamp_key: Atom::from("timestamp"),
+            host_key: Atom::from("host"),
+        }
     }
 }
 

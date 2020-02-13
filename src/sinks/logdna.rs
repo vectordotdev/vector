@@ -78,12 +78,7 @@ impl HttpSink for LogdnaConfig {
         let mut log = event.into_log();
 
         let line = log
-            .remove(
-                &event::LOG_SCHEMA
-                    .get()
-                    .expect("schema is not initialized")
-                    .message_key,
-            )
+            .remove(&event::log_schema().message_key)
             .unwrap_or_else(|| "".into());
         let timestamp = log
             .remove(&event::log_schema().timestamp_key)
