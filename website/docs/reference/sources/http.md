@@ -72,7 +72,7 @@ The address to listen for connections on
 <Field
   common={true}
   defaultValue={"text"}
-  enumValues={{"text":"Newline-delimted text","ndjson":"Newline-delimited JSON objects","json":"Array of JSON objects"}}
+  enumValues={{"text":"Newline-delimited text","ndjson":"Newline-delimited JSON objects","json":"Array of JSON objects"}}
   examples={["text","ndjson","json"]}
   name={"encoding"}
   path={null}
