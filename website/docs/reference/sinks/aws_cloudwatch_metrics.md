@@ -44,10 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
+
+  # OPTIONAL
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -57,15 +61,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"] # example
   namespace = "service" # example
-  region = "us-east-1" # example
+  region = "us-east-1" # example, relevant when host = ""
 
-  # OPTIONAL
-  endpoint = "127.0.0.0:5000" # example, no default
+  # OPTIONAL - General
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_events = 20 # default, events
+    timeout_secs = 1 # default, seconds
 ```
 
 </TabItem>
@@ -85,10 +95,102 @@ import Field from '@site/src/components/Field';
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  name={"assume_role"}
   path={null}
   relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={20}
+  enumValues={null}
+  examples={[20]}
+  name={"max_events"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  >
+
+#### max_events
+
+The maximum size of a batch, in events, before it is flushed.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  name={"timeout_secs"}
+  path={"batch"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  >
+
+#### timeout_secs
+
+The maximum age of a batch before it is flushed.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["127.0.0.0:5000/path/to/service"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={{"region":""}}
   required={false}
   templateable={false}
   type={"string"}
@@ -104,7 +206,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -154,7 +256,7 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   examples={["us-east-1"]}
   name={"region"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"host":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -243,6 +345,12 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
 
+#### Assuming Roles
+
+Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
+optional setting that is helpful for a variety of use cases, such as cross
+account access.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -310,5 +418,6 @@ event-by-event basis. It does not batch data.
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
+[urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html

@@ -1,11 +1,13 @@
 [sources.socket]
 title = "Socket"
+beta = false
 common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-resources = []
 through_description = "a socket, such as a TCP, UDP, or Unix socket"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "socket") %>
 
 [sources.socket.options.mode]
 type = "string"
@@ -22,7 +24,6 @@ unix = "Unix Domain Socket."
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#3"]
-null = false
 relevant_when = {mode = ["tcp", "udp"]}
 required = true
 description = """\
@@ -35,18 +36,16 @@ a port.
 type = "string"
 common = true
 examples = ["/path/to/socket"]
-null = false
+required = true
 relevant_when = {mode = "unix"}
 description = """The unix socket path. *This should be absolute path*.\
 """
 
 [sources.socket.options.host_key]
-name = "host_key"
 type = "string"
 category = "Context"
 required = true
 default = "host"
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """
@@ -71,15 +70,22 @@ The timeout before a connection is forcefully closed during shutdown.\
 
 [[sources.socket.output.log.examples]]
 label = "Generic"
-input = """\
-2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1\
-"""
-output = """\
+body = """\
+Given the following input line:
+
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+
+A log event will be output with the following structure:
+
+```json
 {
   "timestamp": <current_timestamp>,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
   "host": "<upstream_hostname>"
 }
+```\
 """
 
 [sources.socket.output.log.fields.host]

@@ -6,8 +6,9 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer,
-        SinkExt, TowerRequestConfig, TowerRequestSettings,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -16,14 +17,12 @@ use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
-use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
-use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use std::{collections::HashMap, convert::TryInto, fmt};
 use tower::{
     buffer::Buffer,
@@ -443,27 +442,8 @@ fn create_client(
     resolver: Resolver,
 ) -> crate::Result<CloudWatchLogsClient> {
     let http = rusoto::client(resolver)?;
-
-    if let Some(role) = assume_role {
-        let sts = StsClient::new(region.clone());
-
-        let provider = StsAssumeRoleSessionCredentialsProvider::new(
-            sts,
-            role,
-            "default".to_owned(),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let creds = rusoto_credential::AutoRefreshingProvider::new(provider)
-            .context(InvalidCloudwatchCredentials)?;
-        Ok(CloudWatchLogsClient::new_with(http, creds, region))
-    } else {
-        let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
-        Ok(CloudWatchLogsClient::new_with(http, creds, region))
-    }
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    Ok(CloudWatchLogsClient::new_with(http, creds, region))
 }
 
 #[derive(Debug, Clone)]

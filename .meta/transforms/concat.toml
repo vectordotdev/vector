@@ -2,10 +2,12 @@
 title = "Concat"
 allow_you_to_description = "concat (substrings) of other fields to a new one"
 beta = true
+common = false
 function_category = "filter"
 input_types = ["log"]
 output_types = ["log"]
-resources = []
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "concat") %>
 
 [transforms.concat.options.target]
 type = "string"

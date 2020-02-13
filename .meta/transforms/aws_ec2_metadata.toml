@@ -1,11 +1,13 @@
 [transforms.aws_ec2_metadata]
 title = "AWS EC2 Metadata"
 allow_you_to_description = "enrich logs with AWS EC2 instance metadata"
+beta = true
 common = false
 function_category = "enrich"
 input_types = ["log"]
 output_types = ["log"]
-resources = []
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "aws_ec2_metadata") %>
 
 [transforms.aws_ec2_metadata.options.namespace]
 type = "string"

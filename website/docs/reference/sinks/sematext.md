@@ -44,10 +44,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED
   type = "sematext" # must be: "sematext"
   inputs = ["my-source-id"] # example
-  cloud = "north_america" # example
-  token = "some-sematext-token" # example
+  token = "${SEMATEXT_TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -60,11 +63,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "sematext" # must be: "sematext"
   inputs = ["my-source-id"] # example
-  cloud = "north_america" # example
-  token = "some-sematext-token" # example
+  token = "${SEMATEXT_TOKEN_ENV_VAR}" # example
 
   # OPTIONAL - General
   healthcheck = true # default
+  host = "http://127.0.0.1" # example, no default
+  region = "na" # example, no default
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -73,17 +77,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
+    in_flight_limit = 5 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 5 # default
-    retry_attempts = 5 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 60 # default, seconds
@@ -125,14 +132,14 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -140,21 +147,21 @@ Configures the sink batching behavior.
 
 #### max_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -189,20 +196,20 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -217,14 +224,14 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -239,14 +246,14 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -254,7 +261,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -289,28 +296,6 @@ The behavior when the buffer becomes full.
 
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["north_america","europe"]}
-  name={"cloud"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### cloud
-
-The cloud destination to send logs to.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -326,6 +311,50 @@ The cloud destination to send logs to.
 ### healthcheck
 
 Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["http://127.0.0.1","http://example.com"]}
+  name={"host"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### host
+
+The host that will be used to send logs to. This option is required if [`region`](#region) is not set.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["na","eu"]}
+  name={"region"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### region
+
+The region destination to send logs to. This option is required if [`host`](#host) is not set.
 
 
 </Field>
@@ -363,7 +392,7 @@ Configures the sink request behavior.
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -390,7 +419,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -412,7 +441,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -420,9 +449,9 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={-1}
   enumValues={null}
-  examples={[5]}
+  examples={[-1]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -478,7 +507,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -500,7 +529,7 @@ The maximum amount of time to wait between retries.
 
 #### timeout_secs
 
-The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in deuplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -515,7 +544,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["some-sematext-token"]}
+  examples={["${SEMATEXT_TOKEN_ENV_VAR}","some-sematext-token"]}
   name={"token"}
   path={null}
   relevantWhen={null}
@@ -585,6 +614,13 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
+
+### Obtaining a Sematext token
+
+1. Register for a free account at [Sematext.com](https://apps.sematext.com/ui/registration)
+
+2. [Create a Logs App](https://apps.sematext.com/ui/integrations) to get a Logs Token
+for [Sematext Logs](http://www.sematext.com/logsene/)
 
 ### Rate Limits
 

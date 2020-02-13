@@ -1,11 +1,13 @@
 [transforms.ansi_stripper]
 title = "ANSI Stripper"
 allow_you_to_description = "strips ANSI characters from the specified field"
+beta = false
 common = false
 function_category = "sanitize"
 input_types = ["log"]
 output_types = ["log"]
-resources = []
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "ansi_stripper") %>
 
 [transforms.ansi_stripper.options.field]
 type = "string"

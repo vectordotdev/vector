@@ -14,8 +14,10 @@ pub mod elasticsearch;
 pub mod file;
 pub mod gcp;
 pub mod http;
+pub mod humio_logs;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+pub mod logdna;
 pub mod new_relic_logs;
 pub mod prometheus;
 pub mod sematext;

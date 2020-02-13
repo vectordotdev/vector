@@ -7,6 +7,7 @@
 #   Signs all previous commits with a DCO signoff as described in the
 #   CONTRIBUTING.md document.
 
+export FILTER_BRANCH_SQUELCH_WARNING=true
 _current_branch=$(git branch | sed -n -e 's/^\* \(.*\)/\1/p')
 hash1=$(git show-ref --heads -s master)
 hash2=$(git merge-base master $_current_branch)

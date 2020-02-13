@@ -200,6 +200,16 @@ for f,v in pairs(event) do
 end
 ```
 
+### Lua Manual
+
+Understanding Lua and how write it is outside of the scope of Vector. We
+encourage you to take a look at the [Lua manual][urls.lua_manual] for more
+information.
+
+### Lua Version
+
+Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
+
 ### Nested Fields
 
 As described in the [Data Model document][docs.data_model], Vector flatten
@@ -228,6 +238,8 @@ function][urls.lua_require].
 [docs.data_model]: /docs/about/data-model/
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/
+[urls.lua_manual]: http://www.lua.org/manual/5.1/manual.html
 [urls.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
 [urls.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
 [urls.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
+[urls.rlua]: https://github.com/kyren/rlua

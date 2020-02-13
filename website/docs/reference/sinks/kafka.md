@@ -44,11 +44,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
+
+  # REQUIRED - requests
+  encoding = "json" # example, enum
+
+  # OPTIONAL - General
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -65,27 +72,28 @@ import CodeHeader from '@site/src/components/CodeHeader';
   key_field = "user_id" # example
   topic = "topic-1234" # example
 
-  # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # example, no default
-  healthcheck = true # default
-  region = "us-east-1" # example, no default
+  # REQUIRED - requests
+  encoding = "json" # example, enum
 
-  # OPTIONAL - requests
-  encoding = "json" # example, no default, enum
+  # OPTIONAL - General
+  healthcheck = true # default
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
     crt_path = "/path/to/host_certificate.crt" # example, no default
     enabled = false # default
-    key_pass = "PassWord1" # example, no default
+    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
 ```
 
@@ -140,20 +148,20 @@ A comma delimited list of host and port pairs that the Kafka client should conta
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -168,14 +176,14 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -190,14 +198,14 @@ The maximum size of the buffer on the disk.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -205,7 +213,7 @@ The maximum size of the buffer on the disk.
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -239,14 +247,14 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -261,29 +269,7 @@ The encoding format used to serialize the events before outputting.
 
 
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["127.0.0.0:5000"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-Custom endpoint for use with AWS-compatible services. Providing a value for this option will make [`region`](#region) moot.
-
-
-</Field>
-
-
-<Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -330,28 +316,6 @@ The log field name to use for the topic key. If unspecified, the key will be ran
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["us-east-1"]}
-  name={"region"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### region
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is provided it will override this value since the endpoint includes the region.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   name={"tls"}
   path={null}
@@ -367,6 +331,28 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
 Configures the TLS options for connections from this sink.
 
 <Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### enabled
+
+Enable TLS during connections to the remote.
+
+
+</Field>
 
 
 <Field
@@ -415,31 +401,9 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 <Field
   common={false}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  name={"enabled"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### enabled
-
-Enable TLS during connections to the remote.
-
-
-</Field>
-
-
-<Field
-  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["PassWord1"]}
+  examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -451,7 +415,7 @@ Enable TLS during connections to the remote.
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
 
 
 </Field>
@@ -508,57 +472,6 @@ The Kafka topic name to write events to.
 
 </Fields>
 
-## Env Vars
-
-<Fields filters={true}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["AKIAIOSFODNN7EXAMPLE"]}
-  name={"AWS_ACCESS_KEY_ID"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### AWS_ACCESS_KEY_ID
-
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
-  name={"AWS_SECRET_ACCESS_KEY"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### AWS_SECRET_ACCESS_KEY
-
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info. See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
-
-
-</Fields>
-
 ## How It Works
 
 ### AWS Authentication
@@ -579,6 +492,16 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
+### Buffers
+
+import SVG from 'react-inlinesvg';
+
+<SVG src="/img/buffers.svg" />
+
+The `kafka` sink buffers events as shown in
+the diagram above. This helps to smooth out data processing if the downstream
+service applies backpressure. Buffers are controlled via the
+[`buffer.*`](#buffer) options.
 
 ### Environment Variables
 
@@ -620,11 +543,9 @@ event-by-event basis. It does not batch data.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

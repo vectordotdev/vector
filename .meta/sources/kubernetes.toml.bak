@@ -4,8 +4,9 @@ beta = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
 output_types = ["log"]
-resources = []
 through_description = "kubernetes node's"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "kubernetes") %>
 
 [sources.kubernetes.output.log.fields.container_name]
 type = "string"

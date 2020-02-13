@@ -34,7 +34,7 @@ knowledge of the code.
 Dependencies should be _carefully_ selected. Before adding a dependency we
 should ask the following questions:
 
-1. Is the dependency necessary? Can we avoid it?
+1. Is the dependency worth the cost?
 2. Is the dependency actively and professionally maintained?
 3. Is the dependency experimental or in the development phase?
 4. How large is the community?

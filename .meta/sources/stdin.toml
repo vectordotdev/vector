@@ -1,11 +1,13 @@
 [sources.stdin]
 title = "STDIN"
+beta = false
 common = false
 delivery_guarantee = "at_least_once"
 function_category = "receive"
 output_types = ["log"]
-resources = []
 through_description = "standard input (STDIN)"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "stdin") %>
 
 [sources.stdin.options.max_length]
 type = "int"
@@ -18,7 +20,6 @@ type = "string"
 category = "Context"
 required = true
 default = "host"
-section = "context"
 description = """\
 The key name added to each event representing the current host.\
 """

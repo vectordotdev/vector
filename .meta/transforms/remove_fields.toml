@@ -1,10 +1,13 @@
 [transforms.remove_fields]
 title = "Remove Fields"
 allow_you_to_description = "remove one or more log fields"
+beta = false
 common = false
 function_category = "shape"
 input_types = ["log"]
 output_types = ["log"]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "remove_fields") %>
 
 [transforms.remove_fields.options.fields]
 type = "[string]"

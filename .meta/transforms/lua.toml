@@ -6,9 +6,8 @@ common = true
 function_category = "program"
 input_types = ["log"]
 output_types = ["log"]
-resources = [
-  {name = "Lua Reference Manual", short_link = "lua_manual"}
-]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "lua") %>
 
 [transforms.lua.options.source]
 type = "string"

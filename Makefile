@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
-export USE_DOCKER ?= true
+export USE_CONTAINER ?= docker
 
 
 help:
@@ -72,7 +72,7 @@ sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
 test: ## Spins up Docker resources and runs _every_ test
-	@docker-compose up -d
+	@docker-compose up -d test-runtime-deps
 	@cargo test --all --features docker -- --test-threads 4
 
 clean: ## Remove build artifacts

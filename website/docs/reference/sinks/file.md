@@ -44,9 +44,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "file" # must be: "file"
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
+
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
+  # OPTIONAL - General
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -61,12 +68,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
   # OPTIONAL - General
   healthcheck = true # default
   idle_timeout_secs = "30" # default
-
-  # OPTIONAL - requests
-  encoding = "ndjson" # example, no default, enum
 ```
 
 </TabItem>
@@ -83,14 +90,14 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -105,7 +112,7 @@ The encoding format used to serialize the events before outputting.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}

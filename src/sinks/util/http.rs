@@ -1,5 +1,5 @@
 use super::{
-    retries::RetryLogic,
+    retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
     tls::{TlsConnectorExt, TlsSettings},
     Batch, BatchSettings, BatchSink,
@@ -13,7 +13,6 @@ use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -269,16 +268,19 @@ impl RetryLogic for HttpRetryLogic {
         error.is_connect() || error.is_closed()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> Option<Cow<str>> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => Some("Too many requests".into()),
-            StatusCode::NOT_IMPLEMENTED => None,
-            _ if status.is_server_error() => {
-                Some(format!("{}: {}", status, String::from_utf8_lossy(response.body())).into())
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ => None,
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
+            ),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("response status: {}", status)),
         }
     }
 }
@@ -319,10 +321,14 @@ mod test {
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
 
-        assert!(logic.should_retry_response(&response_429).is_some());
-        assert!(logic.should_retry_response(&response_500).is_some());
-        assert!(logic.should_retry_response(&response_400).is_none());
-        assert!(logic.should_retry_response(&response_501).is_none());
+        assert!(logic.should_retry_response(&response_429).is_retryable());
+        assert!(logic.should_retry_response(&response_500).is_retryable());
+        assert!(logic
+            .should_retry_response(&response_400)
+            .is_not_retryable());
+        assert!(logic
+            .should_retry_response(&response_501)
+            .is_not_retryable());
     }
 
     #[test]
