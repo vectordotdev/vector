@@ -30,11 +30,11 @@ write_to_description = "[Loki][urls.loki]"
 
 <%= render("_partials/_tls_options.toml", namespace: "sinks.loki.options", can_enable: false, can_verify: true) %>
 
-[sinks.loki.options.host]
+[sinks.loki.options.endpoint]
 type = "string"
 required = true
 examples = ["http://localhost:3100", "http://127.0.0.1:8080"]
-description = "The host used to ship logs to."
+description = "The endpoint used to ship logs to."
 
 [sinks.loki.options.encoding]
 type = "string"
@@ -66,6 +66,10 @@ examples = [{label = "value"}]
 description = """\
 A set of labels that will be attached to each batch of events. These values\
 are also templateable to allow events to provide dynamic label values.\
+
+Note: If the set of label values has high cardinality this can cause drastic\
+performance issues with Loki. To ensure this does not happen one should try\
+to reduce the amount of unique label values.\
 """
 
 [sinks.loki.options.labels.children."`[label-name`"]
@@ -75,7 +79,7 @@ templateable = true
 examples = [ {key = "value"}, {key = "{{ event_field }}"}]
 description = "A key-value pair for labels."
 
-[sinks.loki.options.remove_labels]
+[sinks.loki.options.remove_label_fields]
 type = "bool"
 required = false
 default = false

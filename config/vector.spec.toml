@@ -4810,12 +4810,12 @@ end
   encoding = "json"
   encoding = "text"
 
-  # The host used to ship logs to.
+  # The endpoint used to ship logs to.
   #
   # * required
   # * type: string
-  host = "http://localhost:3100"
-  host = "http://127.0.0.1:8080"
+  endpoint = "http://localhost:3100"
+  endpoint = "http://127.0.0.1:8080"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -4831,8 +4831,8 @@ end
   # * optional
   # * default: false
   # * type: bool
-  remove_labels = false
-  remove_labels = true
+  remove_label_fields = false
+  remove_label_fields = true
 
   # If this is set to `true` then the timestamp will be removed from the event.
   # This isuseful because loki uses the timestamp to index the event.

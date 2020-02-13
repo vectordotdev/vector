@@ -48,7 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "loki" # must be: "loki"
   inputs = ["my-source-id"] # example
   encoding = "json" # example, enum
-  host = "http://localhost:3100" # example
+  endpoint = "http://localhost:3100" # example
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -70,11 +70,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "loki" # must be: "loki"
   inputs = ["my-source-id"] # example
   encoding = "json" # example, enum
-  host = "http://localhost:3100" # example
+  endpoint = "http://localhost:3100" # example
 
   # OPTIONAL - General
   healthcheck = true # default
-  remove_labels = false # default
+  remove_label_fields = false # default
   remove_timestamp = true # default
   tenant_id = "some_tenant_id" # example, no default
 
@@ -437,6 +437,28 @@ The encoding format used to serialize the events before outputting.
 
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["http://localhost:3100","http://127.0.0.1:8080"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+The endpoint used to ship logs to.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -461,28 +483,6 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["http://localhost:3100","http://127.0.0.1:8080"]}
-  name={"host"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### host
-
-The host used to ship logs to.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={[{"label":"value"}]}
   name={"labels"}
   path={null}
@@ -495,7 +495,7 @@ The host used to ship logs to.
 
 ### labels
 
-A set of labels that will be attached to each batch of events. These valuesare also templateable to allow events to provide dynamic label values.
+A set of labels that will be attached to each batch of events. These valuesare also templateable to allow events to provide dynamic label values.Note: If the set of label values has high cardinality this can cause drasticperformance issues with Loki. To ensure this does not happen one should tryto reduce the amount of unique label values.
 
 <Fields filters={false}>
 
@@ -532,7 +532,7 @@ A key-value pair for labels.
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
-  name={"remove_labels"}
+  name={"remove_label_fields"}
   path={null}
   relevantWhen={null}
   required={false}
@@ -541,7 +541,7 @@ A key-value pair for labels.
   unit={null}
   >
 
-### remove_labels
+### remove_label_fields
 
 If this is set to `true` then when labels are collected from events those fields will also get removed from the event.
 

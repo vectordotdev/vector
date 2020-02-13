@@ -15,6 +15,7 @@
 use crate::{
     dns::Resolver,
     event::{self, Event, Value},
+    runtime::FutureExt,
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
     sinks::util::tls::{TlsOptions, TlsSettings},
     sinks::util::{BatchBytesConfig, TowerRequestConfig, UriSerde},
@@ -22,7 +23,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
-use futures03::{compat::Future01CompatExt, TryFutureExt};
+use futures03::compat::Future01CompatExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -30,15 +31,18 @@ use std::collections::HashMap;
 type Labels = Vec<(String, String)>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct LokiConfig {
-    host: UriSerde,
+    endpoint: UriSerde,
     encoding: Encoding,
 
     tenant_id: Option<String>,
     labels: HashMap<String, Template>,
 
-    remove_labels: Option<bool>,
-    remove_timestamp: Option<bool>,
+    #[serde(default = "crate::serde::default_false")]
+    remove_label_fields: bool,
+    #[serde(default = "crate::serde::default_true")]
+    remove_timestamp: bool,
 
     auth: Option<Auth>,
 
@@ -68,7 +72,7 @@ inventory::submit! {
 impl SinkConfig for LokiConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         if self.labels.is_empty() {
-            return Err(format!("`labels` must include atleast one label.").into());
+            return Err(format!("`labels` must include at least one label.").into());
         }
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
@@ -84,9 +88,9 @@ impl SinkConfig for LokiConfig {
             &cx,
         );
 
-        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
+        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -110,9 +114,7 @@ impl HttpSink for LokiConfig {
                 labels.push((key.clone(), value));
             }
 
-            // Check if we need to remove any labels that might
-            // have been extracted. Defaults to false.
-            if self.remove_labels.unwrap_or(false) {
+            if self.remove_label_fields {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
                         event.as_mut_log().remove(&field);
@@ -127,7 +129,7 @@ impl HttpSink for LokiConfig {
             chrono::Utc::now().timestamp_nanos()
         };
 
-        if self.remove_timestamp.unwrap_or(true) {
+        if self.remove_timestamp {
             event.as_mut_log().remove(&event::TIMESTAMP);
         }
 
@@ -172,7 +174,7 @@ impl HttpSink for LokiConfig {
 
         for (stream, mut events) in streams {
             // Sort by timestamp
-            events.sort_by(|e1, e2| e1.0.cmp(&e2.0));
+            events.sort_by_key(|e| e.0);
 
             let stream = stream.into_iter().collect::<HashMap<_, _>>();
             let events = events
@@ -192,7 +194,7 @@ impl HttpSink for LokiConfig {
         }))
         .unwrap();
 
-        let uri = format!("{}loki/api/v1/push", self.host);
+        let uri = format!("{}loki/api/v1/push", self.endpoint);
 
         let mut req = http::Request::post(uri);
 
@@ -213,7 +215,7 @@ impl HttpSink for LokiConfig {
 }
 
 async fn healthcheck(config: LokiConfig, resolver: Resolver) -> Result<(), crate::Error> {
-    let uri = format!("{}ready", config.host);
+    let uri = format!("{}ready", config.endpoint);
 
     let client = https_client(resolver, TlsSettings::from_options(&None)?)?;
 
@@ -239,10 +241,10 @@ mod tests {
     fn interpolate_labels() {
         let (config, _cx, _rt) = load_sink::<LokiConfig>(
             r#"
-            host = "http://localhost:3100"
+            endpoint = "http://localhost:3100"
             labels = {label1 = "{{ foo }}", label2 = "some-static-label"}
             encoding = "json"
-            remove_labels = true
+            remove_label_fields = true
         "#,
         )
         .unwrap();
@@ -289,7 +291,7 @@ mod integration_tests {
 
         let (mut config, cx, mut rt) = load_sink::<LokiConfig>(
             r#"
-            host = "http://localhost:3100"
+            endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
             encoding = "text"
         "#,
@@ -325,7 +327,7 @@ mod integration_tests {
 
         let (mut config, cx, mut rt) = load_sink::<LokiConfig>(
             r#"
-            host = "http://localhost:3100"
+            endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
             encoding = "json"
             remove_timestamp = false
@@ -364,7 +366,7 @@ mod integration_tests {
 
         let (config, cx, mut rt) = load_sink::<LokiConfig>(
             r#"
-            host = "http://localhost:3100"
+            endpoint = "http://localhost:3100"
             labels = {test_name = "{{ stream_id }}"}
             encoding = "text"
         "#,
