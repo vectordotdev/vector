@@ -170,109 +170,74 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
 }
 
 fn encode_events(events: Vec<Metric>, namespace: &str) -> String {
-    events
-        .into_iter()
-        .filter_map(|event| {
-            let fullname = encode_namespace(namespace, &event.name);
-            let ts = encode_timestamp(event.timestamp);
-            let tags = event.tags.clone();
-            match event.value {
-                MetricValue::Counter { value } => {
-                    let fields = to_fields(value);
+    let mut output = String::new();
+    for event in events.into_iter() {
+        let fullname = encode_namespace(namespace, &event.name);
+        let ts = encode_timestamp(event.timestamp);
+        let tags = event.tags.clone();
+        match event.value {
+            MetricValue::Counter { value } => {
+                let fields = to_fields(value);
 
-                    Some(vec![influx_line_protocol(
-                        fullname,
-                        "counter",
-                        tags,
-                        Some(fields),
-                        ts,
-                    )])
-                }
-                MetricValue::Gauge { value } => {
-                    let fields = to_fields(value);
-
-                    Some(vec![influx_line_protocol(
-                        fullname,
-                        "gauge",
-                        tags,
-                        Some(fields),
-                        ts,
-                    )])
-                }
-                MetricValue::Set { values } => {
-                    let fields = to_fields(values.len() as f64);
-
-                    Some(vec![influx_line_protocol(
-                        fullname,
-                        "set",
-                        tags,
-                        Some(fields),
-                        ts,
-                    )])
-                }
-                MetricValue::AggregatedHistogram {
-                    buckets,
-                    counts,
-                    count,
-                    sum,
-                } => {
-                    let mut fields: HashMap<String, Field> = buckets
-                        .iter()
-                        .zip(counts.iter())
-                        .map(|pair| (format!("bucket_{}", pair.0), Field::UnsignedInt(*pair.1)))
-                        .collect();
-                    fields.insert("count".to_owned(), Field::UnsignedInt(count));
-                    fields.insert("sum".to_owned(), Field::Float(sum));
-
-                    Some(vec![influx_line_protocol(
-                        fullname,
-                        "histogram",
-                        tags,
-                        Some(fields),
-                        ts,
-                    )])
-                }
-                MetricValue::AggregatedSummary {
-                    quantiles,
-                    values,
-                    count,
-                    sum,
-                } => {
-                    let mut fields: HashMap<String, Field> = quantiles
-                        .iter()
-                        .zip(values.iter())
-                        .map(|pair| (format!("quantile_{}", pair.0), Field::Float(*pair.1)))
-                        .collect();
-                    fields.insert("count".to_owned(), Field::UnsignedInt(count));
-                    fields.insert("sum".to_owned(), Field::Float(sum));
-
-                    Some(vec![influx_line_protocol(
-                        fullname,
-                        "summary",
-                        tags,
-                        Some(fields),
-                        ts,
-                    )])
-                }
-                MetricValue::Distribution {
-                    values,
-                    sample_rates,
-                } => {
-                    let fields = encode_distribution(&values, &sample_rates);
-                    Some(vec![influx_line_protocol(
-                        fullname,
-                        "distribution",
-                        tags,
-                        fields,
-                        ts,
-                    )])
-                }
+                influx_line_protocol(fullname, "counter", tags, Some(fields), ts, &mut output)
             }
-        })
-        .flatten()
-        .filter(|lp| !lp.is_empty())
-        .collect::<Vec<String>>()
-        .join("\n")
+            MetricValue::Gauge { value } => {
+                let fields = to_fields(value);
+
+                influx_line_protocol(fullname, "gauge", tags, Some(fields), ts, &mut output);
+            }
+            MetricValue::Set { values } => {
+                let fields = to_fields(values.len() as f64);
+
+                influx_line_protocol(fullname, "set", tags, Some(fields), ts, &mut output);
+            }
+            MetricValue::AggregatedHistogram {
+                buckets,
+                counts,
+                count,
+                sum,
+            } => {
+                let mut fields: HashMap<String, Field> = buckets
+                    .iter()
+                    .zip(counts.iter())
+                    .map(|pair| (format!("bucket_{}", pair.0), Field::UnsignedInt(*pair.1)))
+                    .collect();
+                fields.insert("count".to_owned(), Field::UnsignedInt(count));
+                fields.insert("sum".to_owned(), Field::Float(sum));
+
+                influx_line_protocol(fullname, "histogram", tags, Some(fields), ts, &mut output);
+            }
+            MetricValue::AggregatedSummary {
+                quantiles,
+                values,
+                count,
+                sum,
+            } => {
+                let mut fields: HashMap<String, Field> = quantiles
+                    .iter()
+                    .zip(values.iter())
+                    .map(|pair| (format!("quantile_{}", pair.0), Field::Float(*pair.1)))
+                    .collect();
+                fields.insert("count".to_owned(), Field::UnsignedInt(count));
+                fields.insert("sum".to_owned(), Field::Float(sum));
+
+                influx_line_protocol(fullname, "summary", tags, Some(fields), ts, &mut output);
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+            } => {
+                let fields = encode_distribution(&values, &sample_rates);
+
+                influx_line_protocol(fullname, "distribution", tags, fields, ts, &mut output);
+            }
+        }
+    }
+
+    // remove last '\n'
+    output.pop();
+
+    return output;
 }
 
 fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String, Field>> {
@@ -342,29 +307,31 @@ fn influx_line_protocol(
     tags: Option<HashMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
-) -> String {
-    let mut line_protocol = String::new();
-    encode_string(measurement, &mut line_protocol);
+    line_protocol: &mut String,
+) {
+    // Fields
+    let unwrapped_fields = fields.unwrap_or_else(|| HashMap::new());
+    // LineProtocol should have a field
+    if unwrapped_fields.is_empty() {
+        return;
+    }
+
+    encode_string(measurement, line_protocol);
     line_protocol.push(',');
 
     // Tags
     let mut unwrapped_tags = tags.unwrap_or_else(|| HashMap::new());
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
-    encode_tags(unwrapped_tags, &mut line_protocol);
+    encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
 
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(|| HashMap::new());
-    encode_fields(unwrapped_fields, &mut line_protocol);
-    if line_protocol.is_empty() {
-        return "".to_owned();
-    }
+    encode_fields(unwrapped_fields, line_protocol);
     line_protocol.push(' ');
 
     // Timestamp
     line_protocol.push_str(&timestamp.to_string());
-
-    line_protocol
+    line_protocol.push('\n');
 }
 
 fn encode_string(key: String, output: &mut String) {
@@ -397,17 +364,7 @@ fn encode_tags(tags: HashMap<String, String>, output: &mut String) {
 }
 
 fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
-    let sorted = fields
-        // sort by key
-        .iter()
-        .collect::<BTreeMap<_, _>>();
-
-    let mut was_add = false;
-
-    for (key, value) in sorted {
-        if key.is_empty() {
-            continue;
-        }
+    for (key, value) in fields.into_iter() {
         encode_string(key.to_string(), output);
         output.push('=');
         match value {
@@ -424,20 +381,14 @@ fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
             Field::Float(f) => output.push_str(&f.to_string()),
             Field::UnsignedInt(i) => {
                 output.push_str(&i.to_string());
-                output.push('u')
+                output.push('u');
             }
         };
         output.push(',');
-        was_add = true;
     }
 
     // remove last ','
     output.pop();
-
-    // line protocol cannot be without fields
-    if !was_add {
-        output.clear()
-    }
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -583,7 +534,17 @@ mod tests {
 
         let mut value = String::new();
         encode_fields(fields, &mut value);
-        assert_eq!(value, "escape\\ key=10,field_float=123.45,field_string=\"string value\",field_string_escape=\"string\\\\val\\\"ue\",field_unsigned_int=657u");
+        assert_fields(
+            value,
+            [
+                "escape\\ key=10",
+                "field_float=123.45",
+                "field_string=\"string value\"",
+                "field_string_escape=\"string\\\\val\\\"ue\"",
+                "field_unsigned_int=657u",
+            ]
+            .to_vec(),
+        )
     }
 
     #[test]
@@ -665,10 +626,27 @@ mod tests {
         }];
 
         let line_protocols = encode_events(events, "ns");
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 1);
+
+        let line_protocol1 = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", line_protocol1.0);
         assert_eq!(
-            line_protocols,
-            "ns.requests,metric_type=histogram,normal_tag=value,true_tag=true bucket_1=1u,bucket_2.1=2u,bucket_3=3u,count=6u,sum=12.5 1542182950000000011"
+            "metric_type=histogram,normal_tag=value,true_tag=true",
+            line_protocol1.1
         );
+        assert_fields(
+            line_protocol1.2.to_string(),
+            [
+                "bucket_1=1u",
+                "bucket_2.1=2u",
+                "bucket_3=3u",
+                "count=6u",
+                "sum=12.5",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol1.3);
     }
 
     #[test]
@@ -687,10 +665,27 @@ mod tests {
         }];
 
         let line_protocols = encode_events(events, "ns");
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 1);
+
+        let line_protocol1 = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests_sum", line_protocol1.0);
         assert_eq!(
-            line_protocols,
-                "ns.requests_sum,metric_type=summary,normal_tag=value,true_tag=true count=6u,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12 1542182950000000011"
+            "metric_type=summary,normal_tag=value,true_tag=true",
+            line_protocol1.1
         );
+        assert_fields(
+            line_protocol1.2.to_string(),
+            [
+                "count=6u",
+                "quantile_0.01=1.5",
+                "quantile_0.5=2",
+                "quantile_0.99=3",
+                "sum=12",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol1.3);
     }
 
     #[test]
@@ -729,12 +724,65 @@ mod tests {
         ];
 
         let line_protocols = encode_events(events, "ns");
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 3);
+
+        let line_protocol1 = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", line_protocol1.0);
         assert_eq!(
-            line_protocols,
-                "ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011\n\
-                ns.dense_stats,metric_type=distribution avg=9.5,count=20,max=19,median=9,min=0,quantile_0.95=18,sum=190 1542182950000000011\n\
-                ns.sparse_stats,metric_type=distribution avg=3,count=10,max=4,median=3,min=1,quantile_0.95=4,sum=30 1542182950000000011"
+            "metric_type=distribution,normal_tag=value,true_tag=true",
+            line_protocol1.1
         );
+        assert_fields(
+            line_protocol1.2.to_string(),
+            [
+                "avg=1.875",
+                "count=8",
+                "max=3",
+                "median=2",
+                "min=1",
+                "quantile_0.95=3",
+                "sum=15",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol1.3);
+
+        let line_protocol2 = split_line_protocol(line_protocols[1]);
+        assert_eq!("ns.dense_stats", line_protocol2.0);
+        assert_eq!("metric_type=distribution", line_protocol2.1);
+        assert_fields(
+            line_protocol2.2.to_string(),
+            [
+                "avg=9.5",
+                "count=20",
+                "max=19",
+                "median=9",
+                "min=0",
+                "quantile_0.95=18",
+                "sum=190",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol2.3);
+
+        let line_protocol3 = split_line_protocol(line_protocols[2]);
+        assert_eq!("ns.sparse_stats", line_protocol3.0);
+        assert_eq!("metric_type=distribution", line_protocol3.1);
+        assert_fields(
+            line_protocol3.2.to_string(),
+            [
+                "avg=3",
+                "count=10",
+                "max=4",
+                "median=3",
+                "min=1",
+                "quantile_0.95=4",
+                "sum=30",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol3.3);
     }
 
     #[test]
@@ -786,6 +834,37 @@ mod tests {
 
         let line_protocols = encode_events(events, "ns");
         assert_eq!(line_protocols.len(), 0);
+    }
+
+    fn assert_fields(value: String, fields: Vec<&str>) {
+        let encoded_fields: Vec<&str> = value.split(',').collect();
+
+        assert_eq!(fields.len(), encoded_fields.len());
+
+        for field in fields.into_iter() {
+            assert!(
+                encoded_fields.contains(&field),
+                format!("Fields: {} has to have: {}", value, field)
+            )
+        }
+    }
+
+    // ns.requests,metric_type=distribution,normal_tag=value,true_tag=true avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15 1542182950000000011
+    //
+    // =>
+    //
+    // ns.requests
+    // metric_type=distribution,normal_tag=value,true_tag=true
+    // avg=1.875,count=8,max=3,median=2,min=1,quantile_0.95=3,sum=15
+    // 1542182950000000011
+    //
+    fn split_line_protocol(line_protocol: &str) -> (&str, &str, String, &str) {
+        let mut split = line_protocol.splitn(2, ',').collect::<Vec<&str>>();
+        let measurement = split[0];
+
+        split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
+
+        return (measurement, split[0], split[1].to_string(), split[2]);
     }
 }
 
