@@ -437,7 +437,6 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
@@ -463,7 +462,6 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn rsyslog_omfwd_tcp_default() {
         let msg = "start";
         let raw = format!(
