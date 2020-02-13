@@ -11,36 +11,19 @@ use serde::{Deserialize, Serialize};
 //------------------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum SwimlaneConditionConfig {
-    String(String),
-    Embedded(Box<dyn ConditionConfig>),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(skip)]
     name: String,
 
     #[serde(flatten)]
-    condition: SwimlaneConditionConfig,
+    condition: Box<dyn ConditionConfig>,
 }
 
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let cond = match &self.condition {
-            SwimlaneConditionConfig::Embedded(b) => b.build()?,
-            SwimlaneConditionConfig::String(_s) => {
-                return Err(format!(
-                    "failed to create swimlane '{}': condition references are not yet supported",
-                    self.name,
-                )
-                .into());
-            }
-        };
-        Ok(Box::new(Swimlane::new(cond)))
+        Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
     fn input_type(&self) -> DataType {
@@ -81,7 +64,7 @@ impl Transform for Swimlane {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
-    lanes: IndexMap<String, SwimlaneConditionConfig>,
+    lanes: IndexMap<String, Box<dyn ConditionConfig>>,
 }
 
 inventory::submit! {
