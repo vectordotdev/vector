@@ -1064,7 +1064,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+            .map(|event| event.as_log()[&event::schema().message_key].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
@@ -1073,7 +1073,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+            .map(|event| event.as_log()[&event::schema().message_key].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);

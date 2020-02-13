@@ -88,7 +88,10 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+                let host_key = config
+                    .host_key
+                    .clone()
+                    .unwrap_or(event::schema().host_key.to_string());
                 Ok(unix::unix(config.path, config.max_length, host_key, out))
             }
         }
@@ -357,7 +360,10 @@ mod test {
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(1, events.len());
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "test".into()
+        );
     }
 
     #[cfg(unix)]
@@ -371,8 +377,14 @@ mod test {
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(2, events.len());
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::schema().message_key],
+            "test2".into()
+        );
     }
 
     #[cfg(unix)]
@@ -386,7 +398,13 @@ mod test {
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(2, events.len());
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::schema().message_key],
+            "test2".into()
+        );
     }
 }
