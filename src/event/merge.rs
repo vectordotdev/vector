@@ -1,4 +1,5 @@
 use crate::event::{LogEvent, Value};
+use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 /// Merges all fields specified at `merge_fields` from `incoming` to `current`.
@@ -25,10 +26,26 @@ pub fn merge_value(current: &mut Value, incoming: Value) {
     }
 }
 
+/// Merges `source` map into `dest` recursively
+pub fn merge_nested(dest: &mut HashMap<Atom, Value>, source: HashMap<Atom, Value>) {
+    for (key, value) in source.into_iter() {
+        if let Some(Value::Map(dest_map)) = dest.get_mut(&key) {
+            if let Value::Map(source_map) = value {
+                merge_nested(dest_map, source_map);
+            } else {
+                dest.insert(key, value);
+            }
+        } else {
+            dest.insert(key, value);
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::event::Event;
+    use std::collections::HashMap;
 
     fn assert_merge_value(
         current: impl Into<Value>,
@@ -120,5 +137,35 @@ mod test {
         };
 
         assert_eq!(merged, expected);
+    }
+
+    #[test]
+    fn merge_nested_override() {
+        let mut dest = HashMap::new();
+        dest.insert(Atom::from("a"), Value::from("b"));
+        dest.insert(Atom::from("c"), Value::from("d"));
+        let mut nested = HashMap::new();
+        nested.insert(Atom::from("x1"), Value::from("y1"));
+        nested.insert(Atom::from("x2"), Value::from("y2"));
+        dest.insert(Atom::from("nested"), Value::Map(nested));
+
+        let mut source = HashMap::new();
+        source.insert(Atom::from("a"), Value::from("c"));
+        source.insert(Atom::from("e"), Value::from("f"));
+        let mut nested = HashMap::new();
+        nested.insert(Atom::from("x1"), Value::from("y3"));
+        nested.insert(Atom::from("w"), Value::from("u"));
+        dest.insert(Atom::from("nested"), Value::Map(nested));
+
+        merge_nested(&mut dest, source);
+        assert_eq!(dest.get(&Atom::from("a")), Some(&Value::from("c")));
+        assert_eq!(dest.get(&Atom::from("c")), Some(&Value::from("d")));
+        assert_eq!(dest.get(&Atom::from("e")), Some(&Value::from("f")));
+        if let Some(Value::Map(nested)) = dest.get(&Atom::from("nested")) {
+            assert_eq!(nested.get(&Atom::from("x1")), Some(&Value::from("y3")));
+            assert_eq!(nested.get(&Atom::from("w")), Some(&Value::from("u")));
+        } else {
+            unreachable!("The \"nested\" field is not present");
+        }
     }
 }

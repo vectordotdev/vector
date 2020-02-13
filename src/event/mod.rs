@@ -14,6 +14,7 @@ pub mod merge;
 pub mod merge_state;
 pub mod metric;
 
+use merge::merge_nested;
 pub use metric::Metric;
 
 pub mod proto {
@@ -106,7 +107,18 @@ impl LogEvent {
         K: Into<Atom>,
         V: Into<Value>,
     {
-        self.fields.insert(key.into(), value.into());
+        let key: Atom = key.into();
+        let value: Value = value.into();
+
+        if let Some(Value::Map(existing_map)) = self.fields.get_mut(&key) {
+            if let Value::Map(map) = value {
+                merge_nested(existing_map, map);
+            } else {
+                self.fields.insert(key, value);
+            }
+        } else {
+            self.fields.insert(key, value);
+        }
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
