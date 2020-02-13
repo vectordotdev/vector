@@ -150,7 +150,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event.as_log().get(&event::log_schema().message_key).is_none());
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().message_key)
+            .is_none());
     }
 
     #[test]
@@ -164,7 +167,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event.as_log().get(&event::log_schema().message_key).is_some());
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().message_key)
+            .is_some());
     }
 
     #[test]
@@ -262,7 +268,10 @@ mod test {
         let parsed = parser.transform(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
-        assert_eq!(event.as_log()[&event::log_schema().message_key], invalid.into());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key],
+            invalid.into()
+        );
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {

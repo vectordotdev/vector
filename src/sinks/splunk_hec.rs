@@ -202,12 +202,12 @@ fn encode_event(
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
-    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key)
-    {
-        ts.timestamp()
-    } else {
-        chrono::Utc::now().timestamp()
-    };
+    let timestamp =
+        if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key) {
+            ts.timestamp()
+        } else {
+            chrono::Utc::now().timestamp()
+        };
 
     let mut body = match encoding {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),

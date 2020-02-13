@@ -789,7 +789,10 @@ impl ContainerLogInfo {
             let mut log_event = Event::new_empty_log().into_log();
 
             // The log message.
-            log_event.insert(event::log_schema().message_key.clone(), bytes_message.freeze());
+            log_event.insert(
+                event::log_schema().message_key.clone(),
+                bytes_message.freeze(),
+            );
 
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);

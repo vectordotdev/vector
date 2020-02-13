@@ -1,6 +1,4 @@
-use vector::{
-    topology::{self, Config},
-};
+use vector::topology::{self, Config};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     let rt = vector::runtime::Runtime::single_threaded().unwrap();

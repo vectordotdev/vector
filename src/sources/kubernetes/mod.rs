@@ -159,7 +159,10 @@ fn parse_message() -> crate::Result<ApplicableTransform> {
 }
 
 fn remove_ending_newline(mut event: Event) -> Event {
-    if let Some(Value::Bytes(msg)) = event.as_mut_log().get_mut(&event::log_schema().timestamp_key) {
+    if let Some(Value::Bytes(msg)) = event
+        .as_mut_log()
+        .get_mut(&event::log_schema().timestamp_key)
+    {
         if msg.ends_with(&['\n' as u8]) {
             msg.truncate(msg.len() - 1);
         }

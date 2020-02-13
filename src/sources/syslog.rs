@@ -74,7 +74,10 @@ impl SourceConfig for SyslogConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let host_key = self.host_key.clone().unwrap_or(event::log_schema().host_key.to_string());
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(event::log_schema().host_key.to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address } => {

@@ -13,7 +13,7 @@ use structopt::{clap::AppSettings, StructOpt};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{event, config_paths, generate, list, metrics, runtime, topology, trace, unit_test};
+use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
