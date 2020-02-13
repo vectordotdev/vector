@@ -5,8 +5,11 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::{
         util::{
-            http::https_client, retries::RetryLogic, tls::TlsSettings, BatchBytesConfig, Buffer,
-            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
+            http::https_client,
+            retries::RetryLogic,
+            tls::{TlsOptions, TlsSettings},
+            BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
+            SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -64,6 +67,7 @@ pub struct GcsSinkConfig {
     pub request: TowerRequestConfig,
     #[serde(flatten)]
     auth: GcpAuthConfig,
+    tls: Option<TlsOptions>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -242,10 +246,8 @@ impl GcsSink {
             creds.apply(&mut request);
         }
 
-        let client = https_client(
-            cx.resolver(),
-            TlsSettings::from_options(&Default::default())?,
-        )?;
+        let tls = TlsSettings::from_options(&config.tls)?;
+        let client = https_client(cx.resolver(), tls)?;
 
         let healthcheck =
             client
