@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::{collections::HashMap, net::SocketAddr};
-use syslog_rfc5424::{self, message::ProcId::*, SyslogMessage};
+use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
 use tokio::{
     self,
     codec::{BytesCodec, LinesCodec},
@@ -249,12 +249,12 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         log.insert("procid", value);
     }
 
-    for (id, data) in parsed.sd.iter() {
+    for element in parsed.structured_data.iter() {
         let mut map: HashMap<Atom, Value> = HashMap::new();
-        for (name, value) in data.iter() {
+        for (name, value) in element.params.iter() {
             map.insert(Atom::from(name.clone()), Value::from(value.clone()));
         }
-        log.insert(id.clone(), Value::from(map));
+        log.insert(element.id.clone(), Value::from(map));
     }
 }
 
@@ -263,6 +263,7 @@ mod test {
     use super::{event_from_str, SyslogConfig};
     use crate::event::{self, Atom, Event, Value};
     use chrono::TimeZone;
+    use pretty_assertions::assert_eq;
     use std::collections::HashMap;
 
     #[test]
@@ -517,10 +518,12 @@ mod test {
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
             expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            let mut origin = HashMap::new();
+            origin.insert(Atom::from("software"), Value::from("rsyslogd"));
+            origin.insert(Atom::from("swVersion"), Value::from("8.24.0"));
+            origin.insert(Atom::from("x-pid"), Value::from("9043"));
+            origin.insert(Atom::from("x-info"), Value::from("http://www.rsyslog.com"));
+            expected.insert(Atom::from("origin"), Value::Map(origin));
         }
 
         assert_eq!(
