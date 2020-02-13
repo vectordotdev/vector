@@ -365,10 +365,10 @@ impl<R: Read> Stream for EventStream<R> {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
 
-                    // Add 'line' value as 'event::MESSAGE'
+                    // Add 'line' value as 'event::schema().message_key'
                     if let Some(line) = object.remove("line") {
                         match line {
-                            // This don't quite fit the meaning of a event::MESSAGE
+                            // This don't quite fit the meaning of a event::schema().message_key
                             JsonValue::Array(_) | JsonValue::Object(_) => {
                                 event::flatten::insert(log, "line", line)
                             }

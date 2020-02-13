@@ -1174,7 +1174,10 @@ mod tests {
 
         // Wait for before message
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "before".into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            "before".into()
+        );
 
         id
     }
@@ -1199,7 +1202,7 @@ mod tests {
         container_remove(&id, &docker, &mut rt);
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::schema().message_keyF], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
@@ -1221,8 +1224,14 @@ mod tests {
 
         container_remove(&id, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], message.into());
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            message.into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::schema().message_key],
+            message.into()
+        );
     }
 
     #[test]
@@ -1242,7 +1251,10 @@ mod tests {
         container_remove(&id0, &docker, &mut rt);
         container_remove(&id1, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        assert_eq!(
+            events[0].as_log()[&event::schema().message_key],
+            message.into()
+        )
     }
 
     #[test]
@@ -1263,7 +1275,10 @@ mod tests {
         container_remove(&id0, &docker, &mut rt);
         container_remove(&id1, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        assert_eq!(F
+            events[0].as_log()[&event::schema().message_key],
+            message.into()
+        )
     }
 
     #[test]
@@ -1283,7 +1298,7 @@ mod tests {
         container_remove(&id, &docker, &mut rt);
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::schema().message_keyF], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
@@ -1311,7 +1326,10 @@ mod tests {
 
         container_remove(&id, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        assert_eq!(F
+            events[0].as_log()[&event::schema().message_key],
+            message.into()
+        )
     }
 
     #[test]
