@@ -196,6 +196,9 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
+    /// Allows a transform configuration to expand itself into multiple "child"
+    /// transformations to replace it. This allows a transform to act as a macro
+    /// for various patterns.
     fn expand(&mut self) -> Option<IndexMap<String, Box<dyn TransformConfig>>> {
         None
     }
@@ -334,6 +337,31 @@ impl Config {
         self.transforms.insert(name.to_string(), transform);
     }
 
+    /// Some component configs can act like macros and expand themselves into
+    /// multiple replacement configs.
+    pub fn expand_macros(&mut self) {
+        let mut expanded_transforms = IndexMap::new();
+
+        while let Some((k, mut t)) = self.transforms.pop() {
+            if let Some(expanded) = t.inner.expand() {
+                for (name, child) in expanded {
+                    let full_name = format!("{}.{}", k, name);
+                    expanded_transforms.insert(
+                        full_name,
+                        TransformOuter {
+                            inputs: t.inputs.clone(),
+                            inner: child,
+                        },
+                    );
+                }
+            } else {
+                expanded_transforms.insert(k, t);
+            }
+        }
+
+        self.transforms = expanded_transforms;
+    }
+
     pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {
         let mut source_string = String::new();
         input
@@ -348,7 +376,12 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
+        toml::from_str(&with_vars)
+            .map_err(|e| vec![e.to_string()])
+            .map(|mut c: Config| {
+                c.expand_macros();
+                c
+            })
     }
 
     pub fn append(&mut self, mut with: Self) -> Result<(), Vec<String>> {
