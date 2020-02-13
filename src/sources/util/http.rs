@@ -31,11 +31,6 @@ impl Display for ErrorMessage {
     }
 }
 
-fn string_to_static_str(s: String) -> &'static str {
-    //necessary because warp 0.1.18 needs a &'static str for the path
-    Box::leak(s.into_boxed_str())
-}
-
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_event(
         &self,
@@ -46,7 +41,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     fn run(
         self,
         address: SocketAddr,
-        path: String,
+        path: &'static str,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<crate::sources::Source> {
         let (trigger, tripwire) = Tripwire::new();
@@ -54,13 +49,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
         let mut filter: BoxedFilter<()> = warp::post2().boxed();
         if !path.is_empty() && path != "/" {
-            for s in string_to_static_str(path).split('/') {
+            for s in path.split('/') {
                 filter = filter.and(warp::path(s)).boxed();
             }
         }
         let svc = filter
             .and(warp::path::end())
-            .boxed()
             .and(warp::header::headers_cloned())
             .and(warp::body::concat())
             .and_then(move |headers: HeaderMap, body| {
