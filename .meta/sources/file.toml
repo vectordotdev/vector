@@ -179,19 +179,19 @@ draining the oldest files before moving on to read data from younger files.\
 [sources.file.output.log.fields.file]
 type = "string"
 examples = ["/var/log/nginx.log"]
-key_name_option = "file_key"
 required = true
 description = """\
-The _full_ path of the file tha the log originated from.\
+The _full_ path of the file tha the log originated from. This can be renamed \
+via the `file_key` option.\
 """
 
 [sources.file.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-key_name_option = "host_key"
 required = true
 description = """\
-The current hostname, equivalent to the `gethostname` command.\
+The current hostname, equivalent to the `gethostname` command. This can be \
+renamed via the `host_key` option.\
 """
 
 [sources.file.output.log.fields.message]

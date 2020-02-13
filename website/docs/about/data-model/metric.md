@@ -573,7 +573,7 @@ The value to increment the counter by. Can only be positive.
 
 #### distribution
 
-A dsitribution represents a distribution of sampled values.
+A distribution represents a distribution of sampled values.
 
 <Fields filters={false}>
 

@@ -8,12 +8,17 @@ use crate::{
     Event,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
+#[derivative(Debug)]
 pub enum CheckFieldsPredicateArg {
+    #[derivative(Debug = "transparent")]
     String(String),
+    #[derivative(Debug = "transparent")]
     Integer(i64),
+    #[derivative(Debug = "transparent")]
     Float(f64),
+    #[derivative(Debug = "transparent")]
     Boolean(bool),
 }
 
@@ -166,8 +171,8 @@ fn build_predicate(
 
 fn build_predicates(
     map: &IndexMap<String, CheckFieldsPredicateArg>,
-) -> Result<Vec<Box<dyn CheckFieldsPredicate>>, Vec<String>> {
-    let mut predicates: Vec<Box<dyn CheckFieldsPredicate>> = Vec::new();
+) -> Result<IndexMap<String, Box<dyn CheckFieldsPredicate>>, Vec<String>> {
+    let mut predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for (target_pred, arg) in map {
@@ -185,7 +190,9 @@ fn build_predicates(
                 let pred = target.split_off(i + 1);
                 target.truncate(target.len() - 1);
                 match build_predicate(&pred, target, arg) {
-                    Ok(pred) => predicates.push(pred),
+                    Ok(pred) => {
+                        predicates.insert(format!("{}: {:?}", target_pred, arg), pred);
+                    }
                     Err(err) => errors.push(err),
                 }
                 Some(())
@@ -236,12 +243,29 @@ impl ConditionConfig for CheckFieldsConfig {
 //------------------------------------------------------------------------------
 
 pub struct CheckFields {
-    predicates: Vec<Box<dyn CheckFieldsPredicate>>,
+    predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }
 
 impl Condition for CheckFields {
     fn check(&self, e: &Event) -> bool {
-        self.predicates.iter().find(|p| !p.check(e)).is_none()
+        self.predicates.iter().find(|(_, p)| !p.check(e)).is_none()
+    }
+
+    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+        let failed_preds = self
+            .predicates
+            .iter()
+            .filter(|(_, p)| !p.check(e))
+            .map(|(n, _)| n.to_owned())
+            .collect::<Vec<_>>();
+        if failed_preds.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "predicates failed: [ {} ]",
+                failed_preds.join(", ")
+            ))
+        }
     }
 }
 
@@ -310,14 +334,33 @@ mod test {
 
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
-        let mut event = Event::from("foo");
+        let mut event = Event::from("neither");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.equals: \"foo\", other_thing.eq: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "foo");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.eq: \"bar\" ]".to_owned())
+        );
 
         event.as_mut_log().insert("other_thing", "bar");
         assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("message", "not foo");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.equals: \"foo\" ]".to_owned())
+        );
     }
 
     #[test]
@@ -336,15 +379,31 @@ mod test {
 
         let mut event = Event::from("not foo");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
+        );
 
         event.as_mut_log().insert("other_thing", "not bar");
         assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("other_thing", "bar");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
+        );
 
         event.as_mut_log().insert("message", "foo");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.not_equals: \"foo\", other_thing.neq: \"bar\" ]"
+                    .to_owned()
+            )
+        );
     }
 
     #[test]
@@ -357,11 +416,20 @@ mod test {
 
         let mut event = Event::from("ignored field");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.exists: true ]".to_owned())
+        );
 
         event.as_mut_log().insert("foo", "not ignored");
         assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event.as_mut_log().insert("bar", "also not ignored");
         assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ bar.exists: false ]".to_owned())
+        );
     }
 }

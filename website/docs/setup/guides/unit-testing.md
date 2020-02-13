@@ -7,8 +7,8 @@ status: beta
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The purpose of these tests is to
-improve the maintainability of configs containing larger and more complex
-combinations of transforms.
+assist in the development of configs containing larger and more complex
+topologies, and improve their maintainability.
 
 The full spec can be found [here][docs.reference.tests]. This guide will cover
 writing and executing a unit test for the following config:
@@ -19,7 +19,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.over_tcp]
-  type = "tcp"
+  type = "socket"
+  mode = "tcp"
   address = "0.0.0.0:9000"
 
 [transforms.foo]
@@ -65,7 +66,7 @@ requirements:
 - Has a `timestamp` and `message` field containing the values extracted from the
   raw message of the input log.
 
-Otherwise our system fails and an annoying relative (Uncle Cecil) moves in to
+Otherwise our system fails and an annoying relative (uncle Cecil) moves in to
 live with us indefinitely. We will do _anything_ to prevent that.
 
 ## Input
@@ -89,10 +90,10 @@ transform `foo`. The `raw` input type creates a log with only a `message` field
 and `timestamp` (set to the time of the test), where `message` is populated with
 the contents of the `value` field.
 
-## Conditions
+## Outputs
 
-This test won't work in its current state because there's nothing to check. In
-order to perform checks with this unit test we define an expected output:
+This test won't run in its current state because there's nothing to check. In
+order to perform checks with this unit test we define an output to inspect:
 
 ```toml
 [[tests]]
@@ -114,16 +115,23 @@ order to perform checks with this unit test we define an expected output:
       "message.equals" = "Sorry, I'm busy this week Cecil"
 ```
 
-You can define any number of expected outputs, where we must specify at which
-transform the output events should be extracted for checking. This allows you to
+We can define any number of outputs for a test, and must specify at which
+transform the output events should be extracted for checking. This allows us to
 check the events from different transforms in a single test. For our purposes we
 only need to check the output of `baz`.
 
-An output can also have any number of conditions to check. In order for the test
-to pass each condition for an output must resolve to `true`. It's possible for a
-topology to result in >1 events extracted from a single transform, in which case
-a condition must pass for one or more of the extracted events in order for the
-test to pass.
+An output can also have any number of conditions to check, and these are how we
+determine whether a test has failed or succeeded. In order for the test to pass
+each condition for an output must resolve to `true`.
+
+It's possible for a topology to result in >1 events extracted from a single
+transform, in which case each condition must pass for one or more of the
+extracted events in order for the test to pass.
+
+An output without any conditions cannot fail a test, and instead prints the
+input and output events of a transform during the test. This is useful when
+building a config as it allows us to inspect the behavior of each transform in
+isolation.
 
 The only condition we've defined here is a `check_fields` type. This is
 currently the _only_ condition type on offer, and it allows us to specify any
@@ -131,8 +139,8 @@ number of field queries (of the format `"<field>.<predicate>" = "<argument>"`).
 
 ## Executing
 
-With this test appended to the bottom of our config we are now able to execute
-it. Executing tests within a config file can be done with the `test` subcommand:
+With this test added to the bottom of our config we are now able to execute it.
+Executing tests within a config file can be done with the `test` subcommand:
 
 ```bash
 vector test ./example.toml
@@ -143,84 +151,38 @@ Doing this results in the following output:
 ```sh
 $ vector test ./example.toml
 Running ./example.toml tests
-Test ./example.toml: check_simple_log ... failed
+test ./example.toml: check_simple_log ... failed
 
 failures:
 
 --- ./example.toml ---
 
-Test 'check_simple_log':
-check transform 'baz' failed conditions: [ 0 ], payloads (encoded in JSON format):
-  {"timestamp":"2019-11-28T12:00:00+00:00","message":"Sorry, I'm busy this week Cecil"}
+test 'check_simple_log':
+
+check transform 'baz' failed conditions:
+  condition[0]: predicates failed: [ new_field.equals: "this is a static value" ]
+payloads (events encoded as JSON):
+  input: {"level":"info","timestamp":"2019-11-28T12:00:00+00:00","message":"Sorry, I'm busy this week Cecil"}
+  output: {"timestamp":"2019-11-28T12:00:00+00:00","message":"Sorry, I'm busy this week Cecil"}
 ```
 
-Woops! Something isn't right. Unfortunately we're only told which
-output-condition failed, not which predicate of our `check_fields` condition
-specifically caused the failure. If we refactor our test slightly we can make it
-clearer by breaking our condition down to one per predicate:
-
-
-```toml
-[[tests]]
-  name = "check_simple_log"
-
-  [tests.input]
-    insert_at = "foo"
-    type = "raw"
-    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
-
-  [[tests.outputs]]
-    extract_from = "baz"
-
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "level.exists" = false
-
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "new_field.equals" = "this is a static value"
-
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "timestamp.equals" = "2019-11-28T12:00:00+00:00"
-
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "message.equals" = "Sorry, I'm busy this week Cecil"
-```
-
-Running the test again gives us this:
-
-```sh
-$ vector test ./example.toml
-Running ./example.toml tests
-Test ./example.toml: check_simple_log ... failed
-
-failures:
-
---- ./example.toml ---
-
-Test 'check_simple_log':
-check transform 'baz' failed conditions: [ 1 ], payloads (encoded in JSON format):
-  {"timestamp":"2019-11-28T12:00:00+00:00","message":"Sorry, I'm busy this week Cecil"}
-```
-
-This time the output states that it's condition `1` that failed, which is the
-condition checking for the field `new_field`. Try reviewing our config topology
-to see if you can spot the mistake.
+Woops! Something isn't right. Vector has told us that condition `0` (our only
+condition) failed for the predicate `new_field.equals`. We also get to see a
+JSON encoded representation of the input and output of the transform `baz`.
+Try reviewing our config topology to see if you can spot the mistake.
 
 SPOILERS: The problem is that transform `baz` is configured with the input
 `foo`, which means `bar` is skipped in the topology!
 
-Side note: We would have also caught this particular issue with
-`vector validate --topology ./example.toml`.
+> Side note: We would have also caught this particular issue with
+> `vector validate --topology ./example.toml`.
 
 The fix is easy, we simply change the input of `baz` from `foo` to `bar`:
 
 ```diff
 --- a/example.toml
 +++ b/example.toml
-@@ -15,7 +15,7 @@
+@@ -16,7 +16,7 @@
 
  [transforms.baz]
    type = "remove_fields"
@@ -238,7 +200,7 @@ Test ./example.toml: check_simple_log ... passed
 ```
 
 The test passed! Now if we configure our CI system to execute our test we can
-ensure that Uncle Cecil remains in Shoreditch after any future config change.
+ensure that uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
 
 

@@ -71,6 +71,7 @@ spec:
       - name: vector
         image: timberio/vector:latest-alpine
         imagePullPolicy: Always
+        args: ["-w"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/

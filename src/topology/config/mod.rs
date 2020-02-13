@@ -17,6 +17,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub mod component;
 mod validation;
 mod vars;
+pub mod watcher;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -244,7 +245,7 @@ fn default_test_input_type() -> String {
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
     pub extract_from: String,
-    pub conditions: Vec<TestCondition>,
+    pub conditions: Option<Vec<TestCondition>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
