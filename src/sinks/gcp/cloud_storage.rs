@@ -19,7 +19,7 @@ use chrono::Utc;
 use futures::{stream::iter_ok, Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper::{
-    header::{HeaderMap, HeaderName, HeaderValue},
+    header::{HeaderName, HeaderValue},
     Body, Request,
 };
 use lazy_static::lazy_static;
@@ -35,12 +35,15 @@ const BASE_URL: &str = "https://storage.googleapis.com/";
 
 #[derive(Clone)]
 struct GcsSink {
+    bucket: String,
     client: HttpsClient,
     creds: Option<GcpCredentials>,
+    base_url: String,
+    settings: RequestSettings,
 }
 
 #[derive(Debug, Snafu)]
-enum GcsHealthcheckError {
+enum GcsError {
     #[snafu(display("Bucket {:?} not found", bucket))]
     BucketNotFound { bucket: String },
 }
@@ -48,13 +51,14 @@ enum GcsHealthcheckError {
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
-    pub bucket: String,
+    bucket: String,
+    acl: Option<GcsPredefinedAcl>,
+    storage_class: Option<GcsStorageClass>,
+    tags: Option<HashMap<String, String>>,
     pub key_prefix: Option<String>,
     pub filename_time_format: Option<String>,
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
-    #[serde(flatten)]
-    pub options: GcsOptions,
     encoding: Encoding,
     pub compression: Compression,
     #[serde(default)]
@@ -64,13 +68,6 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
     pub tls: Option<TlsOptions>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct GcsOptions {
-    acl: Option<GcsPredefinedAcl>,
-    storage_class: Option<GcsStorageClass>,
-    tags: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -84,12 +81,6 @@ pub enum GcsPredefinedAcl {
     Private,
     PublicRead,
     ProjectPrivate,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub enum GcsServerSideEncryption {
-    #[serde(rename = "AES256")]
-    AES256,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -111,7 +102,7 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
@@ -120,13 +111,37 @@ pub enum Encoding {
     Ndjson,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+impl Encoding {
+    fn content_type(self) -> &'static str {
+        match self {
+            Self::Text => "text/plain",
+            Self::Ndjson => "application/x-ndjson",
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Compression {
     #[derivative(Default)]
     Gzip,
     None,
+}
+
+impl Compression {
+    fn content_encoding(self) -> Option<&'static str> {
+        match self {
+            Self::Gzip => Some("gzip"),
+            Self::None => None,
+        }
+    }
+    fn extension(self) -> &'static str {
+        match self {
+            Self::Gzip => "log.gz",
+            Self::None => "log",
+        }
+    }
 }
 
 inventory::submit! {
@@ -136,11 +151,11 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::DevStorageReadWrite)?;
-        let healthcheck = GcsSink::healthcheck(self, &cx, &creds)?;
-        let sink = GcsSink::new(self, cx, creds)?;
+        let sink = GcsSink::new(self, &cx)?;
+        let healthcheck = sink.healthcheck()?;
+        let service = sink.service(self, &cx)?;
 
-        Ok((sink, healthcheck))
+        Ok((service, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -163,11 +178,23 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    pub fn new(
-        config: &GcsSinkConfig,
-        cx: SinkContext,
-        creds: Option<GcpCredentials>,
-    ) -> crate::Result<RouterSink> {
+    fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+        let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
+        let settings = RequestSettings::new(config)?;
+        let tls = TlsSettings::from_options(&config.tls)?;
+        let client = https_client(cx.resolver(), tls)?;
+        let base_url = format!("{}{}/", BASE_URL, config.bucket);
+        let bucket = config.bucket.clone();
+        Ok(GcsSink {
+            client,
+            creds,
+            settings,
+            base_url,
+            bucket,
+        })
+    }
+
+    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<RouterSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -175,8 +202,6 @@ impl GcsSink {
             Compression::Gzip => true,
             Compression::None => false,
         };
-        let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
-        let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
         let batch = config.batch.unwrap_or(bytesize::mib(10u64), 300);
 
         let key_prefix = if let Some(kp) = &config.key_prefix {
@@ -185,29 +210,12 @@ impl GcsSink {
             Template::from("date=%F/")
         };
 
-        let tls = TlsSettings::from_options(&config.tls)?;
-        let client = https_client(cx.resolver(), tls)?;
-
-        let gcs = GcsSink { client, creds };
-
-        let filename_extension = config.filename_extension.clone();
-        let bucket = config.bucket.clone();
-        let options = config.options.clone();
+        let settings = self.settings.clone();
 
         let svc = ServiceBuilder::new()
-            .map(move |req| {
-                build_request(
-                    req,
-                    filename_time_format.clone(),
-                    filename_extension.clone(),
-                    filename_append_uuid,
-                    compression,
-                    bucket.clone(),
-                    options.clone(),
-                )
-            })
+            .map(move |req| RequestWrapper::new(req, settings.clone()))
             .settings(request, GcsRetryLogic)
-            .service(gcs);
+            .service(self);
 
         let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
             .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
@@ -216,31 +224,24 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(
-        config: &GcsSinkConfig,
-        cx: &SinkContext,
-        creds: &Option<GcpCredentials>,
-    ) -> crate::Result<Healthcheck> {
+    pub fn healthcheck(&self) -> crate::Result<Healthcheck> {
         let mut builder = Request::builder();
         builder.method(Method::HEAD);
-        builder.uri(format!("{}{}/", BASE_URL, config.bucket).parse::<Uri>()?);
+        builder.uri(self.base_url.parse::<Uri>()?);
 
         let mut request = builder.body(Body::empty()).unwrap();
-        if let Some(creds) = &creds {
+        if let Some(creds) = &self.creds {
             creds.apply(&mut request);
         }
 
-        let tls = TlsSettings::from_options(&config.tls)?;
-        let client = https_client(cx.resolver(), tls)?;
-
         let healthcheck =
-            client
+            self.client
                 .request(request)
                 .map_err(Into::into)
                 .and_then(healthcheck_response(
-                    creds.clone(),
-                    GcsHealthcheckError::BucketNotFound {
-                        bucket: config.bucket.clone(),
+                    self.creds.clone(),
+                    GcsError::BucketNotFound {
+                        bucket: self.bucket.clone(),
                     }
                     .into(),
                 ));
@@ -259,33 +260,27 @@ impl Service<RequestWrapper> for GcsSink {
     }
 
     fn call(&mut self, request: RequestWrapper) -> Self::Future {
-        let options = request.options;
+        let settings = request.settings;
 
-        let uri = format!("{}{}/{}", BASE_URL, request.bucket, request.key)
+        let uri = format!("{}{}", self.base_url, request.key)
             .parse::<Uri>()
             .unwrap();
         let mut builder = Request::builder();
         builder.method(Method::PUT);
         builder.uri(uri);
         let headers = builder.headers_mut().unwrap();
-        add_header(headers, "content-type", "text/plain"); // FIXME needs proper content type
-        add_header(headers, "content-length", format!("{}", request.body.len()));
-        request
+        headers.insert("content-type", HeaderValue::from_str("text/plain").unwrap()); // FIXME needs proper content type
+        headers.insert(
+            "content-length",
+            HeaderValue::from_str(&format!("{}", request.body.len())).unwrap(),
+        );
+        settings
             .content_encoding
-            .map(|ce| add_header(headers, "content-encoding", ce));
-        options
-            .acl
-            .map(|acl| add_header(headers, "x-goog-acl", to_string(acl)));
-        options
-            .storage_class
-            .map(|sc| add_header(headers, "x-goog-storage-class", to_string(sc)));
-        if let Some(tags) = options.tags {
-            for (p, v) in tags {
-                headers.insert(
-                    HeaderName::from_bytes(p.as_bytes()).unwrap(),
-                    HeaderValue::from_str(&v).unwrap(),
-                );
-            }
+            .map(|ce| headers.insert("content-encoding", ce));
+        headers.insert("x-goog-acl", settings.acl);
+        headers.insert("x-goog-storage-class", settings.storage_class);
+        for (p, v) in settings.tags {
+            headers.insert(p, v);
         }
 
         let mut request = builder.body(Body::from(request.body)).unwrap();
@@ -301,65 +296,105 @@ fn to_string(value: impl Serialize) -> String {
     serde_json::to_value(&value).unwrap().to_string()
 }
 
-fn add_header(headers: &mut HeaderMap, name: &'static str, value: impl AsRef<str>) {
-    headers.insert(
-        HeaderName::from_static(name),
-        HeaderValue::from_str(value.as_ref()).unwrap(),
-    );
-}
-
-fn build_request(
-    req: PartitionInnerBuffer<Vec<u8>, Bytes>,
-    time_format: String,
-    extension: Option<String>,
-    uuid: bool,
-    gzip: bool,
-    bucket: String,
-    options: GcsOptions,
-) -> RequestWrapper {
-    let (body, key) = req.into_parts();
-
-    // TODO: pull the seconds from the last event
-    let filename = {
-        let seconds = Utc::now().format(&time_format);
-
-        if uuid {
-            let uuid = Uuid::new_v4();
-            format!("{}-{}", seconds, uuid.to_hyphenated())
-        } else {
-            seconds.to_string()
-        }
-    };
-
-    let extension = extension.unwrap_or_else(|| if gzip { "log.gz" } else { "log" }.into());
-
-    let key = String::from_utf8_lossy(&key[..]).into_owned();
-
-    let key = format!("{}{}.{}", key, filename, extension);
-
-    debug!(
-        message = "sending events.",
-        bytes = &field::debug(body.len()),
-        bucket = &field::debug(&bucket),
-        key = &field::debug(&key)
-    );
-
-    RequestWrapper {
-        body,
-        bucket,
-        key,
-        content_encoding: if gzip { Some("gzip".to_string()) } else { None },
-        options,
-    }
-}
-
 #[derive(Clone, Debug)]
 struct RequestWrapper {
     body: Vec<u8>,
-    bucket: String,
     key: String,
-    content_encoding: Option<String>,
-    options: GcsOptions,
+    settings: RequestSettings,
+}
+
+impl RequestWrapper {
+    fn new(req: PartitionInnerBuffer<Vec<u8>, Bytes>, settings: RequestSettings) -> Self {
+        let (body, key) = req.into_parts();
+
+        // TODO: pull the seconds from the last event
+        let filename = {
+            let seconds = Utc::now().format(&settings.time_format);
+
+            if settings.append_uuid {
+                let uuid = Uuid::new_v4();
+                format!("{}-{}", seconds, uuid.to_hyphenated())
+            } else {
+                seconds.to_string()
+            }
+        };
+
+        let key = format!(
+            "{}{}.{}",
+            String::from_utf8_lossy(&key[..]),
+            filename,
+            settings.extension
+        );
+
+        debug!(
+            message = "sending events.",
+            bytes = &field::debug(body.len()),
+            key = &field::debug(&key)
+        );
+
+        Self {
+            body,
+            key,
+            settings,
+        }
+    }
+}
+
+// Settings required to produce a request that do not change per
+// request. All possible values are pre-computed for direct use in
+// producing a request.
+#[derive(Clone, Debug)]
+struct RequestSettings {
+    acl: HeaderValue,
+    content_type: HeaderValue,
+    content_encoding: Option<HeaderValue>,
+    storage_class: HeaderValue,
+    tags: Vec<(HeaderName, HeaderValue)>,
+    extension: String,
+    time_format: String,
+    append_uuid: bool,
+}
+
+impl RequestSettings {
+    fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
+        let acl = HeaderValue::from_str(&to_string(&config.acl)).unwrap();
+        let content_type = HeaderValue::from_str(config.encoding.content_type()).unwrap();
+        let content_encoding = config
+            .compression
+            .content_encoding()
+            .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
+        let storage_class = HeaderValue::from_str(&to_string(&config.storage_class)).unwrap();
+        let tags = config
+            .tags
+            .as_ref()
+            .map(|tags| tags.iter().map(make_header).collect::<Result<Vec<_>, _>>())
+            .unwrap_or(Ok(vec![]))?;
+        let extension = config
+            .filename_extension
+            .clone()
+            .unwrap_or_else(|| config.compression.extension().into());
+        let time_format = config.filename_time_format.clone().unwrap_or("%s".into());
+        let append_uuid = config.filename_append_uuid.unwrap_or(true);
+        Ok(Self {
+            acl,
+            content_type,
+            content_encoding,
+            storage_class,
+            tags,
+            extension,
+            time_format,
+            append_uuid,
+        })
+    }
+}
+
+// Make a header pair from a key-value string pair
+fn make_header(kv: (&String, &String)) -> crate::Result<(HeaderName, HeaderValue)> {
+    let (name, value) = kv;
+    Ok((
+        HeaderName::from_bytes(name.as_bytes())?,
+        HeaderValue::from_str(&value)?,
+    ))
 }
 
 fn encode_event(
@@ -461,52 +496,43 @@ mod tests {
         assert_eq!(map["key"], "value".to_string());
     }
 
+    fn request_settings(
+        extension: Option<&str>,
+        uuid: bool,
+        compression: Compression,
+    ) -> RequestSettings {
+        RequestSettings::new(&GcsSinkConfig {
+            filename_extension: extension.map(Into::into),
+            filename_append_uuid: Some(uuid),
+            compression: compression,
+            ..Default::default()
+        })
+        .expect("Could not create request settings")
+    }
+
     #[test]
     fn gcs_build_request() {
         let buf = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("key/"));
 
-        let req = build_request(
+        let req = RequestWrapper::new(
             buf.clone(),
-            "date".into(),
-            Some("ext".into()),
-            false,
-            false,
-            "bucket".into(),
-            GcsOptions::default(),
+            request_settings(Some("ext".into()), false, Compression::None),
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
-        let req = build_request(
+        let req = RequestWrapper::new(
             buf.clone(),
-            "date".into(),
-            None,
-            false,
-            false,
-            "bucket".into(),
-            GcsOptions::default(),
+            request_settings(None, false, Compression::None),
         );
         assert_eq!(req.key, "key/date.log".to_string());
 
-        let req = build_request(
+        let req = RequestWrapper::new(
             buf.clone(),
-            "date".into(),
-            None,
-            false,
-            true,
-            "bucket".into(),
-            GcsOptions::default(),
+            request_settings(None, false, Compression::Gzip),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = build_request(
-            buf.clone(),
-            "date".into(),
-            None,
-            true,
-            true,
-            "bucket".into(),
-            GcsOptions::default(),
-        );
+        let req = RequestWrapper::new(buf.clone(), request_settings(None, true, Compression::Gzip));
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }
