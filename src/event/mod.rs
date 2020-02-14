@@ -13,9 +13,11 @@ pub mod flatten;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
+pub mod unflatten;
 
 use merge::merge_nested;
 pub use metric::Metric;
+use unflatten::unflatten_dotted;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -100,6 +102,15 @@ impl LogEvent {
 
     pub fn contains(&self, key: &Atom) -> bool {
         self.fields.contains_key(key)
+    }
+
+    pub fn insert_dotted<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<Atom>,
+        V: Into<Value>,
+    {
+        let (key, value) = unflatten_dotted(key.into(), value.into());
+        self.insert(key, value);
     }
 
     pub fn insert<K, V>(&mut self, key: K, value: V)

@@ -485,10 +485,10 @@ mod test {
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
             expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert_dotted("origin.software", "rsyslogd");
+            expected.insert_dotted("origin.swVersion", "8.24.0");
+            expected.insert_dotted("origin.x-pid", "8979");
+            expected.insert_dotted("origin.x-info", "http://www.rsyslog.com");
         }
 
         assert_eq!(
