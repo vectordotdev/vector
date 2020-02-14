@@ -51,6 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   topic = "this-is-a-topic" # example
 
   # OPTIONAL
+  credentials_path = "/path/to/credentials.json" # example, no default
   healthcheck = true # default
 ```
 
@@ -136,7 +137,7 @@ import Field from '@site/src/components/Field';
 
 ### api_key
 
-A Google Cloud API key used to authenticate access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be set. See [GCP Authentication](#gcp-authentication) for more info.
+A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be set. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -327,7 +328,7 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -342,7 +343,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. Either this or [`api_key`](#api_key) must be set. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -760,7 +761,7 @@ The topic within the project to which to publish logs.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -775,7 +776,7 @@ The topic within the project to which to publish logs.
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>

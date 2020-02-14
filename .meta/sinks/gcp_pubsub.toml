@@ -29,30 +29,14 @@ write_to_description = "[Google Cloud Platform's Pubsub service][urls.gcp_pubsub
   timeout_secs: 60
 ) %>
 
-[sinks.gcp_pubsub.env_vars.GOOGLE_APPLICATION_CREDENTIALS]
-type = "string"
-required = false
-examples = ["/path/to/credentials.json"]
-description = """\
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication.\
-"""
+<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_pubsub", access: "pubsub project and topic", required: false) %>
 
 [sinks.gcp_pubsub.options.api_key]
 type = "string"
 examples = ["${GCP_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 description = """\
-A Google Cloud API key used to authenticate access the pubsub project and topic. \
+A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate access the pubsub project and topic. \
 Either this or `credentials_path` must be set.\
-"""
-
-[sinks.gcp_pubsub.options.credentials_path]
-type = "string"
-examples = ["/path/to/credentials.json"]
-description = """\
-The filename for a Google Cloud service account credentials JSON file \
-used to authenticate access to the pubsub project and topic. If this is unset, \
-Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a \
-filename. Either this or `api_key` must be set.\
 """
 
 [sinks.gcp_pubsub.options.project]

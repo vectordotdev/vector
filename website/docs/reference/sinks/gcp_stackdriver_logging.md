@@ -356,7 +356,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -899,7 +899,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -914,7 +914,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -1014,7 +1014,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
