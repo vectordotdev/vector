@@ -13,7 +13,7 @@ use hyper;
 use hyper_tls::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use tower::Service;
@@ -27,6 +27,21 @@ pub enum Field {
     UnsignedInt(u32),
 }
 
+#[derive(Debug, Snafu)]
+enum ConfigError {
+    #[snafu(display("InfluxDB v1 or v2 should be configured as endpoint."))]
+    MissingConfiguration {},
+    #[snafu(display(
+        "Unclear settings. Both version configured v1: {:?}, v2: {:?}.",
+        v1_settings,
+        v2_settings
+    ))]
+    BothConfiguration {
+        v1_settings: InfluxDB1Settings,
+        v2_settings: InfluxDB2Settings,
+    },
+}
+
 #[derive(Clone)]
 struct InfluxDBSvc {
     config: InfluxDBConfig,
@@ -38,13 +53,83 @@ struct InfluxDBSvc {
 pub struct InfluxDBConfig {
     pub namespace: String,
     pub endpoint: String,
-    pub org: String,
-    pub bucket: String,
-    pub token: String,
+    #[serde(flatten)]
+    pub influxdb1_settings: Option<InfluxDB1Settings>,
+    #[serde(flatten)]
+    pub influxdb2_settings: Option<InfluxDB2Settings>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct InfluxDB1Settings {
+    database: String,
+    consistency: Option<String>,
+    retention_policy_name: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct InfluxDB2Settings {
+    org: String,
+    bucket: String,
+    token: String,
+}
+
+trait InfluxDBSettings {
+    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
+    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
+    fn token(self: &Self) -> String;
+}
+
+impl InfluxDBSettings for InfluxDB1Settings {
+    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+        encode_uri(
+            &endpoint,
+            "write",
+            &mut [
+                ("consistency", self.consistency.clone()),
+                ("db", Some(self.database.clone())),
+                ("rp", self.retention_policy_name.clone()),
+                ("p", self.password.clone()),
+                ("u", self.username.clone()),
+                ("precision", Some("ns".to_owned())),
+            ],
+        )
+    }
+
+    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+        encode_uri(&endpoint, "ping", &mut [])
+    }
+
+    fn token(self: &Self) -> String {
+        "".to_string()
+    }
+}
+
+impl InfluxDBSettings for InfluxDB2Settings {
+    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+        encode_uri(
+            &endpoint,
+            "api/v2/write",
+            &mut [
+                ("org", Some(self.org.clone())),
+                ("bucket", Some(self.bucket.clone())),
+                ("precision", Some("ns".to_owned())),
+            ],
+        )
+    }
+
+    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+        encode_uri(&endpoint, "health", &mut [])
+    }
+
+    fn token(self: &Self) -> String {
+        self.token.clone()
+    }
 }
 
 lazy_static! {
@@ -83,14 +168,15 @@ impl SinkConfig for InfluxDBConfig {
 
 impl InfluxDBSvc {
     pub fn new(config: InfluxDBConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
+        let settings = InfluxDBSvc::influxdb_settings(config.clone())?;
+
         let endpoint = config.endpoint.clone();
-        let org = config.org.clone();
-        let bucket = config.bucket.clone();
-        let token = config.token.clone();
+        let token = settings.token();
+
         let batch = config.batch.unwrap_or(20, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = encode_uri(&endpoint, &org, &bucket)?;
+        let uri = settings.write_uri(endpoint)?;
         let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
@@ -113,11 +199,14 @@ impl InfluxDBSvc {
         Ok(Box::new(sink))
     }
 
-    // https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
+    // V1: https://docs.influxdata.com/influxdb/v1.7/tools/api/#ping-http-endpoint
+    // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
     fn healthcheck(config: InfluxDBConfig) -> crate::Result<super::Healthcheck> {
-        let uri = format!("{}/health", config.endpoint)
-            .parse::<Uri>()
-            .context(super::UriParseError)?;
+        let settings = InfluxDBSvc::influxdb_settings(config.clone())?;
+
+        let endpoint = config.endpoint.clone();
+
+        let uri = settings.healthcheck_uri(endpoint)?;
 
         let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
@@ -129,25 +218,58 @@ impl InfluxDBSvc {
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 StatusCode::OK => Ok(()),
+                StatusCode::NO_CONTENT => Ok(()),
                 other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
             });
 
         Ok(Box::new(healthcheck))
     }
+
+    fn influxdb_settings(
+        config: InfluxDBConfig,
+    ) -> Result<Box<dyn InfluxDBSettings>, crate::Error> {
+        if config.influxdb1_settings.is_some() & config.influxdb2_settings.is_some() {
+            return Err(ConfigError::BothConfiguration {
+                v1_settings: config.influxdb1_settings.unwrap(),
+                v2_settings: config.influxdb2_settings.unwrap(),
+            }
+            .into());
+        }
+
+        if config.influxdb1_settings.is_none() & config.influxdb2_settings.is_none() {
+            return Err(ConfigError::MissingConfiguration {}.into());
+        }
+
+        if let Some(settings) = config.influxdb1_settings {
+            Ok(Box::new(settings))
+        } else {
+            Ok(Box::new(config.influxdb2_settings.unwrap()))
+        }
+    }
 }
 
-fn encode_uri(endpoint: &str, org: &str, bucket: &str) -> crate::Result<Uri> {
-    let query = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("org", org)
-        .append_pair("bucket", bucket)
-        .append_pair("precision", "ns")
-        .finish();
+fn encode_uri(
+    endpoint: &str,
+    path: &str,
+    pairs: &mut [(&str, Option<String>)],
+) -> crate::Result<Uri> {
+    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
-    let url = if endpoint.ends_with('/') {
-        format!("{}api/v2/write?{}", endpoint, query)
+    for pair in pairs {
+        if let Some(v) = &pair.1 {
+            serializer.append_pair(pair.0, v);
+        }
+    }
+
+    let mut url = if endpoint.ends_with('/') {
+        format!("{}{}?{}", endpoint, path, serializer.finish())
     } else {
-        format!("{}/api/v2/write?{}", endpoint, query)
+        format!("{}/{}?{}", endpoint, path, serializer.finish())
     };
+
+    if url.ends_with("?") {
+        url.pop();
+    }
 
     Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
@@ -437,25 +559,184 @@ mod tests {
 
     #[test]
     fn test_encode_uri_valid() {
-        let uri = encode_uri("http://localhost:9999", "my-org", "my-bucket").unwrap();
+        let uri = encode_uri(
+            "http://localhost:9999",
+            "api/v2/write",
+            &mut [
+                ("org", Some("my-org".to_owned())),
+                ("bucket", Some("my-bucket".to_owned())),
+                ("precision", Some("ns".to_owned())),
+            ],
+        )
+        .unwrap();
         assert_eq!(
             uri,
             "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
         );
 
-        let uri = encode_uri("http://localhost:9999/", "my-org", "my-bucket").unwrap();
+        let uri = encode_uri(
+            "http://localhost:9999/",
+            "api/v2/write",
+            &mut [
+                ("org", Some("my-org".to_owned())),
+                ("bucket", Some("my-bucket".to_owned())),
+            ],
+        )
+        .unwrap();
         assert_eq!(
             uri,
-            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket"
         );
 
-        let uri = encode_uri("http://localhost:9999", "Orgazniation name", "Bucket=name").unwrap();
-        assert_eq!(uri, "http://localhost:9999/api/v2/write?org=Orgazniation+name&bucket=Bucket%3Dname&precision=ns");
+        let uri = encode_uri(
+            "http://localhost:9999",
+            "api/v2/write",
+            &mut [
+                ("org", Some("Orgazniation name".to_owned())),
+                ("bucket", Some("Bucket=name".to_owned())),
+                ("none", None),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            uri,
+            "http://localhost:9999/api/v2/write?org=Orgazniation+name&bucket=Bucket%3Dname"
+        );
     }
 
     #[test]
     fn test_encode_uri_invalid() {
-        encode_uri("localhost:9999", "my-org", "my-bucket").unwrap_err();
+        encode_uri(
+            "localhost:9999",
+            "api/v2/write",
+            &mut [
+                ("org", Some("my-org".to_owned())),
+                ("bucket", Some("my-bucket".to_owned())),
+            ],
+        )
+        .unwrap_err();
+    }
+
+    #[test]
+    fn test_influxdb1_test_write_uri() {
+        let settings = InfluxDB1Settings {
+            consistency: Some("quorum".to_owned()),
+            database: "vector_db".to_owned(),
+            retention_policy_name: Some("autogen".to_owned()),
+            username: Some("writer".to_owned()),
+            password: Some("secret".to_owned()),
+        };
+
+        let uri = settings
+            .write_uri("http://localhost:8086".to_owned())
+            .unwrap();
+        assert_eq!("http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns", uri.to_string())
+    }
+
+    #[test]
+    fn test_influxdb2_test_write_uri() {
+        let settings = InfluxDB2Settings {
+            org: "my-org".to_owned(),
+            bucket: "my-bucket".to_owned(),
+            token: "my-token".to_owned(),
+        };
+
+        let uri = settings
+            .write_uri("http://localhost:9999".to_owned())
+            .unwrap();
+        assert_eq!(
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns",
+            uri.to_string()
+        )
+    }
+
+    #[test]
+    fn test_influxdb1_test_healthcheck_uri() {
+        let settings = InfluxDB1Settings {
+            consistency: Some("quorum".to_owned()),
+            database: "vector_db".to_owned(),
+            retention_policy_name: Some("autogen".to_owned()),
+            username: Some("writer".to_owned()),
+            password: Some("secret".to_owned()),
+        };
+
+        let uri = settings
+            .healthcheck_uri("http://localhost:8086".to_owned())
+            .unwrap();
+        assert_eq!("http://localhost:8086/ping", uri.to_string())
+    }
+
+    #[test]
+    fn test_influxdb2_test_healthcheck_uri() {
+        let settings = InfluxDB2Settings {
+            org: "my-org".to_owned(),
+            bucket: "my-bucket".to_owned(),
+            token: "my-token".to_owned(),
+        };
+
+        let uri = settings
+            .healthcheck_uri("http://localhost:9999".to_owned())
+            .unwrap();
+        assert_eq!("http://localhost:9999/health", uri.to_string())
+    }
+
+    #[test]
+    fn test_influxdb_settings_both() {
+        let config = r#"
+        namespace = "service"
+        endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+        bucket = "my-bucket"
+        org = "my-org"
+        token = "my-token"
+        database = "my-database"
+    "#;
+        let config: InfluxDBConfig = toml::from_str(&config).unwrap();
+        let settings = InfluxDBSvc::influxdb_settings(config);
+        match settings {
+            Ok(_) => assert!(false, "Expected error"),
+            Err(e) => assert_eq!(format!("{}",e), "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned())
+        }
+    }
+
+    #[test]
+    fn test_influxdb_settings_missing() {
+        let config = r#"
+        namespace = "service"
+        endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+    "#;
+        let config: InfluxDBConfig = toml::from_str(&config).unwrap();
+        let settings = InfluxDBSvc::influxdb_settings(config);
+        match settings {
+            Ok(_) => assert!(false, "Expected error"),
+            Err(e) => assert_eq!(
+                format!("{}", e),
+                "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
+            ),
+        }
+    }
+
+    #[test]
+    fn test_influxdb1_settings() {
+        let config = r#"
+        namespace = "service"
+        endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+        database = "my-database"
+    "#;
+        let config: InfluxDBConfig = toml::from_str(&config).unwrap();
+        let _ = InfluxDBSvc::influxdb_settings(config).unwrap();
+    }
+
+    #[test]
+    fn test_influxdb2_settings() {
+        let config = r#"
+        namespace = "service"
+        endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+        bucket = "my-bucket"
+        org = "my-org"
+        token = "my-token"
+    "#;
+        let config: InfluxDBConfig = toml::from_str(&config).unwrap();
+        let _ = InfluxDBSvc::influxdb_settings(config).unwrap();
     }
 
     #[test]
@@ -548,7 +829,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_counter() {
+    fn test_encode_counter() {
         let events = vec![
             Metric {
                 name: "total".into(),
@@ -575,7 +856,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_gauge() {
+    fn test_encode_gauge() {
         let events = vec![Metric {
             name: "meter".to_owned(),
             timestamp: Some(ts()),
@@ -592,7 +873,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_set() {
+    fn test_encode_set() {
         let events = vec![Metric {
             name: "users".into(),
             timestamp: Some(ts()),
@@ -611,7 +892,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_histogram() {
+    fn test_encode_histogram() {
         let events = vec![Metric {
             name: "requests".to_owned(),
             timestamp: Some(ts()),
@@ -650,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_summary() {
+    fn test_encode_summary() {
         let events = vec![Metric {
             name: "requests_sum".to_owned(),
             timestamp: Some(ts()),
@@ -689,7 +970,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_distribution() {
+    fn test_encode_distribution() {
         let events = vec![
             Metric {
                 name: "requests".into(),
@@ -786,7 +1067,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_distribution_empty_stats() {
+    fn test_encode_distribution_empty_stats() {
         let events = vec![Metric {
             name: "requests".into(),
             timestamp: Some(ts()),
@@ -803,7 +1084,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_distribution_zero_counts_stats() {
+    fn test_encode_distribution_zero_counts_stats() {
         let events = vec![Metric {
             name: "requests".into(),
             timestamp: Some(ts()),
@@ -820,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_distribution_unequal_stats() {
+    fn test_encode_distribution_unequal_stats() {
         let events = vec![Metric {
             name: "requests".into(),
             timestamp: Some(ts()),
@@ -874,7 +1155,9 @@ mod integration_tests {
     use crate::event::metric::{MetricKind, MetricValue};
     use crate::event::Metric;
     use crate::runtime::Runtime;
-    use crate::sinks::influxdb_metrics::{InfluxDBConfig, InfluxDBSvc};
+    use crate::sinks::influxdb_metrics::{
+        InfluxDB1Settings, InfluxDB2Settings, InfluxDBConfig, InfluxDBSvc,
+    };
     use crate::topology::SinkContext;
     use crate::Event;
     use chrono::Utc;
@@ -883,8 +1166,29 @@ mod integration_tests {
     const ORG: &str = "my-org";
     const BUCKET: &str = "my-bucket";
     const TOKEN: &str = "my-token";
+    const DATABASE: &str = "my-database";
 
-    fn onboarding() {
+    //    fn onboarding_v1() {
+    //        let client = reqwest::Client::builder()
+    //            .danger_accept_invalid_certs(true)
+    //            .build()
+    //            .unwrap();
+    //
+    //        let res = client
+    //            .get("http://localhost:8086/query")
+    //            .query(&[("q", "CREATE DATABASE my-database")])
+    //            .send()
+    //            .unwrap();
+    //
+    //        let status = res.status();
+    //
+    //        assert!(
+    //            status == http::StatusCode::OK,
+    //            format!("UnexpectedStatus: {}", status)
+    //        );
+    //    }
+
+    fn onboarding_v2() {
         let mut body = std::collections::HashMap::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
@@ -913,15 +1217,19 @@ mod integration_tests {
     }
 
     #[test]
-    fn influxdb_metrics_healthchecks_ok() {
-        onboarding();
+    fn influxdb2_metrics_healthchecks_ok() {
+        onboarding_v2();
+
         let mut rt = Runtime::new().unwrap();
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://localhost:9999".to_string(),
-            org: ORG.to_string(),
-            bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            influxdb1_settings: None,
+            influxdb2_settings: Some(InfluxDB2Settings {
+                org: ORG.to_string(),
+                bucket: BUCKET.to_string(),
+                token: TOKEN.to_string(),
+            }),
             batch: Default::default(),
             request: Default::default(),
         };
@@ -931,16 +1239,19 @@ mod integration_tests {
     }
 
     #[test]
-    fn influxdb_metrics_healthchecks_fail() {
-        onboarding();
+    fn influxdb2_metrics_healthchecks_fail() {
+        onboarding_v2();
 
         let mut rt = Runtime::new().unwrap();
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://not_exist:9999".to_string(),
-            org: ORG.to_string(),
-            bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            influxdb1_settings: None,
+            influxdb2_settings: Some(InfluxDB2Settings {
+                org: ORG.to_string(),
+                bucket: BUCKET.to_string(),
+                token: TOKEN.to_string(),
+            }),
             batch: Default::default(),
             request: Default::default(),
         };
@@ -950,8 +1261,8 @@ mod integration_tests {
     }
 
     #[test]
-    fn influxdb_metrics_put_data() {
-        onboarding();
+    fn influxdb2_metrics_put_data() {
+        onboarding_v2();
 
         let mut rt = Runtime::new().unwrap();
         let cx = SinkContext::new_test(rt.executor());
@@ -959,9 +1270,12 @@ mod integration_tests {
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://localhost:9999".to_string(),
-            org: ORG.to_string(),
-            bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            influxdb1_settings: None,
+            influxdb2_settings: Some(InfluxDB2Settings {
+                org: ORG.to_string(),
+                bucket: BUCKET.to_string(),
+                token: TOKEN.to_string(),
+            }),
             batch: Default::default(),
             request: Default::default(),
         };
@@ -1052,5 +1366,48 @@ mod integration_tests {
             record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
             "45"
         );
+    }
+
+    #[test]
+    fn influxdb1_metrics_healthchecks_ok() {
+        let mut rt = Runtime::new().unwrap();
+        let config = InfluxDBConfig {
+            namespace: "ns".to_string(),
+            endpoint: "http://localhost:8086".to_string(),
+            influxdb1_settings: Some(InfluxDB1Settings {
+                database: DATABASE.to_string(),
+                consistency: None,
+                retention_policy_name: None,
+                username: None,
+                password: None,
+            }),
+            influxdb2_settings: None,
+            batch: Default::default(),
+            request: Default::default(),
+        };
+        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        rt.block_on(healthcheck).unwrap();
+    }
+
+    #[test]
+    fn influxdb1_metrics_healthchecks_fail() {
+        let mut rt = Runtime::new().unwrap();
+        let config = InfluxDBConfig {
+            namespace: "ns".to_string(),
+            endpoint: "http://not_exist:8086".to_string(),
+            influxdb1_settings: Some(InfluxDB1Settings {
+                database: DATABASE.to_string(),
+                consistency: None,
+                retention_policy_name: None,
+                username: None,
+                password: None,
+            }),
+            influxdb2_settings: None,
+            batch: Default::default(),
+            request: Default::default(),
+        };
+
+        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        rt.block_on(healthcheck).unwrap_err();
     }
 }
