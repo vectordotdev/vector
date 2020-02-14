@@ -89,12 +89,13 @@ impl WatchClient {
     /// With version None, will also stream inital Pod metadata.
     ///
     /// Caller should maintain latest `pod.metadata.resource_version` and must stop
-    /// using watcher on first RuntimeError and build a new one.
+    /// using stream on first RuntimeError and start a new one.
+    ///
+    /// When encountering end of stream, caller should use RuntimeError::WatchUnexpectedlyEnded.
     ///
     /// Arguments:
-    ///  - `from` should contain `pod.metadata.resource_version` of the last returned pod
-    ///     from previous watcher.
-    ///  - `error` must contain RuntimeError of last returned pod.
+    ///  - `from` should contain latest `pod.metadata.resource_version`.
+    ///  - `error` must contain RuntimeError with which last stream ended.
     pub fn watch_metadata(
         &mut self,
         mut version: Option<Version>,
@@ -285,14 +286,20 @@ mod kube_tests {
         sinks::util::tls::TlsSettings,
         sources::kubernetes::test::{echo, Kube},
         test_util::{runtime, temp_file},
-        transforms::kubernetes::kube_config,
     };
+    use dirs;
     use futures::{future::Future, stream::Stream};
     use http::Uri;
+    use kube::config::Config;
+    use serde_yaml;
+    use snafu::{ResultExt, Snafu};
     use std::fs::OpenOptions;
     use std::io::Write;
-    use std::{path::PathBuf, str::FromStr, sync::mpsc::channel, time::Duration};
+    use std::{fs::File, path::PathBuf, str::FromStr, sync::mpsc::channel, time::Duration};
     use uuid::Uuid;
+
+    /// Enviorment variable that can containa path to kubernetes config file.
+    const CONFIG_PATH: &str = "KUBECONFIG";
 
     fn store_to_file(data: &[u8]) -> Result<PathBuf, std::io::Error> {
         let path = temp_file();
@@ -304,14 +311,43 @@ mod kube_tests {
         Ok(path)
     }
 
+    /// Loads configuration from local kubeconfig file, the same
+    /// one that kubectl uses.
+    /// None if such file doesn't exist.
+    fn load_kube_config() -> Option<Result<Config, KubeConfigLoadError>> {
+        let path = std::env::var(CONFIG_PATH)
+            .ok()
+            .map(PathBuf::from)
+            .or_else(|| dirs::home_dir().map(|home| home.join(".kube").join("config")))?;
+
+        let file = match File::open(path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
+            Err(error) => {
+                return Some(Err(KubeConfigLoadError::FileError { source: error }));
+            }
+        };
+
+        Some(serde_yaml::from_reader(file).context(ParsingError))
+    }
+
+    #[derive(Debug, Snafu)]
+    pub enum KubeConfigLoadError {
+        #[snafu(display("Error opening Kubernetes config file: {}.", source))]
+        FileError { source: std::io::Error },
+        #[snafu(display("Error parsing Kubernetes config file: {}.", source))]
+        ParsingError { source: serde_yaml::Error },
+    }
+
     impl ClientConfig {
         // NOTE: Currently used only for tests, but can be later used in
         //       other places, but then the unsupported feature should be
         //       implemented.
+        //
         /// Loads configuration from local kubeconfig file, the same
         /// one that kubectl uses.
         fn load_kube_config(resolver: Resolver) -> Option<Self> {
-            let config = kube_config::load_kube_config()?.unwrap();
+            let config = load_kube_config()?.unwrap();
             // Get current context
             let context = &config
                 .contexts
