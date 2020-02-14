@@ -296,7 +296,7 @@ export default function cloudify() {
       applyHomeForces();
       applyEdgeForces();
       redraw();
-    }, 1000 / 40)
+    }, 1000 / 30)
   }
 
   setTimeout(function() {
