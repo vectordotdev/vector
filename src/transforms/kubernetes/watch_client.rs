@@ -2,8 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{http::https_client, tls::TlsSettings},
 };
-use futures::stream::Stream;
-use futures03::compat::Future01CompatExt;
+use futures::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body};
 use hyper_tls::HttpsConnector;
@@ -15,6 +14,7 @@ use k8s_openapi::{
 use snafu::{ResultExt, Snafu};
 
 /// Config which could be loaded from kubeconfig or local kubernetes cluster.
+/// Used to build WatchClient which is in turn used to build Stream of metadata.
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     resolver: Resolver,
@@ -25,37 +25,37 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    /// Creates new watcher who will call updater function with freshest Pod data.
-    pub fn build(
-        self,
-        mut updater: impl FnMut(&Pod) + Send + 'static,
-    ) -> Result<WatchClient, BuildError> {
-        let updater = move |response| {
-            let pod = Self::event_to_data(Self::response_to_event(response)?)?;
-            updater(&pod);
-            Ok(pod
-                .metadata
-                .as_ref()
-                .and_then(|metadata| metadata.resource_version.clone().map(Version)))
-        };
-
+    pub fn build(self) -> Result<WatchClient, BuildError> {
         let client =
             https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
 
         let client = WatchClient {
-            updater: Box::new(updater) as Box<_>,
             client,
             config: self,
-            // If watch is initiated with None resource_version, we will receive initial
-            // list of data as synthetic "Added" events.
-            // https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
-            version: None,
         };
 
-        // Test now if the only other source of errors passes.
-        client.build_request()?;
-
         Ok(client)
+    }
+
+    // Builds request to watch Pod data.
+    fn build_request(&self, version: Option<Version>) -> Result<Request<Body>, BuildError> {
+        // Prepare request
+        let field_selector = self
+            .node_name
+            .as_ref()
+            .map(|node_name| format!("spec.nodeName={}", node_name));
+        let (mut request, _) = Pod::watch_pod_for_all_namespaces(WatchOptional {
+            resource_version: version.as_ref().map(|v| v.0.as_str()),
+            field_selector: field_selector.as_ref().map(|selector| selector.as_str()),
+            ..WatchOptional::default()
+        })
+        .context(K8SOpenapiError)?;
+
+        self.authorize(&mut request)?;
+        self.fill_uri(&mut request)?;
+
+        let (parts, body) = request.into_parts();
+        Ok(Request::from_parts(parts, body.into()))
     }
 
     fn authorize(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
@@ -76,175 +76,137 @@ impl ClientConfig {
         *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
         Ok(())
     }
-
-    /// Processes WatchPodForAllNamespacesResponse into WatchEvent<Pod>.
-    fn response_to_event(
-        response: WatchPodForAllNamespacesResponse,
-    ) -> Result<WatchEvent<Pod>, RuntimeError> {
-        match response {
-            WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
-            WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
-                Err(RuntimeError::WrongObjectInResponse)
-            }
-            WatchPodForAllNamespacesResponse::Other(Err(error)) => {
-                Err(error).context(ResponseParseError)
-            }
-        }
-    }
-
-    /// Processes WatchEvent<T> into T.
-    fn event_to_data<T>(event: WatchEvent<T>) -> Result<T, RuntimeError> {
-        match event {
-            WatchEvent::Added(data)
-            | WatchEvent::Modified(data)
-            | WatchEvent::Bookmark(data)
-            | WatchEvent::Deleted(data) => Ok(data),
-            WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
-            WatchEvent::ErrorOther(other) => Err(RuntimeError::UnknownWatchEventError { other }),
-        }
-    }
 }
 
-/// Kubernetes client which watches for changes of T on one Kubernetes API endpoint.
+/// Kubernetes client for watching changes on Kubernetes Objects.
 pub struct WatchClient {
-    updater: Box<
-        dyn FnMut(WatchPodForAllNamespacesResponse) -> Result<Option<Version>, RuntimeError>
-            + Send
-            + 'static,
-    >,
     config: ClientConfig,
     client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
-    /// Most recent watched resource version.
-    version: Option<Version>,
 }
 
 impl WatchClient {
-    /// Watches for data changes and propagates them to updater.
-    /// Never returns
-    pub async fn run(&mut self) {
-        loop {
-            let request = self
-                .build_request()
-                .expect("Request succesfully builded before");
-
-            // Restarts watch with new request.
-            match self.watch(request).await {
-                Ok(()) => (),
-                Err(RuntimeError::WatchEventError { status }) if status.code == Some(410) => {
-                    // 410 Gone, restart with new list.
-                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
-                    info!("Watch list desynced for Kubernetes Pod list. Restarting watch.");
-                    self.version = None;
-                }
-                Err(error) => debug!(%error),
+    /// Builds Stream of newest Pod metadata.
+    /// With version None, will also stream inital Pod metadata.
+    ///
+    /// Caller should maintain latest `pod.metadata.resource_version` and must stop
+    /// using watcher on first RuntimeError and build a new one.
+    ///
+    /// Arguments:
+    ///  - `from` should contain `pod.metadata.resource_version` of the last returned pod
+    ///     from previous watcher.
+    ///  - `error` must contain RuntimeError of last returned pod.
+    pub fn watch_metadata(
+        &mut self,
+        mut version: Option<Version>,
+        error: Option<RuntimeError>,
+    ) -> Result<impl Stream<Item = Pod, Error = RuntimeError>, BuildError> {
+        match error {
+            None => (),
+            Some(RuntimeError::WatchEventError { status }) if status.code == Some(410) => {
+                // 410 Gone, restart with new list.
+                // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
+                info!("Watch list desynced for Kubernetes Pod list. Restarting version.");
+                version = None;
             }
+            Some(error) => debug!(%error),
         }
+
+        // If watch is initiated with None resource_version, we will receive initial
+        // list of data as synthetic "Added" events.
+        // https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
+        let request = self.config.build_request(version)?;
+
+        Ok(self.build_watch_stream(request))
     }
 
-    /// Watches for data with given watch request.
-    /// Returns resource version from which watching can start.
-    /// Accepts resource version from which request is starting to watch.
-    async fn watch(&mut self, request: Request<Body>) -> Result<(), RuntimeError> {
-        // Start watching
-        let response = self
-            .client
+    fn build_watch_stream(
+        &self,
+        request: Request<Body>,
+    ) -> impl Stream<Item = Pod, Error = RuntimeError> {
+        let mut unused = Vec::new();
+        self.client
             .request(request)
-            .compat()
-            .await
-            .context(FailedConnecting)?;
+            .map_err(|error| RuntimeError::FailedConnecting { source: error })
+            .and_then(|response| {
+                let status = response.status();
+                if status == StatusCode::OK {
+                    // Connected succesfully
+                    info!(message = "Watching for changes.");
 
-        let status = response.status();
-        if status == StatusCode::OK {
-            // Connected succesfully
-            info!(message = "Watching for changes.");
-
-            let mut unused = Vec::new();
-            let mut body = response.into_body();
-            loop {
-                // Wait for responses from the API server.
-                let (chunk, tmp_body) = body
-                    .into_future()
-                    .compat()
-                    .await
-                    .map_err(|(error, _)| error)
-                    .context(WatchConnectionErrored)?;
-
-                body = tmp_body;
-                let chunk = chunk.ok_or(RuntimeError::WatchUnexpectedlyEnded)?;
+                    Ok(response
+                        .into_body()
+                        .map_err(|error| RuntimeError::WatchConnectionErrored { source: error }))
+                } else {
+                    Err(RuntimeError::ConnectionStatusNotOK { status })
+                }
+            })
+            .flatten_stream()
+            .map(move |chunk| {
+                // We need to process unused data as soon as we get
+                // them. Because a watch on Kubernetes object behaves
+                // like a never ending stream of bytes.
 
                 // Append new data to unused.
                 unused.extend_from_slice(chunk.as_ref());
 
-                // We need to process unused data as soon as we get
-                // new them. Because a watch on Kubernetes object behaves
-                // like a never ending stream of bytes.
-                self.process_unused(&mut unused)?;
+                // Decodes response from unused data.
+                // Repeats decoding so long as there is sufficient data.
+                // Removes used data.
+                // StatusCode must be 200 OK.
+                let mut decoded = Vec::new();
+                loop {
+                    match WatchPodForAllNamespacesResponse::try_from_parts(StatusCode::OK, &unused)
+                    {
+                        Ok((response, used_bytes)) => {
+                            assert!(used_bytes > 0, "Parser must consume some data");
+                            // Remove used data.
+                            let _ = unused.drain(..used_bytes);
 
-                //Continue watching.
-            }
-        } else {
-            Err(RuntimeError::ConnectionStatusNotOK { status })
-        }
-    }
-
-    /// Decodes T from unused data and processes it further.
-    /// Repeats decoding so long as there is sufficient data.
-    /// Removes used data.
-    /// StatusCode should be 200 OK.
-    fn process_unused(&mut self, unused: &mut Vec<u8>) -> Result<(), RuntimeError> {
-        // Parse then process recieved data.
-        loop {
-            match WatchPodForAllNamespacesResponse::try_from_parts(StatusCode::OK, &unused) {
-                Ok((data, used_bytes)) => {
-                    assert!(used_bytes > 0, "Parser must consume some data");
-                    // Remove used data.
-                    let _ = unused.drain(..used_bytes);
-
-                    // Process watch event
-                    let new_version = (self.updater)(data)?;
-                    // Store last resourceVersion
-                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
-                    self.version = new_version.or(self.version.take());
-
-                    // Continue parsing out data.
+                            decoded.push(Ok(response));
+                            // Continue decoding out data.
+                        }
+                        Err(ResponseError::NeedMoreData) => break,
+                        Err(error) => {
+                            decoded.push(Err(RuntimeError::ParseResponseError {
+                                name: "WatchPodForAllNamespacesResponse".to_owned(),
+                                error,
+                            }));
+                            break;
+                        }
+                    };
                 }
-                Err(ResponseError::NeedMoreData) => return Ok(()),
-                Err(error) => {
-                    return Err(RuntimeError::ParseResponseError {
-                        name: "WatchPodForAllNamespacesResponse".to_owned(),
-                        error,
-                    })
+
+                futures::stream::iter_result(decoded)
+            })
+            // Flatten decoded WatchPodForAllNamespacesResponse array
+            .flatten()
+            // Extracts event from response
+            .and_then(|response| match response {
+                WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
+                WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
+                    Err(RuntimeError::WrongObjectInResponse)
                 }
-            };
-        }
-    }
-
-    // Builds request to watch data.
-    fn build_request(&self) -> Result<Request<Body>, BuildError> {
-        // Prepare request
-        let field_selector = self
-            .config
-            .node_name
-            .as_ref()
-            .map(|node_name| format!("spec.nodeName={}", node_name));
-        let (mut request, _) = Pod::watch_pod_for_all_namespaces(WatchOptional {
-            resource_version: self.version.as_ref().map(|v| v.0.as_str()),
-            field_selector: field_selector.as_ref().map(|selector| selector.as_str()),
-            ..WatchOptional::default()
-        })
-        .context(K8SOpenapiError)?;
-
-        self.config.authorize(&mut request)?;
-        self.config.fill_uri(&mut request)?;
-
-        let (parts, body) = request.into_parts();
-        Ok(Request::from_parts(parts, body.into()))
+                WatchPodForAllNamespacesResponse::Other(Err(error)) => {
+                    Err(error).context(ResponseParseError)
+                }
+            })
+            // Extracts Pod metadata from event
+            .and_then(|event| match event {
+                WatchEvent::Added(data)
+                | WatchEvent::Modified(data)
+                | WatchEvent::Bookmark(data)
+                | WatchEvent::Deleted(data) => Ok(data),
+                WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
+                WatchEvent::ErrorOther(other) => {
+                    Err(RuntimeError::UnknownWatchEventError { other })
+                }
+            })
     }
 }
 
 /// Version of Kubernetes resource
 #[derive(Clone, Debug)]
-struct Version(String);
+pub struct Version(String);
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -261,7 +223,7 @@ pub enum BuildError {
 }
 
 #[derive(Debug, Snafu)]
-enum RuntimeError {
+pub enum RuntimeError {
     #[snafu(display("Received wrong object from Kubernetes API."))]
     WrongObjectInResponse,
     #[snafu(display("Failed parsing response: {}.", source))]
@@ -298,14 +260,16 @@ mod tests {
     #[test]
     fn buildable() {
         let rt = crate::runtime::Runtime::new().unwrap();
-        ClientConfig {
+        let _ = ClientConfig {
             resolver: Resolver::new(Vec::new(), rt.executor()).unwrap(),
             token: None,
             server: Uri::from_static("https://localhost:8001"),
             tls_settings: TlsSettings::from_options(&None).unwrap(),
             node_name: None,
         }
-        .build(|_| ())
+        .build()
+        .unwrap()
+        .watch_metadata(None, None)
         .unwrap();
     }
 }
@@ -323,6 +287,7 @@ mod kube_tests {
         test_util::{runtime, temp_file},
         transforms::kubernetes::kube_config,
     };
+    use futures::{future::Future, stream::Stream};
     use http::Uri;
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -415,7 +380,7 @@ mod kube_tests {
         let namespace = format!("watch-pod-{}", Uuid::new_v4());
         let kube = Kube::new(namespace.as_str());
 
-        let rt = runtime();
+        let mut rt = runtime();
 
         let (sender, receiver) = channel();
 
@@ -423,14 +388,18 @@ mod kube_tests {
         let mut client =
             ClientConfig::load_kube_config(Resolver::new(Vec::new(), rt.executor()).unwrap())
                 .expect("Kubernetes configuration file not present.")
-                .build(move |_| {
-                    let _ = sender.send(());
-                })
+                .build()
                 .unwrap();
 
-        rt.executor().spawn_std(async move {
-            client.run().await;
-        });
+        let stream = client.watch_metadata(None, None).unwrap();
+
+        rt.spawn(
+            stream
+                .map(move |_| sender.send(()))
+                .into_future()
+                .map(|_| ())
+                .map_err(|(error, _)| error!(?error)),
+        );
 
         // Start echo
         let _echo = echo(&kube, "echo", "210");
