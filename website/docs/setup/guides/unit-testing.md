@@ -203,15 +203,5 @@ The test passed! Now if we configure our CI system to execute our test we can
 ensure that uncle Cecil remains in Shoreditch after any future config change.
 What an insufferable hipster he is.
 
-import Alert from '@site/src/components/Alert';
-
-<Alert type="warning">
-
-When executing the tests within a config that contains `log_schema` settings
-they will be honored. However, when executing tests from multiple configuration
-files the `log_schema` from the _first_ file will be applied to _all_ files.
-
-</Alert>
-
 
 [docs.reference.tests]: /docs/reference/tests/
