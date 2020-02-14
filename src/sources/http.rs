@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
 use tokio_codec::Decoder;
+use warp::filters::body::FullBody;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -41,7 +42,7 @@ pub enum Encoding {
 impl HttpSource for SimpleHttpSource {
     fn build_event(
         &self,
-        body: impl Buf,
+        body: FullBody,
         header_map: HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
@@ -93,23 +94,13 @@ fn add_headers(
 
 fn body_to_lines(mut body: BytesMut) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
     let mut decoder = BytesDelimitedCodec::new(b'\n');
-    let mut reached_end = false;
     std::iter::from_fn(move || {
-        if reached_end {
-            //actually done
-            return None;
-        }
-        match decoder.decode(&mut body) {
+        match decoder.decode_eof(&mut body) {
             Err(e) => Some(Err(ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Bad request: {}", e),
             ))),
             Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) if body.len() > 0 => {
-                //if the body does not end with a newline, the decoder will not give it to us
-                reached_end = true; //do not use the decoder again, since we are messing with the body
-                Some(Ok(body.split_to(body.len()).into())) //return the rest of the body
-            }
             Ok(None) => None, //actually done
         }
     })
@@ -120,7 +111,7 @@ fn body_to_lines(mut body: BytesMut) -> impl Iterator<Item = Result<Bytes, Error
     })
 }
 
-fn decode_body(buf: impl Buf, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_body(buf: FullBody, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     let body = buf.collect::<BytesMut>();
 
     match enc {

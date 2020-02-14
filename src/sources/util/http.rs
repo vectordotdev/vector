@@ -1,5 +1,4 @@
 use crate::event::Event;
-use bytes::Buf;
 use futures::{sync::mpsc, Future, IntoFuture, Sink};
 use serde::Serialize;
 use std::error::Error;
@@ -7,7 +6,7 @@ use std::fmt::{self, Display};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use stream_cancel::Tripwire;
-use warp::filters::BoxedFilter;
+use warp::filters::{body::FullBody, BoxedFilter};
 use warp::http::{HeaderMap, StatusCode};
 use warp::{Filter, Rejection};
 
@@ -34,7 +33,7 @@ impl Display for ErrorMessage {
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_event(
         &self,
-        body: impl Buf,
+        body: FullBody,
         header_map: HeaderMap,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
