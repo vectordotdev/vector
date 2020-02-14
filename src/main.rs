@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 #[macro_use]
 extern crate tracing;
 
@@ -290,7 +292,7 @@ fn main() {
     }
 
     let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
-    let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
+    let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -301,6 +303,7 @@ fn main() {
 
     #[cfg(unix)]
     {
+        let mut topology = topology;
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
         let sigquit = Signal::new(SIGQUIT).flatten_stream();
