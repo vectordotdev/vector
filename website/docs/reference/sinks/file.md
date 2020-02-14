@@ -182,7 +182,7 @@ File name to write events to. See [Template Syntax](#template-syntax) for more i
 
 ## How It Works
 
-### Dynamic file and directory creation
+### Dynamic File And Directory Creation
 
 Vector will attempt to create the entire directory structure and the file when
 emitting events to the file sink. This requires that the Vector agent have

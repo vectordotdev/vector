@@ -1,5 +1,5 @@
 ---
-title: Data Model (Event)
+title: Data Model
 sidebar_label: hidden
 description: Vector's internal data model -- event and it's subtypes.
 ---
