@@ -259,7 +259,10 @@ mod integration_test {
         let (tx, rx) = mpsc::channel(1);
         rt.spawn(kafka_source(config, tx).unwrap());
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "my message".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "my message".into()
+        );
         assert_eq!(
             events[0].as_log()[&Atom::from("message_key")],
             "my key".into()

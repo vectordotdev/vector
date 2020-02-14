@@ -400,7 +400,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         &Encoding::Text => {
             let mut bytes = log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -442,7 +442,7 @@ mod tests {
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
-        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 
