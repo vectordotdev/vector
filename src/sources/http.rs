@@ -3,15 +3,14 @@ use crate::{
     sources::util::{ErrorMessage, HttpSource},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::Buf;
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
+use codec::{self, BytesDelimitedCodec};
 use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::{
-    io::{BufRead, BufReader, Read},
-    net::SocketAddr,
-};
+use std::net::SocketAddr;
+use tokio_codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -92,32 +91,51 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(body: impl Buf) -> impl Iterator<Item = String> {
-    BufReader::new(body.reader())
-        .lines()
-        .filter_map(|res| {
-            res.map_err(|error| error!(message = "Error reading request body", ?error))
-                .ok()
-        })
-        .filter(|s| !s.is_empty())
+fn body_to_lines(mut body: BytesMut) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
+    let mut decoder = BytesDelimitedCodec::new(b'\n');
+    let mut reached_end = false;
+    std::iter::from_fn(move || {
+        if reached_end {
+            //actually done
+            return None;
+        }
+        match decoder.decode(&mut body) {
+            Err(e) => Some(Err(ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Bad request: {}", e),
+            ))),
+            Ok(Some(b)) => Some(Ok(b)),
+            Ok(None) if body.len() > 0 => {
+                //if the body does not end with a newline, the decoder will not give it to us
+                reached_end = true; //do not use the decoder again, since we are messing with the body
+                Some(Ok(body.split_to(body.len()).into())) //return the rest of the body
+            }
+            Ok(None) => None, //actually done
+        }
+    })
+    .filter(|s| match s {
+        //filter empty lines
+        Ok(b) => !b.is_empty(),
+        _ => true,
+    })
 }
 
-fn decode_body(body: impl Buf, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_body(buf: impl Buf, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
+    let body = buf.collect::<BytesMut>();
+
     match enc {
-        Encoding::Text => Ok(body_to_lines(body).map(Event::from).collect()),
-        Encoding::Ndjson => Ok(body_to_lines(body)
+        Encoding::Text => body_to_lines(body)
+            .map(|r| Ok(Event::from(r?)))
+            .collect::<Result<_, _>>(),
+        Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
-                let parsed_json = serde_json::from_str(&j)
+                let parsed_json = serde_json::from_slice(&j?)
                     .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
                 json_parse_object(parsed_json)
             })
-            .collect::<Result<_, _>>()?),
+            .collect::<Result<_, _>>(),
         Encoding::Json => {
-            let mut buffer = String::new();
-            body.reader()
-                .read_to_string(&mut buffer)
-                .map_err(|e| json_error(format!("Error reading body: {:?}", e)))?;
-            let parsed_json = serde_json::from_str(&buffer)
+            let parsed_json = serde_json::from_slice(&body)
                 .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
             json_parse_array_of_object(parsed_json)
         }
@@ -232,6 +250,31 @@ mod tests {
     #[test]
     fn http_multiline_text() {
         let body = "test body\n\ntest body 2";
+
+        let mut rt = test_util::runtime();
+        let (rx, addr) = source(&mut rt, Encoding::default(), vec![]);
+
+        assert_eq!(200, send(addr, body));
+
+        let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[&event::MESSAGE], "test body".into());
+            assert!(log.get(&event::TIMESTAMP).is_some());
+        }
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[&event::MESSAGE], "test body 2".into());
+            assert!(log.get(&event::TIMESTAMP).is_some());
+        }
+    }
+
+    #[test]
+    fn http_multiline_text2() {
+        //same as above test but with a newline at the end
+        let body = "test body\n\ntest body 2\n";
 
         let mut rt = test_util::runtime();
         let (rx, addr) = source(&mut rt, Encoding::default(), vec![]);

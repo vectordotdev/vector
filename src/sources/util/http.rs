@@ -1,6 +1,6 @@
 use crate::event::Event;
 use bytes::Buf;
-use futures::{sync::mpsc, Future, Sink};
+use futures::{sync::mpsc, Future, IntoFuture, Sink};
 use serde::Serialize;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -62,42 +62,38 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 let trigger = trigger.clone();
                 info!("Handling http request: {:?}", headers);
 
-                futures::future::result(
-                    self.build_event(body, headers)
-                        .map_err(warp::reject::custom),
-                )
-                .and_then(|events| {
-                    out.send_all(futures::stream::iter_ok(events)).map_err(
-                        move |e: mpsc::SendError<Event>| {
-                            //can only fail if receiving end disconnected, so shut down and make some error logs
-                            error!("Failed to forward events, downstream is closed");
-                            error!("Tried to send the following event: {:?}", e);
-                            error!("Shutting down");
+                self.build_event(body, headers)
+                    .map_err(warp::reject::custom)
+                    .into_future()
+                    .and_then(|events| {
+                        out.send_all(futures::stream::iter_ok(events)).map_err(
+                            move |e: mpsc::SendError<Event>| {
+                                //can only fail if receiving end disconnected, so shut down and make some error logs
+                                error!("Failed to forward events, downstream is closed");
+                                error!("Tried to send the following event: {:?}", e);
+                                error!("Shutting down");
 
-                            trigger.try_lock().ok().take().map(drop); // shut down the http server if someone hasn't already
-                            warp::reject::custom("shutting down")
-                        },
-                    )
-                })
-                .map(|_| warp::reply())
+                                trigger.try_lock().ok().take().map(drop); // shut down the http server if someone hasn't already
+                                warp::reject::custom("shutting down")
+                            },
+                        )
+                    })
+                    .map(|_| warp::reply())
             });
 
         let ping = warp::get2().and(warp::path("ping")).map(|| "pong");
         let routes = svc.or(ping).recover(|r: Rejection| {
-            let err = {
-                if let Some(e_msg) = r.find_cause::<ErrorMessage>() {
-                    let json = warp::reply::json(e_msg);
-                    Ok(warp::reply::with_status(
-                        json,
-                        StatusCode::from_u16(e_msg.code)
-                            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
-                    ))
-                } else {
-                    //other internal error - will return 500 internal server error
-                    Err(r)
-                }
-            };
-            futures::future::result(err)
+            if let Some(e_msg) = r.find_cause::<ErrorMessage>() {
+                let json = warp::reply::json(e_msg);
+                Ok(warp::reply::with_status(
+                    json,
+                    StatusCode::from_u16(e_msg.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                ))
+            } else {
+                //other internal error - will return 500 internal server error
+                Err(r)
+            }
+            .into_future()
         });
 
         info!(message = "building http server", addr = %address);

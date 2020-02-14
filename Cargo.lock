@@ -4625,6 +4625,7 @@ dependencies = [
  "syslog_rfc5424",
  "tempfile",
  "tokio",
+ "tokio-codec",
  "tokio-retry",
  "tokio-signal",
  "tokio-threadpool",
