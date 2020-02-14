@@ -1,10 +1,11 @@
 #![cfg(feature = "kubernetes-integration-tests")]
 
 use dirs;
-use serde::{Deserialize, Serialize};
 use serde_yaml;
 use snafu::{ResultExt, Snafu};
 use std::{fs::File, path::PathBuf};
+
+pub use kube::config::Config;
 
 /// Enviorment variable that can containa path to kubernetes config file.
 const CONFIG_PATH: &str = "KUBECONFIG";
@@ -35,70 +36,4 @@ pub enum KubeConfigLoadError {
     FileError { source: std::io::Error },
     #[snafu(display("Error parsing Kubernetes config file: {}.", source))]
     ParsingError { source: serde_yaml::Error },
-}
-
-/// Config defines currently relevant data that can be found in
-/// kubernetes config file, the same one that kubectl uses.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub clusters: Vec<NamedCluster>,
-    pub users: Vec<NamedUserInfo>,
-    pub contexts: Vec<NamedContext>,
-    #[serde(rename = "current-context")]
-    pub current_context: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedCluster {
-    pub name: String,
-    pub cluster: Cluster,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Cluster {
-    pub server: String,
-    #[serde(rename = "insecure-skip-tls-verify")]
-    pub insecure_skip_tls_verify: Option<bool>,
-    #[serde(rename = "certificate-authority")]
-    pub certificate_authority: Option<String>,
-    #[serde(rename = "certificate-authority-data")]
-    pub certificate_authority_data: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedUserInfo {
-    pub name: String,
-    pub user: UserInfo,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct UserInfo {
-    pub username: Option<String>,
-    pub password: Option<String>,
-
-    pub token: Option<String>,
-    #[serde(rename = "tokenFile")]
-    pub token_file: Option<String>,
-
-    #[serde(rename = "client-certificate")]
-    pub client_certificate: Option<String>,
-    #[serde(rename = "client-certificate-data")]
-    pub client_certificate_data: Option<String>,
-
-    #[serde(rename = "client-key")]
-    pub client_key: Option<String>,
-    #[serde(rename = "client-key-data")]
-    pub client_key_data: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedContext {
-    pub name: String,
-    pub context: Context,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Context {
-    pub cluster: String,
-    pub user: String,
 }

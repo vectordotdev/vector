@@ -377,10 +377,10 @@ mod kube_tests {
                 .context;
             // Get current user
             let user = &config
-                .users
+                .auth_infos
                 .iter()
                 .find(|user| user.name == context.user)?
-                .user;
+                .auth_info;
             // Get current cluster
             let cluster = &config
                 .clusters
