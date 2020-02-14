@@ -72,15 +72,15 @@ pub struct GcsSinkConfig {
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
     BucketOwnerRead,
-    #[derivative(Default)]
     Private,
-    PublicRead,
+    #[derivative(Default)]
     ProjectPrivate,
+    PublicRead,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
