@@ -1,33 +1,40 @@
-use crate::{
-    dns::Resolver,
-    sinks::util::{http::https_client, tls::TlsSettings},
-};
+use crate::dns::Resolver;
 use futures::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body};
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use k8s_openapi::{
     api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
     apimachinery::pkg::apis::meta::v1::WatchEvent,
     RequestError, Response, ResponseError, WatchOptional,
 };
+use openssl::ssl::{SslConnector, SslConnectorBuilder, SslMethod};
 use snafu::{ResultExt, Snafu};
 
 /// Config which could be loaded from kubeconfig or local kubernetes cluster.
 /// Used to build WatchClient which is in turn used to build Stream of metadata.
-#[derive(Clone, Debug)]
 pub struct ClientConfig {
     resolver: Resolver,
     token: Option<String>,
     server: Uri,
-    tls_settings: TlsSettings,
+    ssl: Option<SslConnectorBuilder>,
     node_name: Option<String>,
 }
 
 impl ClientConfig {
-    pub fn build(self) -> Result<WatchClient, BuildError> {
-        let client =
-            https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
+    pub fn build(mut self) -> Result<WatchClient, BuildError> {
+        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
+        http.enforce_http(false);
+
+        let ssl = if let Some(ssl) = self.ssl.take() {
+            ssl
+        } else {
+            SslConnector::builder(SslMethod::tls()).context(OpenSslError)?
+        };
+
+        let https = HttpsConnector::with_connector(http, ssl).context(OpenSslError)?;
+
+        let client = hyper::Client::builder().build(https);
 
         let client = WatchClient {
             client,
@@ -124,6 +131,7 @@ impl WatchClient {
         &self,
         request: Request<Body>,
     ) -> impl Stream<Item = Pod, Error = RuntimeError> {
+        // Unused bytes from Server responses.
         let mut unused = Vec::new();
         self.client
             .request(request)
@@ -142,6 +150,7 @@ impl WatchClient {
                 }
             })
             .flatten_stream()
+            // Process Server responses/data.
             .map(move |chunk| {
                 // We need to process unused data as soon as we get
                 // them. Because a watch on Kubernetes object behaves
@@ -150,7 +159,7 @@ impl WatchClient {
                 // Append new data to unused.
                 unused.extend_from_slice(chunk.as_ref());
 
-                // Decodes response from unused data.
+                // Decodes watch response from unused data.
                 // Repeats decoding so long as there is sufficient data.
                 // Removes used data.
                 // StatusCode must be 200 OK.
@@ -177,9 +186,9 @@ impl WatchClient {
                     };
                 }
 
+                // Returns all currently decodable watch responses.
                 futures::stream::iter_result(decoded)
             })
-            // Flatten decoded WatchPodForAllNamespacesResponse array
             .flatten()
             // Extracts event from response
             .and_then(|response| match response {
@@ -211,8 +220,8 @@ pub struct Version(String);
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
-    #[snafu(display("Http client construction errored {}.", source))]
-    HttpError { source: crate::Error },
+    #[snafu(display("Error constructing Tls: {}.", source))]
+    OpenSslError { source: openssl::error::ErrorStack },
     #[snafu(display("Failed constructing request: {}.", source))]
     K8SOpenapiError { source: RequestError },
     #[snafu(display("Uri is invalid: {}.", source))]
@@ -255,7 +264,7 @@ pub enum RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::ClientConfig;
-    use crate::{dns::Resolver, sinks::util::tls::TlsSettings};
+    use crate::dns::Resolver;
     use http::Uri;
 
     #[test]
@@ -265,7 +274,7 @@ mod tests {
             resolver: Resolver::new(Vec::new(), rt.executor()).unwrap(),
             token: None,
             server: Uri::from_static("https://localhost:8001"),
-            tls_settings: TlsSettings::from_options(&None).unwrap(),
+            ssl: None,
             node_name: None,
         }
         .build()
@@ -282,8 +291,6 @@ mod kube_tests {
     use super::ClientConfig;
     use crate::{
         dns::Resolver,
-        sinks::util::tls::TlsOptions,
-        sinks::util::tls::TlsSettings,
         sources::kubernetes::test::{echo, Kube},
         test_util::{runtime, temp_file},
     };
@@ -291,6 +298,10 @@ mod kube_tests {
     use futures::{future::Future, stream::Stream};
     use http::Uri;
     use kube::config::Config;
+    use openssl::{
+        ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
+        x509::X509,
+    };
     use serde_yaml;
     use snafu::{ResultExt, Snafu};
     use std::fs::OpenOptions;
@@ -372,26 +383,36 @@ mod kube_tests {
             assert!(user.token_file.is_none(), "Not yet supported");
             assert!(user.client_key_data.is_none(), "Not yet supported");
 
-            let certificate_authority_path = cluster
-                .certificate_authority
-                .clone()
-                .map(PathBuf::from)
-                .or_else(|| {
-                    cluster.certificate_authority_data.as_ref().map(|data| {
-                        store_to_file(data.as_bytes())
-                            .expect("Failed to store certificate authority public key.")
-                    })
-                });
+            // Configure TLS
+            let mut ssl = SslConnector::builder(SslMethod::tls()).unwrap();
 
-            let client_certificate_path = user
-                .client_certificate
-                .clone()
-                .map(PathBuf::from)
-                .or_else(|| {
-                    user.client_certificate_data.as_ref().map(|data| {
-                        store_to_file(data.as_bytes()).expect("Failed to store clients public key.")
-                    })
-                });
+            match cluster.insecure_skip_tls_verify {
+                None => (),
+                Some(true) => ssl.set_verify(SslVerifyMode::NONE),
+                Some(false) => ssl.set_verify(SslVerifyMode::PEER),
+            }
+
+            if let Some(path) = cluster.certificate_authority.clone().map(PathBuf::from) {
+                let _ = ssl.set_ca_file(path).unwrap();
+            }
+
+            if let Some(data) = cluster.certificate_authority_data.as_ref() {
+                let _ = ssl
+                    .add_client_ca(&X509::from_pem(data.as_bytes()).unwrap())
+                    .unwrap();
+            }
+
+            if let Some(data) = user.client_certificate_data.as_ref() {
+                let _ = ssl
+                    .set_certificate(&X509::from_pem(data.as_bytes()).unwrap())
+                    .unwrap();
+            } else if let Some(path) = user.client_certificate.clone().map(PathBuf::from) {
+                let _ = ssl.set_certificate_file(path, SslFiletype::PEM).unwrap();
+            }
+
+            if let Some(path) = user.client_key.as_ref() {
+                let _ = ssl.set_private_key_file(path, SslFiletype::PEM).unwrap();
+            }
 
             // Construction
             Some(ClientConfig {
@@ -399,14 +420,7 @@ mod kube_tests {
                 node_name: None,
                 token: user.token.clone(),
                 server: Uri::from_str(&cluster.server).unwrap(),
-                tls_settings: TlsSettings::from_options(&Some(TlsOptions {
-                    verify_certificate: cluster.insecure_skip_tls_verify,
-                    ca_path: certificate_authority_path,
-                    crt_path: client_certificate_path,
-                    key_path: user.client_key.clone().map(PathBuf::from),
-                    ..TlsOptions::default()
-                }))
-                .unwrap(),
+                ssl: Some(ssl),
             })
         }
     }
