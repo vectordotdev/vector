@@ -97,7 +97,7 @@ import Field from '@site/src/components/Field';
 
 ### host_key
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host. This can also be globally set via the [global [`host_key`](#host_key) option][docs.reference.global-options#host-key]. See [Context](#context) for more info.
 
 
 </Field>
@@ -248,3 +248,4 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.global-options#host-key]: /docs/reference/global-options/#host-key
